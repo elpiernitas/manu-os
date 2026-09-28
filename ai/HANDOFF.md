@@ -193,7 +193,7 @@ Comprobación complementaria, esta sí sin ambigüedad: la frase literal que cau
 
 - Releído cada documento señalado por el revisor y confirmado que la opción "runner de pago" para instalación física no aparece ya como recomendación en ningún documento activo (los bloques de `ai/HANDOFF.md` marcados como superados se conservan sin editar, con una nota que remite a esta sección).
 - Comprobación de enlaces relativos Markdown repetida tras esta corrección: **0 enlaces rotos**.
-- Comando de regresión de arriba ejecutado sobre el estado final: 6 coincidencias, las seis revisadas manualmente y confirmadas como correctas (simulador o negación explícita), no como repetición del defecto.
+- Comando de regresión de arriba ejecutado sobre el estado final: todas las coincidencias revisadas manualmente y confirmadas como correctas (simulador o negación explícita), no como repetición del defecto.
 
 ### NO VERIFICADO (de esta corrección)
 
@@ -203,6 +203,41 @@ Comprobación complementaria, esta sí sin ambigüedad: la frase literal que cau
 
 No hay ninguna decisión pendiente de Manu ahora. D-04B es un gate futuro que solo se activará cuando BRAIN-02b–02d estén verificadas en simulador y el equipo intente de verdad la fase de dispositivo real; en ese momento las opciones son (a) que Manu disponga de un Mac compatible conectado al iPhone, (b) TestFlight vía D-03 con su propio gate de credenciales, o (c) posponer/reducir el alcance nativo de la Beta 1 — ninguna resoluble comprando más CI.
 
+> **Corregido más abajo.** Este párrafo describía D-03 (dentro de la opción (b)) como si solo se activara por el fallo de App Groups en otras partes del documento, lo que contradecía que TestFlight (esta misma opción (b)) exige D-03 por sí sola. Se conserva sin editar por trazabilidad; ver "BRAIN-02-PREP — tercera corrección tras revisión externa" para el estado correcto.
+
+## BRAIN-02-PREP — tercera corrección tras revisión externa (mismo PR #5, commit posterior a `2530652`)
+
+Tercer comentario de revisión de @elpiernitas en `253065243e243c410628498b33ca9faf03317a09`: la separación runner/dispositivo físico quedó bien aplicada y Foundation check `36459911067` en verde, pero la nueva ruta TestFlight dejó D-03 internamente contradictoria.
+
+### Defecto confirmado
+
+`docs/roadmap/BRAIN_02_TASK.md` decía en la sección D-04B que TestFlight es una ruta real hacia la fase de dispositivo, gateada por D-03 "sin ambigüedad". Pero la sección D-03 del mismo documento (y `ai/DECISIONS.md`, `ai/PROJECT_STATE.md`, `DECISIONS_AND_OPEN_ITEMS.md` en dos sitios, `BACKLOG.md` y `ROADMAP.md`) decían que D-03 "solo entra en juego" o "solo se pedirá" si firmar con la cuenta gratuita demuestra que App Groups falla. Esas dos afirmaciones no pueden ser ciertas a la vez: se puede elegir TestFlight sin haber intentado nunca Personal Team/App Groups, y esa elección por sí sola exige Apple Developer Program.
+
+### Corrección aplicada
+
+D-03 queda modelada con **dos disparadores independientes**, ninguno excluyente del otro y ninguno activo ahora mismo:
+
+1. Firmar en el iPhone físico con la cuenta gratuita (Ruta 1 de D-04B) demuestra de forma reproducible que App Groups falla.
+2. Se elige TestFlight (Ruta 2 de D-04B) como vía de distribución/prueba física, se haya intentado o no la Ruta 1 — TestFlight exige el programa de pago por sí solo.
+
+Actualizados con esta misma redacción: `docs/roadmap/BRAIN_02_TASK.md` (sección D-03, con nota de corrección explícita), `docs/adr/0011-native-local-storage-and-keys.md`, `docs/architecture/DECISIONS_AND_OPEN_ITEMS.md` (fila D-03 y "Intervención de Manu necesaria"), `docs/roadmap/BACKLOG.md` (dos sitios), `docs/roadmap/ROADMAP.md`, `ai/PROJECT_STATE.md` (dos sitios) y `ai/DECISIONS.md`. Se mantiene explícito en cada uno que ningún disparador está activo hoy (no se ha intentado nada en el dispositivo, nadie ha elegido TestFlight todavía) y que BRAIN-02a–02d siguen desbloqueadas en CI/simulador sin relación con esto.
+
+`ai/QA_LESSONS.md`: añadida QAL-008 (un disparador condicional en un documento puede contradecir una ruta ya listada en otro) con un comando de comprobación (`grep -rn "solo si.*falla" docs ai`, cada coincidencia a releer junto con el resto del documento).
+
+### Verificación de la corrección
+
+- Búsqueda repetida tras la corrección de `"solo si.*falla"` y `"solo si.*App Groups"` en `docs/` y `ai/` (excluyendo los bloques de `ai/HANDOFF.md` ya marcados como historia superada): la única coincidencia activa que queda es la fila D-03 de `DECISIONS_AND_OPEN_ITEMS.md`, donde "solo si" ya califica correctamente "uno de dos disparadores independientes", no una condición exclusiva. `ai/QA_LESSONS.md` también coincide, pero por citar la propia frase corregida como ejemplo de la lección (QAL-008), no por repetir el defecto.
+- Comprobación de enlaces relativos Markdown repetida: **0 enlaces rotos**.
+- No se ha creado ni ejecutado código de producto en esta corrección; sigue siendo un cambio exclusivamente documental.
+
+### NO VERIFICADO (de esta corrección)
+
+- No cambia respecto a las correcciones anteriores.
+
+### Bloqueo humano concreto (estado vigente, sin cambios de fondo)
+
+Sigue sin haber ninguna decisión pendiente de Manu ahora. D-04B y D-03 son gates futuros: D-04B se activa al intentar de verdad la fase de dispositivo real; D-03 se activa por cualquiera de los dos disparadores anteriores, ninguno ocurrido todavía.
+
 ## NO VERIFICADO
 
 - Integración con almacenamiento, cifrado, sync, UI o extensiones.
@@ -211,4 +246,4 @@ No hay ninguna decisión pendiente de Manu ahora. D-04B es un gate futuro que so
 
 ## Próximo paso
 
-BRAIN-02-PREP quedó ejecutada por Claude Code conforme a `docs/roadmap/BRAIN_02_TASK.md`, con dos rondas de corrección tras revisión externa (ver "BRAIN-02-PREP — segunda corrección tras revisión externa" arriba, que es el estado vigente). El orquestador revisa el PR #5 y decide el merge; si lo aprueba, debe abrir inmediatamente el siguiente trabajo autorizado (candidato natural: cualquiera de BRAIN-02a–02d, ninguna con bloqueos técnicos pendientes en CI/simulador, solo falta autorización explícita de código de producto). No hay ningún bloqueo humano que señalar ahora: D-04B queda como gate futuro documentado, no como pregunta activa.
+BRAIN-02-PREP quedó ejecutada por Claude Code conforme a `docs/roadmap/BRAIN_02_TASK.md`, con tres rondas de corrección tras revisión externa (ver "BRAIN-02-PREP — tercera corrección tras revisión externa" arriba, que es el estado vigente). El orquestador revisa el PR #5 y decide el merge; si lo aprueba, debe abrir inmediatamente el siguiente trabajo autorizado (candidato natural: cualquiera de BRAIN-02a–02d, ninguna con bloqueos técnicos pendientes en CI/simulador, solo falta autorización explícita de código de producto). No hay ningún bloqueo humano que señalar ahora: D-04B y D-03 quedan como gates futuros documentados con sus disparadores, no como preguntas activas.
