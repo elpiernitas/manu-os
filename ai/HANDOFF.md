@@ -2,13 +2,75 @@
 
 ## Próximo paso vigente
 
-1. El orquestador revisa el PR #15 (WEB-06). Es la única implementación activa. WEB-05 ya está fusionada (PR #13). Al fusionarse un PR, `web.yml` publica la web en GitHub Pages desde `main`.
+1. WEB-07/08 en un solo PR. Claude Code lo fusiona con CI en verde (nueva gobernanza decidida por Manu el 2026-09-29) y `web.yml` publica la web en GitHub Pages. La revisión de ChatGPT es posterior y bajo petición.
 2. Manu, en su dispositivo y fuera del repositorio, crea el ID de cliente OAuth de Google (Calendar, Tasks, People y Drive, cada uno activable por separado) y, si quiere, la clave gratuita de Gemini.
 3. La línea nativa (PR #7, #8 y #9) sigue en pausa. D-04B y D-03 son gates futuros.
 
 ## Estado
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
+
+## WEB-08 — reglas de categorías de ChatGPT, «Conectar Google» en un paso y sección de Atajos
+
+### Contexto
+
+Prueba real de Manu en su iPhone con la versión 5: Calendar funciona («0 hoy · 1 mañana»); Tasks y Contactos fallan con «Se cerró la ventana de Google» (QAL-015). ChatGPT generó un Excel con 152 reglas de categorías a partir del extracto de Sabadell de Manu. Ni el Excel ni sus reglas están en el repositorio: la app las importa en el dispositivo.
+
+### Archivos cambiados
+
+- `web/core/money.js`: taxonomía ampliada (Ocio nocturno, Tabaco, Viajes, Servicios, Finanzas, Administración, Donaciones), subcategoría, `ruleFor`, `categoryId` (nombres en español a IDs), `rulesFromRows` (hoja «Reglas MANU OS»), `applyRules` (reclasifica solo propuestas y marca «revisar» cuando «¿Preguntar?» es «Sí»). Las correcciones de Manu siempre ganan.
+- `web/app.js`:
+  - Dinero: «Importar reglas (Excel de ChatGPT)», filtro «Por revisar», subcategoría visible.
+  - Google: ID de cliente por defecto; «Conectar Google» (Calendar, Tasks y Contactos con un gesto); `googleConsent` pide juntos los scopes activados en una ventana; `cachedToken` para no abrir ventanas durante la sincronización; GIS precargado.
+  - Tú → **Atajos** con pendientes y creados, «Probar» y «Ya lo tengo».
+  - Versión 8.
+- `web/sw.js` (`manuos-v8`), `web/styles.css`, `web/tests/rules.test.js` y el fixture **inventado** `web/tests/fixtures-reglas-ejemplo.xlsx`.
+- ADR-0013 (enmienda) y QAL-015.
+
+### Comandos ejecutados y resultados reales
+
+- `cd web && npm test`: 58/58 PASS.
+- En local, sin subir nada, con el extracto real y las reglas reales de Manu (solo recuentos): 143 reglas importadas; de 368 gastos, **5 quedan en «Otros»** y 124 se marcan «revisar».
+- Chromium headless: 8/8 PASS.
+  - ID prellenado; todo desconectado al empezar.
+  - **Una sola** ventana de consentimiento con los tres scopes activados, sin Drive.
+  - Calendar y Tasks correctos aunque se deniegue Contactos (sin llamar a People).
+  - Reglas importadas y aplicadas (subcategoría y «revisar»); el filtro «Por revisar» funciona.
+  - Atajos: 4 pendientes; marcar uno lo mueve a «Creados».
+- Regresiones de WEB-03, WEB-05, WEB-06 y WEB-07: PASS. Se actualizó una expectativa de WEB-03: con el ID por defecto, un ID inválido no se guarda, pero los servicios se muestran.
+
+### NO_VERIFICADO
+
+- Consentimiento conjunto en el iPhone real.
+- Instalar atajos automáticamente: Apple no lo permite desde una web, así que se crean a mano y la app lleva la lista.
+
+## WEB-07 — accesos por modo, Spotify en el altavoz «baño», WhatsApp y otros asistentes (ADR-0014)
+
+### Archivos cambiados
+
+- `web/core/spotify.js` (nuevo): PKCE S256 (verificado con el vector de la RFC 7636, apéndice B, y con Python), URL de autorización, intercambio y refresco de tokens sin secreto, `findSpeaker` sin distinguir mayúsculas ni tildes, `transferTo` con `play: false`, errores 401/403/404 explicados.
+- `web/core/hub.js` (nuevo): accesos por modo (las mañanas de Oviedo, primero la ruta y ALSA; en modo Trabajo no hay música), `wa.me` con número español normalizado, «preguntar en ChatGPT/Claude».
+- `web/app.js`: tarjeta «Accesos» en Hoy con «Música en el baño»; Tú → Spotify (Client ID, altavoz, conectar y desconectar, guía); vuelta del redirect PKCE con validación de `state` y caducidad de 15 minutos; teléfono opcional en Personas y «Felicitar por WhatsApp» el día del cumpleaños; «Preguntar en ChatGPT/Claude» en la propuesta de IA. Versión 7.
+- `web/index.html` (CSP con `accounts.spotify.com` y `api.spotify.com`), `web/sw.js` (`manuos-v7`), `web/styles.css`, `web/tests/spotify-hub.test.js` (nuevo).
+- `docs/adr/0014-spotify-and-app-hub.md`, `docs/adr/README.md`, `docs/security/THREAT_MODEL.md`.
+
+### Comandos ejecutados y resultados reales
+
+- `cd web && npm test`: 55/55 PASS.
+- Preflight CORS hacia `accounts.spotify.com/api/token` y `api.spotify.com/v1/me/player*` con `Origin: https://elpiernitas.github.io`: permitido.
+- Chromium headless con Spotify simulado: 6/6 PASS.
+  - tarjeta de accesos visible;
+  - ida y vuelta PKCE (`code_verifier` enviado, sin `client_secret`) y URL limpia al volver;
+  - los tokens no están en el vault;
+  - transferencia `PUT` a «Baño» con `play: false` y el token correcto.
+- Las regresiones de WEB-03, WEB-05 y WEB-06 siguen en PASS.
+
+### NO_VERIFICADO
+
+- Cuenta real de Spotify (requisito de Premium y visibilidad del altavoz en Connect).
+- El redirect dentro de la web instalada en iOS.
+- La apertura de apps nativas desde enlaces universales.
+- El prellenado `?q=` de ChatGPT y Claude.
 
 ## WEB-06 — importar el Excel de Sabadell y aprender categorías por comercio
 

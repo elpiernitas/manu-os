@@ -65,3 +65,7 @@ Si la rama siguiente parte del commit previo a la fusión squash, el PR nuevo qu
 
 Si una sincronización deduce «ya no existe» o «se cerró» porque un elemento no aparece en la respuesta remota, antes tiene que haber leído la colección completa: paginar hasta agotar el token, protegerse de tokens repetidos y de un límite de páginas, y tratar cualquier listado incompleto como «no sé» (no cerrar ni borrar nada). Prueba: `web/tests/ai-google.test.js` («round 3: tasks on page 2 are never closed»).
 
+### QAL-015 — En iOS, una ventana emergente por gesto
+
+Safari de iOS solo permite abrir una ventana emergente, como el consentimiento OAuth, dentro del gesto del usuario. Encadenar varias peticiones de permiso tras `await` de red hace que la segunda y las siguientes fallen con «ventana cerrada». Hay que pedir en una sola ventana todo lo que ese gesto necesita, precargar el script del proveedor antes del toque y no abrir ventanas desde procesos en segundo plano. Evidencia: captura del iPhone de Manu (2026-09-29, Tasks y Contactos con «Se cerró la ventana de Google»). Prueba: el recorrido de navegador de WEB-08, «ONE consent window».
+

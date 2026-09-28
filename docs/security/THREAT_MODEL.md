@@ -165,4 +165,6 @@ Exportar todo no significa exportar credenciales. OAuth tokens, claves privadas,
 | robo de la clave de Gemini | uso de la cuota de Manu | clave fuera del vault; `sessionStorage` por defecto; `localStorage` solo si Manu lo activa (riesgo aceptado); CSP restrictiva | DECIDIDO |
 | permisos de Google excesivos | acceso innecesario a datos | un scope por función, integraciones desconectadas por defecto, `drive.appdata` en lugar de `drive`, `contacts.readonly` | VERIFICADO (petición de scope) |
 | pérdida del `localStorage` en iOS | pérdida de datos | exportación manual y copia cifrada en Drive con restauración probada en perfil limpio | PARCIAL: no probado en iOS |
+| robo de los tokens de Spotify | control de la reproducción de Manu | PKCE sin secreto, scopes solo de reproducción, tokens fuera del vault, CSP restrictiva, «Desconectar» los borra | DECIDIDO |
+| teléfonos de terceros | exposición de datos de contacto | opcionales, solo en el dispositivo y en su copia cifrada; nunca en el repositorio; bloqueados para Gemini | DECIDIDO |
 

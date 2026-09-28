@@ -12,6 +12,13 @@ export const CATEGORIES = {
   SHOPPING: "Compras",
   TRANSFERS: "Bizum y transferencias",
   CASH: "Efectivo",
+  NIGHTLIFE: "Ocio nocturno",
+  TOBACCO: "Tabaco",
+  TRAVEL: "Viajes",
+  SERVICES: "Servicios",
+  FINANCE: "Finanzas",
+  ADMIN: "Administración",
+  DONATIONS: "Donaciones",
   OTHER: "Otros",
 };
 
@@ -45,12 +52,22 @@ export function merchantKey(merchant) {
   return t.replace(PREFIXES, "").trim().split(" ").slice(0, 4).join(" ") || null;
 }
 
+// A learned rule is either a category id (Manu's correction) or
+// { category, sub, ask } (imported rules). Unknown categories are ignored.
+export function ruleFor(merchant, learned = {}) {
+  const key = merchantKey(merchant);
+  const r = key ? learned[key] : null;
+  if (!r) return null;
+  const rule = typeof r === "string" ? { category: r } : r;
+  return rule.category in CATEGORIES ? rule : null;
+}
+
 // Manu's own corrections win over the built-in rules. They are his decisions,
 // never inferred facts (AGENTS.md).
 export function categorise(merchant, learned = {}) {
   if (!merchant) return "OTHER";
-  const key = merchantKey(merchant);
-  if (key && learned[key] && learned[key] in CATEGORIES) return learned[key];
+  const rule = ruleFor(merchant, learned);
+  if (rule) return rule.category;
   const text = normalise(merchant).replace(/[^a-z0-9ñ]+/g, " ");
   for (const [category, re] of RULE_PATTERNS) if (re.test(text)) return category;
   return "OTHER";
@@ -72,9 +89,57 @@ export function euros(cents) {
 }
 
 export function newEntry({ id, cents, merchant, at }, learned = {}) {
-  const key = merchantKey(merchant);
-  const fromManu = Boolean(key && learned[key]);
-  return { id, cents, merchant: merchant ?? null, at, category: categorise(merchant, learned), inferred: !fromManu };
+  const rule = ruleFor(merchant, learned);
+  const entry = { id, cents, merchant: merchant ?? null, at, category: categorise(merchant, learned), inferred: !rule || Boolean(rule.ask) };
+  if (rule?.sub) entry.sub = rule.sub;
+  if (rule?.ask) entry.review = true;
+  return entry;
+}
+
+// Spanish category names (e.g. from the enriched Excel) -> ids.
+const NAME_TO_ID = {
+  "restauracion": "FOOD_AND_DRINK", "comer y beber": "FOOD_AND_DRINK",
+  "alimentacion": "GROCERIES", "supermercado": "GROCERIES",
+  "transporte": "TRANSPORT", "suscripciones": "SUBSCRIPTIONS", "digital": "SUBSCRIPTIONS",
+  "ocio": "LEISURE", "ocio y cultura": "LEISURE", "casa": "HOME", "hogar": "HOME", "salud": "HEALTH",
+  "compras": "SHOPPING", "transferencias": "TRANSFERS", "bizum y transferencias": "TRANSFERS", "efectivo": "CASH",
+  "ocio nocturno": "NIGHTLIFE", "tabaco": "TOBACCO", "viajes": "TRAVEL", "servicios": "SERVICES",
+  "finanzas": "FINANCE", "administracion": "ADMIN", "donaciones": "DONATIONS", "otros": "OTHER",
+};
+export const categoryId = (name) => NAME_TO_ID[normalise(name ?? "")] ?? null;
+
+// Rows of the "Reglas MANU OS" sheet: header row with "Patrón / comercio",
+// "Categoría", "Subcategoría", "¿Preguntar?". Returns { rules, skipped } or { error }.
+export function rulesFromRows(rows) {
+  const norm = (c) => normalise(String(c ?? ""));
+  const h = (rows ?? []).findIndex((r) => (r ?? []).some((c) => norm(c).startsWith("patron")) && (r ?? []).some((c) => norm(c) === "categoria"));
+  if (h < 0) return { error: "No encuentro la hoja de reglas (columnas «Patrón / comercio» y «Categoría»)." };
+  const header = rows[h].map(norm);
+  const col = (pred) => header.findIndex(pred);
+  const cPat = col((c) => c.startsWith("patron")), cCat = col((c) => c === "categoria"), cSub = col((c) => c.startsWith("subcategoria")), cAsk = col((c) => c.includes("preguntar"));
+  const rules = {};
+  let skipped = 0;
+  for (const r of rows.slice(h + 1)) {
+    const key = merchantKey(r?.[cPat]);
+    const category = categoryId(r?.[cCat]);
+    if (!key || !category) { if (r?.some((c) => c !== null && c !== "")) skipped++; continue; }
+    rules[key] = { category, ...(cSub >= 0 && r[cSub] ? { sub: String(r[cSub]).slice(0, 60) } : {}), ...(cAsk >= 0 && norm(r[cAsk]).startsWith("s") ? { ask: true } : {}) };
+  }
+  return { rules, skipped };
+}
+
+// Re-applies rules to entries that are still proposals; confirmed ones are kept.
+export function applyRules(entries, learned) {
+  let changed = 0;
+  const next = entries.map((e) => {
+    if (!e.inferred) return e;
+    const rule = ruleFor(e.merchant, learned);
+    if (!rule) return e;
+    changed++;
+    const { sub, review, ...rest } = e;
+    return { ...rest, category: rule.category, inferred: Boolean(rule.ask), ...(rule.sub ? { sub: rule.sub } : {}), ...(rule.ask ? { review: true } : {}) };
+  });
+  return { entries: next, changed };
 }
 
 // Manu corrects one entry: remember the rule and apply it to every entry of
@@ -87,8 +152,8 @@ export function learnCategory(entries, learned, entryId, category) {
   const nextLearned = key ? { ...learned, [key]: category } : learned;
   let applied = 0;
   const next = entries.map((e) => {
-    if (e.id === entryId) return { ...e, category, inferred: false };
-    if (key && e.inferred && merchantKey(e.merchant) === key) { applied++; return { ...e, category, inferred: false }; }
+    if (e.id === entryId) { const { review, ...rest } = e; return { ...rest, category, inferred: false }; }
+    if (key && e.inferred && merchantKey(e.merchant) === key) { applied++; const { review, ...rest } = e; return { ...rest, category, inferred: false }; }
     return e;
   });
   return { entries: next, learned: nextLearned, applied };
