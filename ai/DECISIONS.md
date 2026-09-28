@@ -44,7 +44,7 @@
 
 ## Pendientes
 
-- D-03: Apple Developer Program. Solo se pedirá a Manu si firmar en el iPhone físico con la cuenta gratuita demuestra que App Groups falla.
+- D-03: Apple Developer Program. Se pedirá a Manu si se activa uno de dos disparadores independientes: firmar en el iPhone físico con la cuenta gratuita demuestra que App Groups falla, o se elige TestFlight como ruta de distribución/prueba física (la exige por sí sola, sin relación con si App Groups falla o no). Ninguno activo ahora.
 - D-04B: firma e instalación de un proyecto Xcode real en el iPhone físico (no su compilación/prueba en simulador, ya desbloqueada por D-04); gate futuro, no decisión pendiente ahora. Ningún runner de CI, gratuito o de pago, tiene acceso físico al iPhone; las rutas reales son un Mac de Manu compatible conectado al dispositivo, o TestFlight vía D-03 (con su propio gate de credenciales de firma), o reducir el alcance. El Mac de Manu no cumple hoy los requisitos oficiales de ningún Xcode actual.
 - D-05: fuente de calendario.
 - D-06: servicio meteorológico.

@@ -55,7 +55,7 @@ Comunicadas directamente por Manu. Detalle en `docs/product/EXPERIENCE.md`.
 
 | ID | Decisión | Opciones | Quién decide | Bloquea |
 | --- | --- | --- | --- | --- |
-| **D-03** | Asumir o no Apple Developer Program | cuenta gratuita (perfiles de 7 días, 10 App IDs, sin TestFlight ni WeatherKit; registrar App Groups contra un equipo real con esta cuenta es `NO_VERIFICADO`) o programa de pago | Manu, y solo si intentar firmar en el iPhone físico con la cuenta gratuita demuestra que falla | fase de dispositivo real de BRAIN-02 (no su verificación en simulador), parte de BRAIN-03, D-06, D-07 |
+| **D-03** | Asumir o no Apple Developer Program | cuenta gratuita (perfiles de 7 días, 10 App IDs, sin TestFlight ni WeatherKit; registrar App Groups contra un equipo real con esta cuenta es `NO_VERIFICADO`) o programa de pago | Manu, solo si se activa uno de dos disparadores independientes: (1) firmar en el iPhone físico con la cuenta gratuita demuestra que App Groups falla, o (2) se elige TestFlight como ruta de distribución/prueba física (la exige por sí sola, se haya intentado o no (1)) — ninguno activo ahora | fase de dispositivo real de BRAIN-02 (no su verificación en simulador), parte de BRAIN-03, D-06, D-07 |
 | **D-04B** | Firma e instalación de la app integrada en el iPhone físico con iOS 27 (no su compilación/prueba en simulador, ya desbloqueada por D-04) | disponer de un Mac de Manu compatible con Xcode actual, conectado directamente al iPhone (única ruta con Xcode en el dispositivo; ningún runner de CI, gratuito o de pago, tiene acceso físico al iPhone); TestFlight vía D-03, que evita el Mac conectado pero exige gestionar credenciales/perfiles de firma — un gate propio que requeriría autorización específica cuando se intente; reducir o retrasar la Beta nativa | Manu, y solo cuando BRAIN-02b–02d estén verificadas en simulador y se intente de verdad la fase de dispositivo real — no es una decisión pendiente ahora | fase de dispositivo real de BRAIN-02 y Beta 1 |
 | D-05 | Fuente de calendario para Agenda y el modo Trabajo | EventKit, Google Calendar read-only o ambos | Manu | BRAIN-09 |
 | D-06 | Servicio meteorológico | WeatherKit (requiere D-03), API pública gratuita, organismo oficial | propuesta técnica + Manu | BRAIN-10 |
@@ -152,7 +152,7 @@ Si Manu no acepta la recomendación, la alternativa menos costosa es (c) solo si
 ## Intervención de Manu necesaria
 
 - D-01 ya está decidida, D-02 ya está decidida ([ADR-0011](../adr/0011-native-local-storage-and-keys.md)) y D-04 resuelta para BRAIN-01 y para la verificación en simulador de BRAIN-02a–02d.
-- Decidir D-04B cuando BRAIN-02b–02d estén verificadas en simulador y llegue el momento de firmar e instalar en el iPhone físico; decidir D-03 solo si ese intento demuestra que App Groups falla con la cuenta gratuita.
+- Decidir D-04B cuando BRAIN-02b–02d estén verificadas en simulador y llegue el momento de firmar e instalar en el iPhone físico; decidir D-03 si ese intento demuestra que App Groups falla con la cuenta gratuita, **o** si en vez de eso se opta por TestFlight como ruta de distribución/prueba física (la exige por sí sola). Ninguno de los dos disparadores está activo hoy.
 - Indicar si tiene Spotify Premium (afecta a la rutina de la mañana).
 - Autorizar explícitamente BRAIN-01 cuando corresponda.
 
