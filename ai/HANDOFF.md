@@ -4,6 +4,27 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
+## WEB-05 ronda 1 — correcciones de la revisión del PR #13
+
+Defectos demostrados por el orquestador y corregidos:
+
+1. **La copia de Drive iba en claro y automática.** Ahora `web/core/crypto.js` usa AES-256-GCM con la cabecera autenticada y PBKDF2-SHA-256 con 600 000 iteraciones. La frase la elige Manu y no se guarda. `saveBackup` rechaza el texto en claro. Ya no hay subida automática: se sube y restaura a mano, con la frase.
+2. **Gemini recibía mensajes automáticamente, con un filtro que no garantiza nada.** Ahora la app enseña el payload exacto y pide confirmación en cada petición (`ask` exige `confirmed: true`). Por defecto solo va la frase y una instrucción fija. `isSensitive` se amplía con los cuatro ejemplos de la revisión y queda documentado como lista de mejor esfuerzo. La clave vive en `sessionStorage` salvo que Manu active «Recordar»; ese riesgo queda documentado.
+3. **Se pedían los cuatro scopes de golpe.** Ahora hay `SCOPE` por función, interruptores desconectados por defecto, un token por scope y `runServices`, que aísla las denegaciones.
+4. **Estado canónico desactualizado.** Actualizados `ai/CURRENT_TASK.md` (conserva el historial de BRAIN-02-PREP), `ai/PROJECT_STATE.md`, `docs/security/THREAT_MODEL.md`, ADR-0013 y `ai/QA_LESSONS.md` (QAL-010 a QAL-013). La rama estaba creada desde el commit anterior a la fusión squash, así que el PR quedó en conflicto y sin checks (QAL-013). Rebasada sobre `main`; `web.yml` también se ejecuta en `push` a ramas `claude/**` para que el check sea recuperable.
+
+Comandos y resultados:
+
+- `cd web && npm test`: 42/42 PASS.
+- Chromium headless con Google, Drive y Gemini simulados (script de prueba fuera del repo): 15/15 PASS.
+  - Clave de Gemini solo en la sesión por defecto.
+  - Sin llamada a Gemini hasta confirmar; el payload visible no lleva contexto; los cuatro ejemplos sensibles ni se ofrecen ni se envían.
+  - Integraciones desconectadas por defecto; Drive pide solo `drive.appdata`.
+  - La copia subida no contiene marcadores en claro.
+  - En un perfil limpio, la frase incorrecta no restaura y la correcta sí; la copia restaurada no lleva la clave de Gemini.
+  - 0 errores de página.
+- Recorrido general: 21/21 PASS en dos ejecuciones. Una ejecución falló en «birthday soon» porque el script calculaba la fecha en UTC mientras el navegador estaba en Europe/Madrid pasada la medianoche. Corregido en el script calculando la fecha en el propio navegador. No es un fallo de la app.
+
 ## WEB-05 — Gemini opcional, Google Tasks, cumpleaños de Contactos y copia en Drive (ADR-0013)
 
 Rama `claude/magical-goodall-rf5qoo`, desde `main` (`be88f9c`).

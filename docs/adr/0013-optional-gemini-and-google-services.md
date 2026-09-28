@@ -11,17 +11,20 @@ La app web (ADR-0012) funciona sin IA, pero el chat solo entiende órdenes concr
 ## Decisión
 
 1. **Gemini opcional** con una clave gratuita de Google AI Studio que Manu pega en la app.
-   - La clave se guarda solo en el dispositivo, fuera del vault: no va en las copias JSON ni en Drive.
+   - La clave nunca está en el vault, así que nunca va en las copias.
+   - Por defecto vive solo en `sessionStorage` (se pierde al cerrar la app). Con «Recordar la clave en este móvil» pasa a `localStorage`. **Riesgo aceptado de forma explícita por Manu al activarlo**: cualquier script que se ejecute en este origen podría leerla. Mitigación: la CSP solo permite scripts propios y `accounts.google.com`.
    - Se envía en la cabecera `x-goog-api-key`, nunca en la URL.
-   - El modelo se elige de la lista de la cuenta (el «flash» estable más reciente), sin nombres fijos.
-2. El núcleo determinista **responde primero**. Gemini solo recibe la frase cuando no hay intención reconocida.
-3. **Nunca** se envía a Gemini nada que parezca salud, dinero, ánimo, Refugio, teléfonos, correos, IBAN o contraseñas (`isSensitive`). La crisis y el ánimo bajo no llegan a la IA. Las respuestas de IA se marcan como «IA» y no crean hechos, tareas ni gastos.
-4. **Google con un único consentimiento OAuth** (Google Identity Services, sin servidor, token solo en memoria):
+   - El modelo se elige de la lista de la cuenta, sin nombres fijos.
+2. **Nada se envía automáticamente.** El núcleo determinista responde primero. Cuando no entiende una frase, la app muestra el **payload exacto** y solo lo envía si Manu pulsa «Enviar a Gemini», una confirmación por petición.
+3. **Payload mínimo por defecto**: la frase de Manu y una instrucción fija. Sin historial, tareas ni agenda.
+4. `isSensitive` es una **lista de bloqueo de mejor esfuerzo** (salud, medicamentos, dinero e ingresos, ánimo, teléfonos, correos, IBAN, números de tarjeta, contraseñas). Con ella la app ni siquiera ofrece el envío, pero **no es exhaustiva ni es una garantía**: la garantía es la confirmación explícita con el payload visible. Crisis y ánimo bajo nunca llegan a la IA. Las respuestas se marcan «IA» y no crean hechos, tareas ni gastos.
+5. **Google con permisos incrementales** (Google Identity Services, sin servidor, un token por scope y solo en memoria). Todas las integraciones empiezan **desconectadas**; cada una tiene su interruptor y pide **solo su scope** la primera vez que se usa. Si se deniega una, las demás siguen funcionando (`runServices`).
    - `calendar.events`: agenda de hoy y mañana, y crear eventos.
    - `tasks`: sincronización de tareas en los dos sentidos con la lista por defecto.
    - `contacts.readonly`: solo nombres y cumpleaños, guardados en el dispositivo.
-   - `drive.appdata`: copia del vault en la carpeta privada de la app. La app no ve el resto de Drive.
-5. El ID de cliente OAuth es público por diseño. El secreto de cliente no se usa ni se guarda.
+   - `drive.appdata`: copia **cifrada en el cliente** en la carpeta privada de la app.
+6. **Copia en Drive siempre cifrada y manual.** Formato `manuos-backup` v1: AES-256-GCM (AEAD) con la cabecera autenticada como datos adicionales; KDF PBKDF2-HMAC-SHA-256 con 600 000 iteraciones y sal aleatoria de 16 bytes; IV de 12 bytes. La frase la elige Manu (mínimo 10 caracteres) y no se guarda ni se sube. Sin la frase no hay recuperación. `saveBackup` rechaza cualquier cosa que no sea un sobre cifrado. No hay subida automática. En web se usa PBKDF2 en lugar del Argon2id de ADR-0011 porque es el KDF nativo de Web Crypto; la desviación queda documentada aquí.
+7. El ID de cliente OAuth es público por diseño. El secreto de cliente no se usa ni se guarda.
 
 ## Consecuencias
 
@@ -29,7 +32,12 @@ La app web (ADR-0012) funciona sin IA, pero el chat solo entiende órdenes concr
 - Si se agota el cupo gratuito (HTTP 429), el chat sigue funcionando sin IA.
 - La app en modo «Prueba» de Google Cloud solo sirve para los usuarios de prueba (Manu). El permiso caduca cada hora y se vuelve a pedir al sincronizar.
 - Los nombres de terceros de Contactos quedan en el dispositivo y en la copia privada de Drive; nunca en el repositorio.
-- `NO_VERIFICADO`: la ventana de consentimiento de Google desde la web instalada en iOS; el cupo real gratuito de Gemini.
+- `NO_VERIFICADO`: la ventana de consentimiento de Google desde la web instalada en iOS; el cupo real gratuito de Gemini; `google.accounts.oauth2.hasGrantedAllScopes` con las cuentas reales.
+- `VERIFICADO` (Chromium headless, servicios simulados): copia cifrada subida sin marcadores en claro; restauración en un perfil limpio con la frase correcta; rechazo con una frase incorrecta; una sola petición de scope por función; sin llamadas a Gemini sin confirmación.
+
+## Historial
+
+- Ronda 1 de revisión (PR #13, 2026-09-28): la primera versión subía el vault en claro y automáticamente a Drive, enviaba a Gemini sin confirmación con un filtro de palabras presentado como garantía, y pedía los cuatro scopes de golpe. Corregido en esta versión del ADR.
 
 ## Alternativas rechazadas
 

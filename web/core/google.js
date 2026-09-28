@@ -1,12 +1,31 @@
+import { isEnvelope } from "./crypto.js";
+
 // More Google services with the same OAuth consent as Calendar:
 // Tasks (two-way), Contacts birthdays (read) and a Drive backup in the
 // app's private folder (drive.appdata: MANU cannot see the rest of Drive).
-export const SCOPES = [
-  "https://www.googleapis.com/auth/calendar.events",
-  "https://www.googleapis.com/auth/tasks",
-  "https://www.googleapis.com/auth/contacts.readonly",
-  "https://www.googleapis.com/auth/drive.appdata",
-].join(" ");
+// One scope per feature, requested only when that feature is switched on and used.
+export const SCOPE = {
+  calendar: "https://www.googleapis.com/auth/calendar.events",
+  tasks: "https://www.googleapis.com/auth/tasks",
+  contacts: "https://www.googleapis.com/auth/contacts.readonly",
+  drive: "https://www.googleapis.com/auth/drive.appdata",
+};
+
+// Runs each enabled service with a token for its own scope only. A denied or
+// failing service never stops the others. Returns { key: "ok: …" | "error: …" | "off" }.
+export async function runServices(services, enabled, tokenFor) {
+  const status = {};
+  for (const svc of services) {
+    if (!enabled[svc.key]) { status[svc.key] = "off"; continue; }
+    try {
+      const token = await tokenFor(svc.scope);
+      status[svc.key] = `ok: ${await svc.run(token)}`;
+    } catch (err) {
+      status[svc.key] = `error: ${err?.message ?? "fallo"}`;
+    }
+  }
+  return status;
+}
 
 const TASKS = "https://tasks.googleapis.com/tasks/v1/lists/@default/tasks";
 const PEOPLE = "https://people.googleapis.com/v1/people/me/connections?personFields=names,birthdays&pageSize=1000";
@@ -84,8 +103,10 @@ export async function findBackup(token, fetchImpl) {
   return json?.files?.[0] ?? null;
 }
 
-export async function saveBackup(token, vault, fetchImpl) {
-  const body = JSON.stringify(vault);
+// Only encrypted envelopes are ever uploaded (see core/crypto.js).
+export async function saveBackup(token, envelope, fetchImpl) {
+  if (!isEnvelope(envelope)) throw new Error("Solo se suben copias cifradas");
+  const body = JSON.stringify(envelope);
   const existing = await findBackup(token, fetchImpl);
   if (existing) {
     return call(token, `${UPLOAD}/${existing.id}?uploadType=media`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body }, fetchImpl);

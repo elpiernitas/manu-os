@@ -1,16 +1,17 @@
 // Optional AI for the MANU chat (ADR-0013). The deterministic core always
-// answers first; the model is only asked when nothing matched, and never with
-// health, money, mood or contact data. The key lives outside the vault, so
-// backups never carry it.
+// answers first. Nothing is sent automatically: the app shows the exact
+// payload and Manu confirms each request. `isSensitive` is a best-effort
+// denylist that blocks obvious cases; it is NOT exhaustive and is not a
+// privacy guarantee — the explicit confirmation is.
 import { normalise } from "./text.js";
 
 const API = "https://generativelanguage.googleapis.com/v1beta";
 
 const SENSITIVE = [
   // health
-  "medico", "medica", "enfermedad", "pastilla", "medicacion", "medicamento", "diagnostic", "sintoma", "dolor", "hospital", "urgencias", "terapia", "psicolog", "psiquiatr", "ansiedad", "depresi", "salud", "analitica", "embaraz", "peso ",
+  "medico", "medica", "vih", "sida", "receta", "sertralina", "ibuprofeno", "paracetamol", "antidepresiv", "ansiolitic", "enfermedad", "pastilla", "medicacion", "medicamento", "diagnostic", "sintoma", "dolor", "hospital", "urgencias", "terapia", "psicolog", "psiquiatr", "ansiedad", "depresi", "salud", "analitica", "embaraz", "peso ",
   // money
-  "euro", "€", "banco", "sabadell", "nomina", "sueldo", "salario", "deuda", "prestamo", "hipoteca", "tarjeta", "cuenta corriente", "iban", "transferencia", "gaste", "pague", "dinero", "factura",
+  "euro", "€", "cobro", "cobra", "gano ", "ingreso", "al mes", "banco", "sabadell", "nomina", "sueldo", "salario", "deuda", "prestamo", "hipoteca", "tarjeta", "cuenta corriente", "iban", "transferencia", "gaste", "pague", "dinero", "factura",
   // mood / crisis
   "triste", "bajon", "suicid", "morir", "llorar", "solo y", "refugio",
   // secrets
@@ -22,6 +23,7 @@ export function isSensitive(text) {
   const t = ` ${normalise(raw)} `;
   if (SENSITIVE.some((k) => t.includes(k))) return true;
   if (/\b[A-Z]{2}\d{2}[ ]?\d{4}/.test(raw)) return true; // IBAN-like
+  if (/\b(?:\d[ -]?){13,19}\b/.test(raw)) return true; // card-like numbers
   if (/(\+34)?[ ]?[6-9]\d{2}[ ]?\d{3}[ ]?\d{3}\b/.test(raw)) return true; // phone
   if (/[^\s@]+@[^\s@]+\.[a-z]{2,}/i.test(raw)) return true; // email
   return false;
@@ -52,6 +54,14 @@ export function systemPrompt({ now = new Date(), city = null, tasks = [], events
   ].filter(Boolean).join("\n");
 }
 
+// Default payload: only the message and a fixed instruction. No history, no
+// tasks, no agenda (they are opt-in and shown to Manu before sending).
+export const BASE_SYSTEM = "Eres MANU, el asistente personal de Manu. Responde en español de España, cercano, honesto y breve (máximo 4 frases). No inventes datos sobre Manu. No des diagnósticos médicos ni consejos financieros.";
+
+export function buildPayload(message, { history = null, system = BASE_SYSTEM } = {}) {
+  return requestBody(message, history ?? [], system);
+}
+
 // history: [{ from: "me"|"manu", text }] — sensitive turns are dropped.
 export function requestBody(message, history = [], system = "") {
   const turns = history.filter((m) => m.text && !isSensitive(m.text)).slice(-6)
@@ -76,12 +86,16 @@ export async function listModels(key, fetchImpl = fetch) {
   return res.json();
 }
 
-export async function ask({ key, model, message, history, system }, fetchImpl = fetch) {
-  if (isSensitive(message)) throw Object.assign(new Error("sensible"), { code: "sensitive" });
+// Sends exactly `payload` (built with buildPayload and shown to Manu), only
+// after an explicit confirmation from the UI.
+export async function ask({ key, model, payload, confirmed }, fetchImpl = fetch) {
+  if (confirmed !== true) throw Object.assign(new Error("Falta tu confirmación"), { code: "unconfirmed" });
+  const texts = (payload?.contents ?? []).flatMap((c) => c.parts.map((p) => p.text));
+  if (texts.some(isSensitive)) throw Object.assign(new Error("sensible"), { code: "sensitive" });
   const res = await fetchImpl(`${API}/models/${encodeURIComponent(model)}:generateContent`, {
     method: "POST",
     headers: { "x-goog-api-key": key, "Content-Type": "application/json" },
-    body: JSON.stringify(requestBody(message, history, system)),
+    body: JSON.stringify(payload),
   });
   if (res.status === 429) throw Object.assign(new Error("Límite gratuito de Gemini alcanzado por ahora"), { code: "quota" });
   if (res.status === 400 || res.status === 403) throw Object.assign(new Error("La clave de Gemini no es válida"), { code: "key" });

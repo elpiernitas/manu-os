@@ -2,6 +2,43 @@
 
 Status: **REVIEW_PENDING**
 
+Correcciones de la ronda 1 de revisión del PR #13 implementadas por Claude Code y pendientes de la revisión del orquestador.
+
+## Tarea activa
+
+WEB-05 — IA opcional con Gemini y servicios de Google en la app web ([ADR-0013](../docs/adr/0013-optional-gemini-and-google-services.md)), dentro de la línea web autorizada por Manu ([ADR-0012](../docs/adr/0012-installable-web-app-as-operational-path.md)).
+
+## Autorización
+
+- 2026-09-28: Manu decide que la vía operativa es una app web instalable en GitHub Pages (no puede instalar la app nativa sin Mac con Xcode ni pagar). Hace público el repositorio, activa Pages y autoriza a Claude Code a fusionar los PR web #10, #11 y #12.
+- 2026-09-28: Manu autoriza Gemini y «todo» lo posible de Google, a coste 0 €.
+- El orquestador (ChatGPT/Codex) revisa el PR #13. Claude Code **no fusiona** el #13 hasta que la revisión lo apruebe. Los PR #7, #8 y #9 quedan en borrador o pausa.
+
+## Alcance autorizado
+
+- código en `web/` (sin servidor), tests y workflow `web.yml`;
+- integración opcional con Gemini y con Google (Calendar, Tasks, Contactos, Drive) con consentimiento de Manu en su dispositivo;
+- documentación canónica, ADR, threat model, handoff y QA lessons.
+
+## Criterios de aceptación (ronda 1 del PR #13)
+
+- toda copia en Drive se cifra en el cliente (formato versionado, AEAD, KDF, recuperación documentada); sin subida automática; restauración probada en un perfil limpio;
+- ningún envío automático a Gemini: payload exacto visible y confirmación por petición; sin historial, tareas ni agenda por defecto; no se afirma detección exhaustiva; riesgo de la clave documentado;
+- scopes de Google incrementales por función, con interruptores y degradación si se deniegan;
+- regresiones de los cuatro puntos y check de CI recuperable.
+
+## Trabajo prohibido
+
+- usar credenciales o datos reales en código, tests o CI; conectar servicios desde CI;
+- activar facturación o servicios de pago;
+- fusionar el PR #13 sin la aprobación del orquestador.
+
+---
+
+## Historial: tarea anterior (BRAIN-02-PREP)
+
+Estado al cerrarse: REVIEW_PENDING (BRAIN-02-PREP, PR #5).
+
 Implementación de esta tarea de preparación completada por Claude Code, con tres rondas de corrección tras revisión externa. Ver `ai/HANDOFF.md` para el resultado completo (D-02 decidida por ADR-0011, BRAIN-02 dividida en subfases 02a–02d verificables en CI/simulador, D-03/D-04B precisadas) y el PR #5 para la evidencia. No hay ninguna decisión pendiente de Manu ahora: D-04B queda modelado como un gate futuro (fase de dispositivo real), no como un bloqueo humano actual. Pendiente de revisión del orquestador.
 
 ## Tarea activa

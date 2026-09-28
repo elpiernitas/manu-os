@@ -10,8 +10,9 @@ import { fetchForecast, searchCities, advice, WEATHER_TTL_MS } from "./core/weat
 import { importStatement } from "./core/bank.js";
 import { CITIES, proposeAlarm, shouldAskTomorrow, shortcutUrl, guessCity } from "./core/night.js";
 import { isClientId, listEvents, createEvent, newEventBody } from "./core/gcal.js";
-import { SCOPES, planTaskSync, listOpenTasks, insertTask, completeTask, contactBirthdays, mergePeople, saveBackup, loadBackup } from "./core/google.js";
-import { isSensitive, pickModel, listModels, ask, systemPrompt } from "./core/ai.js";
+import { SCOPE, runServices, planTaskSync, listOpenTasks, insertTask, completeTask, contactBirthdays, mergePeople, saveBackup, loadBackup } from "./core/google.js";
+import { isSensitive, pickModel, listModels, ask, buildPayload } from "./core/ai.js";
+import { encryptBackup, decryptBackup, passphraseProblem } from "./core/crypto.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
 export const APP_VERSION = "5";
@@ -29,15 +30,27 @@ let sheet = null; // quick add: { kind }
 let confirmWipe = false;
 let cityResults = null;
 let overlay = null; // "weather"
-const gcal = { token: null, expires: 0, busy: false, error: null, client: null };
+const gcal = { tokens: {}, busy: false, error: null };
 let confirmDriveRestore = null;
-// Gemini key: kept outside the vault so exports and Drive backups never include it.
+// Gemini key: never in the vault (so never in exports or backups). By default it
+// lives only for this session; "Recordar" keeps it in this device's storage,
+// a risk documented in ADR-0013 (readable by any script running on this origin).
 const aiStore = {
-  get key() { try { return localStorage.getItem("manuos.gemini") || ""; } catch { return ""; } },
-  set key(v) { try { v ? localStorage.setItem("manuos.gemini", v) : localStorage.removeItem("manuos.gemini"); } catch {} },
+  get remember() { try { return localStorage.getItem("manuos.gemini.remember") === "1"; } catch { return false; } },
+  set remember(v) { try { v ? localStorage.setItem("manuos.gemini.remember", "1") : localStorage.removeItem("manuos.gemini.remember"); } catch {} },
+  store() { return this.remember ? localStorage : sessionStorage; },
+  get key() { try { return sessionStorage.getItem("manuos.gemini") || localStorage.getItem("manuos.gemini") || ""; } catch { return ""; } },
+  set key(v) {
+    try {
+      sessionStorage.removeItem("manuos.gemini"); localStorage.removeItem("manuos.gemini");
+      if (v) this.store().setItem("manuos.gemini", v);
+    } catch {}
+  },
   get model() { try { return localStorage.getItem("manuos.gemini.model") || ""; } catch { return ""; } },
   set model(v) { try { v ? localStorage.setItem("manuos.gemini.model", v) : localStorage.removeItem("manuos.gemini.model"); } catch {} },
 };
+const GOOGLE_FEATURES = [["calendar", "Calendar", "Ver tu agenda y crear eventos"], ["tasks", "Tasks", "Sincronizar tus tareas"], ["contacts", "Contactos", "Leer nombres y cumpleaños"], ["drive", "Drive", "Guardar una copia cifrada (solo cuando tú lo pidas)"]];
+const googleOn = (k) => Boolean(vault.settings.google?.[k]);
 const aiReady = () => Boolean(aiStore.key && aiStore.model && vault.settings.aiEnabled !== false);
 let variant = vault.chat.length;
 const weather = { loading: false, error: null };
@@ -247,11 +260,12 @@ const screens = {
     const done = vault.inbox.filter((i) => i.status === "TASK" && i.done).slice(-10);
     const idea = ideas(vault.inbox);
     const rems = vault.reminders.filter((r) => !r.done).sort((a, b) => (a.at < b.at ? -1 : 1));
-    const g = isClientId(vault.settings.gcalClientId);
+    const g = isClientId(vault.settings.gcalClientId) && GOOGLE_FEATURES.some(([k]) => googleOn(k));
     const synced = vault.settings.gcalSyncedAt ? new Date(vault.settings.gcalSyncedAt).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }) : null;
+    const gCal = isClientId(vault.settings.gcalClientId) && googleOn("calendar");
     return `<h1>Agenda</h1><p class="subtitle">${esc(longDate())}</p>
       ${g ? `<div class="btns"><button class="btn ghost" data-act="gcal-sync">${gcal.busy ? "Sincronizando…" : "Sincronizar con Google"}</button></div><p class="muted small">${synced ? `Última sincronización: ${synced}` : "Aún sin sincronizar."}${gcal.error ? ` · ${esc(gcal.error)}` : ""}</p>` : `<p class="muted small"><button class="link small" data-act="goto-gcal">Conectar Google (Calendar, Tasks, Contactos y Drive)</button></p>`}
-      ${sectionTitle("Hoy", g ? addLink("EVENT", "Nuevo evento") : "")}
+      ${sectionTitle("Hoy", gCal ? addLink("EVENT", "Nuevo evento") : "")}
       <section class="card">${agendaToday()
         ? (vault.agenda.events.length ? vault.agenda.events.map((ev) => `<div class="row"><span class="num chip">${esc(ev.time ? ev.time + (ev.end ? "–" + ev.end : "") : "Todo el día")}</span><span class="grow">${esc(ev.title)}</span></div>`).join("") : '<p class="muted">Hoy no tienes eventos.</p>')
         : '<p class="muted">La web no puede leer el Calendario de Apple. Pega tus eventos o usa el atajo (Tú → Atajos del iPhone).</p>'}
@@ -267,10 +281,10 @@ const screens = {
   manu() {
     const chips = refuge ? ["quiero entender por qué", "buscar una solución", "necesito desconectar"] : ["gasté 3,20 en café", "recuérdame llamar al taller a las 18", "pon una alarma a las 7:30", "apunta idea: viaje", "refugio"];
     const history = vault.chat.length ? vault.chat : [{ from: "manu", text: "Hola, Manu. Puedo apuntar gastos, ideas y tareas, crear recordatorios y alarmas, y acompañarte en el Refugio. Aún funciono sin IA: habla claro y corto." }];
-    return `<h1>MANU</h1><p class="subtitle">Tu asistente · ${aiReady() ? "IA activada para lo que no entiendo" : '<button class="link small" data-sub-go="ia">activar IA</button>'}</p>
+    return `<h1>MANU</h1><p class="subtitle">Tu asistente · ${aiReady() ? "IA disponible, siempre con tu confirmación" : '<button class="link small" data-sub-go="ia">activar IA</button>'}</p>
       ${refuge ? `<div class="refuge-bar"><span>Refugio · no se guarda</span><button class="link" data-act="leave-refuge">Salir</button></div>` : ""}
       <div class="suggest" aria-label="Sugerencias">${chips.map((s) => `<button data-say="${esc(s)}">${esc(s)}</button>`).join("")}</div>
-      <div class="chat" id="chat" aria-live="polite">${[...history, ...(refuge?.messages ?? [])].map((b) => `<div class="bubble ${b.from}${b.safety ? " safety" : ""}">${b.ai ? '<span class="ai-tag">IA</span>' : ""}${esc(b.text)}${b.action ? `<div class="btns"><a class="btn" href="${esc(b.action.href)}">${esc(b.action.label)}</a></div>` : ""}</div>`).join("")}</div>
+      <div class="chat" id="chat" aria-live="polite">${[...history, ...(refuge?.messages ?? [])].map((b) => `<div class="bubble ${b.from}${b.safety ? " safety" : ""}">${b.ai ? '<span class="ai-tag">IA</span>' : ""}${esc(b.text)}${b.proposal ? `<pre class="payload">${esc(JSON.stringify(buildPayload(b.proposal.message), null, 1))}</pre>${b.proposal.state ? `<p class="muted small">${b.proposal.state === "sent" ? "Enviado a Gemini." : "No enviado."}</p>` : `<div class="btns"><button class="btn" data-act="ai-send" data-id="${esc(b.proposal.id)}">Enviar a Gemini</button><button class="btn ghost" data-act="ai-cancel" data-id="${esc(b.proposal.id)}">No</button></div>`}` : ""}${b.action ? `<div class="btns"><a class="btn" href="${esc(b.action.href)}">${esc(b.action.label)}</a></div>` : ""}</div>`).join("")}</div>
       <form class="composer glass" id="composer"><label for="msg" class="sr">Mensaje para MANU</label><input id="msg" autocomplete="off" enterkeyhint="send" placeholder="${refuge ? "Cuéntame" : "Escribe a MANU"}"><button class="btn" type="submit">Enviar</button></form>`;
   },
   dinero() {
@@ -392,32 +406,36 @@ const subpages = {
     const id = vault.settings.gcalClientId ?? "";
     const ok = isClientId(id);
     const st = vault.settings.googleStatus ?? {};
-    const line = (k, label) => `<div class="row"><span class="grow">${label}</span><span class="muted small">${st[k] ? esc(st[k]) : "—"}</span></div>`;
     return `${backBar("Google")}
-      <section class="card"><h2>Estado</h2><p>${ok ? (gcal.token && Date.now() < gcal.expires ? "Conectado en esta sesión." : "Configurado. Al sincronizar, Google te pedirá permiso.") : "Sin configurar."}</p>
-        ${ok ? `${line("calendar", "Calendar")}${line("tasks", "Tasks")}${line("contacts", "Cumpleaños de Contactos")}${line("drive", "Copia en Drive")}<button class="btn" data-act="gcal-sync">${gcal.busy ? "Sincronizando…" : "Sincronizar ahora"}</button>` : ""}
+      <section class="card"><h2>ID de cliente</h2>
         <form id="gcalForm" class="stack"><label for="gcalId" class="muted small">ID de cliente OAuth (termina en .apps.googleusercontent.com). No es una contraseña.</label><input id="gcalId" value="${esc(id)}" autocomplete="off" spellcheck="false" placeholder="123-abc.apps.googleusercontent.com"><button class="btn ghost" type="submit">Guardar ID</button></form></section>
-      ${ok ? `<section class="card"><h2>Copia en Google Drive</h2><p class="muted small">MANU guarda una copia en una carpeta privada de tu Drive que solo ve la app. Se hace sola al sincronizar, como mucho cada 6 horas. La clave de Gemini nunca se incluye.</p>
-        <div class="btns"><button class="btn ghost" data-act="drive-save">Copiar ahora</button><button class="btn ghost" data-act="drive-restore">Restaurar desde Drive</button></div>
-        ${confirmDriveRestore ? `<p>La copia de Drive es del ${esc(new Date(confirmDriveRestore.file.modifiedTime).toLocaleString("es-ES"))}. Reemplazará lo que hay en este móvil.</p><div class="btns"><button class="btn danger" data-act="drive-restore-yes">Sí, restaurar</button><button class="btn ghost" data-act="drive-restore-no">Cancelar</button></div>` : ""}</section>` : ""}
+      ${ok ? `<section class="card"><h2>Servicios</h2><p class="muted small">Todo empieza desconectado. Cada servicio pide su propio permiso la primera vez que lo usas; si lo rechazas, los demás siguen funcionando.</p>
+        ${GOOGLE_FEATURES.map(([k, label, desc]) => `<div class="row"><div class="grow"><div>${label}</div><div class="muted small">${esc(desc)}${st[k] && st[k] !== "off" ? ` · ${esc(st[k].replace(/^ok: /, "").replace(/^error: /, "⚠︎ "))}` : ""}</div></div><button class="check" data-act="gfeature" data-k="${k}" aria-pressed="${googleOn(k)}" aria-label="${label}">${I.check}</button></div>`).join("")}
+        ${["calendar", "tasks", "contacts"].some(googleOn) ? `<button class="btn" data-act="gcal-sync">${gcal.busy ? "Sincronizando…" : "Sincronizar ahora"}</button>` : ""}</section>` : ""}
+      ${ok && googleOn("drive") ? `<section class="card"><h2>Copia cifrada en Drive</h2>
+        <p class="muted small">Se cifra en tu móvil (AES-256-GCM) con una frase que eliges tú y que nunca se guarda ni se sube. Sin la frase, nadie puede leerla, tampoco Google ni MANU. Si la olvidas, la copia no se puede recuperar. La copia solo se sube cuando pulsas el botón.</p>
+        <form id="driveForm" class="stack"><label for="drivePass" class="muted small">Frase de la copia (mínimo 10 caracteres)</label><input id="drivePass" type="password" autocomplete="new-password" minlength="10">
+          <div class="btns"><button class="btn ghost" type="submit" data-drive="save">Cifrar y subir</button><button class="btn ghost" type="submit" data-drive="restore">Descargar y restaurar</button></div></form>
+        ${confirmDriveRestore ? `<p>La copia de Drive es del ${esc(new Date(confirmDriveRestore.file.modifiedTime).toLocaleString("es-ES"))} y se ha descifrado bien. Reemplazará lo que hay en este móvil.</p><div class="btns"><button class="btn danger" data-act="drive-restore-yes">Sí, restaurar</button><button class="btn ghost" data-act="drive-restore-no">Cancelar</button></div>` : ""}</section>` : ""}
       <section class="card"><h2>Cómo conseguir el ID (una vez, mejor desde el ordenador)</h2><ol class="muted small">
-        <li>Entra en <b>console.cloud.google.com</b> con tu cuenta de Google y crea un proyecto «MANU OS». Es gratis.</li>
-        <li>«APIs y servicios» → «Biblioteca»: habilita <b>Google Calendar API</b>, <b>Google Tasks API</b>, <b>People API</b> y <b>Google Drive API</b>.</li>
-        <li>«Pantalla de consentimiento de OAuth»: tipo <b>Externo</b>, nombre «MANU OS» y tu correo. Añade tu Gmail en «Usuarios de prueba».</li>
+        <li>Entra en <b>console.cloud.google.com</b> y crea un proyecto «MANU OS». Es gratis.</li>
+        <li>«APIs y servicios» → «Biblioteca»: habilita las APIs que vayas a usar (Google Calendar API, Google Tasks API, People API, Google Drive API).</li>
+        <li>«Pantalla de consentimiento de OAuth»: tipo <b>Externo</b>, nombre «MANU OS», tu correo; añade tu Gmail en «Usuarios de prueba».</li>
         <li>«Credenciales» → «Crear credenciales» → <b>ID de cliente de OAuth</b> → «Aplicación web».</li>
         <li>«Orígenes de JavaScript autorizados»: <code>https://elpiernitas.github.io</code></li>
-        <li>Copia el <b>ID de cliente</b> y pégalo arriba. El «secreto de cliente» no hace falta: no lo pegues en ningún sitio.</li></ol>
-        <p class="muted small">Permisos que pide MANU: ver y crear eventos, gestionar tus tareas, leer los cumpleaños de tus contactos y guardar su copia en su carpeta privada de Drive. El permiso dura una hora; luego se vuelve a pedir al sincronizar.</p></section>`;
+        <li>Copia el <b>ID de cliente</b> y pégalo arriba. El «secreto de cliente» no se usa: no lo pegues en ningún sitio.</li></ol></section>`;
   },
   ia() {
     const key = aiStore.key;
     return `${backBar("IA (Gemini)")}
       <section class="card"><h2>Estado</h2><p>${aiReady() ? `Activada con <b>${esc(aiStore.model)}</b>.` : key ? "Clave guardada. Pulsa «Probar clave»." : "Sin clave: MANU funciona sin IA."}</p>
-        <form id="aiForm" class="stack"><label for="aiKey" class="muted small">Clave de API de Gemini. Se guarda solo en este móvil y nunca va en las copias.</label><input id="aiKey" type="password" value="${esc(key)}" autocomplete="off" spellcheck="false" placeholder="AIza…"><div class="btns"><button class="btn" type="submit">Guardar y probar clave</button>${key ? '<button class="btn danger" type="button" data-act="ai-forget">Borrar clave</button>' : ""}</div></form>
-        ${key ? `<div class="row"><span>Usar la IA en el chat</span><button class="check" data-act="ai-toggle" aria-pressed="${vault.settings.aiEnabled !== false}" aria-label="Usar IA">${I.check}</button></div>` : ""}</section>
+        <form id="aiForm" class="stack"><label for="aiKey" class="muted small">Clave de API de Gemini. Nunca va en las copias. Por defecto solo dura mientras MANU está abierta.</label><input id="aiKey" type="password" value="${esc(key)}" autocomplete="off" spellcheck="false" placeholder="AIza…"><div class="btns"><button class="btn" type="submit">Guardar y probar clave</button>${key ? '<button class="btn danger" type="button" data-act="ai-forget">Borrar clave</button>' : ""}</div></form>
+        <div class="row"><div class="grow"><div>Recordar la clave en este móvil</div><div class="muted small">Más cómodo, pero cualquier código que corra en esta web podría leerla (ADR-0013).</div></div><button class="check" data-act="ai-remember" aria-pressed="${aiStore.remember}" aria-label="Recordar clave">${I.check}</button></div>
+        ${key ? `<div class="row"><span>Ofrecer la IA en el chat</span><button class="check" data-act="ai-toggle" aria-pressed="${vault.settings.aiEnabled !== false}" aria-label="Usar IA">${I.check}</button></div>` : ""}</section>
       <section class="card"><h2>Privacidad</h2><ul class="muted small">
-        <li>MANU responde primero sin IA. Solo pregunta a Gemini cuando no ha entendido la frase.</li>
-        <li><b>Nunca</b> envía salud, dinero, ánimo, el Refugio, teléfonos, correos ni contraseñas: esos mensajes se quedan en el móvil.</li>
+        <li>MANU responde primero sin IA. Cuando no entiende algo, te enseña <b>exactamente</b> lo que enviaría y solo lo manda si pulsas «Enviar a Gemini». Nada se envía solo.</li>
+        <li>Solo se envía tu frase y una instrucción fija: ni historial, ni tareas, ni agenda.</li>
+        <li>MANU bloquea lo que reconoce como salud, dinero, ánimo, teléfonos, tarjetas o contraseñas, pero ese filtro no es perfecto: revisa siempre lo que vas a enviar.</li>
         <li>Con la clave gratuita, Google puede usar lo que le envías para mejorar sus productos. Consulta sus condiciones en AI Studio.</li>
         <li>Si se acaba el cupo gratuito, MANU sigue funcionando sin IA.</li></ul></section>
       <section class="card"><h2>Cómo conseguir la clave</h2><ol class="muted small"><li>Entra en <b>aistudio.google.com</b> con tu Gmail.</li><li>«Get API key» o «Crear clave de API». Es gratis y no pide tarjeta. Si te pide activar facturación, no lo hagas.</li><li>Cópiala y pégala arriba.</li></ol></section>`;
@@ -531,30 +549,29 @@ function say(text) {
   if (intent.kind === "agenda") { setTimeout(() => go("agenda"), 900); }
   if (intent.kind === "unknown" && aiReady() && navigator.onLine) {
     if (isSensitive(clean)) {
-      vault.chat.push({ from: "me", text: clean, at }, { from: "manu", text: `${reply(intent, variant++)} (Esto no se lo mando a la IA: es privado.)`, at });
+      vault.chat.push({ from: "me", text: clean, at }, { from: "manu", text: `${reply(intent, variant++)} (Parece privado: no te ofrezco enviarlo a la IA.)`, at });
       persist(); render(); return;
     }
-    const history = vault.chat.slice(-8);
-    vault.chat.push({ from: "me", text: clean, at });
-    const bubble = { from: "manu", text: "Pensando…", at, ai: true };
-    vault.chat.push(bubble);
-    render();
-    askAi(clean, history, bubble);
-    return;
+    vault.chat.push({ from: "me", text: clean, at }, { from: "manu", text: "No lo entiendo sin IA. ¿Se lo pregunto a Gemini? Se enviaría exactamente esto:", at, proposal: { id: uid("q"), message: clean } });
+    persist(); render(); return;
   }
   vault.chat.push({ from: "me", text: clean, at }, { from: "manu", text: reply(intent, variant++), at, ...(action ? { action } : {}) });
   persist();
   render();
 }
 
-async function askAi(message, history, bubble) {
-  const tasksOpen = tasks(vault.inbox).map((t) => t.text);
-  const events = agendaToday()?.events.map((e) => `${e.time ?? "todo el día"} ${e.title}`) ?? [];
+async function askAi(proposalId) {
+  const bubble = vault.chat.find((b) => b.proposal?.id === proposalId);
+  if (!bubble || bubble.proposal.state) return;
+  bubble.proposal.state = "sent";
+  const answer = { from: "manu", text: "Pensando…", at: new Date().toISOString(), ai: true };
+  vault.chat.push(answer);
+  render();
   try {
-    bubble.text = await ask({ key: aiStore.key, model: aiStore.model, message, history, system: systemPrompt({ city: activeCity().name, tasks: tasksOpen, events }) });
+    answer.text = await ask({ key: aiStore.key, model: aiStore.model, payload: buildPayload(bubble.proposal.message), confirmed: true });
   } catch (err) {
-    bubble.ai = false;
-    bubble.text = `${reply({ kind: "unknown" }, variant++)}${err.code === "quota" ? " (Hoy ya no queda IA gratuita.)" : err.code === "key" ? " (Revisa la clave de Gemini en Tú → IA.)" : " (La IA no ha respondido ahora.)"}`;
+    answer.ai = false;
+    answer.text = err.code === "quota" ? "Hoy ya no queda IA gratuita. Sigo sin IA." : err.code === "key" ? "La clave de Gemini no funciona. Revísala en Tú → IA." : err.code === "sensitive" ? "Eso parece privado: no lo envío." : "La IA no ha respondido ahora.";
   }
   persist();
   if (tab === "manu") render();
@@ -597,10 +614,12 @@ document.addEventListener("click", async (e) => {
     case "overlay-close": overlay = null; render({ focus: true }); scrollTo(0, 0); break;
     case "goto-gcal": tab = "tu"; sub = "gcal"; render({ focus: true }); scrollTo(0, 0); break;
     case "gcal-sync": syncGoogle(); break;
-    case "drive-save": try { await saveBackup(await googleToken(), vault); vault.settings.driveBackupAt = new Date().toISOString(); persist(); toast("Copia guardada en tu Drive"); } catch (err) { toast(err.message); } break;
-    case "drive-restore": try { const b = await loadBackup(await googleToken()); if (!b) { toast("No hay copia en Drive todavía"); break; } confirmDriveRestore = b; render(); } catch (err) { toast(err.message); } break;
     case "drive-restore-no": confirmDriveRestore = null; render(); break;
     case "drive-restore-yes": { const r = validateVault(confirmDriveRestore?.data); confirmDriveRestore = null; if (!r.ok) { toast(r.reason); render(); break; } vault = r.vault; persist(); render(); toast("Copia de Drive restaurada"); break; }
+    case "gfeature": { const k = a.dataset.k; vault.settings.google = { ...(vault.settings.google ?? {}), [k]: !googleOn(k) }; if (!googleOn(k)) delete gcal.tokens[SCOPE[k]]; persist(); render(); break; }
+    case "ai-send": askAi(id); break;
+    case "ai-cancel": { const b = vault.chat.find((x) => x.proposal?.id === id); if (b) { b.proposal.state = "cancelled"; persist(); render(); } break; }
+    case "ai-remember": { const k = aiStore.key; aiStore.remember = !aiStore.remember; aiStore.key = k; render(); break; }
     case "ai-forget": aiStore.key = ""; aiStore.model = ""; render(); toast("Clave borrada de este móvil"); break;
     case "ai-toggle": vault.settings.aiEnabled = vault.settings.aiEnabled === false; persist(); render(); break;
     case "mood": vault.moods = setMood(vault.moods, localDay(), Number(a.dataset.v)); persist(); render(); break;
@@ -658,6 +677,26 @@ document.addEventListener("submit", async (e) => {
     persist(); render(); toast(id ? "ID guardado" : "Google Calendar desconectado"); return;
   }
   if (f === "workStartForm") return;
+  if (f === "driveForm") {
+    const pass = $("drivePass").value;
+    const problem = passphraseProblem(pass);
+    if (problem) { toast(problem); return; }
+    const action = e.submitter?.dataset.drive ?? "save";
+    try {
+      if (action === "save") {
+        const envelope = await encryptBackup(vault, pass);
+        await withRetry(SCOPE.drive, (tk) => saveBackup(tk, envelope));
+        vault.settings.googleStatus = { ...(vault.settings.googleStatus ?? {}), drive: `ok: copia cifrada ${new Date().toLocaleString("es-ES", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}` };
+        persist(); render(); toast("Copia cifrada guardada en tu Drive");
+      } else {
+        const b = await withRetry(SCOPE.drive, (tk) => loadBackup(tk));
+        if (!b) { toast("No hay copia en Drive todavía"); return; }
+        confirmDriveRestore = { file: b.file, data: await decryptBackup(b.data, pass) };
+        render();
+      }
+    } catch (err) { toast(err.message || "No se pudo completar la copia"); }
+    return;
+  }
   if (f === "aiForm") {
     const key = $("aiKey").value.trim();
     if (!key) { aiStore.key = ""; aiStore.model = ""; render(); return; }
@@ -703,7 +742,7 @@ document.addEventListener("submit", async (e) => {
     } else if (k === "EVENT" && text) {
       const minutes = Math.min(1440, Math.max(5, Number($("qMinutes").value) || 60));
       try {
-        const token = await googleToken();
+        const token = await googleToken(SCOPE.calendar);
         await createEvent(token, newEventBody({ title: text, start: $("qWhen").value, minutes }));
         sheet = null; render(); toast("Evento creado en Google Calendar"); syncGoogle();
       } catch (err) { toast(err.message || "No se pudo crear el evento"); }
@@ -753,73 +792,71 @@ function loadGis() {
   });
 }
 
-async function googleToken() {
-  if (gcal.token && Date.now() < gcal.expires - 60000) return gcal.token;
+// One token per scope: each feature asks only for its own permission.
+async function googleToken(scope) {
+  const t = gcal.tokens[scope];
+  if (t && Date.now() < t.expires - 60000) return t.token;
   const id = vault.settings.gcalClientId;
-  if (!isClientId(id)) throw new Error("Configura Google Calendar en Tú → Google Calendar");
+  if (!isClientId(id)) throw new Error("Configura Google en Tú → Google");
   await loadGis();
   return new Promise((resolve, reject) => {
-    gcal.client = google.accounts.oauth2.initTokenClient({
+    const client = google.accounts.oauth2.initTokenClient({
       client_id: id,
-      scope: SCOPES,
+      scope,
+      include_granted_scopes: false,
       callback: (resp) => {
-        if (resp.error || !resp.access_token) { reject(new Error("Google no ha dado permiso")); return; }
-        gcal.token = resp.access_token;
-        gcal.expires = Date.now() + (Number(resp.expires_in) || 3600) * 1000;
-        resolve(gcal.token);
+        if (resp.error || !resp.access_token || !google.accounts.oauth2.hasGrantedAllScopes(resp, scope)) { reject(new Error("Permiso no concedido")); return; }
+        gcal.tokens[scope] = { token: resp.access_token, expires: Date.now() + (Number(resp.expires_in) || 3600) * 1000 };
+        resolve(resp.access_token);
       },
       error_callback: () => reject(new Error("Se cerró la ventana de Google")),
     });
-    gcal.client.requestAccessToken({ prompt: "" });
+    client.requestAccessToken({ prompt: "" });
   });
+}
+
+async function withRetry(scope, fn) {
+  try { return await fn(await googleToken(scope)); }
+  catch (err) { if (err.code !== "auth") throw err; delete gcal.tokens[scope]; return fn(await googleToken(scope)); }
 }
 
 async function syncGoogle() {
   if (gcal.busy) return;
   gcal.busy = true; gcal.error = null; render();
-  try {
-    const start = new Date(); start.setHours(0, 0, 0, 0);
-    const end = new Date(start); end.setDate(end.getDate() + 2);
-    let days;
-    try { days = await listEvents(await googleToken(), start, end); }
-    catch (err) { if (err.code !== "auth") throw err; gcal.token = null; days = await listEvents(await googleToken(), start, end); }
-    const t = localDay(); const tk = tomorrowKey();
-    vault.agenda = { day: t, events: days.get(t) ?? [], importedAt: new Date().toISOString(), source: "GOOGLE" };
-    vault.agendaTomorrow = { day: tk, events: days.get(tk) ?? [] };
-    vault.settings.gcalSyncedAt = new Date().toISOString();
-    const status = { calendar: `${vault.agenda.events.length} hoy · ${vault.agendaTomorrow.events.length} mañana` };
-    const token = await googleToken();
-    try {
-      const remote = await listOpenTasks(token);
-      const plan = planTaskSync(vault.inbox, remote);
+  const services = [
+    { key: "calendar", scope: SCOPE.calendar, run: async () => {
+      const start = new Date(); start.setHours(0, 0, 0, 0);
+      const end = new Date(start); end.setDate(end.getDate() + 2);
+      const days = await withRetry(SCOPE.calendar, (tk) => listEvents(tk, start, end));
+      const t = localDay(); const tk = tomorrowKey();
+      vault.agenda = { day: t, events: days.get(t) ?? [], importedAt: new Date().toISOString(), source: "GOOGLE" };
+      vault.agendaTomorrow = { day: tk, events: days.get(tk) ?? [] };
+      return `${vault.agenda.events.length} hoy · ${vault.agendaTomorrow.events.length} mañana`;
+    } },
+    { key: "tasks", scope: SCOPE.tasks, run: async (token) => {
+      const plan = planTaskSync(vault.inbox, await listOpenTasks(token));
       for (const item of plan.push) { const created = await insertTask(token, item.text); vault.inbox = vault.inbox.map((i) => (i.id === item.id ? { ...i, googleId: created.id } : i)); }
       for (const item of plan.complete) { await completeTask(token, item.googleId); vault.inbox = vault.inbox.map((i) => (i.id === item.id ? { ...i, googleDone: true } : i)); }
       const closed = new Set(plan.closedRemotely.map((i) => i.id));
       vault.inbox = vault.inbox.map((i) => (closed.has(i.id) ? { ...i, done: true, googleDone: true } : i));
       for (const t of plan.pull) vault.inbox.push({ ...capture({ id: uid("c"), text: t.title, at: new Date().toISOString() }), status: "TASK", googleId: t.id });
-      status.tasks = `↑${plan.push.length} ↓${plan.pull.length} ✓${plan.complete.length + plan.closedRemotely.length}`;
-    } catch (err) { status.tasks = err.message; }
-    const last = vault.settings.contactsSyncedAt ? new Date(vault.settings.contactsSyncedAt).getTime() : 0;
-    if (Date.now() - last > 24 * 3600e3) {
-      try {
-        const merged = mergePeople(vault.people, await contactBirthdays(token), () => uid("p"));
-        vault.people = merged.people; vault.settings.contactsSyncedAt = new Date().toISOString();
-        status.contacts = `${merged.added} nuevos`;
-      } catch (err) { status.contacts = err.message; }
-    } else status.contacts = (vault.settings.googleStatus ?? {}).contacts ?? "al día";
-    const lastBackup = vault.settings.driveBackupAt ? new Date(vault.settings.driveBackupAt).getTime() : 0;
-    if (Date.now() - lastBackup > 6 * 3600e3) {
-      try { await saveBackup(token, vault); vault.settings.driveBackupAt = new Date().toISOString(); status.drive = "copia hecha ahora"; }
-      catch (err) { status.drive = err.message; }
-    } else status.drive = `última ${new Date(lastBackup).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}`;
-    vault.settings.googleStatus = status;
-    persist();
-    toast(`Google: ${status.calendar}`);
-  } catch (err) {
-    gcal.error = err.message || "No se pudo sincronizar";
-  } finally {
-    gcal.busy = false; render();
-  }
+      return `↑${plan.push.length} ↓${plan.pull.length} ✓${plan.complete.length + plan.closedRemotely.length}`;
+    } },
+    { key: "contacts", scope: SCOPE.contacts, run: async (token) => {
+      const merged = mergePeople(vault.people, await contactBirthdays(token), () => uid("p"));
+      vault.people = merged.people;
+      return `${merged.added} nuevos`;
+    } },
+  ];
+  const enabled = Object.fromEntries(["calendar", "tasks", "contacts"].map((k) => [k, googleOn(k)]));
+  const status = await runServices(services, enabled, (scope) => googleToken(scope));
+  vault.settings.googleStatus = { ...(vault.settings.googleStatus ?? {}), ...status };
+  if (status.calendar?.startsWith("ok")) vault.settings.gcalSyncedAt = new Date().toISOString();
+  const failed = Object.values(status).filter((v) => v.startsWith("error"));
+  gcal.error = failed.length ? failed.map((v) => v.replace(/^error: /, "")).join(" · ") : null;
+  gcal.busy = false;
+  persist(); render();
+  toast(failed.length ? "Google: algo no se ha sincronizado" : "Google sincronizado");
 }
 
 function exportBackup() {

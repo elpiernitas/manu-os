@@ -155,3 +155,14 @@ Exportar todo no significa exportar credenciales. OAuth tokens, claves privadas,
 - prueba de borrado controlado de fuentes con registro correcto (G-10);
 - cero mensajes automáticos fuera de la lista blanca;
 - cero datos sensibles enviados a proveedores de modelo sin decisión específica.
+
+## App web (ADR-0012, ADR-0013)
+
+| Riesgo | Impacto | Control | Estado |
+|---|---|---|---|
+| copia en Drive legible por Google o por quien acceda a la cuenta | filtración del vault | cifrado en el cliente AES-256-GCM + PBKDF2 (600 000 iteraciones), frase que nunca se guarda ni se sube, subida solo manual, `saveBackup` rechaza texto en claro | VERIFICADO en navegador con servicios simulados |
+| envío de datos sensibles a Gemini | exposición a un proveedor de modelo | sin envío automático; payload exacto visible; confirmación por petición; sin contexto por defecto; lista de bloqueo de mejor esfuerzo (no exhaustiva) | VERIFICADO en navegador con Gemini simulado |
+| robo de la clave de Gemini | uso de la cuota de Manu | clave fuera del vault; `sessionStorage` por defecto; `localStorage` solo si Manu lo activa (riesgo aceptado); CSP restrictiva | DECIDIDO |
+| permisos de Google excesivos | acceso innecesario a datos | un scope por función, integraciones desconectadas por defecto, `drive.appdata` en lugar de `drive`, `contacts.readonly` | VERIFICADO (petición de scope) |
+| pérdida del `localStorage` en iOS | pérdida de datos | exportación manual y copia cifrada en Drive con restauración probada en perfil limpio | PARCIAL: no probado en iOS |
+
