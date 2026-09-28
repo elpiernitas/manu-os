@@ -4,6 +4,35 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
+## WEB-02 — agenda pegada, enlaces de Atajos y aviso de actualización
+
+Rama `claude/magical-goodall-rf5qoo`, desde `main` (`e797aba`, WEB-01 ya publicada en GitHub Pages).
+
+### Archivos cambiados
+
+- `web/core/intake.js` (nuevo): lee `?di=` y `?eventos=`, interpreta líneas de eventos («09:30 Dentista», «10:00-11:00 Reunión», «todo el día X»), limita tamaños y quita caracteres de control; calcula el próximo evento de hoy.
+- `web/core/assistant.js`: el comercio conserva la escritura original («Café Central»); la categoría sigue normalizando. **Diverge de Swift** (`IntentParser.merchant` normaliza): hay que portar el cambio al núcleo Swift.
+- `web/core/storage.js`: valida el campo opcional `agenda`.
+- `web/app.js`: tarjeta «Próximo» en Hoy; agenda de hoy en Agenda con formulario para pegarla; guía de Atajos en Tú; versión visible; aviso «MANU se ha actualizado»; los parámetros de URL se procesan una vez y se eliminan de la URL.
+- `web/sw.js` (caché `manuos-v2`, incluye `intake.js`), `web/styles.css`, `web/tests/intake.test.js` (nuevo), `web/tests/core.test.js`.
+
+### Comandos ejecutados y resultados reales
+
+- `cd web && npm test`: 17/17 PASS.
+- `node --check` de todos los scripts: sin errores.
+- Chromium headless (perfil iPhone 13): `?di=` registra el gasto con «Café Central» y limpia la URL; tras recargar no se repite; `?eventos=` abre Agenda con los eventos; pegar eventos reemplaza la agenda de hoy; Hoy muestra el próximo evento; sin scroll horizontal; 0 errores de consola; la regresión de WEB-01 sigue pasando.
+
+### Riesgos y regresiones posibles
+
+- Cualquiera que te envíe un enlace `?di=` puede añadir un mensaje o un gasto a tu MANU si lo abres. Se ve en el chat y se puede borrar, pero no hay confirmación.
+- La agenda pegada solo vale para el día en que se guarda.
+
+### NO_VERIFICADO
+
+- Los nombres exactos de las acciones de Atajos en iOS en español.
+- Si abrir una URL desde Atajos entra en la web del icono o en Safari (con datos separados).
+- El aviso de actualización en iOS.
+
 ## WEB-01 — app web instalable (ADR-0012)
 
 Rama `claude/magical-goodall-rf5qoo`, desde `main` (`ff2f86a`). Decisión de Manu: sin Mac capaz de ejecutar Xcode y sin pagar el Apple Developer Program, la app nativa no se puede instalar; se añade una web instalable publicada con GitHub Pages.

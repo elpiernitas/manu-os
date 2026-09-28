@@ -20,6 +20,9 @@ export function validateVault(data) {
     if (ids.has(item.id)) return { ok: false, reason: `Identificador repetido: ${item.id}.` };
     ids.add(item.id);
   }
+  if (data.agenda !== undefined && data.agenda !== null) {
+    if (typeof data.agenda.day !== "string" || !Array.isArray(data.agenda.events)) return { ok: false, reason: "La agenda guardada no es válida." };
+  }
   for (const entry of data.spending) {
     if (!Number.isInteger(entry.cents) || entry.cents <= 0) return { ok: false, reason: "Hay un gasto con un importe no válido." };
   }

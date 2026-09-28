@@ -18,10 +18,11 @@ export function amountCents(text) {
   return m ? toCents(m[1]) : null;
 }
 
+// Keeps Manu's own spelling ("Café", not "cafe"); categorising normalises later.
 export function merchant(text) {
-  const m = normalise(text).match(/\d(?:[.,]\d{1,2})?\s*(?:€|eur|euros)?\s+en\s+(.+)$/);
+  const m = String(text).trim().match(/\d(?:[.,]\d{1,2})?\s*(?:€|eur|euros)?\s+en\s+(.+)$/i);
   if (!m) return null;
-  const value = m[1].replace(/[ .!]+$/, "").trim();
+  const value = m[1].replace(/[\s.!?]+$/, "").trim().slice(0, 80);
   return value || null;
 }
 
@@ -39,7 +40,7 @@ export function parse(input) {
   }
   if (EXPENSE.some((p) => text.includes(p))) {
     const cents = amountCents(text);
-    if (cents) return { kind: "expense", cents, merchant: merchant(text) };
+    if (cents) return { kind: "expense", cents, merchant: merchant(input) };
   }
   if ((text.includes("tiempo") && (text.includes("que tiempo") || text.includes("hace"))) || text.includes("va a llover") || text.includes("llueve")) {
     return { kind: "weather" };

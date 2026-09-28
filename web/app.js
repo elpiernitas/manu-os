@@ -4,6 +4,7 @@ import { MODE_TITLES, modeState } from "./core/modes.js";
 import { capture, confirm, markUnclassified, pending, tasks, ideas, toggleDone } from "./core/inbox.js";
 import { initialRefuge, refugeReply } from "./core/refuge.js";
 import { LocalStore, emptyVault, validateVault } from "./core/storage.js";
+import { launchParams, parseEvents, nextEvent, localDay } from "./core/intake.js";
 import { notificationStatus, isInstalled, enableNotifications, testNotification } from "./core/notify.js";
 
 const store = new LocalStore(globalThis.localStorage ?? { getItem: () => null, setItem: () => { throw new Error("no storage"); } });
@@ -13,6 +14,9 @@ let tab = sessionStorage.getItem("manuos.tab") || "hoy";
 let refuge = null; // Refugio conversation lives only in memory, never saved.
 let confirmWipe = false;
 let variant = vault.chat.length;
+
+export const APP_VERSION = "2";
+const SITE = new URL(".", location.href).href;
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -53,6 +57,7 @@ const screens = {
     const month = summary(vault.spending, s, e);
     return `<h1>Hoy</h1><div class="stack">
       <section class="card"><h2>Ahora</h2><div class="row"><span class="chip">Modo ${esc(MODE_TITLES[m.mode])}</span><span class="muted small">${esc(m.reason)}</span></div></section>
+      <section class="card"><h2>Próximo</h2>${agendaToday() ? (() => { const n = nextEvent(vault.agenda); return n ? `<div class="row"><span class="num chip">${esc(n.time)}</span><span class="grow">${esc(n.title)}</span></div>` : '<p class="muted">No te queda nada más en la agenda de hoy.</p>'; })() : '<p class="muted">Sin agenda de hoy. Pégala en Agenda o tráela con un atajo.</p>'}</section>
       <section class="card"><h2>Bandeja</h2>
         ${inbox.length ? inbox.map((c) => `<div class="stack"><div>${esc(c.text)}</div><div class="btns">
           <button class="btn" data-act="task" data-id="${esc(c.id)}">Es una tarea</button>
@@ -73,7 +78,11 @@ const screens = {
     const idea = ideas(vault.inbox);
     const row = (t) => `<div class="row"><button class="check" data-act="toggle" data-id="${esc(t.id)}" aria-pressed="${Boolean(t.done)}" aria-label="${t.done ? "Reabrir" : "Completar"}: ${esc(t.text)}"></button><span class="grow">${esc(t.text)}</span></div>`;
     return `<h1>Agenda</h1><div class="stack">
-      <section class="card"><h2>Calendario</h2><p class="muted">Todavía no leo tu calendario. En la versión web no hay acceso al Calendario de Apple (ADR-0012).</p></section>
+      <section class="card"><h2>Hoy</h2>${agendaToday()
+        ? (vault.agenda.events.length ? vault.agenda.events.map((ev) => `<div class="row"><span class="num">${esc(ev.time ? ev.time + (ev.end ? "–" + ev.end : "") : "Todo el día")}</span><span class="grow">${esc(ev.title)}</span></div>`).join("") : '<p class="muted">Hoy no tienes eventos.</p>')
+        : '<p class="muted">La web no puede leer tu Calendario de Apple. Pega aquí tus eventos o usa el atajo de la pestaña Tú.</p>'}
+        <form id="pasteEvents" class="stack"><label for="eventsText" class="muted small">Un evento por línea: «09:30 Dentista», «10:00-11:00 Reunión» o «todo el día Cumpleaños».</label><textarea id="eventsText" rows="3" placeholder="09:30 Dentista"></textarea><div class="btns"><button class="btn ghost" type="submit">Guardar agenda de hoy</button></div></form>
+      </section>
       <section class="card"><h2>Tareas</h2>${open.length ? open.map(row).join("") : '<p class="muted">Sin tareas. Dile a MANU «apunta …» y confírmala como tarea en Hoy.</p>'}</section>
       ${done.length ? `<section class="card"><h2>Hechas</h2>${done.map(row).join("")}</section>` : ""}
       <section class="card"><h2>Ideas</h2>${idea.length ? idea.map((i) => `<div class="row"><span class="grow">${esc(i.text)}</span></div>`).join("") : '<p class="muted">Tus ideas quedan aquí, sin convertirse en proyectos sin tu permiso.</p>'}</section>
@@ -107,21 +116,46 @@ const screens = {
   },
   tu() {
     const n = notificationStatus();
+    const sayUrl = `${SITE}?di=`;
+    const eventsUrl = `${SITE}?eventos=`;
     const notif = { unsupported: isInstalled() ? "Este dispositivo no permite avisos web." : "En iPhone, primero añade MANU a la pantalla de inicio (Compartir → Añadir a pantalla de inicio) y ábrela desde ahí.", default: "Desactivados.", granted: "Activados.", denied: "Bloqueados. Actívalos en Ajustes → Notificaciones → MANU." }[n];
     return `<h1>Tú</h1><div class="stack">
       <section class="card"><h2>Refugio</h2><p class="muted">Para cuando no estás bien. Sin diagnósticos y sin guardar la conversación.</p><div class="btns"><button class="btn" data-act="refuge">Abrir Refugio</button></div></section>
       <section class="card"><h2>Avisos</h2><p class="muted">${esc(notif)}</p>
         <div class="btns">${n === "default" ? '<button class="btn" data-act="notify-on">Activar avisos</button>' : ""}${n === "granted" ? '<button class="btn ghost" data-act="notify-test">Probar un aviso</button>' : ""}</div>
         <p class="muted small">Los recordatorios a una hora concreta necesitan un servidor de avisos que aún no existe.</p></section>
+      <section class="card"><h2>Atajos del iPhone</h2>
+        <p class="muted">La app Atajos puede mandar cosas a MANU. Los nombres de las acciones pueden variar según tu versión de iOS.</p>
+        <details><summary>Apuntar algo por voz o con el botón de acción</summary><ol class="muted small">
+          <li>Atajos → nuevo atajo → acción «Solicitar entrada» (texto).</li>
+          <li>Acción «URL»: <code>${esc(sayUrl)}</code> seguido de la variable «Entrada proporcionada».</li>
+          <li>Acción «Abrir URL».</li></ol></details>
+        <details><summary>Traer la agenda de hoy</summary><ol class="muted small">
+          <li>«Buscar eventos del calendario» con fecha de inicio hoy.</li>
+          <li>«Repetir con cada» → «Texto»: hora de inicio en formato HH:mm, un espacio y el título.</li>
+          <li>«Combinar texto» con saltos de línea → «Copiar al portapapeles».</li>
+          <li>Abre MANU desde su icono → Agenda → pega el texto y guarda.</li></ol>
+          <p class="muted small">También puedes abrir <code>${esc(eventsUrl)}</code> más el texto codificado, pero se abrirá en Safari, y Safari guarda sus datos aparte del icono de MANU (NO_VERIFICADO en tu iPhone).</p></details>
+      </section>
       <section class="card"><h2>Tus datos</h2><p class="muted">Todo se guarda solo en este dispositivo. Haz copias de vez en cuando: si borras los datos de Safari, se pierden.</p>
         <div class="btns"><button class="btn ghost" data-act="export">Descargar copia</button><label class="btn ghost" for="import" role="button" tabindex="0">Restaurar copia</label><input id="import" type="file" accept="application/json,.json" class="sr"></div>
         ${confirmWipe ? '<p>¿Seguro? Se borra todo lo guardado en este dispositivo.</p><div class="btns"><button class="btn danger" data-act="wipe-yes">Sí, borrar todo</button><button class="btn ghost" data-act="wipe-no">Cancelar</button></div>' : '<button class="link" data-act="wipe">Borrar todos los datos…</button>'}
       </section>
       <section class="card"><h2>Próximamente</h2><p class="muted">Salud, comidas, personas y hábitos. En la web no hay acceso a Salud ni a Contactos de Apple.</p></section>
-      <p class="muted small">MANU OS web · datos locales · sin IA</p>
+      <p class="muted small">MANU OS web · versión ${APP_VERSION} · datos locales · sin IA</p>
     </div>`;
   },
 };
+
+function agendaToday() {
+  return vault.agenda && vault.agenda.day === localDay() ? vault.agenda : null;
+}
+
+function importEvents(events) {
+  vault.agenda = { day: localDay(), events, importedAt: new Date().toISOString() };
+  persist();
+  toast(events.length ? `Agenda de hoy: ${events.length} evento${events.length === 1 ? "" : "s"}` : "No he reconocido ningún evento");
+}
 
 function render({ focus = false } = {}) {
   $("tabs").innerHTML = TABS.map(([id, label]) => `<button class="tab" role="tab" data-tab="${id}" aria-selected="${tab === id}">${id === "manu" ? '<span class="dot" aria-hidden="true">M</span>' : ICONS[id]}<span>${label}</span></button>`).join("");
@@ -194,6 +228,12 @@ document.addEventListener("keydown", (e) => {
 });
 
 document.addEventListener("submit", (e) => {
+  if (e.target.id === "pasteEvents") {
+    e.preventDefault();
+    importEvents(parseEvents($("eventsText").value));
+    render();
+    return;
+  }
   if (e.target.id !== "composer") return;
   e.preventDefault();
   const input = $("msg");
@@ -238,5 +278,17 @@ if (loaded.warning) {
   $("banner").textContent = loaded.warning;
   $("banner").hidden = false;
 }
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+if ("serviceWorker" in navigator) {
+  const hadController = Boolean(navigator.serviceWorker.controller);
+  navigator.serviceWorker.addEventListener("controllerchange", () => { if (hadController) toast("MANU se ha actualizado"); });
+  navigator.serviceWorker.register("sw.js").catch(() => {});
+}
+
+// Input from a link or an iOS Shortcut, handled once and removed from the URL.
+const launch = launchParams(location.search);
+if (launch.say || launch.events) {
+  history.replaceState(null, "", location.pathname);
+  if (launch.events) { importEvents(launch.events); tab = "agenda"; }
+  if (launch.say) { tab = "manu"; say(launch.say); }
+}
 render();
