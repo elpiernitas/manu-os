@@ -1,6 +1,6 @@
 # CURRENT TASK
 
-Status: **IN_PROGRESS**
+Status: **REVIEW_PENDING**
 
 ## Corrección activa — D-03 y TestFlight
 

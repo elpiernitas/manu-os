@@ -247,3 +247,9 @@ Sigue sin haber ninguna decisión pendiente de Manu ahora. D-04B y D-03 son gate
 ## Próximo paso
 
 BRAIN-02-PREP quedó ejecutada por Claude Code conforme a `docs/roadmap/BRAIN_02_TASK.md`, con tres rondas de corrección tras revisión externa (ver "BRAIN-02-PREP — tercera corrección tras revisión externa" arriba, que es el estado vigente). El orquestador revisa el PR #5 y decide el merge; si lo aprueba, debe abrir inmediatamente el siguiente trabajo autorizado (candidato natural: cualquiera de BRAIN-02a–02d, ninguna con bloqueos técnicos pendientes en CI/simulador, solo falta autorización explícita de código de producto). No hay ningún bloqueo humano que señalar ahora: D-04B y D-03 quedan como gates futuros documentados con sus disparadores, no como preguntas activas.
+
+## PR #6 — corrección D-03/TestFlight (rama `fix/brain-02-prep-d03-gates`)
+
+La rama base `brain/02-preparation` (`c83be34`) ya incluía la alineación de D-03 en los documentos activos, la regresión documental (QAL-008) y su entrada en este archivo. Se fusionó la base en esta rama sin conflictos. La revisión encontró un único residuo: `docs/roadmap/BRAIN_02_TASK.md` (fila "Fase de dispositivo real") aún decía "Solo si ... falla ..., entra D-03"; se reescribió con los dos disparadores independientes.
+
+Comprobaciones: grep `solo si.*(falla|fallo)` sobre `docs` y `ai` (sin los archivos históricos) → solo queda `DECISIONS_AND_OPEN_ITEMS.md` D-03, que ya enumera ambos disparadores; enlaces relativos Markdown: 34 archivos, 0 rotos; sin ADR duplicados; R-41 una sola vez; documentos requeridos y `Status` válidos como en Foundation check. Sin código, servicios, costes ni credenciales.
