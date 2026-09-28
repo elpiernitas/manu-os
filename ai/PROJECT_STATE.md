@@ -4,7 +4,7 @@
 
 ## Estado actual
 
-- **Línea web (ADR-0012)**: app web instalable publicada en GitHub Pages (`https://elpiernitas.github.io/manu-os/`) desde `main`. WEB-01 a WEB-04 están fusionadas (PR #10, #11 y #12, con fusión autorizada por Manu). Local-first, sin servidor. Incluye Open-Meteo para el tiempo y la conexión opcional con Google Calendar. WEB-05 (Gemini y más Google, ADR-0013) está en revisión en el PR #13.
+- **Línea web (ADR-0012)**: app web instalable publicada en GitHub Pages (`https://elpiernitas.github.io/manu-os/`) desde `main`. WEB-01 a WEB-04 están fusionadas (PR #10, #11 y #12, con fusión autorizada por Manu). Local-first, sin servidor. Incluye Open-Meteo para el tiempo y la conexión opcional con Google Calendar. WEB-05 (Gemini y más Google, ADR-0013) está fusionada (PR #13). WEB-06 (Excel de Sabadell) está en revisión en el PR #15.
 - Servicios externos que la **web** puede usar desde el dispositivo de Manu y con su consentimiento: Open-Meteo (sin clave), Google (OAuth del propio Manu, un scope por función) y Gemini (clave de Manu, envío solo confirmado). El repositorio no guarda credenciales.
 
 - BRAIN-00: **COMPLETED Y FUSIONADO** en `main` mediante el PR #1.
@@ -23,7 +23,7 @@ Los documentos canónicos están en `docs/`. Las tareas activas se controlan med
 
 ## Siguiente gate
 
-1. El orquestador revisa el PR #13 (WEB-05, ADR-0013). Es la única implementación activa.
+1. El orquestador revisa el PR #15 (WEB-06). Es la única implementación activa.
 2. Manu, en su dispositivo y fuera del repositorio, crea el ID de cliente OAuth de Google y, si quiere, la clave gratuita de Gemini. Ningún secreto entra en Git.
 3. Nativo: sin cambios hasta que exista una vía de instalación sin coste (D-04B) o Manu decida otra cosa.
 
