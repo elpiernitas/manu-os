@@ -2,13 +2,48 @@
 
 ## Próximo paso vigente
 
-1. WEB-07/08 fusionadas (PR #16). WEB-09 (movimiento) sigue el mismo flujo: Claude Code fusiona con CI en verde y `web.yml` publica. La revisión de ChatGPT es bajo petición.
+1. WEB-07/08 fusionadas (PR #16). WEB-09 (movimiento) fusionada (PR #17); WEB-10 sigue el mismo flujo: Claude Code fusiona con CI en verde y `web.yml` publica. La revisión de ChatGPT es bajo petición.
 2. Manu, en su dispositivo y fuera del repositorio, crea el ID de cliente OAuth de Google (Calendar, Tasks, People y Drive, cada uno activable por separado) y, si quiere, la clave gratuita de Gemini.
 3. La línea nativa (PR #7, #8 y #9) sigue en pausa. D-04B y D-03 son gates futuros.
 
 ## Estado
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
+
+## WEB-10 — calendario de mes, cobros fijos, «cuándo gastas» y contactos explicados
+
+Prueba real de Manu con la versión 8: Google sincroniza (Calendar sí, Tasks trae su tarea, Contactos «0 nuevos»).
+
+### Cambios
+
+- `web/core/gcal.js`: `listEvents` paginado (hasta 10 páginas de 250) y `monthGrid` (semanas de lunes a domingo).
+- `web/core/insights.js` (nuevo):
+  - `detectRecurring`: cobros cada 25–35 días con importe estable ±15 %; 2 repeticiones para suscripciones, servicios, casa y finanzas, 3 para el resto; día del mes, próximo cobro y «vencido»;
+  - `upcomingRecurring`;
+  - `spendingPattern`: por día de la semana, por tercio del mes y por momento del día, este último solo en gastos apuntados a mano porque el banco no da la hora.
+- `web/core/google.js`: `contactBirthdays` devuelve también el total leído. El estado pasa a ser «N leídos · M con cumpleaños · K nuevos», porque «0 nuevos» confundía: solo se importan los contactos con cumpleaños.
+- `web/app.js`:
+  - Agenda con **calendario de mes estilo Apple**: puntos por evento, hoy resaltado, día elegido, flechas y deslizamiento para cambiar de mes, animación suave y lista del día con ubicación y recordatorios;
+  - la sincronización trae del mes anterior al siguiente (`vault.calendar`);
+  - pegar eventos queda como opción plegada si no se usa Google;
+  - Dinero con «Cobros fijos» y «Cuándo gastas»;
+  - versión 10.
+- `web/core/storage.js` valida `calendar`. También cambian `web/styles.css` y `web/sw.js` (`manuos-v10`).
+
+### Decisión de privacidad
+
+Manu pidió que su Excel (gastos y reglas) viniera «de serie» en la app. **No se incluye en el código**, porque el repositorio es público. La importación es una sola vez en su móvil, persiste en el dispositivo y en su copia cifrada de Drive.
+
+### Resultados
+
+- `npm test`: 64/64 PASS.
+- En local, con los datos reales de Manu y solo recuentos: 3 cobros fijos (días 8, 11 y 23).
+- Chromium headless, con zona Europe/Madrid: calendario (rejilla, 2 puntos hoy, lista del día, cambio de mes), estado de contactos, cobros fijos y «Cuándo gastas» en PASS; regresiones de WEB-03 a WEB-09 en PASS. Un primer fallo del test del calendario venía de que el script calculaba las fechas en UTC y el navegador estaba en Madrid pasada la medianoche; no era un fallo de la app.
+
+### NO_VERIFICADO
+
+- El calendario con la cuenta real de Manu.
+- El deslizamiento táctil en su iPhone.
 
 ## WEB-09 — movimiento estilo iOS y detalles
 

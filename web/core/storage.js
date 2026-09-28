@@ -26,6 +26,7 @@ export function validateVault(data) {
     if (ids.has(item.id)) return { ok: false, reason: `Identificador repetido: ${item.id}.` };
     ids.add(item.id);
   }
+  if (data.calendar !== undefined && data.calendar !== null && (typeof data.calendar.days !== "object" || Array.isArray(data.calendar.days))) return { ok: false, reason: "El calendario guardado no es válido." };
   for (const key of ["agenda", "agendaTomorrow"]) {
     const a = data[key];
     if (a !== undefined && a !== null && (typeof a.day !== "string" || !Array.isArray(a.events))) return { ok: false, reason: "La agenda guardada no es válida." };
