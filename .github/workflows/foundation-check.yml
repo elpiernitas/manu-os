@@ -53,4 +53,4 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          grep -Eq '^Status: \*\*(READY|IN_PROGRESS|PAUSED|BLOCKED|COMPLETED|NOT_AUTHORIZED)\*\*$' ai/CURRENT_TASK.md
+          grep -Eq '^Status: \*\*(READY|IN_PROGRESS|REVIEW_PENDING|PAUSED|BLOCKED|COMPLETED|NOT_AUTHORIZED)\*\*$' ai/CURRENT_TASK.md
