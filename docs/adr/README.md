@@ -20,3 +20,4 @@ Estados permitidos:
 - [ADR-0007 — Experiencia nativa de iPhone como prioridad](0007-native-iphone-first.md)
 - [ADR-0008 — Retención, extracción y borrado controlado de fuentes](0008-source-retention-and-controlled-deletion.md) — complementa ADR-0002
 - [ADR-0009 — Asistente MANU con núcleo determinista y modelos opcionales](0009-manu-assistant-without-mandatory-ai.md)
+- [ADR-0010 — Contratos de conocimiento en Swift](0010-swift-knowledge-contracts.md)

@@ -2,48 +2,76 @@
 
 ## Estado
 
-No hay una implementación activa. BRAIN-00 dejó preparada la documentación fundacional, revisada el 2026-09-28 por ADR-0007 y, el mismo día, por las decisiones de producto de Manu. BRAIN-01 sigue `NOT_AUTHORIZED`.
+BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está implementado en `brain/01-knowledge-contracts` y pendiente de revisión externa en el PR #2. No está fusionado.
 
-## Última tarea: decisiones de producto de Manu (2026-09-28)
+## BRAIN-01 — resultado
 
-Autorizada explícitamente por Manu, solo para documentación. Ejecutada por Claude Code en la rama `chore/brain-00-foundation` (PR #1, en borrador), sobre el commit `3158903`.
+Se implementó un Swift Package sin dependencias externas, UI, almacenamiento, red ni proveedor de IA.
 
-### Cambios realizados
+### Cambios
 
-- Nuevos:
-  - `docs/product/EXPERIENCE.md`: visión funcional completa con la viabilidad de cada pieza.
-  - `docs/adr/0008-source-retention-and-controlled-deletion.md`: retención por fuente y borrado controlado.
-  - `docs/adr/0009-manu-assistant-without-mandatory-ai.md`: chat MANU con nivel base sin IA y nivel conversacional opcional.
-- Modificados:
-  - `docs/product/PRODUCT_CHARTER.md`, `docs/product/MVP_ACCEPTANCE.md` (MVP técnico interno frente a Beta 1).
-  - `docs/architecture/ARCHITECTURE.md`, `docs/architecture/DATA_MODEL.md`, `docs/architecture/DECISIONS_AND_OPEN_ITEMS.md` (recomendación D-01, datos para D-04, D-07 a D-09).
-  - `docs/integrations/INTEGRATIONS.md`, `docs/roadmap/ROADMAP.md`, `docs/roadmap/BACKLOG.md`, `docs/roadmap/BRAIN_01_TASK.md` (solo nota).
-  - `docs/security/RISK_REGISTER.md` (R-24 a R-40), `docs/security/THREAT_MODEL.md`, `docs/research/SOURCES.md`.
-  - `docs/adr/README.md`, `docs/adr/0002-evidence-backed-knowledge.md` y `docs/adr/0007-native-iphone-first.md` (solo notas añadidas; su decisión no se reescribe).
-  - `README.md`, `AGENTS.md`, `ai/*.md` salvo `QA_REPORT.md`.
+- `Package.swift`: paquete y módulo `ManuBrainDomain`.
+- `Sources/ManuBrainDomain/ManuBrainDomain.swift`:
+  - UUIDv7 y timestamps ISO-8601 UTC;
+  - Source, SourceItem, Fragment y SourceDeletionEvent;
+  - Entity, Claim, EvidenceLink, Activity y Agent;
+  - clasificaciones, estados y valores tipados;
+  - validación de evidencia/confianza/modelos;
+  - sustitución, detección de ciclos y resolución temporal;
+  - `StrictJSON` para campos superiores desconocidos;
+  - consulta honesta de disponibilidad del original.
+- `Tests/ManuBrainDomainTests/KnowledgeContractTests.swift`: 12 casos obligatorios y uno adicional de ADR-0008.
+- `.github/workflows/brain-01.yml`: runner `macos-26`, permisos `contents: read`, sin deploy y timeout de 15 minutos.
+- ADR-0010 y actualización de los documentos de estado/tarea.
 
-### Verificación ejecutada
+### Decisiones
 
-Ver la sección de verificación del PR #1 y el informe de la tarea. Comprobaciones: pasos de `foundation-check.yml` reproducidos en local, enlaces Markdown relativos, IDs R-xx/G-xx/D-xx definidos y ausencia de archivos de código o infraestructura en el diff.
+- D-01: núcleo Swift compartible por iPhone y Mac.
+- ADR-0008: retención explícita y ningún original descartado se presenta como disponible.
+- ADR-0010: Swift Package, structs inmutables, funciones puras y cero dependencias externas.
+
+### Verificación real
+
+Runner: `macos-26-arm64`, macOS 26.6.2, Apple Swift 6.3.3.
+
+Run fallido inicial: `36446223794`. Detectó que un inicializador que lanza error no satisface `RawRepresentable`; se eliminó esa conformidad sin relajar validación.
+
+Run corregido: `36446466658` — SUCCESS.
+
+- `swift package dump-package`: PASS.
+- `swift build --build-tests`: PASS.
+- `swift test --parallel`: PASS.
+- Resultado: **13 tests, 1 suite, 13/13 PASS**.
+- Foundation check del mismo commit: PASS.
+
+Commits:
+- `caf146c`: implementación inicial.
+- `cde9fe4`: corrección de compilación.
 
 ### Riesgos
 
-- Los valores P/I de R-15 a R-40 son estimaciones iniciales sin evidencia.
-- Varias conclusiones técnicas dependen de documentación de Apple y Spotify consultada el 2026-09-28; pueden cambiar.
-- El entorno local está verificado: `MacBookPro14,2` de 2017, oficialmente limitado a Ventura, ejecutando Sonoma 14.8.7 mediante un mecanismo no verificado. No se usará para compilar ni se actualizará a Tahoe para este proyecto.
+- `StrictJSON` solo protege si las entradas externas usan ese límite; `JSONDecoder` directo sigue tolerando campos desconocidos.
+- El test histórico conserva ambos structs en memoria; la persistencia real pertenece a BRAIN-02.
+- El runner valida macOS ARM, no el iPhone 14 ni el Mac Intel de Manu.
+- No se ha medido rendimiento porque el volumen de BRAIN-01 es mínimo.
+
+## Revisión externa (2026-09-28)
+
+Revisión del head `1941319` por Claude Code. Detalle completo en `ai/QA_REPORT.md`.
+
+- Reproducido 13/13 PASS con Swift 6.3.3 en Linux x86_64.
+- 10 defectos demostrados con pruebas ejecutables y corregidos en esta rama, cada uno con test de regresión: creador de la Claim no comprobado, Claims de modelo visibles, sustitución que invierte o amplía la vigencia o resucita Claims rechazadas, Claims en disputa resueltas en silencio, `hasOriginal` que ignora la política de retención, aborto con IDs duplicados en la detección de ciclos, falta de `init` públicos y timestamps no UTC o imposibles aceptados.
+- Archivos: `Sources/ManuBrainDomain/ManuBrainDomain.swift`, `Package.swift` (target `ManuBrainDomainPublicAPITests`), `Tests/ManuBrainDomainTests/ReviewRegressionTests.swift`, `Tests/ManuBrainDomainPublicAPITests/PublicAPITests.swift`, `.gitignore`, `ai/QA_REPORT.md`, `ai/HANDOFF.md`.
+- Comandos: `swift package dump-package` PASS; `swift build --build-tests` PASS sin warnings; `swift test --parallel` **31/31 PASS en 3 suites** (Linux x86_64 en local y GitHub Actions `macos-26`, run `36451712052`).
+- Observaciones no bloqueantes documentadas en `ai/QA_REPORT.md` para BRAIN-02.
+- Revisión posterior del orquestador: se cerró el último hueco para que un agente `MODEL` solo pueda crear Claims `PROPOSED`; el test parametrizado cubre `ACTIVE`, `SUPERSEDED`, `CONTESTED`, `REJECTED` y `RETRACTED`. Commit `72aa272`; CI `macos-26` (run `36452298444`) **31/31 PASS en 3 suites** y Foundation check (run `36452298319`) PASS.
 
 ## NO VERIFICADO
 
-- No se ha implementado ni probado nada de MANU BRAIN, las apps ni sus extensiones.
-- Compilación, firma e instalación de la app integrada en el iPhone 14 con iOS 27 (D-04B).
-- Compatibilidad real de la futura app de Mac con `MacBookPro14,2`.
-- Capacidades disponibles con cuenta gratuita (HealthKit, contenedor compartido, notificaciones push) frente a Apple Developer Program.
-- Controles del Centro de Control, AlarmKit, disparadores de Atajos y borrado en Fotos en el iPhone de Manu.
-- Spotify DJ, Chromecast, batería de AirPods, Toque posterior y disparador de transacciones de Wallet.
-- Calidad del OCR y del reconocimiento de voz en español.
-- Grabación de llamadas y detección de llegada a casa.
-- Utilidad del chat MANU sin modelo.
+- Integración con almacenamiento, cifrado, sync, UI o extensiones.
+- Compilación, firma o instalación de una app iOS/macOS.
+- Comportamiento en dispositivos reales.
 
 ## Próximo paso
 
-Revisión y merge del PR #1. D-01 está decidida (Swift/SwiftUI) y D-04 permite verificar BRAIN-01 en GitHub Actions. D-03 y D-04B se aplazan hasta BRAIN-02. Solo con autorización explícita, revalidar y autorizar BRAIN-01.
+Aprobación de Manu del PR #2 tras la revisión externa. No fusionar automáticamente. BRAIN-02 sigue sin autorizar.

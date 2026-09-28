@@ -1,0 +1,32 @@
+name: BRAIN-01 Swift checks
+
+on:
+  pull_request:
+    paths:
+      - Package.swift
+      - Sources/**
+      - Tests/**
+      - .github/workflows/brain-01.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brain-01-\${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contracts:
+    runs-on: macos-26
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Toolchain
+        run: swift --version
+      - name: Validate package
+        run: swift package dump-package
+      - name: Build
+        run: swift build --build-tests
+      - name: Test
+        run: swift test --parallel

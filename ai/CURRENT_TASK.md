@@ -1,29 +1,28 @@
 # CURRENT TASK
 
-Status: **NOT_AUTHORIZED**
+Status: **REVIEW_PENDING**
 
-## Tarea preparada
+## Tarea activa
 
 BRAIN-01 — contratos de conocimiento con fuentes, afirmaciones, evidencia y temporalidad.
 
-## Instrucción de pausa
+## Autorización
 
-No ejecutar esta tarea todavía. Claude Code tiene acceso al repositorio desde el 2026-09-28, pero solo para tareas documentales que Manu autoriza de forma explícita; no está autorizado a iniciar BRAIN-01.
+Manu autorizó continuar BRAIN-01 el 2026-09-28 tras revisar y fusionar el PR #1. La implementación se realiza en `brain/01-knowledge-contracts`, no en `main`.
 
-La especificación completa preparada para el futuro está en `docs/roadmap/BRAIN_01_TASK.md`. D-01 ya está cerrada (Swift) y D-04 permite verificar el núcleo como Swift Package en GitHub Actions. Antes de autorizarla hay que fusionar el PR #1 y adaptar la especificación a ADR-0007, ADR-0008 y la decisión de Swift.
+La implementación y sus 13 tests han pasado en GitHub Actions con Swift 6.3.3. El PR #2 está pendiente de revisión externa y no está autorizado a fusionarse.
 
-## Trabajo permitido mientras está pausada
+## Alcance autorizado
 
-- revisión de documentación;
-- detección de contradicciones;
-- propuestas sin modificar código;
-- correcciones documentales autorizadas.
+- Swift Package independiente de UI;
+- contratos inmutables, validación y resolución temporal;
+- fixtures sintéticos y tests;
+- CI de coste controlado, sin deploy;
+- ADR y handoff de BRAIN-01.
 
 ## Trabajo prohibido
 
-- crear paquetes, schemas o tests de BRAIN-01;
-- añadir React, PWA, proyecto Xcode/SwiftUI, base de datos o infraestructura;
-- conectar servicios o credenciales;
-- instalar plugins o activar revisiones automáticas que consuman créditos;
-- abrir PR de implementación;
+- añadir UI, proyecto Xcode, base de datos, red, sync o infraestructura;
+- conectar servicios, credenciales o datos reales;
+- instalar plugins o activar revisiones automáticas;
 - hacer merge o deploy.
