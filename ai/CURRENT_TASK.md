@@ -1,28 +1,35 @@
 # CURRENT TASK
 
-Status: **REVIEW_PENDING**
+Status: **READY**
 
 ## Tarea activa
 
-BRAIN-01 — contratos de conocimiento con fuentes, afirmaciones, evidencia y temporalidad.
+Preparación de BRAIN-02 — cerrar decisiones y contrato de aceptación antes de implementar.
 
 ## Autorización
 
-Manu autorizó continuar BRAIN-01 el 2026-09-28 tras revisar y fusionar el PR #1. La implementación se realiza en `brain/01-knowledge-contracts`, no en `main`.
+BRAIN-01 fue fusionado en `main` mediante el PR #2 tras revisión externa, correcciones y 31/31 tests.
 
-La implementación y sus 13 tests han pasado en GitHub Actions con Swift 6.3.3. El PR #2 está pendiente de revisión externa y no está autorizado a fusionarse.
+El 2026-09-28 Manu delegó en el orquestador técnico de ChatGPT/Codex la decisión final sobre revisiones y merges. El orquestador puede aceptar, corregir o rechazar aportaciones de Claude y fusionar trabajo verificado sin solicitar aprobación de Manu en cada PR.
 
 ## Alcance autorizado
 
-- Swift Package independiente de UI;
-- contratos inmutables, validación y resolución temporal;
-- fixtures sintéticos y tests;
-- CI de coste controlado, sin deploy;
-- ADR y handoff de BRAIN-01.
+- actualizar estado, handoff y documentación de gobierno;
+- preparar BRAIN-02 y convertir D-02, D-03 y D-04 en decisiones verificables;
+- encargar y revisar trabajo de Claude con alcance cerrado;
+- abrir, corregir y fusionar PRs cuando exista revisión externa y checks suficientes.
 
-## Trabajo prohibido
+## Límites que siguen requiriendo a Manu
 
-- añadir UI, proyecto Xcode, base de datos, red, sync o infraestructura;
+- cualquier coste, suscripción o facturación;
+- despliegue público o publicación de datos;
+- permisos sensibles, credenciales o conexión de servicios externos;
+- acceso a datos personales reales o dispositivos;
+- decisiones materiales de producto sin una recomendación claramente dominante.
+
+## Trabajo todavía prohibido
+
+- iniciar la implementación de BRAIN-02 antes de cerrar sus decisiones y gates;
 - conectar servicios, credenciales o datos reales;
-- instalar plugins o activar revisiones automáticas;
-- hacer merge o deploy.
+- saltarse revisión externa o checks;
+- merge automático basado solo en que Claude declare PASS.
