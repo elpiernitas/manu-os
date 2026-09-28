@@ -2,11 +2,11 @@
 
 Status: **REVIEW_PENDING**
 
-WEB-10 implementado por Claude Code; se fusiona cuando CI está en verde. La revisión del orquestador es bajo petición.
+WEB-11 implementado por Claude Code; se fusiona cuando CI está en verde. La revisión del orquestador es bajo petición.
 
 ## Tarea activa
 
-WEB-10 — calendario de mes estilo Apple con Google Calendar, cobros fijos, «cuándo gastas» y estado de contactos comprensible (`ai/HANDOFF.md`, «WEB-10»).
+WEB-11 — todos los calendarios de Google con sus colores, eventos de varios días como barra y acceso de WhatsApp corregido (`ai/HANDOFF.md`, «WEB-11»).
 
 ## Autorización
 
@@ -39,6 +39,7 @@ WEB-10 — calendario de mes estilo Apple con Google Calendar, cobros fijos, «c
 
 ## Historial (cerrado)
 
+- **WEB-10** (calendario de mes, cobros fijos, cuándo gastas): CERRADA. Fusionada mediante el PR #18 (`505c6bf`).
 - **WEB-09** (movimiento estilo iOS): CERRADA. Fusionada mediante el PR #17 (`8ca2bbb`).
 - **WEB-07/08** (accesos, Spotify, WhatsApp, reglas, «Conectar Google», Atajos): CERRADAS. Fusionadas en `main` mediante el PR #16 (`dfb0c56`).
 - **WEB-06** (Excel de Sabadell y aprendizaje por comercio): CERRADA. Fusionada en `main` mediante el PR #15 (`4b19d3e`).

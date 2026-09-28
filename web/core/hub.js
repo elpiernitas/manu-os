@@ -3,7 +3,9 @@
 // NO_VERIFICADO from a home-screen web app.
 export const APPS = {
   spotify: { label: "Spotify", url: "https://open.spotify.com/", color: "green" },
-  whatsapp: { label: "WhatsApp", url: "https://wa.me/", color: "green" },
+  // wa.me without a number makes WhatsApp show "No se pudo abrir este enlace"
+  // (Manu's screenshot, 2026-09-29); the app scheme just opens WhatsApp.
+  whatsapp: { label: "WhatsApp", url: "whatsapp://", color: "green" },
   calendar: { label: "Calendar", url: "https://calendar.google.com/", color: "blue" },
   gmail: { label: "Gmail", url: "https://mail.google.com/", color: "red" },
   drive: { label: "Drive", url: "https://drive.google.com/", color: "orange" },
