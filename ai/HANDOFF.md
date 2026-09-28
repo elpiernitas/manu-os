@@ -74,4 +74,4 @@ Revisión del head `1941319` por Claude Code. Detalle completo en `ai/QA_REPORT.
 
 ## Próximo paso
 
-Preparar BRAIN-02 y cerrar D-02, D-03 y D-04 antes de implementar. Manu delegó en el orquestador técnico la decisión final sobre revisiones y merges; siguen requiriendo autorización específica los costes, servicios externos, datos reales, permisos sensibles y decisiones materiales de producto.
+Preparar BRAIN-02 y cerrar D-02, D-03 y D-04B antes de implementar. Manu delegó en el orquestador técnico la decisión final sobre revisiones y merges; siguen requiriendo autorización específica los costes, servicios externos, datos reales, permisos sensibles y decisiones materiales de producto.
