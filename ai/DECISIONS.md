@@ -36,12 +36,16 @@
 - Fuera de alcance: armario digital, dieta, terapia.
 - Nuevos gates G-10 a G-14.
 
+## Decisiones cerradas tras verificar los dispositivos y tras BRAIN-02-PREP (2026-09-28)
+
+- D-01: **DECIDIDA**. Núcleo Swift y apps SwiftUI para iPhone y Mac; Manu aceptó la recomendación. *(Esta sección corrige una entrada anterior de este archivo que seguía describiéndola como pendiente después de cerrarse.)*
+- D-02: **DECIDIDA** ([ADR-0011](../docs/adr/0011-native-local-storage-and-keys.md)). SQLite del sistema tras `LocalStore`, Argon2id + Keychain para claves, App Group para el contenedor compartido (disponibilidad con cuenta gratuita `NO_VERIFICADO`, no bloquea el cierre de D-02).
+- D-04: **PARCIALMENTE RESUELTA**. BRAIN-01 y las cuatro subfases de BRAIN-02 (incluido un proyecto Xcode real con Keychain, App Group y extensiones) se verifican en el runner `macos-26` contra iOS Simulator sin firma ni coste; solo firmar e instalar en el iPhone físico sigue bloqueado por D-04B (corrección del 2026-09-28 tras revisión externa del PR #5).
+
 ## Pendientes
 
-- D-01: reparto SwiftUI/web y lenguaje del núcleo. **Recomendación documentada (no cerrada): núcleo Swift y apps SwiftUI para iPhone y Mac.**
-- D-02: almacenamiento local nativo y contenedor compartido con extensiones.
-- D-03: Apple Developer Program.
-- D-04: entorno de compilación y pruebas; faltan datos del Mac y del iPhone.
+- D-03: Apple Developer Program. Se pedirá a Manu si se activa uno de dos disparadores independientes: firmar en el iPhone físico con la cuenta gratuita demuestra que App Groups falla, o se elige TestFlight como ruta de distribución/prueba física (la exige por sí sola, sin relación con si App Groups falla o no). Ninguno activo ahora.
+- D-04B: firma e instalación de un proyecto Xcode real en el iPhone físico (no su compilación/prueba en simulador, ya desbloqueada por D-04); gate futuro, no decisión pendiente ahora. Ningún runner de CI, gratuito o de pago, tiene acceso físico al iPhone; las rutas reales son un Mac de Manu compatible conectado al dispositivo, o TestFlight vía D-03 (con su propio gate de credenciales de firma), o reducir el alcance. El Mac de Manu no cumple hoy los requisitos oficiales de ningún Xcode actual.
 - D-05: fuente de calendario.
 - D-06: servicio meteorológico.
 - D-07: transporte de sync.
@@ -61,3 +65,5 @@ Los detalles están en `docs/architecture/DECISIONS_AND_OPEN_ITEMS.md`.
 - `docs/adr/0007-native-iphone-first.md` — ACCEPTED (con notas posteriores)
 - `docs/adr/0008-source-retention-and-controlled-deletion.md` — ACCEPTED
 - `docs/adr/0009-manu-assistant-without-mandatory-ai.md` — ACCEPTED
+- `docs/adr/0010-swift-knowledge-contracts.md` — ACCEPTED
+- `docs/adr/0011-native-local-storage-and-keys.md` — ACCEPTED

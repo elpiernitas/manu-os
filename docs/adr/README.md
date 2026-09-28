@@ -21,3 +21,4 @@ Estados permitidos:
 - [ADR-0008 — Retención, extracción y borrado controlado de fuentes](0008-source-retention-and-controlled-deletion.md) — complementa ADR-0002
 - [ADR-0009 — Asistente MANU con núcleo determinista y modelos opcionales](0009-manu-assistant-without-mandatory-ai.md)
 - [ADR-0010 — Contratos de conocimiento en Swift](0010-swift-knowledge-contracts.md)
+- [ADR-0011 — Almacenamiento local nativo, claves y contenedor compartido (D-02)](0011-native-local-storage-and-keys.md)

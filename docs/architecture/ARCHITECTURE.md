@@ -76,14 +76,14 @@ Decisión en [ADR-0009](../adr/0009-manu-assistant-without-mandatory-ai.md).
 
 ## Componentes decididos
 
-> Esta tabla es la decisión BRAIN-00, cuando la PWA era la interfaz principal. Las filas marcadas **(D-01)** o **(D-02)** quedan pendientes de revisión por ADR-0007; el resto sigue vigente.
+> Esta tabla es la decisión BRAIN-00, cuando la PWA era la interfaz principal. Las filas marcadas **(D-01)** quedan pendientes de revisión por ADR-0007; las marcadas **DECIDIDO (D-02, ...)** ya están cerradas por ADR-0011; el resto sigue vigente.
 
 | Capa | Decisión BRAIN-00 | Motivo |
 | --- | --- | --- |
 | UI | **Sustituida (ADR-0007)**: app nativa SwiftUI para iPhone. Antes: React + TypeScript + Vite PWA. Un componente web solo si D-01 lo mantiene | las superficies del sistema solo están disponibles en nativo |
 | Estilo | **(D-01)** En nativo: componentes del sistema, Dynamic Type y modo oscuro. CSS propio con tokens solo para un componente web | seguir las convenciones de iOS |
-| Estado local | **(D-02)** Adaptador `LocalStore`. BRAIN-00: IndexedDB + Dexie (válido solo para un componente web) | la tecnología nativa y el contenedor compartido con extensiones están por decidir |
-| Blobs locales | **(D-02)** BRAIN-00: OPFS con fallback a IndexedDB (solo web) | archivos sin inflar registros estructurados |
+| Estado local | **DECIDIDO (D-02, [ADR-0011](../adr/0011-native-local-storage-and-keys.md))**: adaptador `LocalStore` sobre `sqlite3` del sistema con wrapper Swift propio, sin SwiftData ni Core Data. BRAIN-00: IndexedDB + Dexie (válido solo para un componente web) | control fino de migraciones y cifrado por registro; SwiftData/Core Data exigían una versión mínima de SO mayor y acoplaban a CloudKit |
+| Blobs locales | **DECIDIDO (D-02)**: archivos en el contenedor de la app, referenciados por hash SHA-256 desde SQLite. BRAIN-00: OPFS con fallback a IndexedDB (solo web) | archivos sin inflar registros estructurados |
 | Dominio | **(D-01)** BRAIN-00: paquetes TypeScript + Zod | contratos ejecutables y compartidos; el lenguaje depende de D-01 |
 | API | estándar Fetch; implementación de referencia en Cloudflare Workers | portable y con free tier suficiente |
 | Metadatos de servicio | D1/SQLite | auth, dispositivos, cursores y cuotas; nunca corpus en claro |
@@ -93,7 +93,7 @@ Decisión en [ADR-0009](../adr/0009-manu-assistant-without-mandatory-ai.md).
 | Búsqueda | índice textual local; Postgres/SQLite FTS solo en adaptadores compatibles | funciona offline y sin IA |
 | Embeddings | desactivados en MVP | coste, privacidad y poca necesidad inicial |
 | Auth | passkey/WebAuthn + sesión segura; recuperación separada. En nativo, **sin bloqueo interno de Face ID** (decisión de Manu, 2026-09-28): la protección local depende del bloqueo del dispositivo y del cifrado. *(Sustituye a «desbloqueo local con biometría», anotado antes como D-02.)* | sin contraseña reutilizable; menos fricción |
-| Cifrado | AES-256-GCM; clave maestra local envuelta por secreto de recuperación. Implementación: Web Crypto en web; en nativo, pendiente de D-02 (candidatos a verificar: CryptoKit y Keychain) | nube sin contenido legible |
+| Cifrado | AES-256-GCM; clave maestra local envuelta por secreto de recuperación. Implementación: Web Crypto en web; en nativo, **DECIDIDO (D-02, ADR-0011)**: CryptoKit para AES-GCM, Argon2id (dependencia mínima) para derivar la KEK, Keychain (`kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`) para la clave desenvuelta | nube sin contenido legible |
 | Monorepo | **(D-01)** BRAIN-00: pnpm workspaces, sin Turborepo. Con app nativa hace falta además un proyecto Xcode o Swift Package | menos herramientas y menor mantenimiento |
 
 Las marcas de librería son decisiones iniciales, no contratos permanentes. Los puertos `LocalStore`, `BlobStore`, `SyncTransport`, `SearchIndex`, `IntegrationAdapter` y `AgentAdapter` impiden acoplar el cerebro.
@@ -134,10 +134,10 @@ No se introduce CRDT genérico en el MVP. Si la edición colaborativa o multidis
 
 - Cada vault tiene una Data Encryption Key aleatoria de 256 bits.
 - Los registros y blobs se cifran con AES-256-GCM y nonce único.
-- La clave de datos se envuelve con una Key Encryption Key derivada de una frase/secreto de recuperación usando Argon2id con parámetros versionados (BRAIN-00: Argon2id WASM para web; implementación nativa pendiente de D-02).
+- La clave de datos se envuelve con una Key Encryption Key derivada de una frase/secreto de recuperación usando Argon2id con parámetros versionados (BRAIN-00: Argon2id WASM para web; en nativo, DECIDIDO por D-02/ADR-0011: dependencia Swift mínima de Argon2id, con PBKDF2-HMAC-SHA256 vía CryptoKit como alternativa de cero dependencias si Manu la prefiere).
 - Las extensiones solo reciben el snapshot mínimo del modo activo; qué parte de ese snapshot puede leerse con el iPhone bloqueado se decide por tipo de dato (ver `docs/security/THREAT_MODEL.md`).
 - El servidor nunca recibe la clave de datos ni la frase de recuperación.
-- La clave descifrada vive en memoria durante la sesión. En nativo, la clave local se guarda en el almacén seguro del sistema con acceso limitado a este dispositivo (detalle en D-02, `NO_VERIFICADO`).
+- La clave descifrada vive en memoria durante la sesión. En nativo, la clave local se guarda en Keychain con `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly` (D-02, ADR-0011); sin probar en dispositivo real, sigue `TEÓRICAMENTE_POSIBLE`.
 - ~~Se ofrece bloqueo local y cierre automático configurables.~~ Sustituido (2026-09-28): Manu no quiere bloqueos internos de Face ID. No hay bloqueo interno por defecto; el riesgo residual está en R-33.
 - La búsqueda e inferencia sobre el corpus ocurren en el dispositivo mientras el vault está abierto.
 
@@ -173,7 +173,7 @@ R2 tiene una franquicia gratuita amplia, pero cobra por exceso en cuentas factur
 - extensiones: widgets de inicio y pantalla bloqueada, App Intents (Atajos y Siri; botón de acción solo en iPhones que lo tengan), controles del Centro de Control y Live Activities (el iPhone 14 estándar no tiene Dynamic Island, así que se verían en la pantalla bloqueada; confirmar el modelo exacto);
 - Share Extension para capturar desde otras apps;
 - acceso con permiso, pedido en el momento de uso, a calendario y recordatorios, fotos, micrófono y reconocimiento de voz;
-- datos compartidos con las extensiones mediante un contenedor común limitado al snapshot mínimo **(D-02)**;
+- datos compartidos con las extensiones mediante un contenedor común (App Group) limitado al snapshot mínimo — **DECIDIDO en su diseño por D-02/ADR-0011**; se prueba en simulador (sin firma ni cuenta) en BRAIN-02c; solo **registrar** el App Group contra un equipo de desarrollador real, necesario para firmar e instalar en un iPhone físico, sigue `NO_VERIFICADO` con cuenta Apple gratuita;
 - Dynamic Type, VoiceOver, modo oscuro y convenciones de navegación de iOS desde el primer incremento.
 
 Nada de esta lista está implementado ni probado.
@@ -197,7 +197,7 @@ Datos de la documentación de Apple consultada el 2026-09-28 (ver `docs/research
 Consecuencias:
 
 - **D-03**: decidir si Manu asume Apple Developer Program. Sin él, la app caduca cada 7 días y algunas capacidades (TestFlight, WeatherKit, posiblemente notificaciones push y servicios de iCloud) no están disponibles. El precio y las condiciones deben comprobarse en la documentación actual de Apple.
-- **D-04 (parcialmente resuelta)**: el Mac de Manu no se usa para compilar. BRAIN-01 se compila y prueba como Swift Package en GitHub Actions, runner estándar `macos-26` con Xcode 26.6, presupuesto de gasto 0 € y workflows breves/manuales. Esto no valida la app en el iPhone 14 con iOS 27. Xcode 27 está en vista previa en el runner `xcode-27-xlarge`, no adoptado por coste; la ruta de firma e instalación de la Beta queda como D-04B. No se usará un Mac prestado ni se actualizará este Mac a Tahoe para el proyecto.
+- **D-04 (parcialmente resuelta)**: el Mac de Manu no se usa para compilar. BRAIN-01 se compila y prueba como Swift Package en GitHub Actions, runner estándar `macos-26` con Xcode 26.6, presupuesto de gasto 0 € y workflows breves/manuales. El mismo runner, al traer SDKs e imágenes de iOS Simulator, también compila y prueba un proyecto Xcode real (BRAIN-02b–02d, incluido Keychain, App Group y extensiones) sin firma ni Apple ID, porque el simulador no aplica la autorización de entitlements por perfil de aprovisionamiento ([ADR-0011](../adr/0011-native-local-storage-and-keys.md)). Lo que ninguno de los dos valida es la app en el iPhone 14 físico con iOS 27. Xcode 27 está en vista previa en el runner `xcode-27-xlarge`, no adoptado por coste; la ruta de firma e instalación de la Beta en ese dispositivo físico queda como D-04B. No se usará un Mac prestado ni se actualizará este Mac a Tahoe para el proyecto.
 
 ### PWA V1 (BRAIN-00, sustituida como interfaz principal por ADR-0007)
 
