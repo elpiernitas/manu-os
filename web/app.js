@@ -434,7 +434,7 @@ const screens = {
     const synced = vault.settings.gcalSyncedAt ? new Date(vault.settings.gcalSyncedAt).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }) : null;
     const gCal = isClientId(gClientId()) && googleOn("calendar");
     return `<h1>Agenda</h1><p class="subtitle">${esc(longDate())}</p>
-      ${g ? `<div class="btns"><button class="btn ghost" data-act="gcal-sync">${gcal.busy ? "Sincronizando…" : "Sincronizar con Google"}</button></div><p class="muted small">${synced ? `Última sincronización: ${synced}` : "Aún sin sincronizar."}${gcal.error ? ` · ${esc(gcal.error)}` : ""}</p>` : `<p class="muted small"><button class="link small" data-act="goto-gcal">Conectar Google (Calendar, Tasks, Contactos y Drive)</button></p>`}
+      ${g ? `<div class="btns"><button class="btn ghost" data-act="gcal-sync">${gcal.busy ? "Sincronizando…" : "Sincronizar con Google"}</button></div><p class="muted small">${synced ? `Última sincronización: ${synced}` : "Aún sin sincronizar."}${gcal.error ? ` · ${esc(gcal.error)}` : ""}${validToken(SCOPE.calendar) ? " · se actualiza sola cada 10 min" : ""}</p>` : `<p class="muted small"><button class="link small" data-act="goto-gcal">Conectar Google (Calendar, Tasks, Contactos y Drive)</button></p>`}
       ${calendarCard(gCal)}
       <details class="card"><summary class="muted small">Sin Google: pegar los eventos de hoy</summary><p class="muted small">Si tu calendario no es de Google, pega aquí tus eventos (o usa el atajo «MANU Agenda»).</p>${agendaToday() && vault.agenda.source !== "GOOGLE"
         ? (vault.agenda.events.length ? vault.agenda.events.map((ev) => `<div class="row"><span class="num chip">${esc(ev.time ? ev.time + (ev.end ? "–" + ev.end : "") : "Todo el día")}</span><span class="grow">${esc(ev.title)}</span></div>`).join("") : "") : ""}
@@ -1246,9 +1246,11 @@ async function withRetry(scope, fn) {
   catch (err) { if (err.code !== "auth") throw err; delete gcal.tokens[scope]; return fn(await googleToken(scope)); }
 }
 
-async function syncGoogle() {
+// silent: automatic refresh. Never opens a Google window (iOS would block it
+// and it would interrupt Manu); it only uses tokens still valid in memory.
+async function syncGoogle({ silent = false } = {}) {
   if (gcal.busy) return;
-  gcal.busy = true; gcal.error = null; render();
+  gcal.busy = true; gcal.lastRun = Date.now(); if (!silent) { gcal.error = null; render(); }
   const services = [
     { key: "calendar", scope: SCOPE.calendar, run: async () => {
       const now = new Date();
@@ -1285,15 +1287,33 @@ async function syncGoogle() {
   const enabled = Object.fromEntries(["calendar", "tasks", "contacts"].map((k) => [k, googleOn(k)]));
   const wanted = Object.keys(enabled).filter((k) => enabled[k]).map((k) => SCOPE[k]);
   if (enabled.calendar) wanted.push(SCOPE.calendarList); // to show all of Manu's calendars
-  try { await googleConsent(wanted); } catch { /* each service reports its own missing permission */ }
+  if (silent) {
+    // Only the services whose permission is still valid; the rest wait for a tap.
+    for (const k of Object.keys(enabled)) if (enabled[k] && !validToken(SCOPE[k])) enabled[k] = false;
+    if (!Object.values(enabled).some(Boolean)) { gcal.busy = false; return; }
+  } else {
+    try { await googleConsent(wanted); } catch { /* each service reports its own missing permission */ }
+  }
   const status = await runServices(services, enabled, cachedToken);
   vault.settings.googleStatus = { ...(vault.settings.googleStatus ?? {}), ...status };
   if (status.calendar?.startsWith("ok")) vault.settings.gcalSyncedAt = new Date().toISOString();
   const failed = Object.values(status).filter((v) => v.startsWith("error"));
   gcal.error = failed.length ? failed.map((v) => v.replace(/^error: /, "")).join(" · ") : null;
   gcal.busy = false;
-  persist(); render();
+  persist();
+  if (silent) { if (!sheet && !document.activeElement?.matches("input, textarea")) render(); return; }
+  render();
   toast(failed.length ? "Google: algo no se ha sincronizado" : "Google sincronizado");
+}
+
+const validToken = (scope) => { const t = gcal.tokens[scope]; return Boolean(t && Date.now() < t.expires - 60000); };
+const AUTO_SYNC_MS = 10 * 60000;
+function autoSyncGoogle() {
+  if (document.visibilityState !== "visible" || !navigator.onLine || gcal.busy) return;
+  if (!["calendar", "tasks", "contacts"].some((k) => googleOn(k) && validToken(SCOPE[k]))) return;
+  const last = Math.max(Date.parse(vault.settings.gcalSyncedAt ?? "") || 0, gcal.lastRun ?? 0);
+  if (Date.now() - last < AUTO_SYNC_MS) return;
+  syncGoogle({ silent: true }).catch(() => { gcal.busy = false; });
 }
 
 // SheetJS (vendor/, Apache-2.0) is loaded only when an Excel file is imported.
@@ -1369,4 +1389,6 @@ refreshWeather();
 if (isClientId(gClientId()) && GOOGLE_FEATURES.some(([k]) => googleOn(k))) loadGis().catch(() => {});
 checkReminders();
 setInterval(checkReminders, 30000);
+setInterval(autoSyncGoogle, 60000);
+document.addEventListener("visibilitychange", autoSyncGoogle);
 setInterval(() => { if (tab === "hoy" && !sheet && !document.activeElement?.matches("input, textarea")) render(); }, 60000);

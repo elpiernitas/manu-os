@@ -23,9 +23,12 @@ Revisión pedida por Manu y devuelta el 2026-09-29 sobre `4b19d3e` y `dfb0c56`.
 5. `pkceValid`: el estado tiene que coincidir, y la hora tiene que ser un número finito, no futura y de 15 minutos como máximo.
 6. **No corregido en código, bloqueo registrado:** HANDOFF autoriza fusionar con CI en verde, mientras que AGENTS.md exige revisión externa antes de fusionar. Es la decisión de gobernanza de Manu del 2026-09-29, pero AGENTS.md no se ha cambiado. Hasta que Manu decida si se enmienda, prevalece lo más restrictivo (CLAUDE.md) y este PR no se fusiona.
 
+7. **Sincronización automática de Google** (petición de Manu con captura de la Agenda, 2026-09-29). Mientras MANU está abierta y el permiso sigue vigente (unos 60 min tras tocar «Sincronizar»), se resincroniza sola cada 10 minutos y al volver a la app, sin abrir nunca una ventana de Google. Cuando el permiso caduca, espera al siguiente toque. Los tokens siguen solo en memoria (ADR-0013). Sincronizar en segundo plano o con la app cerrada no es posible sin un servidor que guarde un token de refresco.
+
 ### Resultados
 
 - `npm test`: 76/76 PASS (6 tests nuevos en `web/tests/review-web06-08.test.js`).
+- Chromium con reloj simulado: sin ventana ni sincronización al abrir sin permiso; la sincronización manual abre 1 ventana; nada antes de 10 min; a los 11 min trae el evento cambiado sin ventana nueva; al caducar se detiene sin abrir ventanas.
 - El ejemplo de colisión de la revisión **no colisiona** en `4b19d3e` ni en `dfb0c56`: se obtienen 2 entradas y 0 duplicados. Se buscó por fuerza bruta una colisión real, que con el importador antiguo da 1 entrada y 1 «duplicado», y es la que usa el test (QAL-019).
 - Navegador: tras borrar solo queda `manuos.vault` vacío, e IA muestra «Sin clave». Las regresiones de WEB-03 a WEB-12 pasan.
 
