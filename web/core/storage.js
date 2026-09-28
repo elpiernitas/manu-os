@@ -26,6 +26,10 @@ export function validateVault(data) {
     if (ids.has(item.id)) return { ok: false, reason: `Identificador repetido: ${item.id}.` };
     ids.add(item.id);
   }
+  for (const key of ["agenda", "agendaTomorrow"]) {
+    const a = data[key];
+    if (a !== undefined && a !== null && (typeof a.day !== "string" || !Array.isArray(a.events))) return { ok: false, reason: "La agenda guardada no es válida." };
+  }
   if (data.agenda !== undefined && data.agenda !== null) {
     if (typeof data.agenda.day !== "string" || !Array.isArray(data.agenda.events)) return { ok: false, reason: "La agenda guardada no es válida." };
   }

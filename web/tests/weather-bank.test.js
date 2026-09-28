@@ -13,13 +13,32 @@ test("weather: codes, parsing and advice", () => {
   assert.equal(wmo(0).text, "Despejado");
   assert.equal(wmo(999).text, "Tiempo variable");
   const f = parseForecast(sample);
-  assert.deepEqual(f.now, { temp: 18, text: "Poco nuboso", icon: "cloud-sun" });
+  assert.equal(f.now.temp, 18);
+  assert.equal(f.now.text, "Poco nuboso");
   assert.equal(f.today.max, 27);
   assert.equal(f.tomorrow.text, "Lluvia");
   assert.equal(advice(f), "Hoy puede llover (53 %). Lleva paraguas.");
   assert.throws(() => parseForecast({}));
   assert.ok(forecastUrl({ latitude: 41.6, longitude: -4.7 }).startsWith("https://api.open-meteo.com/v1/forecast?latitude=41.6"));
   assert.deepEqual(parseCities({ results: [{ name: "Ciudad", admin1: "Región", country: "España", latitude: 1, longitude: 2 }, { name: "Mala" }] }), [{ name: "Ciudad", region: "Región, España", latitude: 1, longitude: 2 }]);
+});
+
+test("weather: full forecast like the iPhone, no contradictory advice", () => {
+  const full = {
+    current: { temperature_2m: 20.3, apparent_temperature: 22.6, relative_humidity_2m: 89, wind_speed_10m: 4.9, weather_code: 2, is_day: 0 },
+    hourly: { time: ["2026-09-28T23:00", "2026-09-29T00:00", "2026-09-29T09:00"], temperature_2m: [20.3, 20.3, 21], weather_code: [61, 0, 0], precipitation_probability: [0, 0, 3] },
+    daily: { time: ["2026-09-28", "2026-09-29"], weather_code: [61, 3], temperature_2m_max: [21.8, 28.4], temperature_2m_min: [18.0, 19.6], precipitation_probability_max: [10, 70], sunrise: ["2026-09-28T08:16", "2026-09-29T08:17"], sunset: ["2026-09-28T20:09", "2026-09-29T20:07"], uv_index_max: [4.5, 4.0], wind_speed_10m_max: [11.2, 27.0] },
+  };
+  const f = parseForecast(full);
+  assert.equal(f.now.icon, "cloud-moon");
+  assert.equal(f.now.feels, 23);
+  assert.equal(f.hours[0].time, "Ahora");
+  assert.equal(f.hours[1].icon, "moon");
+  assert.equal(f.hours[2].icon, "sun");
+  assert.equal(f.days[1].weekday, "Mar");
+  assert.equal(f.today.sunset, "20:09");
+  assert.equal(advice(f), "Ahora poco nuboso. Hoy entre 18 y 22 °C.");
+  assert.ok(!advice(f).startsWith("Lluvia"));
 });
 
 test("weather adapter reports HTTP errors", async () => {

@@ -8,10 +8,11 @@ import { notificationStatus, isInstalled, enableNotifications, testNotification 
 import { launchParams, parseEvents, nextEvent, localDay } from "./core/intake.js";
 import { fetchForecast, searchCities, advice, WEATHER_TTL_MS } from "./core/weather.js";
 import { importStatement } from "./core/bank.js";
-import { CITIES, proposeAlarm, shouldAskTomorrow, shortcutUrl } from "./core/night.js";
+import { CITIES, proposeAlarm, shouldAskTomorrow, shortcutUrl, guessCity } from "./core/night.js";
+import { isClientId, listEvents, createEvent, newEventBody, GCAL_SCOPE } from "./core/gcal.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "3";
+export const APP_VERSION = "4";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -25,6 +26,8 @@ let refuge = null; // Refugio lives only in memory
 let sheet = null; // quick add: { kind }
 let confirmWipe = false;
 let cityResults = null;
+let overlay = null; // "weather"
+const gcal = { token: null, expires: 0, busy: false, error: null, client: null };
 let variant = vault.chat.length;
 const weather = { loading: false, error: null };
 
@@ -67,6 +70,13 @@ const I = {
   rain: svg('<path d="M7 15h10a4 4 0 0 0 0-8 5.5 5.5 0 0 0-10.4 1.6A3.3 3.3 0 0 0 7 15z"/><path d="M9 18l-1 3M13 18l-1 3M17 18l-1 3"/>'),
   snow: svg('<path d="M7 14h10a4 4 0 0 0 0-8 5.5 5.5 0 0 0-10.4 1.6A3.3 3.3 0 0 0 7 14z"/><path d="M9 18h.01M13 20h.01M17 18h.01"/>', 'stroke-width="2.6"'),
   storm: svg('<path d="M7 14h10a4 4 0 0 0 0-8 5.5 5.5 0 0 0-10.4 1.6A3.3 3.3 0 0 0 7 14z"/><path d="M12 14l-2 4h4l-2 4"/>'),
+  moon: svg('<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>'),
+  "cloud-moon": svg('<path d="M7 19h10a4 4 0 0 0 0-8 5.5 5.5 0 0 0-10.4 1.6A3.3 3.3 0 0 0 7 19z"/><path d="M17 3.5a4 4 0 0 0 3.5 5.5"/>'),
+  drop: svg('<path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z"/>'),
+  wind: svg('<path d="M3 9h11a3 3 0 1 0-3-3M3 15h15a3 3 0 1 1-3 3"/>'),
+  sunrise: svg('<path d="M4 18h16M7 14a5 5 0 0 1 10 0M12 3v5M9 6l3-3 3 3"/>'),
+  sunset: svg('<path d="M4 18h16M7 14a5 5 0 0 1 10 0M12 3v5M9 5l3 3 3-3"/>'),
+  google: svg('<rect x="3" y="4" width="18" height="17" rx="3"/><path d="M3 9h18M8 2v4M16 2v4M12 12v6M9 15h6"/>'),
   heart: svg('<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>'),
   repeat: svg('<path d="M4 12a6 6 0 0 1 6-6h8M15 3l3 3-3 3M20 12a6 6 0 0 1-6 6H6M9 21l-3-3 3-3"/>'),
   people: svg('<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c1-3.5 3.5-5 6.5-5s5.5 1.5 6.5 5M16 4.5a3.5 3.5 0 0 1 0 7M18 15c2 .6 3 2.2 3.5 5"/>'),
@@ -108,7 +118,7 @@ function activeCity() {
 async function refreshWeather(force = false) {
   const city = activeCity();
   const cache = vault.weather;
-  const fresh = cache && cache.city?.name === city.name && Date.now() - new Date(cache.at).getTime() < WEATHER_TTL_MS;
+  const fresh = cache && cache.city?.name === city.name && Array.isArray(cache.data?.hours) && Date.now() - new Date(cache.at).getTime() < WEATHER_TTL_MS;
   if ((fresh && !force) || weather.loading || !navigator.onLine) return;
   weather.loading = true;
   weather.error = null;
@@ -120,7 +130,7 @@ async function refreshWeather(force = false) {
     weather.error = "No he podido traer el tiempo ahora.";
   } finally {
     weather.loading = false;
-    if (tab === "hoy" && !sheet) render();
+    if (tab === "hoy" && !sheet && !document.activeElement?.matches("input, textarea")) render();
   }
 }
 
@@ -137,11 +147,36 @@ function weatherCard() {
   const f = w.data;
   const age = Math.round((Date.now() - new Date(w.at).getTime()) / 60000);
   return `<section class="card hero" aria-label="Tiempo en ${esc(city.name)}">
-    <div class="row"><h2>${esc(city.name)}</h2><span class="muted small">${age < 2 ? "ahora" : `hace ${age} min`}</span></div>
+    <button class="hero-tap" data-act="weather-open" aria-label="Ver el tiempo completo"></button>
+    <div class="row"><h2>${esc(city.name)}</h2><span class="muted small">${age < 2 ? "ahora" : `hace ${age} min`} ›</span></div>
     <div class="weather-now">${I[f.now.icon] ?? I.cloud}<div><div class="temp">${f.now.temp}°</div><div class="muted">${esc(f.now.text)} · ${f.today.min}° / ${f.today.max}°</div></div></div>
+    ${f.hours?.length ? `<div class="hours">${f.hours.slice(0, 8).map((h) => `<div><span class="muted small">${esc(h.time)}</span>${I[h.icon] ?? I.cloud}<b>${h.temp}°</b></div>`).join("")}</div>` : ""}
     <p>${esc(advice(f))}</p>
     ${f.tomorrow ? `<p class="muted small">Mañana: ${esc(f.tomorrow.text.toLowerCase())}, ${f.tomorrow.min}°–${f.tomorrow.max}°${f.tomorrow.rain !== null ? `, lluvia ${f.tomorrow.rain} %` : ""}.</p>` : ""}
     <div class="btns">${cityChips}</div></section>`;
+}
+
+function weatherPage() {
+  const city = activeCity();
+  const w = vault.weather && vault.weather.city?.name === city.name ? vault.weather : null;
+  if (!w || !w.data.hours) return `<button class="link" data-act="overlay-close">${I.back} Hoy</button><h1>${esc(city.name)}</h1><p class="muted">${weather.loading ? "Cargando…" : "Sin datos todavía."}</p>`;
+  const f = w.data;
+  const lo = Math.min(...f.days.map((d) => d.min)), hi = Math.max(...f.days.map((d) => d.max));
+  const span = Math.max(1, hi - lo);
+  return `<button class="link" data-act="overlay-close">${I.back} Hoy</button>
+    <div class="weather-head"><p class="muted">${esc(city.name)}</p><div class="temp xl">${f.now.temp}°</div><p>${esc(f.now.text)}</p><p class="muted">Máx. ${f.today.max}° · Mín. ${f.today.min}°</p></div>
+    <section class="card"><p class="small">${esc(advice(f))}</p><div class="hours scroll">${f.hours.map((h) => `<div><span class="muted small">${esc(h.time)}</span>${I[h.icon] ?? I.cloud}${h.rain >= 20 ? `<span class="rain small">${h.rain}%</span>` : ""}<b>${h.temp}°</b></div>`).join("")}</div></section>
+    ${sectionTitle("Próximos 7 días")}
+    <section class="card">${f.days.map((d) => `<div class="row day"><span class="wd">${esc(d.weekday)}</span><span class="dicon">${I[d.icon] ?? I.cloud}${d.rain >= 20 ? `<span class="rain small">${d.rain}%</span>` : ""}</span><span class="num muted">${d.min}°</span><span class="range"><i data-l="${Math.round(((d.min - lo) / span) * 100)}" data-w="${Math.max(6, Math.round(((d.max - d.min) / span) * 100))}"></i></span><span class="num">${d.max}°</span></div>`).join("")}</section>
+    <div class="tiles">
+      <section class="card"><h2>${I["cloud-sun"]} Sensación</h2><div class="tile-v">${f.now.feels ?? "—"}°</div><p class="muted small">${f.now.feels !== null && f.now.feels > f.now.temp ? "Se nota más calor por la humedad." : "Parecida a la real."}</p></section>
+      <section class="card"><h2>${I.drop} Humedad</h2><div class="tile-v">${f.now.humidity ?? "—"} %</div></section>
+      <section class="card"><h2>${I.wind} Viento</h2><div class="tile-v">${f.now.wind ?? "—"}<span class="small"> km/h</span></div><p class="muted small">Máx. hoy ${f.today.windMax ?? "—"} km/h</p></section>
+      <section class="card"><h2>${I.sun} Índice UV</h2><div class="tile-v">${f.today.uv !== null ? Math.round(f.today.uv) : "—"}</div><p class="muted small">${f.today.uv >= 6 ? "Alto: protección solar." : f.today.uv >= 3 ? "Moderado." : "Bajo."}</p></section>
+      <section class="card"><h2>${I.sunrise} Amanecer</h2><div class="tile-v">${esc(f.today.sunrise ?? "—")}</div></section>
+      <section class="card"><h2>${I.sunset} Atardecer</h2><div class="tile-v">${esc(f.today.sunset ?? "—")}</div></section>
+    </div>
+    <p class="muted small">Datos de Open-Meteo · actualizado ${new Date(w.at).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}</p>`;
 }
 
 // ---------- Night question ----------
@@ -150,14 +185,17 @@ function nightCard() {
   const tk = tomorrowKey();
   if (s.tomorrow && s.tomorrow.day === tk) {
     if (!s.tomorrow.work) return "";
-    const p = proposeAlarm({ events: [{ time: "09:00", title: "Trabajo" }], city: s.tomorrow.city, wantsBreakfast: s.wantsBreakfast !== false });
+    const real = vault.agendaTomorrow?.day === tk ? vault.agendaTomorrow.events : null;
+    const p = proposeAlarm({ events: real?.some((e) => e.time) ? real : [{ time: s.workStart ?? "09:00", title: "Trabajo" }], city: s.tomorrow.city, wantsBreakfast: s.wantsBreakfast !== false });
     return `<section class="card"><h2>${I.alarm} Mañana</h2>
       <div class="row"><span>Trabajas en <b>${esc(CITIES[s.tomorrow.city].name)}</b></span><span class="temp num">${p.time}</span></div>
-      <p class="muted small">${esc(p.explanation)} Hora de entrada supuesta: 09:00.</p>
+      <p class="muted small">${esc(p.explanation)}${real?.some((e) => e.time) ? " Según tu Google Calendar." : ` Entrada supuesta: ${esc(s.workStart ?? "09:00")} (cámbiala en Tú → Tiempo y ciudades).`}</p>
       <div class="btns"><a class="btn" href="${esc(shortcutUrl(SHORTCUT_ALARM, p.time))}">Poner alarma ${p.time}</a><button class="btn ghost" data-act="tomorrow-reset">Cambiar</button></div></section>`;
   }
   if (!shouldAskTomorrow(today(), s.tomorrow?.day, tk)) return "";
-  return `<section class="card"><h2>${I.alarm} Antes de dormir</h2><p><b>¿Mañana trabajas en Oviedo?</b></p>
+  const tomorrowEvents = vault.agendaTomorrow?.day === tk ? vault.agendaTomorrow.events : null;
+  const guess = tomorrowEvents ? guessCity(tomorrowEvents) : null;
+  return `<section class="card"><h2>${I.alarm} Antes de dormir</h2><p><b>¿Mañana trabajas en Oviedo?</b></p>${guess ? `<p class="muted small">Tu calendario: ${esc(guess.reason)}.</p>` : ""}
     <div class="btns"><button class="btn" data-act="tomorrow" data-city="OVIEDO">Sí, en Oviedo</button><button class="btn ghost" data-act="tomorrow" data-city="GIJON">En Gijón</button><button class="btn ghost" data-act="tomorrow" data-city="NONE">No trabajo</button></div></section>`;
 }
 
@@ -198,8 +236,11 @@ const screens = {
     const done = vault.inbox.filter((i) => i.status === "TASK" && i.done).slice(-10);
     const idea = ideas(vault.inbox);
     const rems = vault.reminders.filter((r) => !r.done).sort((a, b) => (a.at < b.at ? -1 : 1));
+    const g = isClientId(vault.settings.gcalClientId);
+    const synced = vault.settings.gcalSyncedAt ? new Date(vault.settings.gcalSyncedAt).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }) : null;
     return `<h1>Agenda</h1><p class="subtitle">${esc(longDate())}</p>
-      ${sectionTitle("Hoy")}
+      ${g ? `<div class="btns"><button class="btn ghost" data-act="gcal-sync">${gcal.busy ? "Sincronizando…" : "Sincronizar Google Calendar"}</button></div><p class="muted small">${synced ? `Última sincronización: ${synced}` : "Aún sin sincronizar."}${gcal.error ? ` · ${esc(gcal.error)}` : ""}</p>` : `<p class="muted small"><button class="link small" data-act="goto-gcal">Conectar Google Calendar</button></p>`}
+      ${sectionTitle("Hoy", g ? addLink("EVENT", "Nuevo evento") : "")}
       <section class="card">${agendaToday()
         ? (vault.agenda.events.length ? vault.agenda.events.map((ev) => `<div class="row"><span class="num chip">${esc(ev.time ? ev.time + (ev.end ? "–" + ev.end : "") : "Todo el día")}</span><span class="grow">${esc(ev.title)}</span></div>`).join("") : '<p class="muted">Hoy no tienes eventos.</p>')
         : '<p class="muted">La web no puede leer el Calendario de Apple. Pega tus eventos o usa el atajo (Tú → Atajos del iPhone).</p>'}
@@ -266,6 +307,7 @@ const screens = {
       ${sectionTitle("Ajustes")}
       <div class="list">
         ${item("tiempo", "pin", "blue", "Tiempo y ciudades", `Casa: ${(vault.settings.homeCity ?? CITIES.GIJON).name}`)}
+        ${item("gcal", "google", "blue", "Google Calendar", isClientId(vault.settings.gcalClientId) ? "Configurado" : "Conectar tu calendario")}
         ${item("avisos", "bell", "red", "Avisos, alarmas y Atajos", "Recordatorios que suenan en el iPhone")}
         ${item("datos", "box", "gray", "Tus datos", "Copia, restaurar y borrar")}
       </div>
@@ -331,8 +373,24 @@ const subpages = {
         <form id="citySearch" class="stack"><label for="cityName" class="muted small">Buscar otra ciudad</label><input id="cityName" type="search" maxlength="80" placeholder="Gijón"><button class="btn ghost" type="submit">Buscar</button></form>
         ${cityResults ? (cityResults.length ? cityResults.map((c, i) => `<button class="item" data-act="home-city" data-i="${i}"><span class="grow">${esc(c.name)}<br><span class="muted small">${esc(c.region)}</span></span></button>`).join("") : '<p class="muted">No he encontrado esa ciudad.</p>') : ""}
         ${home.name !== CITIES.GIJON.name ? '<button class="link" data-act="home-gijon">Volver a Gijón</button>' : ""}</section>
-      <section class="card"><h2>Mañanas</h2><div class="row"><span>Contar tiempo para desayunar</span><button class="check" data-act="breakfast" aria-pressed="${vault.settings.wantsBreakfast !== false}" aria-label="Desayuno">${I.check}</button></div></section>
+      <section class="card"><h2>Mañanas</h2><form class="row" id="workStartForm"><label for="workStart" class="grow">Hora de entrada al trabajo</label><input id="workStart" type="time" value="${esc(vault.settings.workStart ?? "09:00")}"></form><div class="row"><span>Contar tiempo para desayunar</span><button class="check" data-act="breakfast" aria-pressed="${vault.settings.wantsBreakfast !== false}" aria-label="Desayuno">${I.check}</button></div></section>
       <p class="muted small">Datos del tiempo: Open-Meteo. Solo se envían las coordenadas de la ciudad.</p>`;
+  },
+  gcal() {
+    const id = vault.settings.gcalClientId ?? "";
+    const ok = isClientId(id);
+    return `${backBar("Google Calendar")}
+      <section class="card"><h2>Estado</h2><p>${ok ? (gcal.token && Date.now() < gcal.expires ? "Conectado en esta sesión." : "Configurado. Al sincronizar, Google te pedirá permiso.") : "Sin configurar."}</p>
+        ${ok ? '<button class="btn" data-act="gcal-sync">Sincronizar ahora</button>' : ""}
+        <form id="gcalForm" class="stack"><label for="gcalId" class="muted small">ID de cliente OAuth (termina en .apps.googleusercontent.com). No es una contraseña.</label><input id="gcalId" value="${esc(id)}" autocomplete="off" spellcheck="false" placeholder="123-abc.apps.googleusercontent.com"><button class="btn ghost" type="submit">Guardar ID</button></form></section>
+      <section class="card"><h2>Cómo conseguir el ID (una vez, mejor desde el ordenador)</h2><ol class="muted small">
+        <li>Entra en <b>console.cloud.google.com</b> con tu cuenta de Google y crea un proyecto llamado «MANU OS». Es gratis.</li>
+        <li>«APIs y servicios» → «Biblioteca» → busca <b>Google Calendar API</b> → Habilitar.</li>
+        <li>«Pantalla de consentimiento de OAuth» → tipo <b>Externo</b> → nombre «MANU OS» y tu correo. En «Usuarios de prueba» añade tu propio Gmail.</li>
+        <li>«Credenciales» → «Crear credenciales» → <b>ID de cliente de OAuth</b> → tipo «Aplicación web».</li>
+        <li>En «Orígenes de JavaScript autorizados» añade <code>https://elpiernitas.github.io</code>.</li>
+        <li>Copia el <b>ID de cliente</b> y pégalo arriba. El «secreto de cliente» no hace falta: no lo pegues en ningún sitio.</li></ol>
+        <p class="muted small">MANU solo pide permiso para ver y crear eventos. El permiso dura una hora; luego vuelve a pedirlo al sincronizar. Los nombres de los menús de Google pueden variar.</p></section>`;
   },
   avisos() {
     const n = notificationStatus();
@@ -358,6 +416,7 @@ const subpages = {
 
 // ---------- Quick add sheet ----------
 const KINDS = [["TASK", "Tarea"], ["IDEA", "Idea"], ["EXPENSE", "Gasto"], ["REMINDER", "Aviso"]];
+const kindsFor = (k) => (k === "EVENT" ? [["EVENT", "Evento en Google"]] : KINDS);
 function sheetHtml() {
   if (!sheet) return "";
   const k = sheet.kind;
@@ -368,11 +427,12 @@ function sheetHtml() {
     TASK: '<label for="qText" class="sr">Tarea</label><input id="qText" maxlength="140" placeholder="¿Qué tienes que hacer?" required>',
     IDEA: '<label for="qText" class="sr">Idea</label><textarea id="qText" rows="3" maxlength="400" placeholder="Apunta la idea" required></textarea>',
     EXPENSE: '<label for="qAmount" class="muted small">Importe (€)</label><input id="qAmount" inputmode="decimal" placeholder="12,50" required><label for="qText" class="muted small">Concepto</label><input id="qText" maxlength="80" placeholder="Café">',
+    EVENT: `<label for="qText" class="sr">Evento</label><input id="qText" maxlength="140" placeholder="Título del evento" required><label for="qWhen" class="muted small">Empieza</label><input id="qWhen" type="datetime-local" value="${local}" required><label for="qMinutes" class="muted small">Duración (minutos)</label><input id="qMinutes" inputmode="numeric" value="60">`,
     REMINDER: `<label for="qText" class="sr">Recordatorio</label><input id="qText" maxlength="140" placeholder="¿Qué te recuerdo?" required><label for="qWhen" class="muted small">Cuándo</label><input id="qWhen" type="datetime-local" value="${local}" required>`,
   }[k];
   return `<div class="sheet-bg" id="sheetBg"><form class="sheet glass" id="quickAdd" role="dialog" aria-modal="true" aria-label="Añadir">
     <div class="grabber"></div>
-    <div class="segmented" role="group" aria-label="Tipo">${KINDS.map(([id, label]) => `<button type="button" data-kind="${id}" data-act="sheet" aria-pressed="${id === k}">${label}</button>`).join("")}</div>
+    <div class="segmented${k === "EVENT" ? " one" : ""}" role="group" aria-label="Tipo">${kindsFor(k).map(([id, label]) => `<button type="button" data-kind="${id}" data-act="sheet" aria-pressed="${id === k}">${label}</button>`).join("")}</div>
     ${fields}<button class="btn block" type="submit">Guardar</button><button class="btn ghost block" type="button" data-act="sheet-close">Cancelar</button></form></div>`;
 }
 
@@ -380,9 +440,10 @@ function sheetHtml() {
 function render({ focus = false } = {}) {
   document.body.dataset.mode = modeState(today(), undefined, vault.settings.override).mode;
   $("tabs").innerHTML = TABS.map(([id, label]) => `<button class="tab" role="tab" data-tab="${id}" aria-selected="${tab === id}">${id === "manu" ? '<span class="dot" aria-hidden="true">M</span>' : I[id]}<span>${label}</span></button>`).join("");
-  $("screen").innerHTML = (screens[tab] ?? screens.hoy)();
+  $("screen").innerHTML = overlay === "weather" ? weatherPage() : (screens[tab] ?? screens.hoy)();
   $("screen").querySelectorAll(".bar > i[data-w]").forEach((el) => { el.style.width = `${el.dataset.w}%`; });
-  $("topTitle").textContent = sub ? { habitos: "Hábitos", salud: "Salud", comidas: "Comidas", personas: "Personas", tiempo: "Tiempo", avisos: "Avisos", datos: "Tus datos" }[sub] : TABS.find(([id]) => id === tab)[1];
+  $("screen").querySelectorAll(".range > i").forEach((el) => { el.style.left = `${el.dataset.l}%`; el.style.width = `${el.dataset.w}%`; });
+  $("topTitle").textContent = sub ? { habitos: "Hábitos", salud: "Salud", comidas: "Comidas", personas: "Personas", tiempo: "Tiempo", avisos: "Avisos", datos: "Tus datos", gcal: "Google Calendar" }[sub] : TABS.find(([id]) => id === tab)[1];
   $("fab").hidden = tab === "manu" || Boolean(sheet);
   $("sheetRoot").innerHTML = sheetHtml();
   if (sheet) $("qText")?.focus();
@@ -393,6 +454,7 @@ function render({ focus = false } = {}) {
 function go(newTab) {
   tab = newTab;
   sub = null;
+  overlay = null;
   sessionStorage.setItem("manuos.tab", tab);
   render({ focus: true });
   scrollTo(0, 0);
@@ -473,6 +535,10 @@ document.addEventListener("click", async (e) => {
     case "refuge": refuge = { state: initialRefuge(), messages: [{ from: "manu", text: "Estoy aquí. ¿Qué te vendría mejor ahora: entender por qué estás así, buscar una solución o cambiar de aire?" }] }; go("manu"); break;
     case "leave-refuge": refuge = null; render(); break;
     case "back": sub = null; render({ focus: true }); break;
+    case "weather-open": overlay = "weather"; render({ focus: true }); scrollTo(0, 0); refreshWeather(); break;
+    case "overlay-close": overlay = null; render({ focus: true }); scrollTo(0, 0); break;
+    case "goto-gcal": tab = "tu"; sub = "gcal"; render({ focus: true }); scrollTo(0, 0); break;
+    case "gcal-sync": syncGoogle(); break;
     case "mood": vault.moods = setMood(vault.moods, localDay(), Number(a.dataset.v)); persist(); render(); break;
     case "habit": vault.habits = vault.habits.map((h) => (h.id === id ? toggleHabit(h, localDay()) : h)); persist(); render(); break;
     case "talked": vault.people = vault.people.map((p) => (p.id === id ? { ...p, lastContact: new Date().toISOString() } : p)); persist(); render(); toast("Anotado"); break;
@@ -521,6 +587,13 @@ document.addEventListener("submit", async (e) => {
   const f = e.target.id;
   if (f === "composer") { const input = $("msg"); const v = input.value; input.value = ""; say(v); $("msg")?.focus(); return; }
   if (f === "pasteEvents") { const events = parseEvents($("eventsText").value); vault.agenda = { day: localDay(), events, importedAt: new Date().toISOString() }; persist(); render(); toast(events.length ? `Agenda de hoy: ${events.length} evento${events.length === 1 ? "" : "s"}` : "No he reconocido ningún evento"); return; }
+  if (f === "gcalForm") {
+    const id = $("gcalId").value.trim();
+    if (id && !isClientId(id)) { toast("Ese no parece un ID de cliente de Google"); return; }
+    vault.settings.gcalClientId = id || null; gcal.client = null; gcal.token = null;
+    persist(); render(); toast(id ? "ID guardado" : "Google Calendar desconectado"); return;
+  }
+  if (f === "workStartForm") return;
   if (f === "addHabit") { const n = $("habitName").value.trim(); if (n) { vault.habits.push({ id: uid("h"), name: n.slice(0, 60), done: [] }); persist(); render(); } return; }
   if (f === "addMeal") { addMeal($("mealText").value); return; }
   if (f === "addPerson") {
@@ -552,6 +625,14 @@ document.addEventListener("submit", async (e) => {
       const cents = toCents($("qAmount").value.replace(/\s|€/g, ""));
       if (!cents) { toast("Pon un importe válido, por ejemplo 12,50"); return; }
       vault.spending.push(newEntry({ id: uid("s"), cents, merchant: text || null, at }));
+    } else if (k === "EVENT" && text) {
+      const minutes = Math.min(1440, Math.max(5, Number($("qMinutes").value) || 60));
+      try {
+        const token = await googleToken();
+        await createEvent(token, newEventBody({ title: text, start: $("qWhen").value, minutes }));
+        sheet = null; render(); toast("Evento creado en Google Calendar"); syncGoogle();
+      } catch (err) { toast(err.message || "No se pudo crear el evento"); }
+      return;
     } else if (k === "REMINDER" && text) {
       const when = new Date($("qWhen").value);
       if (Number.isNaN(when.getTime())) { toast("Elige cuándo"); return; }
@@ -563,6 +644,7 @@ document.addEventListener("submit", async (e) => {
 });
 
 document.addEventListener("change", async (e) => {
+  if (e.target.id === "workStart" && /^\d{2}:\d{2}$/.test(e.target.value)) { vault.settings.workStart = e.target.value; persist(); toast(`Entrada: ${e.target.value}`); return; }
   if (e.target.dataset.cat) {
     vault.spending = vault.spending.map((x) => (x.id === e.target.dataset.cat ? correctCategory(x, e.target.value) : x));
     persist(); render(); return;
@@ -582,6 +664,62 @@ document.addEventListener("change", async (e) => {
     } catch { toast("Ese archivo no es una copia de MANU OS."); }
   }
 });
+
+// ---------- Google Calendar (Google Identity Services token model) ----------
+function loadGis() {
+  if (globalThis.google?.accounts?.oauth2) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const el = document.createElement("script");
+    el.src = "https://accounts.google.com/gsi/client";
+    el.async = true;
+    el.onload = () => resolve();
+    el.onerror = () => reject(new Error("No se pudo cargar el acceso de Google. ¿Tienes conexión?"));
+    document.head.appendChild(el);
+  });
+}
+
+async function googleToken() {
+  if (gcal.token && Date.now() < gcal.expires - 60000) return gcal.token;
+  const id = vault.settings.gcalClientId;
+  if (!isClientId(id)) throw new Error("Configura Google Calendar en Tú → Google Calendar");
+  await loadGis();
+  return new Promise((resolve, reject) => {
+    gcal.client = google.accounts.oauth2.initTokenClient({
+      client_id: id,
+      scope: GCAL_SCOPE,
+      callback: (resp) => {
+        if (resp.error || !resp.access_token) { reject(new Error("Google no ha dado permiso")); return; }
+        gcal.token = resp.access_token;
+        gcal.expires = Date.now() + (Number(resp.expires_in) || 3600) * 1000;
+        resolve(gcal.token);
+      },
+      error_callback: () => reject(new Error("Se cerró la ventana de Google")),
+    });
+    gcal.client.requestAccessToken({ prompt: "" });
+  });
+}
+
+async function syncGoogle() {
+  if (gcal.busy) return;
+  gcal.busy = true; gcal.error = null; render();
+  try {
+    const start = new Date(); start.setHours(0, 0, 0, 0);
+    const end = new Date(start); end.setDate(end.getDate() + 2);
+    let days;
+    try { days = await listEvents(await googleToken(), start, end); }
+    catch (err) { if (err.code !== "auth") throw err; gcal.token = null; days = await listEvents(await googleToken(), start, end); }
+    const t = localDay(); const tk = tomorrowKey();
+    vault.agenda = { day: t, events: days.get(t) ?? [], importedAt: new Date().toISOString(), source: "GOOGLE" };
+    vault.agendaTomorrow = { day: tk, events: days.get(tk) ?? [] };
+    vault.settings.gcalSyncedAt = new Date().toISOString();
+    persist();
+    toast(`Google Calendar: ${vault.agenda.events.length} hoy, ${vault.agendaTomorrow.events.length} mañana`);
+  } catch (err) {
+    gcal.error = err.message || "No se pudo sincronizar";
+  } finally {
+    gcal.busy = false; render();
+  }
+}
 
 function exportBackup() {
   const blob = new Blob([JSON.stringify(vault, null, 2)], { type: "application/json" });
