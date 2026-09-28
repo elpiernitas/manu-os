@@ -257,3 +257,39 @@ BRAIN-02-PREP quedó ejecutada por Claude Code conforme a `docs/roadmap/BRAIN_02
 - El alcance verificable, criterios de aceptación y prohibiciones están en `ai/CURRENT_TASK.md`.
 - Este relevo no autoriza proyecto Xcode, UI, Keychain/App Groups reales, servicios, credenciales, datos personales, firma, dispositivo, publicación ni costes.
 - Claude debe completar esta sección con archivos, comandos, resultados, riesgos y `NO_VERIFICADO` antes de entregar el PR a revisión.
+
+## BRAIN-02a — resultado (PR #8 sobre la rama del PR #7)
+
+Rama de trabajo: `claude/eager-albattani-fu39pt` (base `brain/02a-persistence-and-keys`). Head verificado: `15e54389e21e526cadbfd1778eeb4067ea1d9eb4`.
+
+### Archivos
+
+- `Package.swift`: producto/target `ManuBrainStorage` y dependencia `phc-winner-argon2` fijada por revisión `f57e61e`.
+- `Sources/ManuBrainStorage/`: `Ports.swift` (LocalStore, BlobStore, KeyStore, InMemoryKeyStore), `SQLiteDatabase.swift` (wrapper y migraciones v1→v2), `SQLiteLocalStore.swift`, `FileBlobStore.swift`, `VaultCrypto.swift` (Argon2id, AES-256-GCM, DEK/KEK), `SourceDeletion.swift`.
+- `Tests/ManuBrainStorageTests/StorageTests.swift`: 23 tests.
+- `.github/workflows/brain-02a.yml`: `macos-26`, `contents: read`, timeout 20 min.
+- `docs/adr/0012-argon2id-dependency-and-storage-core.md` (+ índice) y `ai/QA_LESSONS.md` (QAL-009).
+
+### Comandos y resultados (Actions `macos-26`, Swift 6.3.3, run `36475885333`)
+
+- `swift package dump-package`: PASS. `swift package resolve`: PASS (resuelve `f57e61e`). `swift build --build-tests`: PASS.
+- `swift test --parallel`: **PASS** — 23 tests XCTest de `ManuBrainStorageTests` + 31 tests de BRAIN-01 (3 suites) sin cambios.
+- Los vectores Argon2id: `password/somesalt`, t=2, m=64 MiB, p=1 → `09316115…913cf7` (`test.c` de la referencia); el perfil ligero de CI se generó compilando la misma referencia con gcc.
+
+### Cobertura de criterios
+
+Migración desde cada versión anterior y rechazo de versión futura sin tocar el archivo; commit/rollback; reapertura; blobs (duplicado, corrupción, intercambio, traversal); clave incorrecta, ciphertext y metadatos manipulados, nonces no repetidos (2000); ausencia de texto sintético en SQLite y blobs; `SourceDeletionEvent` (registro y blob inaccesibles, blob compartido conservado, `secure_delete` activo, `VACUUM` contado, freelist 0, el ciphertext borrado ya no está en el archivo); límites de Argon2id.
+
+### Riesgos
+
+- Dependencia Argon2id sin etiqueta con `Package.swift` (fijada por SHA); ver ADR-0012 y R-41.
+- Colección e id de cada registro quedan en claro.
+- El borrado físico no está garantizado en SSD/APFS; solo se demuestra sobre el archivo SQLite.
+- Cada `put` de blob ejecuta lectura+descifrado previo (coste de duplicados); sin medición de rendimiento.
+
+### NO_VERIFICADO
+
+- `NSFileProtectionCompleteUntilFirstUserAuthentication` (código solo `#if os(iOS)`, no compilado ni probado en simulador ni dispositivo).
+- Ejecución en iOS/simulador, iPhone 14 o Mac Intel; solo `macos-26` ARM.
+- Rendimiento del perfil `standard` de Argon2id (64 MiB) en dispositivo.
+- Rama `brain/02a-persistence-and-keys` (PR #7) no modificada por mí: el trabajo está en el PR #8 hacia ella; el orquestador decide cómo integrarlo.
