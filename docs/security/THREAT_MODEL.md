@@ -1,5 +1,7 @@
 # 04 — Privacidad, threat model, backups y exportación
 
+> Revisado el 2026-09-28 por [ADR-0007](../adr/0007-native-iphone-first.md): se añaden activos, fronteras y amenazas de la app nativa, sus extensiones, finanzas y grabaciones. Los controles nuevos están marcados `PENDIENTE` porque dependen de D-01 a D-04; no están implementados.
+
 ## Activos de mayor sensibilidad
 
 - fuentes originales y conversaciones;
@@ -8,17 +10,24 @@
 - claves del vault y secretos de recuperación;
 - refresh tokens OAuth;
 - prompts y datos enviados a modelos;
-- exports y backups completos.
+- exports y backups completos;
+- datos financieros: capturas, extractos, movimientos e insights;
+- grabaciones de audio, transcripciones y resúmenes, incluidas voces y datos de terceros;
+- configuración de modos, horarios y excepciones (revela rutinas y contactos importantes);
+- snapshot compartido con las extensiones.
 
 ## Fronteras de confianza
 
 1. iPhone/Mac de Manu.
-2. JavaScript y dependencias cargadas por la PWA.
+2. JavaScript y dependencias cargadas por un componente web (si D-01 lo mantiene).
 3. hosting/API de referencia.
 4. almacenamiento remoto cifrado.
 5. proveedores OAuth.
 6. modelos y servidores MCP externos.
 7. repositorio/CI.
+8. extensiones de la app (widgets, controles, Live Activities, App Intents, Share Extension) y el contenedor compartido con ellas.
+9. superficies visibles con el iPhone bloqueado (pantalla bloqueada, notificaciones, Live Activities).
+10. servicios de Apple usados por la app (Siri/Atajos, notificaciones push, iCloud si se usa) y dependencias Swift de terceros.
 
 ## Amenazas y controles
 
@@ -36,6 +45,15 @@
 | cuota o cierre de proveedor | indisponibilidad | local-first, adaptadores, export abierto, modo offline y degradación visible | DECIDIDO |
 | modelo inventa conocimiento | falsedad presentada como hecho | salida `PROPOSED`, clasificación visible, evidencia obligatoria, revisión humana | DECIDIDO |
 | telemetría revela intimidad | metadatos sensibles | sin analítica de terceros; logs minimizados, redacción y corta retención | DECIDIDO |
+| lectura de la pantalla bloqueada por otra persona | exposición de calendario, finanzas, contactos o tareas | snapshot mínimo; clasificación de sensibilidad por tipo de dato; redacción por defecto con el iPhone bloqueado; G-09 | PENDIENTE |
+| extensión con acceso excesivo | una extensión comprometida o con fallo lee el vault completo | las extensiones solo leen el snapshot del modo activo; sin claves del vault en el contenedor compartido | PENDIENTE (D-02) |
+| App Intent invocado sin intención de Manu | acción ejecutada desde Siri, Atajos o automatización | intents de lectura y captura sin efectos externos; cualquier escritura sensible pide confirmación; nada destructivo sin la app desbloqueada | PENDIENTE |
+| grabación sin consentimiento | infracción legal y daño a terceros | G-08; consentimiento explícito de todos los participantes; aviso visible; revisión legal aplicable | PENDIENTE |
+| filtración de transcripciones | exposición de conversaciones y datos de terceros | transcripción en el dispositivo; envío a modelos solo con aprobación del lote; retención definida | PENDIENTE |
+| extracción financiera errónea | decisiones basadas en datos incorrectos | movimientos `PROPOSED` hasta confirmación; original conservado con hash; insights con procedencia | PENDIENTE (G-07) |
+| filtración de datos financieros | fraude o exposición | cifrado; nada en superficies bloqueadas; sin envío a modelos sin aprobación; sin credenciales bancarias en MVP | PENDIENTE (G-07) |
+| pérdida de la app por caducidad del aprovisionamiento | la app deja de abrirse y el vault local queda inaccesible | export/restore probado antes de datos reales; decisión D-03; instrucciones de reinstalación | PENDIENTE (D-03) |
+| dependencia Swift maliciosa | robo de datos con el vault abierto | dependencias mínimas, versiones fijadas, revisión de cambios | PENDIENTE |
 
 ## Políticas obligatorias
 
@@ -48,6 +66,9 @@
 - Export y borrado están en Ajustes, no ocultos.
 - Cada envío a una IA o MCP registra proveedor, propósito, categorías, IDs de origen y consentimiento; nunca el secreto.
 - Nunca se sube una exportación personal real a fixtures o CI.
+- Los permisos del sistema se piden cuando Manu usa la función que los necesita, con un texto que explica para qué; la app sigue funcionando si se deniegan.
+- Widgets, Live Activities y notificaciones visibles con el iPhone bloqueado no muestran contenido sensible sin permiso explícito por tipo de dato.
+- MANU OS no inicia pagos ni transferencias ni graba llamadas sin consentimiento.
 
 ## Retención
 
@@ -57,6 +78,8 @@
 - Logs de servicio: sin contenido; retención objetivo ≤ 7 días.
 - Papelera: 30 días por defecto antes de purga física.
 - Tokens revocados: borrado inmediato del token, conservación de evento de revocación sin secreto.
+- Grabaciones y transcripciones: política de retención pendiente de G-08.
+- Datos financieros: política de retención pendiente de G-07.
 
 ## Backup 3-2-1 adaptado
 
@@ -101,4 +124,6 @@ Exportar todo no significa exportar credenciales. OAuth tokens, claves privadas,
 - secret scanning en CI;
 - revocación OAuth probada;
 - export/restauración comprobado con fixture y después con una copia real controlada;
-- ninguna petición de red inesperada al usar el modo local.
+- ninguna petición de red inesperada al usar el modo local;
+- ningún contenido sensible visible con el iPhone bloqueado;
+- prueba de retirada de cada permiso usado en el recorrido del MVP.

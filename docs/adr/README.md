@@ -11,9 +11,10 @@ Estados permitidos:
 
 ## Índice
 
-- [ADR-0001 — PWA local-first como primera interfaz](0001-local-first-pwa.md)
+- [ADR-0001 — PWA local-first como primera interfaz](0001-local-first-pwa.md) — `SUPERSEDED` por ADR-0007
 - [ADR-0002 — Conocimiento basado en afirmaciones y evidencia](0002-evidence-backed-knowledge.md)
 - [ADR-0003 — Cifrado del contenido antes de sincronizar](0003-client-side-encryption.md)
 - [ADR-0004 — Coste operativo cero sin cobros automáticos](0004-zero-cost-guardrails.md)
 - [ADR-0005 — Grafo como proyección relacional](0005-relational-graph-projection.md)
 - [ADR-0006 — Agentes opcionales con aprobación de escrituras](0006-optional-agents-and-approvals.md)
+- [ADR-0007 — Experiencia nativa de iPhone como prioridad](0007-native-iphone-first.md)

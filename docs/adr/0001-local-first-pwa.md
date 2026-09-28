@@ -1,7 +1,10 @@
 # ADR-0001 — PWA local-first como primera interfaz
 
-Status: **ACCEPTED**  
-Date: **2026-09-28**
+Status: **SUPERSEDED**  
+Date: **2026-09-28**  
+Sustituido por: **[ADR-0007](0007-native-iphone-first.md)** (2026-09-28)
+
+> Este ADR se conserva por trazabilidad. La interfaz principal y el calendario de la app nativa los decide ahora ADR-0007. Los principios local-first y offline útil siguen vigentes; la PWA ya no es la interfaz principal y la app nativa ya no es «futura».
 
 ## Contexto
 

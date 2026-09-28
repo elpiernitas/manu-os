@@ -16,6 +16,18 @@ Fecha de consulta: 2026-09-28. Las capacidades que dependan de cuenta/dispositiv
 - [Apple Shortcuts input types](https://support.apple.com/guide/shortcuts/input-types-apd7644168e1/ios)
 - [Apple Shortcuts clipboard](https://support.apple.com/guide/shortcuts/apd081d9d61f/ios)
 
+## App nativa de iPhone (añadidas por ADR-0007)
+
+Consultadas el 2026-09-28. Se comprobó que las páginas de documentación existen, no que cada capacidad funcione en el iPhone o con la cuenta de Manu.
+
+- [WidgetKit](https://developer.apple.com/documentation/widgetkit)
+- [App Intents](https://developer.apple.com/documentation/appintents)
+- [ActivityKit (Live Activities)](https://developer.apple.com/documentation/activitykit)
+- [Human Interface Guidelines — Privacy](https://developer.apple.com/design/human-interface-guidelines/privacy) (consultada a través de la copia de referencia de la skill `apple-design`)
+- [Human Interface Guidelines — Managing notifications](https://developer.apple.com/design/human-interface-guidelines/managing-notifications) (Focus e interrupción; consultada a través de la misma copia)
+
+Sin fuente verificada en esta revisión: controles del Centro de Control, filtros de Focus para apps, API de alarmas para terceros, grabación de llamadas en iOS y capacidades disponibles con cuenta gratuita frente a Apple Developer Program. Deben documentarse con fuente antes de cerrar D-03 y las fases que las usen.
+
 ## Google
 
 - [Google OAuth 2.0](https://developers.google.com/identity/protocols/oauth2)

@@ -8,9 +8,9 @@ BRAIN-01 — contratos de conocimiento con fuentes, afirmaciones, evidencia y te
 
 ## Instrucción de pausa
 
-No ejecutar esta tarea todavía. Claude está trabajando en otro proyecto y Manu ha pedido expresamente no enviarle ni iniciar nada en MANU OS.
+No ejecutar esta tarea todavía. Claude Code tiene acceso al repositorio desde el 2026-09-28, pero solo para tareas documentales que Manu autoriza de forma explícita; no está autorizado a iniciar BRAIN-01.
 
-La especificación completa preparada para el futuro está en `docs/roadmap/BRAIN_01_TASK.md`.
+La especificación completa preparada para el futuro está en `docs/roadmap/BRAIN_01_TASK.md`. Antes de autorizarla hay que cerrar D-01 (lenguaje del núcleo) y adaptar la especificación, según ADR-0007.
 
 ## Trabajo permitido mientras está pausada
 
@@ -22,7 +22,7 @@ La especificación completa preparada para el futuro está en `docs/roadmap/BRAI
 ## Trabajo prohibido
 
 - crear paquetes, schemas o tests de BRAIN-01;
-- añadir React, PWA, base de datos o infraestructura;
+- añadir React, PWA, proyecto Xcode/SwiftUI, base de datos o infraestructura;
 - conectar servicios o credenciales;
 - abrir PR de implementación;
 - hacer merge o deploy.

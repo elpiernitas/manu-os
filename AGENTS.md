@@ -34,7 +34,10 @@ Usa estas etiquetas con precisión:
 
 ## Arquitectura
 
-- MANU BRAIN es independiente de React, Cloudflare, Google y proveedores de IA.
+- MANU BRAIN es independiente de React, SwiftUI, Cloudflare, Google y proveedores de IA.
+- La app nativa de iPhone es la experiencia principal (ADR-0007). Un componente web solo existe si D-01 lo mantiene.
+- Las extensiones del sistema (widgets, controles, Live Activities, App Intents) leen solo el snapshot mínimo del modo activo y no muestran contenido sensible con el iPhone bloqueado.
+- No declares funcional una capacidad de iOS probada solo en el simulador o no probada: indica `TEÓRICAMENTE_POSIBLE` o `NO_VERIFICADO`.
 - Local-first y offline útil son requisitos, no mejoras opcionales.
 - Las fuentes brutas son inmutables; los derivados deben poder regenerarse.
 - Ninguna inferencia se convierte automáticamente en hecho.

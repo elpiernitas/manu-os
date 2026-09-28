@@ -1,5 +1,15 @@
 # CURRENT TASK — BRAIN-01
 
+Status: **NOT_AUTHORIZED**. Este documento es una especificación preparada, no una autorización.
+
+> **Revisión pendiente (ADR-0007, 2026-09-28).** Esta especificación se redactó cuando la PWA era la interfaz principal y el núcleo iba a ser TypeScript. Con la app nativa de iPhone como prioridad, el lenguaje y las herramientas (TypeScript, Zod, pnpm, Vitest) dependen de **D-01**. Antes de autorizar BRAIN-01 hay que:
+>
+> 1. cerrar D-01 (núcleo en Swift, en TypeScript o contrato compartido en ambos);
+> 2. adaptar «Alcance permitido» y «Comandos de verificación esperados» a esa decisión;
+> 3. conservar sin cambios los invariantes obligatorios y los 12 tests mínimos, que no dependen del lenguaje.
+>
+> El resto del documento se mantiene tal como se redactó en BRAIN-00.
+
 ## Encargo para Claude Opus 5.5
 
 **Esfuerzo recomendado: alto. No máximo.**
