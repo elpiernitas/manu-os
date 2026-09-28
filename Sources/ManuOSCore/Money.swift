@@ -77,6 +77,16 @@ public struct SpendingSummary: Equatable, Sendable {
 }
 
 public enum SpendingReport {
+    /// Spanish euro formatting, e.g. 12.5 → "12,50 €".
+    public static func euros(_ amount: Decimal) -> String {
+        let formatter = NumberFormatter()
+        formatter.locale = Locale(identifier: "es_ES")
+        formatter.numberStyle = .decimal
+        formatter.minimumFractionDigits = 2
+        formatter.maximumFractionDigits = 2
+        return (formatter.string(from: amount as NSDecimalNumber) ?? "\(amount)") + " €"
+    }
+
     /// Totals for entries inside `[start, end)`.
     public static func summary(_ entries: [SpendingEntry], from start: Date, to end: Date) -> SpendingSummary {
         let inRange = entries.filter { $0.occurredAt >= start && $0.occurredAt < end }

@@ -32,6 +32,7 @@ public enum ManuTab: String, CaseIterable, Hashable, Sendable {
 /// a custom floating button would break platform conventions.
 public struct RootView: View {
     @State private var selection: ManuTab
+    @StateObject private var store = SessionStore()
     private let engine: ModeEngine
 
     public init(initialTab: ManuTab = .today, timeZone: TimeZone = TimeZone(identifier: "Europe/Madrid") ?? .current) {
@@ -57,6 +58,7 @@ public struct RootView: View {
                 .tabItem { Label(ManuTab.you.title, systemImage: ManuTab.you.symbol) }
                 .tag(ManuTab.you)
         }
+        .environmentObject(store)
         .tint(ManuTheme.accentText)
         .preferredColorScheme(.dark)
     }

@@ -4,8 +4,10 @@ import SwiftUI
 
 /// The MANU tab: base-level chat (ADR-0009). Works offline and without AI.
 struct ManuChatView: View {
-    @State private var transcript = ChatTranscript()
+    @EnvironmentObject private var store: SessionStore
     @State private var draft = ""
+
+    private var transcript: ChatTranscript { store.session.transcript }
     @FocusState private var inputFocused: Bool
 
     var body: some View {
@@ -66,7 +68,8 @@ struct ManuChatView: View {
     }
 
     private func send() {
-        guard transcript.send(draft) != nil else { return }
+        guard !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        store.handle(draft)
         draft = ""
     }
 }

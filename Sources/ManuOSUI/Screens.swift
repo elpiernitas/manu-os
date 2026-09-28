@@ -8,9 +8,11 @@ import SwiftUI
 
 struct TodayView: View {
     let engine: ModeEngine
+    @EnvironmentObject private var store: SessionStore
 
     var body: some View {
         ManuPage(title: "Hoy") {
+            InboxCard(captures: store.session.inbox.pending, store: store)
             TimelineView(.periodic(from: .now, by: 60)) { context in
                 let state = engine.state(at: context.date)
                 ManuCard(title: "Ahora") {
@@ -52,11 +54,71 @@ struct AgendaView: View {
     }
 }
 
+/// Pending captures. Nothing is classified until Manu taps a button.
+private struct InboxCard: View {
+    let captures: [Capture]
+    let store: SessionStore
+
+    var body: some View {
+        ManuCard(title: "Bandeja") {
+            if captures.isEmpty {
+                EmptyStateText(text: "Nada pendiente. Lo que le pidas a MANU que apunte aparecerá aquí para que lo confirmes.")
+            } else {
+                ForEach(captures) { capture in
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(capture.text ?? "Captura sin texto")
+                            .font(.body)
+                            .foregroundStyle(ManuTheme.textPrimary)
+                        HStack(spacing: 12) {
+                            Button("Guardar como idea") { store.confirmAsIdea(captureID: capture.id) }
+                                .buttonStyle(.borderedProminent)
+                                .tint(ManuTheme.accentFill)
+                            Button("No recuerdo") { store.markUnclassified(captureID: capture.id) }
+                                .buttonStyle(.bordered)
+                        }
+                        .frame(minHeight: ManuTheme.minimumTouchTarget)
+                    }
+                }
+            }
+            Text("Por ahora la bandeja no se guarda al cerrar la app.")
+                .font(.footnote)
+                .foregroundStyle(ManuTheme.textSecondary)
+        }
+    }
+}
+
 struct MoneyView: View {
+    @EnvironmentObject private var store: SessionStore
+
     var body: some View {
         ManuPage(title: "Dinero") {
-            ManuCard(title: "Este mes") {
-                EmptyStateText(text: "Cuando registres gastos verás en qué se va el dinero, sin juicios.")
+            ManuCard(title: "Esta sesión") {
+                let entries = store.session.spending
+                if entries.isEmpty {
+                    EmptyStateText(text: "Cuando registres gastos verás en qué se va el dinero, sin juicios.")
+                } else {
+                    ForEach(entries) { entry in
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(entry.merchant ?? "Sin comercio")
+                                    .font(.body)
+                                    .foregroundStyle(ManuTheme.textPrimary)
+                                Text(entry.category.title + (entry.categoryInferred ? " · propuesta" : ""))
+                                    .font(.footnote)
+                                    .foregroundStyle(ManuTheme.textSecondary)
+                            }
+                            Spacer()
+                            Text(SpendingReport.euros(entry.amount))
+                                .font(.body.monospacedDigit())
+                                .foregroundStyle(ManuTheme.textPrimary)
+                        }
+                        .accessibilityElement(children: .combine)
+                    }
+                    let total = entries.reduce(Decimal(0)) { $0 + $1.amount }
+                    Text("Total: " + SpendingReport.euros(total))
+                        .font(.headline)
+                        .foregroundStyle(ManuTheme.textPrimary)
+                }
             }
             ManuCard(title: "Cómo registrar") {
                 EmptyStateText(text: "Escribe a MANU, por ejemplo: «gasté 12,50 en café». La categoría se propone y la puedes corregir.")
