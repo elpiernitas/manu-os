@@ -4,12 +4,12 @@
 
 ## Regla de selección
 
-Solo puede existir una tarea de implementación `IN_PROGRESS`. Una fase no empieza hasta cumplir sus dependencias y gates, y hasta que Manu la autorice.
+Solo puede existir una tarea de implementación `IN_PROGRESS`. Una fase no empieza hasta cumplir sus dependencias y gates. Desde el 2026-09-28, Manu delega en el orquestador técnico la autorización de tareas, revisiones y merges; los costes, servicios externos, datos reales, permisos sensibles y decisiones materiales de producto siguen reservados a Manu.
 
 | Fase | Resultado | Depende de | Beta 1 | Estado |
 | --- | --- | --- | --- | --- |
 | BRAIN-00 | fundación documental; revisiones ADR-0007 a ADR-0009 | — | — | COMPLETED |
-| BRAIN-01 | contratos de Source (con retención), Claim, Evidence y tiempo | BRAIN-00, D-01 | sí | NOT_AUTHORIZED |
+| BRAIN-01 | contratos de Source (con retención), Claim, Evidence y tiempo | BRAIN-00, D-01 | sí | COMPLETED |
 | BRAIN-02 | apps nativas mínimas, vault local, cinco pestañas | BRAIN-01, D-02, D-03, D-04 | sí | BLOCKED |
 | BRAIN-03 | superficies del sistema y modos | BRAIN-02 | sí | BLOCKED |
 | BRAIN-04 | búsqueda, relaciones y explicación | BRAIN-02 | sí | BLOCKED |
@@ -64,6 +64,6 @@ Detalle y recomendación en `docs/architecture/DECISIONS_AND_OPEN_ITEMS.md`.
 | D-08 | fuente de modelo para el nivel conversacional | nivel conversacional de BRAIN-11 |
 | D-09 | detección de llegada a casa | activación automática de BRAIN-15 |
 
-## Preparado, no iniciado
+## Completado
 
-La especificación de BRAIN-01 existe en `BRAIN_01_TASK.md`. Su existencia no autoriza ejecutarla, y debe revalidarse contra D-01 y ADR-0008 antes de autorizarse.
+BRAIN-01 fue fusionado mediante el PR #2 tras revisión externa, corrección de 11 defectos y 31/31 tests en 3 suites. El siguiente trabajo permitido es la preparación documental de BRAIN-02; su implementación continúa bloqueada por D-02, D-03 y D-04.
