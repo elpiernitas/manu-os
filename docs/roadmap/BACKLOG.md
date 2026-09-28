@@ -10,7 +10,7 @@ Solo puede existir una tarea de implementación `IN_PROGRESS`. Una fase no empie
 | --- | --- | --- | --- | --- |
 | BRAIN-00 | fundación documental; revisiones ADR-0007 a ADR-0009 | — | — | COMPLETED |
 | BRAIN-01 | contratos de Source (con retención), Claim, Evidence y tiempo | BRAIN-00, D-01 | sí | COMPLETED |
-| BRAIN-02 | apps nativas mínimas, vault local, cinco pestañas | BRAIN-01, D-02, D-03, D-04 | sí | BLOCKED |
+| BRAIN-02 | apps nativas mínimas, vault local, cinco pestañas | BRAIN-01, D-02, D-03, D-04B | sí | BLOCKED |
 | BRAIN-03 | superficies del sistema y modos | BRAIN-02 | sí | BLOCKED |
 | BRAIN-04 | búsqueda, relaciones y explicación | BRAIN-02 | sí | BLOCKED |
 | BRAIN-05 | export, restore y copia semanal en el Mac | BRAIN-04 | sí | BLOCKED |
@@ -57,7 +57,7 @@ Detalle y recomendación en `docs/architecture/DECISIONS_AND_OPEN_ITEMS.md`.
 | D-01 | reparto SwiftUI/web, lenguaje del núcleo y tecnología de la app de Mac | BRAIN-01, BRAIN-02 |
 | D-02 | almacenamiento local nativo y contenedor compartido con extensiones | BRAIN-02 |
 | D-03 | Apple Developer Program: sí o no | BRAIN-02, parte de BRAIN-03, D-06, D-07 |
-| D-04 | entorno de compilación y pruebas (faltan datos del Mac) | BRAIN-02 |
+| D-04B | ruta de compilación, firma e instalación de la app integrada en el iPhone con iOS 27 | BRAIN-02 y Beta 1 |
 | D-05 | fuente de calendario | BRAIN-09 |
 | D-06 | servicio meteorológico | BRAIN-10 |
 | D-07 | transporte de sync cifrado | BRAIN-06 |
@@ -66,4 +66,4 @@ Detalle y recomendación en `docs/architecture/DECISIONS_AND_OPEN_ITEMS.md`.
 
 ## Completado
 
-BRAIN-01 fue fusionado mediante el PR #2 tras revisión externa, corrección de 11 defectos y 31/31 tests en 3 suites. El siguiente trabajo permitido es la preparación documental de BRAIN-02; su implementación continúa bloqueada por D-02, D-03 y D-04.
+BRAIN-01 fue fusionado mediante el PR #2 tras revisión externa, corrección de 11 defectos y 31/31 tests en 3 suites. El siguiente trabajo permitido es la preparación documental de BRAIN-02; su implementación continúa bloqueada por D-02, D-03 y D-04B.
