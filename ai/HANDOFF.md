@@ -66,6 +66,12 @@ Revisión del head `1941319` por Claude Code. Detalle completo en `ai/QA_REPORT.
 - Observaciones no bloqueantes documentadas en `ai/QA_REPORT.md` para BRAIN-02.
 - Revisión posterior del orquestador: se cerró el último hueco para que un agente `MODEL` solo pueda crear Claims `PROPOSED`; el test parametrizado cubre `ACTIVE`, `SUPERSEDED`, `CONTESTED`, `REJECTED` y `RETRACTED`. Commit `72aa272`; CI `macos-26` (run `36452298444`) **31/31 PASS en 3 suites** y Foundation check (run `36452298319`) PASS.
 
+## BRAIN-02-PREP — relevo activo
+
+Rama: `brain/02-preparation`.
+
+Alcance: cerrar el contrato técnico y reducir D-02, D-03 y D-04B sin implementar todavía las apps. Claude Code debe realizar la investigación y documentación; ChatGPT/Codex revisará, decidirá el merge y abrirá el siguiente relevo autorizado.
+
 ## NO VERIFICADO
 
 - Integración con almacenamiento, cifrado, sync, UI o extensiones.
@@ -74,4 +80,4 @@ Revisión del head `1941319` por Claude Code. Detalle completo en `ai/QA_REPORT.
 
 ## Próximo paso
 
-Preparar BRAIN-02 y cerrar D-02, D-03 y D-04 antes de implementar. Manu delegó en el orquestador técnico la decisión final sobre revisiones y merges; siguen requiriendo autorización específica los costes, servicios externos, datos reales, permisos sensibles y decisiones materiales de producto.
+Claude Code ejecuta BRAIN-02-PREP conforme a `docs/roadmap/BRAIN_02_TASK.md`. Al cerrar el PR, el orquestador debe abrir inmediatamente el siguiente trabajo autorizado o señalar un único bloqueo humano concreto.
