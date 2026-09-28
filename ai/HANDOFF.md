@@ -1,5 +1,19 @@
 # HANDOFF
 
+## Relevo vigente — WEB-05-VERIFY (PR #14)
+
+Cierre verificable del PR #13: fusionado en `main` como `7c16024`, 45/45 pruebas y workflows `MANU OS web` y `Foundation check` verdes. Sus rondas 1 a 3 quedan documentadas más abajo sin cambios.
+
+WEB-05-VERIFY es solo documental. Revisión independiente del runbook `docs/operations/WEB_05_REAL_DEVICE_VERIFICATION.md` contra el código fusionado:
+
+- Corregido: hablaba de «redirect URI», pero la app usa Google Identity Services en modo token y solo necesita el origen JavaScript autorizado (`web/app.js`, `googleToken`).
+- Corregido: «cerrar la sesión» de Gemini no existe como botón; es «Borrar clave» (y cerrar la app si no se activó «Recordar»).
+- Corregido: el archivo de Drive está en `appDataFolder` y no se ve en Drive; se indica cómo inspeccionarlo sin exponer la cabecera `Authorization`.
+- Añadido: niveles `VERIFICADO` (solo con mocks), `TEÓRICAMENTE_POSIBLE` y `NO_VERIFICADO`; cuenta de prueba dedicada; el ID de cliente no se publica; los datos ocultos de Drive no se borran al revocar; forma real de comprobar el commit publicado; registro por función.
+- Comprobado sin cambios necesarios: los scopes de la matriz coinciden con `SCOPE` en `web/core/google.js`; `include_granted_scopes: false` y un token por scope; sin secreto de cliente.
+
+Ningún código de producto cambiado. No se conectó ningún servicio ni se usaron credenciales. Los PR #7, #8 y #9 siguen en pausa. Siguiente paso: el orquestador revisa el PR #14 y Manu ejecuta el runbook en su dispositivo.
+
 ## Próximo paso vigente
 
 1. El orquestador revisa el PR #13 (WEB-05, ADR-0013). Es la única implementación activa. Si lo aprueba y lo fusiona, `web.yml` publica la web en GitHub Pages desde `main`.
