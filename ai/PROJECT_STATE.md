@@ -4,10 +4,10 @@
 
 ## Estado actual
 
-- BRAIN-00: **COMPLETED**, revisado por ADR-0007 (experiencia nativa), ADR-0008 (retención de fuentes), ADR-0009 (asistente sin IA obligatoria) y las decisiones de producto de Manu (`docs/product/EXPERIENCE.md`). La revisión está en el PR #1, en borrador y sin fusionar.
-- BRAIN-01: **NOT AUTHORIZED**. Debe revalidarse contra D-01 y ADR-0008 antes de autorizarse.
+- BRAIN-00: **COMPLETED Y FUSIONADO** en `main` mediante el PR #1.
+- BRAIN-01: **IN PROGRESS**, autorizado por Manu el 2026-09-28 en la rama `brain/01-knowledge-contracts`, revalidado para Swift y ADR-0008.
 - BRAIN-02 y siguientes: no autorizados.
-- Implementación de producto: no iniciada. No existe código Swift, TypeScript, proyecto Xcode ni infraestructura.
+- Implementación de producto: iniciado solo el núcleo Swift de BRAIN-01. No existe UI, proyecto Xcode, base de datos, red ni infraestructura.
 - Claude Code: con acceso al repositorio desde el 2026-09-28, solo para tareas documentales autorizadas por Manu.
 - Servicios externos: ninguno conectado.
 - Datos personales reales: ninguno incorporado.
@@ -19,15 +19,14 @@ Los documentos canónicos están en `docs/`. Las tareas activas se controlan med
 
 ## Siguiente gate
 
-1. Revisión y merge del PR #1 por Manu (o revisor externo).
-2. D-01 cerrada: núcleo Swift y apps SwiftUI. D-04 resuelta para BRAIN-01 mediante GitHub Actions `macos-26`/Xcode 26.6 con presupuesto 0 €; D-04B queda pendiente para la app integrada.
-3. D-03 y D-04B se decidirán antes de BRAIN-02.
-4. Tras el merge, Manu debe autorizar explícitamente BRAIN-01. Hasta entonces solo se permite preparar y revisar documentación fundacional.
+1. Implementar y verificar BRAIN-01 con los tests obligatorios.
+2. Revisión externa del PR de BRAIN-01; no fusionarlo automáticamente.
+3. D-03 y D-04B siguen aplazadas hasta BRAIN-02.
 
 ## Restricciones vigentes
 
-- No usar Claude ni otro implementador para implementación sin autorización explícita de Manu.
+- BRAIN-01 está autorizado; BRAIN-02 y siguientes no.
 - No configurar OAuth, APIs, hosting o facturación.
-- No crear interfaz ni código de producto.
+- No crear interfaz, proyecto Xcode ni código fuera del núcleo BRAIN-01.
 - No instalar plugins ni activar revisiones automáticas que consuman créditos.
 - No usar exports personales como fixtures.

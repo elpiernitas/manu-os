@@ -1,20 +1,11 @@
 # CURRENT TASK — BRAIN-01
 
-Status: **NOT_AUTHORIZED**. Este documento es una especificación preparada, no una autorización.
+Status: **IN_PROGRESS**. Autorizado por Manu el 2026-09-28 tras el merge del PR #1.
 
-> **Revisión pendiente (ADR-0007, 2026-09-28).** Esta especificación se redactó cuando la PWA era la interfaz principal y el núcleo iba a ser TypeScript. Con la app nativa de iPhone como prioridad, el lenguaje y las herramientas (TypeScript, Zod, pnpm, Vitest) dependen de **D-01**. Antes de autorizar BRAIN-01 hay que:
->
-> 1. cerrar D-01 (núcleo en Swift, en TypeScript o contrato compartido en ambos);
-> 2. adaptar «Alcance permitido» y «Comandos de verificación esperados» a esa decisión;
-> 3. conservar sin cambios los invariantes obligatorios y los 12 tests mínimos, que no dependen del lenguaje.
->
-> El resto del documento se mantiene tal como se redactó en BRAIN-00.
->
-> **Revisión pendiente adicional (ADR-0008, 2026-09-28).** Al revalidar, añadir al contrato: política de retención de cada `Source`, `original_retained`, `original_hash` opcional, `SourceDeletionEvent` y la invariante «ninguna consulta afirma un original no conservado». El invariante «Source y SourceItem se modelan como contenido inmutable» se lee como «no se modifican mientras se conservan». Recomendación para D-01 documentada en `docs/architecture/DECISIONS_AND_OPEN_ITEMS.md`: núcleo en Swift; si se acepta, los comandos `pnpm` de abajo se sustituyen por los equivalentes de Swift.
+> **Revalidación cerrada (2026-09-28).** D-01 elige un núcleo Swift y apps SwiftUI. BRAIN-01 se implementa como Swift Package independiente de UI y se verifica en GitHub Actions `macos-26`. Se conservan los invariantes y los 12 tests, y se añaden los contratos de retención de ADR-0008.
 
-## Encargo para Claude Opus 5.5
 
-**Esfuerzo recomendado: alto. No máximo.**
+## Encargo autorizado para el implementador
 
 Trabaja en el repositorio privado de MANU OS. Crea una rama nueva llamada `brain/01-knowledge-contracts`. No modifiques `main` directamente. No despliegues nada, no conectes servicios, no uses datos personales reales y no añadas UI.
 
@@ -30,27 +21,13 @@ Implementar y demostrar el contrato mínimo, independiente de proveedor, para fu
 
 ### Alcance permitido
 
-- Configurar el monorepo mínimo con pnpm workspaces, TypeScript estricto, lint/format y Vitest si aún no existe.
-- Crear `packages/brain-domain` sin dependencia de React, base de datos, red ni proveedor de IA.
-- Implementar schemas Zod y tipos inferidos para:
-  - `Source`
-  - `SourceItem`
-  - `Fragment`
-  - `Entity`
-  - `Claim`
-  - `EvidenceLink`
-  - `Activity`
-  - `Agent`
-  - clasificación y estados
-  - valores tipados de Claim
-- Implementar funciones puras:
-  - `validateClaimEvidence`
-  - `supersedeClaim`
-  - `resolveCurrentClaims(at)`
-  - `detectSupersessionCycle`
-- Añadir fixtures sintéticos, incluido el ejemplo «nombre de proyecto X → Everours».
-- Escribir ADR breve para las decisiones del contrato que no estén ya cerradas.
-- Configurar CI de checks sin deploy y con permisos mínimos.
+- Crear un Swift Package raíz sin dependencias externas.
+- Crear el módulo `ManuBrainDomain`, sin SwiftUI, base de datos, red ni proveedor de IA.
+- Implementar contratos `Codable` y `Sendable` para Source, SourceItem, Fragment, SourceDeletionEvent, Entity, Claim, EvidenceLink, Activity, Agent, clasificaciones, estados y valores tipados.
+- Implementar las funciones puras obligatorias de validación, sustitución, resolución temporal y detección de ciclos.
+- Añadir fixtures totalmente sintéticos, incluido «X → Everours».
+- Añadir ADR-0010 y CI sin deploy, con permisos mínimos y gasto 0 €.
+
 
 ### Fuera de alcance
 
@@ -91,17 +68,14 @@ Implementar y demostrar el contrato mínimo, independiente de proveedor, para fu
 
 ### Comandos de verificación esperados
 
-Define scripts raíz equivalentes a:
-
 ```bash
-pnpm install --frozen-lockfile
-pnpm lint
-pnpm typecheck
-pnpm test
-pnpm build
+swift package dump-package
+swift build --build-tests
+swift test --parallel
 ```
 
-Si el primer install crea lockfile, documenta el comando exacto usado y vuelve a verificar con `--frozen-lockfile`.
+Se ejecutan en GitHub Actions `macos-26`. No se declara PASS hasta que los tres terminen con éxito.
+
 
 ### Entrega
 
