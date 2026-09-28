@@ -9,6 +9,8 @@ Status: **NOT_AUTHORIZED**. Este documento es una especificación preparada, no 
 > 3. conservar sin cambios los invariantes obligatorios y los 12 tests mínimos, que no dependen del lenguaje.
 >
 > El resto del documento se mantiene tal como se redactó en BRAIN-00.
+>
+> **Revisión pendiente adicional (ADR-0008, 2026-09-28).** Al revalidar, añadir al contrato: política de retención de cada `Source`, `original_retained`, `original_hash` opcional, `SourceDeletionEvent` y la invariante «ninguna consulta afirma un original no conservado». El invariante «Source y SourceItem se modelan como contenido inmutable» se lee como «no se modifican mientras se conservan». Recomendación para D-01 documentada en `docs/architecture/DECISIONS_AND_OPEN_ITEMS.md`: núcleo en Swift; si se acepta, los comandos `pnpm` de abajo se sustituyen por los equivalentes de Swift.
 
 ## Encargo para Claude Opus 5.5
 

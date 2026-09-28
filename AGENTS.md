@@ -39,7 +39,11 @@ Usa estas etiquetas con precisión:
 - Las extensiones del sistema (widgets, controles, Live Activities, App Intents) leen solo el snapshot mínimo del modo activo y no muestran contenido sensible con el iPhone bloqueado.
 - No declares funcional una capacidad de iOS probada solo en el simulador o no probada: indica `TEÓRICAMENTE_POSIBLE` o `NO_VERIFICADO`.
 - Local-first y offline útil son requisitos, no mejoras opcionales.
-- Las fuentes brutas son inmutables; los derivados deben poder regenerarse.
+- Las fuentes brutas son inmutables mientras se conservan; su retención y su eliminación siguen ADR-0008, con procedencia y evento de eliminación. Nunca afirmes que se conserva un original descartado.
+- Los derivados deben poder regenerarse cuando el original se conserva.
+- Lo etiquetado como sensible (salud, finanzas, Refugio, datos de terceros) no aparece en superficies bloqueadas ni en exportaciones compartibles, y no se envía a proveedores de modelo sin decisión específica.
+- El chat MANU y todo el núcleo deben funcionar sin IA (ADR-0009). No envíes mensajes automáticos fuera de la lista blanca.
+- No escribas en el repositorio nombres ni datos reales de terceros (por ejemplo, las excepciones laborales de Manu).
 - Ninguna inferencia se convierte automáticamente en hecho.
 - Todo conocimiento derivado debe conservar procedencia y evidencia.
 - No introduzcas microservicios, bases de grafos, embeddings o IA obligatoria sin un ADR aprobado.

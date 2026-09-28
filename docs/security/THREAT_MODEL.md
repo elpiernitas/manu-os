@@ -1,6 +1,6 @@
 # 04 — Privacidad, threat model, backups y exportación
 
-> Revisado el 2026-09-28 por [ADR-0007](../adr/0007-native-iphone-first.md): se añaden activos, fronteras y amenazas de la app nativa, sus extensiones, finanzas y grabaciones. Los controles nuevos están marcados `PENDIENTE` porque dependen de D-01 a D-04; no están implementados.
+> Revisado el 2026-09-28 por [ADR-0007](../adr/0007-native-iphone-first.md): se añaden activos, fronteras y amenazas de la app nativa, sus extensiones, finanzas y grabaciones. Revisado de nuevo el mismo día por las decisiones de producto de Manu ([ADR-0008](../adr/0008-source-retention-and-controlled-deletion.md), [ADR-0009](../adr/0009-manu-assistant-without-mandatory-ai.md)): borrado controlado de fuentes, asistente, Refugio, salud, personas y ausencia de bloqueo interno. Los controles nuevos están marcados `PENDIENTE`; no están implementados.
 
 ## Activos de mayor sensibilidad
 
@@ -14,7 +14,14 @@
 - datos financieros: capturas, extractos, movimientos e insights;
 - grabaciones de audio, transcripciones y resúmenes, incluidas voces y datos de terceros;
 - configuración de modos, horarios y excepciones (revela rutinas y contactos importantes);
-- snapshot compartido con las extensiones.
+- snapshot compartido con las extensiones;
+- datos del Refugio: estado emocional, desencadenantes, personas relacionadas y evolución;
+- datos de salud: sueño, actividad, ritmo cardiaco, estado de ánimo y comidas;
+- perfiles de personas y chats importados (datos de terceros);
+- texto extraído de capturas de pantalla (puede contener cualquier cosa, incluidas credenciales o datos bancarios);
+- registro de sugerencias y patrones aprendidos (describe hábitos);
+- ubicación de casa y llegadas;
+- lista blanca de mensajes automáticos.
 
 ## Fronteras de confianza
 
@@ -33,7 +40,8 @@
 
 | Amenaza | Riesgo | Controles BRAIN-00 | Estado |
 | --- | --- | --- | --- |
-| pérdida o robo del dispositivo | acceso al vault desbloqueado | passcode/biometría del SO, bloqueo de sesión, cifrado local razonable, revocación de dispositivo | DECIDIDO |
+| pérdida o robo del dispositivo | acceso al vault desbloqueado | passcode/biometría del SO, ~~bloqueo de sesión~~ (sustituido: sin bloqueo interno por decisión de Manu, R-33), cifrado local, revocación de dispositivo | DECIDIDO |
+| dispositivo desbloqueado en manos de otra persona | acceso a Refugio, salud, finanzas y personas sin barrera adicional | riesgo aceptado por Manu (R-33); lo sensible no aparece en superficies bloqueadas ni notificaciones | ACEPTADO |
 | proveedor cloud comprometido | filtración de corpus | cifrado en cliente; servidor recibe ciphertext y metadatos mínimos | DECIDIDO |
 | XSS o dependencia maliciosa | robo de datos/clave con vault abierto | CSP estricta, sin scripts remotos, lockfile, auditoría, Trusted Types cuando sea viable, escapar HTML | DECIDIDO |
 | secreto en Git | toma de cuentas | `.env.example`, secret scanning, CI sin volcar entorno, rotación y revisión de commits | DECIDIDO |
@@ -54,6 +62,14 @@
 | filtración de datos financieros | fraude o exposición | cifrado; nada en superficies bloqueadas; sin envío a modelos sin aprobación; sin credenciales bancarias en MVP | PENDIENTE (G-07) |
 | pérdida de la app por caducidad del aprovisionamiento | la app deja de abrirse y el vault local queda inaccesible | export/restore probado antes de datos reales; decisión D-03; instrucciones de reinstalación | PENDIENTE (D-03) |
 | dependencia Swift maliciosa | robo de datos con el vault abierto | dependencias mínimas, versiones fijadas, revisión de cambios | PENDIENTE |
+| borrado erróneo de originales | pérdida de información o historial falso | G-10; confirmación en MANU OS y en iOS; texto extraído guardado antes de pedir el borrado; registro del resultado real (ADR-0008) | PENDIENTE |
+| captura con credenciales o datos bancarios | secretos guardados como texto extraído | etiquetado sensible; detección básica de patrones de credenciales con aviso a Manu; nunca en superficies ni exportaciones compartibles | PENDIENTE |
+| prompt injection en enlaces, capturas o chats importados | MANU sigue instrucciones escondidas en el contenido | todo contenido capturado es dato, nunca instrucción; las acciones solo salen de Manu o de reglas autorizadas | PENDIENTE |
+| mensaje automático indebido | envío en nombre de Manu que él no quería | G-14; lista blanca explícita; registro de envíos; ningún otro mensaje automático | PENDIENTE |
+| proveedor de modelo recibe datos sensibles | exposición de salud, finanzas, Refugio o chats | G-13; exclusión por defecto; decisión específica y revisión de condiciones | PENDIENTE |
+| Refugio ante riesgo real | respuesta inadecuada en una crisis | G-12; priorizar ayuda humana inmediata (112, 024); no diagnosticar ni actuar como terapia | PENDIENTE |
+| informe del Laboratorio con datos personales | datos enviados a GitHub u otro agente | nada se envía automáticamente; informe revisable; sin datos personales salvo que Manu los añada | PENDIENTE |
+| aprendizaje proactivo intrusivo | perfil de hábitos visible o mal usado | aprendizaje local, visible y borrable; sin envío a terceros | PENDIENTE |
 
 ## Políticas obligatorias
 
@@ -69,10 +85,17 @@
 - Los permisos del sistema se piden cuando Manu usa la función que los necesita, con un texto que explica para qué; la app sigue funcionando si se deniegan.
 - Widgets, Live Activities y notificaciones visibles con el iPhone bloqueado no muestran contenido sensible sin permiso explícito por tipo de dato.
 - MANU OS no inicia pagos ni transferencias ni graba llamadas sin consentimiento.
+- MANU OS no envía mensajes automáticamente salvo los de la lista blanca explícita (G-14).
+- Lo etiquetado `SENSITIVE` no entra en exportaciones compartibles; el backup completo cifrado sí lo incluye.
+- Salud, finanzas, Refugio, chats privados y transcripciones no se envían a ningún proveedor de modelo sin decisión específica (G-13).
 
 ## Retención
 
-- Fuentes originales: hasta borrado explícito de Manu.
+- Fuentes originales: según su política de retención (ADR-0008); con `FULL`, hasta borrado explícito de Manu.
+- Capturas de la bandeja diaria: el original no se conserva en MANU OS (`EXTRACTED_ONLY`).
+- Audios de respuesta: se descartan tras transcribirlos (`TRANSIENT`).
+- Registro de procedencia y eventos de eliminación: se conservan mientras exista algún derivado de la fuente.
+- Datos del Refugio y de salud: política de retención pendiente de G-12 y G-11.
 - Derivados: regenerables; se pueden purgar y recalcular.
 - Sync events: compactación tras snapshot verificado, conservando manifiesto e historial mínimo.
 - Logs de servicio: sin contenido; retención objetivo ≤ 7 días.
@@ -83,9 +106,11 @@
 
 ## Backup 3-2-1 adaptado
 
-- Copia 1: vault operativo local.
-- Copia 2: sync/backup remoto cifrado.
-- Copia 3: export cifrado periódico guardado por Manu en otra ubicación (por ejemplo iCloud Drive o disco externo).
+- Copia 1: vault operativo local (iPhone y Mac).
+- Copia 2: sync cifrado (D-07).
+- Copia 3: copia completa semanal cifrada en el Mac; copia manual por cable como opción adicional. Se recomienda que Manu guarde además una copia en otra ubicación.
+
+La copia en el Mac y el vault del Mac están en el mismo equipo: si falla el Mac, se pierden ambos. Por eso la copia 2 o una copia externa siguen siendo necesarias.
 
 El producto no declarará backup funcional hasta superar una restauración completa en un perfil limpio. Cada backup incluye:
 
@@ -101,7 +126,7 @@ El producto no declarará backup funcional hasta superar una restauración compl
 
 Dos modos:
 
-- **Portable ZIP**: JSONL + Markdown/CSV auxiliares + originales. Puede ir cifrado con una contraseña diferente.
+- **Portable ZIP**: JSONL + Markdown/CSV auxiliares + originales conservados + procedencia y eventos de eliminación. Puede ir cifrado con una contraseña diferente. Lo `SENSITIVE` solo se incluye si Manu lo elige de forma explícita.
 - **Snapshot técnico**: conserva eventos, ciphertext y metadatos para restauración exacta.
 
 Exportar todo no significa exportar credenciales. OAuth tokens, claves privadas, cookies y claves de servidor nunca se incluyen. El manifiesto enumera integraciones y cómo volver a autorizarlas.
@@ -126,4 +151,7 @@ Exportar todo no significa exportar credenciales. OAuth tokens, claves privadas,
 - export/restauración comprobado con fixture y después con una copia real controlada;
 - ninguna petición de red inesperada al usar el modo local;
 - ningún contenido sensible visible con el iPhone bloqueado;
-- prueba de retirada de cada permiso usado en el recorrido del MVP.
+- prueba de retirada de cada permiso usado en el recorrido del MVP;
+- prueba de borrado controlado de fuentes con registro correcto (G-10);
+- cero mensajes automáticos fuera de la lista blanca;
+- cero datos sensibles enviados a proveedores de modelo sin decisión específica.

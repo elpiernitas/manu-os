@@ -2,49 +2,48 @@
 
 ## Estado
 
-No hay una implementación activa. BRAIN-00 dejó preparada la documentación fundacional; el 2026-09-28 se revisó para reflejar la nueva visión (ADR-0007: experiencia nativa de iPhone como prioridad). BRAIN-01 sigue `NOT_AUTHORIZED`.
+No hay una implementación activa. BRAIN-00 dejó preparada la documentación fundacional, revisada el 2026-09-28 por ADR-0007 y, el mismo día, por las decisiones de producto de Manu. BRAIN-01 sigue `NOT_AUTHORIZED`.
 
-## Última tarea: revisión documental ADR-0007
+## Última tarea: decisiones de producto de Manu (2026-09-28)
 
-Autorizada explícitamente por Manu. Ejecutada por Claude Code en la rama `chore/brain-00-foundation` (PR #1, en borrador). Solo documentación; sin código de producto.
+Autorizada explícitamente por Manu, solo para documentación. Ejecutada por Claude Code en la rama `chore/brain-00-foundation` (PR #1, en borrador), sobre el commit `3158903`.
 
 ### Cambios realizados
 
-- `docs/adr/0007-native-iphone-first.md`: nuevo ADR aceptado; sustituye a ADR-0001.
-- `docs/adr/0001-local-first-pwa.md`: estado `SUPERSEDED`, contenido original conservado.
-- `docs/adr/README.md`, `ai/DECISIONS.md`: índice y registro de decisiones actualizados.
-- `docs/product/PRODUCT_CHARTER.md`: propósito, modos, casos de uso descubiertos, MVP, límites y tabla de historial de cambios.
-- `docs/product/MVP_ACCEPTANCE.md`: recorrido centrado en la app nativa, modos, superficies y retirada de permisos.
-- `docs/architecture/ARCHITECTURE.md`: diagrama, superficies nativas y modos, filas de la tabla marcadas como sustituidas o pendientes (D-01/D-02), distribución y aprovisionamiento (D-03/D-04); secciones PWA y companion conservadas como sustituidas.
-- `docs/architecture/DECISIONS_AND_OPEN_ITEMS.md`: decisiones sustituidas, decisiones ADR-0007, decisiones pendientes D-01 a D-06, estado de acceso de Claude.
-- `docs/integrations/INTEGRATIONS.md`: columna nueva «Con app nativa», filas de superficies del sistema, alarma, voz y llamadas; secciones «Momentos y servicios externos» y «Finanzas».
-- `docs/roadmap/ROADMAP.md`, `docs/roadmap/BACKLOG.md`: fases reordenadas, BRAIN-13 y BRAIN-14, G-05 retirado, gates G-07 a G-09, tabla del roadmap original sustituido.
-- `docs/roadmap/BRAIN_01_TASK.md`: estado explícito `NOT_AUTHORIZED` y nota de revalidación contra D-01; especificación original intacta.
-- `docs/security/RISK_REGISTER.md`: R-01, R-11 y R-13 ajustados; nuevos R-15 a R-23.
-- `docs/security/THREAT_MODEL.md`: activos, fronteras, amenazas y políticas de la app nativa, extensiones, finanzas y grabaciones.
-- `docs/research/SOURCES.md`: fuentes Apple añadidas y lista de capacidades sin fuente verificada.
-- `README.md`, `AGENTS.md`, `ai/PROJECT_STATE.md`, `ai/CURRENT_TASK.md`: visión nueva y referencias a Claude actualizadas.
+- Nuevos:
+  - `docs/product/EXPERIENCE.md`: visión funcional completa con la viabilidad de cada pieza.
+  - `docs/adr/0008-source-retention-and-controlled-deletion.md`: retención por fuente y borrado controlado.
+  - `docs/adr/0009-manu-assistant-without-mandatory-ai.md`: chat MANU con nivel base sin IA y nivel conversacional opcional.
+- Modificados:
+  - `docs/product/PRODUCT_CHARTER.md`, `docs/product/MVP_ACCEPTANCE.md` (MVP técnico interno frente a Beta 1).
+  - `docs/architecture/ARCHITECTURE.md`, `docs/architecture/DATA_MODEL.md`, `docs/architecture/DECISIONS_AND_OPEN_ITEMS.md` (recomendación D-01, datos para D-04, D-07 a D-09).
+  - `docs/integrations/INTEGRATIONS.md`, `docs/roadmap/ROADMAP.md`, `docs/roadmap/BACKLOG.md`, `docs/roadmap/BRAIN_01_TASK.md` (solo nota).
+  - `docs/security/RISK_REGISTER.md` (R-24 a R-40), `docs/security/THREAT_MODEL.md`, `docs/research/SOURCES.md`.
+  - `docs/adr/README.md`, `docs/adr/0002-evidence-backed-knowledge.md` y `docs/adr/0007-native-iphone-first.md` (solo notas añadidas; su decisión no se reescribe).
+  - `README.md`, `AGENTS.md`, `ai/*.md` salvo `QA_REPORT.md`.
 
 ### Verificación ejecutada
 
-- Pasos de `.github/workflows/foundation-check.yml` reproducidos localmente con bash: documentos canónicos presentes, sin `.env` versionados, `Status` válido en `ai/CURRENT_TASK.md`. Resultado: PASS en los tres pasos.
-- Comprobación de enlaces Markdown relativos: sin enlaces rotos.
-- Comprobación de que todos los IDs R-xx, G-0x y D-0x citados están definidos: sin IDs huérfanos.
-- Búsqueda de referencias obsoletas («Claude no conectado», «PWA primera interfaz»): solo quedan en ADR-0001 sustituido y en el contexto de ADR-0007.
+Ver la sección de verificación del PR #1 y el informe de la tarea. Comprobaciones: pasos de `foundation-check.yml` reproducidos en local, enlaces Markdown relativos, IDs R-xx/G-xx/D-xx definidos y ausencia de archivos de código o infraestructura en el diff.
 
 ### Riesgos
 
-- Los valores P/I de R-15 a R-23 son estimaciones iniciales sin evidencia.
-- Parte de la documentación (DATA_MODEL, detalles de cifrado) sigue escrita pensando en la web; se ha marcado lo que depende de D-01/D-02, pero puede quedar algún detalle sin marcar.
+- Los valores P/I de R-15 a R-40 son estimaciones iniciales sin evidencia.
+- Varias conclusiones técnicas dependen de documentación de Apple y Spotify consultada el 2026-09-28; pueden cambiar.
+- La compatibilidad del Mac con macOS Tahoe se deduce del procesador descrito; hace falta el modelo exacto.
 
 ## NO VERIFICADO
 
-- No se ha implementado ni probado MANU BRAIN.
-- No se han probado app nativa, widgets, App Intents, Centro de Control, botón de acción, Live Activities, Focus, almacenamiento, cifrado, sync ni integraciones.
-- Qué capacidades funcionan con cuenta Apple gratuita frente a Apple Developer Program.
-- Existencia y condiciones de una API de alarmas para terceros, controles del Centro de Control en la versión de iOS de Manu y rutas reales para grabar llamadas.
-- El resultado del workflow de GitHub Actions tras el push (se comprueba en el PR).
+- No se ha implementado ni probado nada de MANU BRAIN, las apps ni sus extensiones.
+- Modelo exacto del Mac, versión de macOS máxima y posibilidad de compilar con algún Xcode.
+- Modelo exacto y versión de iOS del iPhone 14.
+- Capacidades disponibles con cuenta gratuita (HealthKit, contenedor compartido, notificaciones push) frente a Apple Developer Program.
+- Controles del Centro de Control, AlarmKit, disparadores de Atajos y borrado en Fotos en el iPhone de Manu.
+- Spotify DJ, Chromecast, batería de AirPods, Toque posterior y disparador de transacciones de Wallet.
+- Calidad del OCR y del reconocimiento de voz en español.
+- Grabación de llamadas y detección de llegada a casa.
+- Utilidad del chat MANU sin modelo.
 
 ## Próximo paso
 
-Revisión del PR #1 por Manu. Después, cerrar D-01, D-03 y D-04 y, solo con autorización explícita, revalidar y autorizar BRAIN-01.
+Revisión del PR #1 por Manu. Datos del Mac y del iPhone para D-04. Decisiones D-01, D-03 y D-04. Solo con autorización explícita, revalidar y autorizar BRAIN-01.

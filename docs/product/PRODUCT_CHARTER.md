@@ -1,131 +1,111 @@
 # 01 — Product Charter
 
-> Revisado el 2026-09-28 por [ADR-0007](../adr/0007-native-iphone-first.md): la experiencia nativa de iPhone pasa a ser prioritaria. Los cambios respecto a la versión BRAIN-00 están en «Historial de cambios», al final del documento.
+> Revisado el 2026-09-28 dos veces: por [ADR-0007](../adr/0007-native-iphone-first.md) (experiencia nativa prioritaria) y por las decisiones de producto de Manu del mismo día, que añaden [ADR-0008](../adr/0008-source-retention-and-controlled-deletion.md), [ADR-0009](../adr/0009-manu-assistant-without-mandatory-ai.md) y `docs/product/EXPERIENCE.md`. Los cambios están en «Historial de cambios», al final.
 
 ## Propósito
 
-MANU OS es una **capa visual y operativa sobre el iPhone** y la interfaz cotidiana de una infraestructura personal. Adapta el teléfono a los momentos del día de Manu y le da acceso rápido a lo que necesita en cada uno, desde la app y desde las superficies del sistema (widgets, pantalla bloqueada, Centro de Control, botón de acción, Live Activities y Atajos).
+MANU OS es una **capa personal sobre el iPhone y el Mac de Manu**. Su experiencia empieza en la pantalla bloqueada, los widgets, el Centro de Control, los modos y las automatizaciones. La aplicación principal es la cabeza del sistema: memoria, organización, consulta, configuración y chat personal (MANU).
 
-MANU BRAIN, su núcleo, conserva fuentes, contexto y conocimiento estructurado para que Manu pueda capturar información con poca fricción, recuperar por qué sabe algo, entender cambios en el tiempo y conectar sus herramientas sin entregar el núcleo a un proveedor de IA.
+MANU OS convierte la actividad cotidiana dispersa (capturas, mensajes compartidos, enlaces, audios, calendario, gastos, salud, archivos e ideas) en **memoria organizada y siguientes pasos útiles**. El sistema se organiza alrededor de Manu; Manu no mantiene la app organizada a mano.
 
-No pretende simular conciencia ni hablar como si fuera Manu. MIRROR responde sobre el corpus de Manu y debe separar siempre hechos, preferencias, decisiones, memorias, inferencias e hipótesis.
+MANU BRAIN, su núcleo, conserva fuentes o su procedencia, contexto y conocimiento estructurado para que Manu pueda capturar con poca fricción, recuperar por qué sabe algo, entender cambios en el tiempo y conectar sus herramientas sin entregar el núcleo a un proveedor de IA.
+
+MANU no simula conciencia ni habla como si fuera Manu. Separa siempre hechos, preferencias, decisiones, memorias, inferencias e hipótesis.
+
+El detalle funcional (navegación, rutinas, bandeja de capturas, proyectos, personas, salud, Refugio, finanzas, Laboratorio) está en [`EXPERIENCE.md`](EXPERIENCE.md).
 
 ## Promesa de producto
 
-> Capturo algo una vez; MANU BRAIN conserva el original, entiende de dónde salió, lo relaciona sin inventar y me lo devuelve cuando realmente es útil.
+> Capturo algo una vez; MANU BRAIN entiende de dónde salió, lo relaciona sin inventar, me pregunta lo necesario y me lo devuelve cuando realmente es útil.
 
 > Mi iPhone me muestra lo que importa en cada momento del día, y lo cambio yo, no un sistema que decide por mí.
 
-## Usuarios y dispositivo
+## Usuarios y dispositivos
 
-- Usuario inicial: una sola persona, Manu.
-- Dispositivo principal: iPhone.
-- Segundo dispositivo: Mac.
-- Interfaz principal: **app nativa de iPhone (Swift/SwiftUI)**, con extensiones del sistema desde las primeras fases. La app principal es el cerebro y centro de configuración.
-- Componente web/local-first: opcional, como cerebro compartido, panel o compañero para Mac, si resulta útil. No bloquea ni pospone la experiencia nativa. Queda por definir en **D-01** (ver `docs/architecture/DECISIONS_AND_OPEN_ITEMS.md`).
+- Usuario: una sola persona, Manu.
+- Dispositivos actuales: **iPhone 14**, **Mac Intel** (Intel Core i5 de doble núcleo a 3,1 GHz), AirPods y un Chromecast en el baño.
+- Interfaz principal: **app nativa de iPhone (Swift/SwiftUI)** con extensiones del sistema.
+- **App de Mac** con las mismas capacidades que la de iPhone. Tecnología pendiente de D-01 (recomendación: SwiftUI nativa).
+- Componente web: solo si D-01 lo mantiene.
 
-## Modos
+## Entrega: primera beta integrada
 
-Un modo es un conjunto de información, accesos, pantallas y comportamiento de MANU OS asociado a un momento. Modos iniciales:
+Manu prefiere recibir **una primera beta completa y coherente** en lugar de instalar prototipos parciales cada semana. El desarrollo se divide internamente en fases con gates y QA progresiva, pero Manu prueba cuando existe un recorrido integrado suficientemente completo. `MVP_ACCEPTANCE.md` distingue el **MVP técnico interno** de la **Beta 1** que recibe Manu.
 
-- **Mañana**
-- **Trabajo** (inicialmente de 9:00 a 13:00)
-- **Fuera del trabajo**
-- **Fin de semana**
+## Modos y rutinas
+
+Un modo es un conjunto de información, accesos y comportamiento de MANU OS asociado a un momento. Momentos definidos por Manu: noche, mañana, trabajo (lunes a viernes, 09:00–13:00), desconexión laboral (desde las 13:00), tarde y fin de semana.
 
 Reglas:
 
-- Un modo cambia lo que muestran la app y sus extensiones. iOS no permite sustituir el launcher ni modificar globalmente el sistema, y MANU OS no lo intentará.
-- Cuando un modo requiere un cambio del sistema (por ejemplo silenciar apps o contactos laborales), se apoya en los Focus de iOS configurados por Manu. MANU OS puede reaccionar al Focus activo y guiar la configuración, pero Manu controla qué contactos y apps lo atraviesan.
-- El cambio de modo es visible y reversible; nunca oculta información sin que Manu pueda recuperarla.
-
-## Casos de uso descubiertos
-
-Registrados el 2026-09-28. Ninguno está implementado ni verificado; su viabilidad técnica se detalla en `docs/integrations/INTEGRATIONS.md`.
-
-| Caso | Descripción | Observaciones |
-| --- | --- | --- |
-| Mañana | alarma, previsión de Gijón u Oviedo y acceso para iniciar música en el baño | las alarmas, el tiempo y la música dependen de APIs y permisos a verificar |
-| Trabajo (9:00–13:00) | calendario, captura rápida, llamadas grabadas con consentimiento, transcripciones, resúmenes y tareas | grabar llamadas tiene límites técnicos en iOS y requisitos legales; ver riesgos R-18 y R-19 |
-| Fuera del trabajo | silenciar herramientas y contactos laborales, manteniendo excepciones concretas | depende del Focus de iOS configurado por Manu |
-| Finanzas | importar capturas o extractos bancarios, extraer movimientos con confirmación y generar insights | Open Banking solo como estudio posterior; ver gate G-07 y riesgo R-17 |
-| Captura universal | ideas, notas, audios, fotos y eventos | entrada principal: app, widget, App Intent, botón de acción y Share Sheet |
-| Integraciones progresivas | conectar las apps y servicios que Manu use de verdad | una a una, con permiso mínimo y valor demostrado |
+- Un modo cambia contenido, accesos y comportamiento. **No cambia colores, fondos ni widgets**: la apariencia es estable todo el día.
+- iOS no permite sustituir el launcher ni modificar globalmente el sistema, y MANU OS no lo intentará.
+- Silenciar apps o contactos se apoya en los Focus de iOS configurados por Manu. MANU OS puede reaccionar al Focus activo y guiar su configuración.
+- El cambio de modo es visible y reversible.
 
 ## Principios no negociables
 
 - **Fuente antes que conclusión**: toda afirmación derivada apunta a evidencia.
+- **Procedencia honesta**: MANU OS conserva el original cuando la política de retención lo dice y, si no, conserva la procedencia y nunca afirma tener un original que se ha descartado (ADR-0008).
+- **Confirmar la clasificación**: toda clasificación de una captura nueva se confirma. En finanzas, la categoría se asigna automáticamente como inferencia corregible.
 - **Local-first**: capturar y consultar lo esencial no depende de la red.
+- **Funciona sin IA**: organización, memoria, búsqueda y automatizaciones funcionan sin ningún modelo (ADR-0009).
 - **Proveedor sustituible**: IA, hosting, almacenamiento y sync entran mediante adaptadores. MANU OS no depende de ChatGPT, Claude ni Gemini.
-- **Privacidad por defecto**: mínimo privilegio, permisos incrementales pedidos en el momento de uso y cifrado del contenido antes de subirlo.
-- **Aprobación antes de escrituras sensibles**: ninguna acción externa, comunicativa, financiera o destructiva sin confirmación explícita.
+- **Privacidad por diseño**: mínimo privilegio, permisos pedidos en el momento de uso, cifrado del contenido antes de subirlo y datos sensibles etiquetados.
+- **Aprobación antes de consecuencias**: acciones pequeñas y rutinas previamente autorizadas pueden ser automáticas; toda acción con consecuencias se prepara y se confirma. Ningún mensaje se envía automáticamente fuera de una lista blanca explícita.
 - **Temporalidad real**: una afirmación puede quedar sustituida sin borrar su historia.
-- **Portabilidad completa**: exportación legible y documentada, más copia de fuentes originales.
-- **Coste 0 € como modo operativo**: si se agota una cuota, el servicio se degrada; no factura automáticamente. Una suscripción explícita (como Apple Developer Program) solo con decisión de Manu (D-03).
-- **Complejidad detrás**: la pantalla diaria no muestra el modelo de datos ni un dashboard empresarial.
-- **No automatizar sin evidencia**: una integración o QA no se declara funcional hasta probarse.
-- **Superficies discretas**: widgets, pantalla bloqueada y Live Activities no muestran contenido sensible sin que Manu lo haya permitido.
+- **Portabilidad**: exportación legible y documentada, con procedencia y eventos de eliminación.
+- **Coste 0 € adicional**: si se agota una cuota, el servicio se degrada; no factura automáticamente. Cualquier suscripción nueva (Apple Developer Program, API de modelos) requiere decisión explícita de Manu.
+- **La interfaz es criterio de permanencia**: si es lenta o no le gusta, Manu deja de usarla.
+- **Superficies discretas**: widgets, pantalla bloqueada y Live Activities no muestran contenido sensible.
+- **No automatizar sin evidencia**: una integración no se declara funcional hasta probarse.
 
-## Capacidades del MVP
+## Identidad y navegación
 
-El MVP queda definido por un recorrido completo y recuperable:
+Modo oscuro por defecto; negro, blanco y azul eléctrico; tipografía del sistema. Menú inferior de cinco pestañas: **Hoy, Agenda, MANU (central), Dinero y Tú**. Laboratorio y Ajustes quedan fuera del menú principal. Valores y detalle en `EXPERIENCE.md`.
 
-1. Instalar la app nativa de MANU OS en el iPhone de Manu. El acceso desde Mac depende de D-01.
-2. Capturar texto, enlace, audio y archivo/foto seleccionado manualmente, desde la app y al menos desde una superficie del sistema (widget, App Intent o botón de acción).
-3. Conservar el original, fecha, autor, origen y hash.
-4. Revisar una Inbox de capturas pendientes sin exigir clasificación inmediata.
-5. Crear o confirmar entidades, afirmaciones y relaciones con su evidencia.
-6. Buscar por texto, tipo, fecha, persona, proyecto y estado actual/histórico.
-7. Ver por qué dos elementos están relacionados.
-8. Marcar una afirmación como sustituida por otra sin destruir el historial.
-9. Cambiar entre al menos dos modos y ver cómo cambian la app y un widget.
-10. Funcionar offline; sincronizar al recuperar conectividad y abrir la app.
-11. Exportar y restaurar un paquete completo y abierto.
-12. Importar un ZIP de ChatGPT y una exportación de Claude conservando el contenido bruto.
+## Qué incluye la Beta 1
 
-HOME en el MVP será una vista de contexto muy limitada: modo activo, ahora, Inbox y proyectos activos. MIND será una vista navegable con filtros y cadenas de evidencia, no un lienzo infinito. MIRROR empezará como recuperación con citas; la generación con IA será opcional y posterior.
-
-## Métricas de éxito del MVP
-
-- Una captura de texto tarda menos de 10 segundos desde un widget, el botón de acción o la pantalla de inicio.
-- Ninguna captura confirmada se pierde tras cerrar la app o estar offline.
-- El 100 % de afirmaciones derivadas tiene al menos una evidencia o queda explícitamente como hipótesis sin validar.
-- Un export nuevo se restaura en una instalación limpia y conserva hashes y recuentos.
-- La app sigue siendo útil con todas las integraciones e IA desconectadas.
-- Una consulta de «¿por qué?» muestra la cadena fuente → fragmento → afirmación → relación.
-- Ninguna superficie visible con el iPhone bloqueado muestra contenido marcado como sensible.
+Definido y verificable en `MVP_ACCEPTANCE.md`. Resumen: núcleo con evidencia y búsqueda, app de iPhone con las cinco pestañas, superficies del sistema viables en iPhone 14, modos y rutinas de noche, mañana y trabajo, captura universal, bandeja diaria de capturas, chat MANU en nivel base, proyectos, personas, Laboratorio, sincronización cifrada y copia semanal en el Mac, y restauración probada. Finanzas, salud y Refugio entran solo si superan sus gates; si no, se entregan en betas posteriores.
 
 ## No se construye todavía
 
-- Clon conversacional de Manu o generación automática en su nombre.
-- Lectura automática de Mensajes, WhatsApp, Apple Notes o Screen Time.
+- Clon conversacional de Manu o mensajes enviados en su nombre fuera de la lista blanca.
+- Lectura automática de Mensajes, WhatsApp, Apple Notes, Screen Time o notificaciones de otras apps.
 - Grafo 3D, animaciones complejas o miles de conexiones simultáneas.
 - Neo4j, microservicios, Kafka, colas distribuidas o Kubernetes.
 - Vector database o embeddings obligatorios.
-- Publicación en App Store. (La app nativa sí se construye; Apple Developer Program queda pendiente de D-03.)
-- Agentes con permisos de escritura autónoma sobre correo, calendario o archivos.
-- Procesamiento masivo de toda la fototeca.
-- Integración de salud o ubicación continua.
+- Publicación en App Store. Apple Developer Program queda pendiente de D-03.
+- Agentes con escritura autónoma sobre correo, calendario o archivos.
+- Procesamiento de toda la fototeca: la bandeja diaria procesa **capturas de pantalla** nuevas, no el resto de fotos.
+- Ubicación continua salvo para detectar la llegada a casa, si Manu lo autoriza (D-09).
 - Automatizaciones que publiquen, envíen mensajes, muevan dinero o borren datos sin confirmación.
 - Conexión directa con bancos u Open Banking.
 - Grabación de llamadas sin consentimiento de todos los participantes.
+- Armario digital, catálogo de prendas o recomendaciones de conjuntos.
+- Dieta, calorías o recomendaciones nutricionales.
+- Diagnósticos psicológicos o terapia.
 - Entrenar un modelo con el corpus personal.
 
 ## Límites honestos
 
-- iOS no permite sustituir el launcher ni cambiar globalmente el comportamiento del sistema; los modos actúan sobre MANU OS y se apoyan en Focus y Atajos para lo demás.
-- Las extensiones (widgets, Live Activities, controles) tienen presupuestos de actualización y memoria limitados por el sistema; no son pantallas en tiempo real.
-- iOS puede interrumpir procesos; la sincronización no dependerá de tareas en segundo plano.
-- Cada permiso (calendario, micrófono, fotos, voz, ubicación) lo concede Manu y puede retirarlo; la app debe seguir funcionando sin él.
-- Grabar llamadas telefónicas desde una app de terceros tiene fuertes límites técnicos en iOS; la grabación y transcripción de llamadas queda como `NO_VERIFICADO` hasta estudiar rutas reales y requisitos legales.
-- Una PWA no puede acceder a las bases privadas de la mayoría de apps de Apple ni a las superficies del sistema.
-- El almacenamiento local no es la única copia: exportación y backup son obligatorios.
-- Google Workspace exige OAuth, scopes mínimos y, para determinados scopes, verificación.
-- «Todo conectado» es una dirección estratégica, no una capacidad del primer lanzamiento.
+- El **iPhone 14 no tiene botón de acción**; el acceso rápido a MANU usa Centro de Control y pantalla bloqueada.
+- **Apple Intelligence no está disponible** en el iPhone 14 ni en el Mac Intel de Manu.
+- Las suscripciones ChatGPT Plus, Claude Pro y Gemini Pro son de consumo: no dan acceso por API a una app propia. Sin un proveedor de modelo decidido, el chat MANU funciona en su nivel base (ADR-0009).
+- iOS no permite sustituir el launcher ni cambiar globalmente el sistema.
+- MANU OS no puede leer mensajes de WhatsApp o iMessage ni las notificaciones de otras apps.
+- Las extensiones tienen presupuestos de actualización y memoria; no son pantallas en tiempo real.
+- iOS puede interrumpir procesos; la sincronización no depende de tareas en segundo plano.
+- Cada permiso lo concede Manu y puede retirarlo; la app sigue funcionando sin él.
+- Spotify DJ no tiene una ruta de automatización documentada; la Web API de Spotify exige Premium y no menciona DJ.
+- Grabar llamadas desde una app de terceros tiene fuertes límites técnicos y requisitos legales (`NO_VERIFICADO`).
+- Con el Mac actual, compilar la app con las herramientas vigentes de Apple probablemente no es posible (D-04).
+- «Todo conectado» es una dirección estratégica: cada integración entra por su ruta real (API, Share Sheet, importación, Atajos o enlace profundo).
 
 ## Historial de cambios
 
 | Fecha | Cambio | Motivo |
 | --- | --- | --- |
-| 2026-09-28 | Versión BRAIN-00: PWA instalable como interfaz V1; companion nativo «futuro» si las integraciones lo justifican; App Store, Apple Developer Program y app nativa fuera del MVP. | ADR-0001 |
-| 2026-09-28 | App nativa de iPhone como interfaz principal desde las primeras fases; modos; casos de uso descubiertos; componente web opcional (D-01); la app nativa entra en el MVP; Apple Developer Program pasa a decisión pendiente (D-03). | ADR-0007 |
+| 2026-09-28 | Versión BRAIN-00: PWA instalable como interfaz V1; companion nativo «futuro»; App Store, Apple Developer Program y app nativa fuera del MVP. | ADR-0001 |
+| 2026-09-28 | App nativa de iPhone como interfaz principal; modos; casos de uso descubiertos; componente web opcional (D-01); Apple Developer Program a decisión (D-03). | ADR-0007 |
+| 2026-09-28 | Capa sobre iPhone **y Mac**; chat MANU como pestaña central; cinco pestañas; identidad visual; rutinas; bandeja diaria de capturas; retención controlada de fuentes; asistente sin IA obligatoria; Beta 1 integrada frente a MVP técnico; dispositivos concretos (iPhone 14, Mac Intel); nuevas exclusiones (armario, dieta, terapia). Se sustituye la promesa «MANU BRAIN conserva el original» por «entiende de dónde salió», por ADR-0008. La tabla «Casos de uso descubiertos» de la revisión anterior queda absorbida por `EXPERIENCE.md`. | decisiones de Manu, ADR-0008, ADR-0009 |

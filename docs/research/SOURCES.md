@@ -26,7 +26,28 @@ Consultadas el 2026-09-28. Se comprobó que las páginas de documentación exist
 - [Human Interface Guidelines — Privacy](https://developer.apple.com/design/human-interface-guidelines/privacy) (consultada a través de la copia de referencia de la skill `apple-design`)
 - [Human Interface Guidelines — Managing notifications](https://developer.apple.com/design/human-interface-guidelines/managing-notifications) (Focus e interrupción; consultada a través de la misma copia)
 
-Sin fuente verificada en esta revisión: controles del Centro de Control, filtros de Focus para apps, API de alarmas para terceros, grabación de llamadas en iOS y capacidades disponibles con cuenta gratuita frente a Apple Developer Program. Deben documentarse con fuente antes de cerrar D-03 y las fases que las usen.
+Sin fuente verificada en esta revisión: controles del Centro de Control, filtros de Focus para apps, API de alarmas para terceros, grabación de llamadas en iOS y capacidades disponibles con cuenta gratuita frente a Apple Developer Program. Deben documentarse con fuente antes de cerrar D-03 y las fases que las usen. *(Parcialmente cubierto en la sección siguiente.)*
+
+## Dispositivos, herramientas y servicios (decisiones de producto, 2026-09-28)
+
+Consultadas el 2026-09-28. Resumen de lo que dice cada fuente; no implica prueba en los dispositivos de Manu.
+
+- [How to get Apple Intelligence (Apple Support)](https://support.apple.com/en-us/121115): requiere iPhone 15 Pro, 15 Pro Max o serie 16 y posteriores, y Mac con M1 o posterior. El iPhone 14 y los Mac Intel no son compatibles.
+- [Models with an Action button (Apple Support)](https://support.apple.com/guide/iphone/aside/iph44c8b4227/18.0/ios/18.0): iPhone 15 Pro, 15 Pro Max, 16, 16 Plus, 16 Pro, 16 Pro Max y 16e (lista de la guía de iOS 18).
+- [iPhone models compatible with iOS 26 (Apple Support)](https://support.apple.com/en-me/guide/iphone/iphe3fa5df43/ios): incluye el iPhone 14.
+- [Xcode system requirements (Apple Developer)](https://developer.apple.com/xcode/system-requirements/): Xcode 26.4.1 a 26.6 requieren macOS Tahoe 26.2 o posterior; Xcode 27 requiere macOS Tahoe 26.6 o posterior.
+- [macOS Tahoe 26 compatible computers (Apple Support)](https://support.apple.com/en-us/122867): los únicos portátiles Intel listados son MacBook Pro de 16 pulgadas (2019) y MacBook Pro de 13 pulgadas (2020, cuatro puertos Thunderbolt 3).
+- [Developer account comparison (Apple Developer)](https://developer.apple.com/support/compare-memberships/): la cuenta gratuita permite probar en el dispositivo con Xcode; hasta 10 App IDs y 3 dispositivos que caducan a los 7 días, y perfiles que caducan a los 7 días. TestFlight, App Store Connect y notarización de Mac requieren el programa de pago.
+- [Get Started with WeatherKit (Apple Developer)](https://developer.apple.com/weatherkit/): 500.000 llamadas al mes por membresía de Apple Developer Program.
+- [AlarmKit (Apple Developer)](https://developer.apple.com/documentation/AlarmKit): framework de alarmas para apps en iOS y iPadOS 26.
+- [Creating controls to perform actions across the system (Apple Developer)](https://developer.apple.com/documentation/widgetkit/creating-controls-to-perform-actions-across-the-system): controles de WidgetKit para Centro de Control, pantalla bloqueada y botón de acción (introducidos en iOS 18).
+- [PHAssetChangeRequest.deleteAssets (Apple Developer)](https://developer.apple.com/documentation/photokit/phassetchangerequest/1624062-deleteassets): borrado de elementos de la fototeca; el sistema pide confirmación (según la documentación y los foros de Apple; hay informes de fallos en algunos casos).
+- [Event triggers in Shortcuts (Apple Support)](https://support.apple.com/guide/shortcuts/event-triggers-apd932ff833f/ios): disparador de alarma «Is Stopped».
+- [Transaction triggers in Shortcuts (Apple Support)](https://support.apple.com/guide/shortcuts/transaction-trigger-apd65c67538a/ios): disparador «When I tap» para tarjetas de Wallet; no documenta qué datos entrega.
+- [Spotify Web API — Start/Resume Playback](https://developer.spotify.com/documentation/web-api/reference/start-a-users-playback): solo Spotify Premium; permiso `user-modify-playback-state`; admite `device_id`; no menciona DJ.
+- [Línea 024 — Ministerio de Sanidad](https://www.sanidad.gob.es/linea024/home.htm): línea de atención a la conducta suicida, 24 horas, gratuita y confidencial.
+
+Sin fuente verificada en esta revisión: batería de AirPods para apps de terceros, Toque posterior como disparador de Atajos, control del Chromecast desde Spotify Connect, APIs de Instagram, TikTok, ManyChat y Canva, calidad del OCR y del reconocimiento de voz en español, disponibilidad de HealthKit y App Groups con cuenta gratuita, y rendimiento de un modelo local en el Mac Intel.
 
 ## Google
 

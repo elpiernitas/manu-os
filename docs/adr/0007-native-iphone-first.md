@@ -55,3 +55,12 @@ Se registran en `docs/architecture/DECISIONS_AND_OPEN_ITEMS.md`:
 ## Verificación
 
 Nada de este ADR está implementado ni probado. Todas las capacidades de iOS citadas son `TEÓRICAMENTE_POSIBLE` hasta probarlas en el iPhone de Manu, con la versión de iOS y el tipo de cuenta de desarrollador que se usen.
+
+## Notas posteriores (2026-09-28)
+
+Añadidas tras las decisiones de producto de Manu del mismo día. No cambian la decisión de este ADR; precisan su aplicación:
+
+- **Botón de acción**: según Apple, solo lo tienen iPhone 15 Pro, 15 Pro Max y la serie 16 o posterior. El dispositivo actual de Manu es un **iPhone 14, que no lo tiene**. El acceso rápido a MANU se hará desde el Centro de Control, la pantalla bloqueada y, como alternativa `NO_VERIFICADO`, Toque posterior (Accesibilidad) con un Atajo.
+- **Mac**: MANU OS incluye también una app para Mac con las mismas capacidades que la de iPhone (ver `docs/product/EXPERIENCE.md`). El reparto entre SwiftUI y web sigue en D-01, con recomendación documentada en `docs/architecture/DECISIONS_AND_OPEN_ITEMS.md`.
+- **Apariencia**: los modos cambian contenido, accesos y comportamiento, no colores, fondos ni widgets. La identidad visual es estable durante todo el día.
+- **Referencia trasladada**: la sección «Casos de uso descubiertos» citada en el Contexto ya no está en el Product Charter; su contenido, ampliado, está en `docs/product/EXPERIENCE.md`.

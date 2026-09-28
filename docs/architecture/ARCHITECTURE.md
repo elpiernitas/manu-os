@@ -1,29 +1,34 @@
 # 02 — Arquitectura
 
-> Revisado el 2026-09-28 por [ADR-0007](../adr/0007-native-iphone-first.md). La app nativa de iPhone es la interfaz principal. Las decisiones BRAIN-00 que dependían de la PWA como interfaz principal se conservan abajo, marcadas como **pendientes de D-01** o **sustituidas**; no se han borrado.
+> Revisado el 2026-09-28 por [ADR-0007](../adr/0007-native-iphone-first.md) y, el mismo día, por las decisiones de producto de Manu ([ADR-0008](../adr/0008-source-retention-and-controlled-deletion.md), [ADR-0009](../adr/0009-manu-assistant-without-mandatory-ai.md), `docs/product/EXPERIENCE.md`). Las decisiones anteriores que cambian se conservan marcadas como **pendientes** o **sustituidas**.
 
 ## Vista general
 
 ```mermaid
 flowchart TD
-    APP["MANU OS iPhone app (SwiftUI)<br/>cerebro y centro de configuración"] --> CORE["MANU BRAIN Core"]
-    EXT["Extensiones: widgets, pantalla bloqueada,<br/>Centro de Control, botón de acción,<br/>Live Activities, App Intents"] --> SNAP["Snapshot mínimo por modo"]
+    APP["MANU OS iPhone app (SwiftUI)<br/>cabeza del sistema y configuración"] --> CORE["MANU BRAIN Core"]
+    MAC["MANU OS Mac app<br/>(tecnología según D-01)"] --> CORE
+    EXT["Extensiones: widgets, pantalla bloqueada,<br/>Centro de Control, Live Activities,<br/>App Intents, Share Extension"] --> SNAP["Snapshot mínimo por modo<br/>(sin contenido sensible)"]
     APP --> SNAP
-    APP --> MODES["Motor de modos"]
+    APP --> MODES["Motor de modos y rutinas"]
     MODES --> SNAP
-    CORE --> LOCAL["Local Vault (tecnología pendiente de D-02)"]
+    APP --> CONV["Motor de conversación MANU<br/>(nivel base determinista)"]
+    CONV --> CORE
+    APP --> PRO["Motor de proactividad<br/>y registro de sugerencias"]
+    PRO --> CORE
+    CORE --> LOCAL["Local Vault (D-02)"]
     CORE --> PROJ["Search + graph projections"]
-    CORE --> SYNC["Encrypted sync adapter"]
-    SYNC --> CLOUD["Zero-cost reference cloud"]
+    CORE --> SYNC["Encrypted sync adapter (D-07)"]
+    SYNC --> REMOTE["Transporte de sync cifrado"]
+    CORE --> BACKUP["Copia semanal en el Mac"]
     CORE --> INT["Integration adapters"]
-    CORE --> AGENT["Agent gateway"]
-    AGENT --> AI["ChatGPT / Claude / Gemini / local"]
-    WEB["Componente web / Mac (opcional, D-01)"] -.-> CORE
+    CORE --> AGENT["Agent gateway (opcional, D-08)"]
+    AGENT --> AI["Proveedor de modelo opcional"]
 ```
 
-MANU BRAIN Core no depende de ninguna interfaz, nube ni IA. Define comandos, eventos, validación, resolución temporal y exportación. La app nativa, sus extensiones, un posible componente web, la nube y los agentes consumen ese núcleo mediante interfaces.
+MANU BRAIN Core no depende de ninguna interfaz, nube ni IA. Define comandos, eventos, validación, resolución temporal, retención y exportación. Las apps, sus extensiones, la sincronización y los agentes consumen ese núcleo mediante interfaces.
 
-**Pendiente (D-01)**: el lenguaje y la ubicación del núcleo. BRAIN-00 lo definió como TypeScript. Con la app nativa como interfaz principal hay tres opciones abiertas: núcleo en Swift, núcleo en TypeScript ejecutado en el dispositivo, o contrato compartido (schemas y vectores de test) implementado en ambos lenguajes. La decisión debe tomarse antes de autorizar BRAIN-01.
+**Pendiente (D-01)**: el lenguaje y la ubicación del núcleo. BRAIN-00 lo definió como TypeScript. Opciones: núcleo en Swift, núcleo en TypeScript ejecutado en el dispositivo, o contrato compartido implementado en ambos lenguajes. **Recomendación técnica documentada (no cerrada)**: núcleo en Swift y apps SwiftUI para iPhone y Mac, sin duplicar el núcleo en TypeScript; ver `DECISIONS_AND_OPEN_ITEMS.md`. La decisión es de Manu y debe tomarse antes de autorizar BRAIN-01.
 
 ## Superficies nativas y modos
 
@@ -34,8 +39,9 @@ Todas estas capacidades son `TEÓRICAMENTE_POSIBLE` hasta probarlas en el iPhone
 | App principal (SwiftUI) | vault, configuración de modos, permisos, integraciones, Inbox, búsqueda | puede ser suspendida por iOS en segundo plano |
 | Widgets de inicio y pantalla bloqueada | información del modo activo y accesos directos | actualización con presupuesto del sistema; no son tiempo real; visibles con el iPhone bloqueado |
 | App Intents / Atajos / Siri | captura y acciones sin abrir la app; base para botón de acción y automatizaciones | cada acción con efectos externos requiere confirmación |
-| Botón de acción | acceso directo a captura o cambio de modo | solo en modelos de iPhone que lo tienen; lo asigna Manu en Ajustes |
-| Centro de Control | controles para captura o cambio de modo | disponibilidad según versión de iOS; `NO_VERIFICADO` |
+| Botón de acción | abrir el chat de MANU | **no existe en el iPhone 14** (según Apple, solo iPhone 15 Pro y posteriores). Aplicable si Manu cambia de iPhone |
+| Centro de Control y controles de pantalla bloqueada | hablar con MANU, guardar una idea, registrar un gasto | controles de terceros desde iOS 18 (WidgetKit); requieren SDK de iOS 18 o posterior (D-04); `NO_VERIFICADO` en el iPhone de Manu |
+| Toque posterior (Accesibilidad) + Atajo | alternativa al botón de acción para abrir MANU | `NO_VERIFICADO`; lo configura Manu |
 | Live Activities | seguimiento de algo en curso (por ejemplo, bloque de trabajo) | duración limitada por el sistema; visibles con el iPhone bloqueado |
 | Focus del sistema | señal de contexto para elegir el modo | Manu configura qué apps y contactos lo atraviesan; MANU OS no puede silenciar otras apps por sí mismo |
 
@@ -45,7 +51,28 @@ Reglas de diseño:
 - Nada marcado como sensible aparece en superficies visibles con el iPhone bloqueado, salvo permiso explícito de Manu por tipo de dato.
 - Los permisos se piden cuando Manu usa por primera vez la función que los necesita, con un texto que explica para qué.
 - El motor de modos es determinista y explicable: cada modo declara su horario o disparador, qué muestra y qué excepciones tiene. La IA puede proponer cambios de modo, no aplicarlos.
+- Los modos cambian contenido y comportamiento, **no la apariencia** (colores, fondos y widgets son estables).
 - Si una superficie no está disponible (versión de iOS, modelo de iPhone o permiso retirado), la función sigue siendo accesible desde la app.
+
+## Asistente, proactividad y acciones
+
+Decisión en [ADR-0009](../adr/0009-manu-assistant-without-mandatory-ai.md).
+
+- **Motor de conversación (nivel base)**: reconoce intenciones de forma determinista, ejecuta comandos contra MANU BRAIN, responde con plantillas variadas y cita fuentes. Funciona sin red y sin modelo.
+- **Nivel conversacional (opcional)**: `AgentAdapter` hacia un proveedor decidido en D-08, con contexto mínimo, registro de divulgación y exclusión por defecto de datos sensibles (G-13).
+- **Motor de proactividad**: genera sugerencias a partir de reglas, horarios y patrones aprendidos localmente. Cada sugerencia queda registrada con su resultado (aceptada, rechazada, ignorada) para aprender los momentos adecuados. Respeta Focus, un presupuesto diario de interrupciones y la regla de no repetirse.
+- **Niveles de acción**:
+  1. lectura y consulta: automáticas;
+  2. acciones pequeñas y rutinas **previamente autorizadas** por Manu: automáticas, registradas y reversibles cuando sea posible;
+  3. acciones con consecuencias (crear eventos, borrar, gastos, mensajes): se preparan y se confirman;
+  4. mensajes automáticos: solo los de una **lista blanca explícita** (candidato único: aviso de llegada, `NO_VERIFICADO`).
+- **Puente con apps oficiales**: MANU prepara el contexto, lo muestra y abre ChatGPT, Claude o Gemini; no automatiza sus cuentas.
+
+## Sensibilidad y retención
+
+- Cada dato lleva una **etiqueta de sensibilidad** (ver `DATA_MODEL.md`). Lo sensible (salud, finanzas, estado emocional, datos de terceros, capturas marcadas) se procesa localmente igual que lo demás, pero no entra en el snapshot de las extensiones, en notificaciones visibles ni en exportaciones compartibles.
+- Cada fuente tiene una **política de retención** (`FULL`, `EXTRACTED_ONLY`, `REFERENCE_ONLY`, `TRANSIENT`) según ADR-0008. La bandeja diaria de capturas usa `EXTRACTED_ONLY` y el audio de respuesta, `TRANSIENT`.
+- La petición de borrado en Fotos es una acción destructiva externa: se confirma en MANU OS, iOS muestra su propia confirmación y se registra el resultado real.
 
 ## Componentes decididos
 
@@ -65,7 +92,7 @@ Reglas de diseño:
 | Grafo | proyección relacional de afirmaciones y relaciones | evita una base especializada prematura |
 | Búsqueda | índice textual local; Postgres/SQLite FTS solo en adaptadores compatibles | funciona offline y sin IA |
 | Embeddings | desactivados en MVP | coste, privacidad y poca necesidad inicial |
-| Auth | passkey/WebAuthn + sesión segura; recuperación separada. En nativo, desbloqueo local con biometría del sistema **(D-02)** | sin contraseña reutilizable |
+| Auth | passkey/WebAuthn + sesión segura; recuperación separada. En nativo, **sin bloqueo interno de Face ID** (decisión de Manu, 2026-09-28): la protección local depende del bloqueo del dispositivo y del cifrado. *(Sustituye a «desbloqueo local con biometría», anotado antes como D-02.)* | sin contraseña reutilizable; menos fricción |
 | Cifrado | AES-256-GCM; clave maestra local envuelta por secreto de recuperación. Implementación: Web Crypto en web; en nativo, pendiente de D-02 (candidatos a verificar: CryptoKit y Keychain) | nube sin contenido legible |
 | Monorepo | **(D-01)** BRAIN-00: pnpm workspaces, sin Turborepo. Con app nativa hace falta además un proyecto Xcode o Swift Package | menos herramientas y menor mantenimiento |
 
@@ -95,6 +122,14 @@ No se promete sincronización en background en iPhone. En la app nativa, iOS dec
 
 No se introduce CRDT genérico en el MVP. Si la edición colaborativa o multidispositivo concurrente demuestra necesitarlo, se evaluará Automerge/Yjs detrás del mismo contrato.
 
+### Sincronización iPhone ↔ Mac y copias (preferencias de Manu, 2026-09-28)
+
+- Sincronización automática cifrada entre iPhone y Mac. Transporte pendiente de **D-07**. Candidatos: Google Drive `appDataFolder` (ya evaluado), un servicio mínimo propio (Worker/D1) o un servicio de Apple; el uso de servicios de Apple desde una app propia puede requerir Apple Developer Program (`NO_VERIFICADO`, D-03).
+- **Copia completa semanal en el Mac**, cifrada, generada por la app de Mac.
+- **Restaurar un iPhone nuevo desde el Mac** a partir de esa copia.
+- **Copia manual por cable** como opción adicional (`NO_VERIFICADO`: ruta concreta por definir, por ejemplo intercambio de archivos con la app).
+- La copia semanal no sustituye al gate G-01: debe restaurarse en una instalación limpia antes de declararse funcional.
+
 ## Cifrado y claves
 
 - Cada vault tiene una Data Encryption Key aleatoria de 256 bits.
@@ -102,8 +137,8 @@ No se introduce CRDT genérico en el MVP. Si la edición colaborativa o multidis
 - La clave de datos se envuelve con una Key Encryption Key derivada de una frase/secreto de recuperación usando Argon2id con parámetros versionados (BRAIN-00: Argon2id WASM para web; implementación nativa pendiente de D-02).
 - Las extensiones solo reciben el snapshot mínimo del modo activo; qué parte de ese snapshot puede leerse con el iPhone bloqueado se decide por tipo de dato (ver `docs/security/THREAT_MODEL.md`).
 - El servidor nunca recibe la clave de datos ni la frase de recuperación.
-- La clave descifrada vive en memoria durante la sesión.
-- Se ofrece bloqueo local y cierre automático configurables.
+- La clave descifrada vive en memoria durante la sesión. En nativo, la clave local se guarda en el almacén seguro del sistema con acceso limitado a este dispositivo (detalle en D-02, `NO_VERIFICADO`).
+- ~~Se ofrece bloqueo local y cierre automático configurables.~~ Sustituido (2026-09-28): Manu no quiere bloqueos internos de Face ID. No hay bloqueo interno por defecto; el riesgo residual está en R-33.
 - La búsqueda e inferencia sobre el corpus ocurren en el dispositivo mientras el vault está abierto.
 
 El uso de passkeys autentica al usuario ante el servicio, pero no sustituye el secreto de recuperación del cifrado. No se basará el cifrado en extensiones WebAuthn que no estén probadas en los dispositivos reales.
@@ -135,7 +170,7 @@ R2 tiene una franquicia gratuita amplia, pero cobra por exceso en cuentas factur
 ### App nativa de iPhone (ADR-0007)
 
 - app SwiftUI como cerebro y centro de configuración: vault, modos, permisos, integraciones, Inbox y búsqueda;
-- extensiones: widgets de inicio y pantalla bloqueada, App Intents (Atajos, Siri y botón de acción), controles del Centro de Control y Live Activities;
+- extensiones: widgets de inicio y pantalla bloqueada, App Intents (Atajos y Siri; botón de acción solo en iPhones que lo tengan), controles del Centro de Control y Live Activities (el iPhone 14 estándar no tiene Dynamic Island, así que se verían en la pantalla bloqueada; confirmar el modelo exacto);
 - Share Extension para capturar desde otras apps;
 - acceso con permiso, pedido en el momento de uso, a calendario y recordatorios, fotos, micrófono y reconocimiento de voz;
 - datos compartidos con las extensiones mediante un contenedor común limitado al snapshot mínimo **(D-02)**;
@@ -145,14 +180,24 @@ Nada de esta lista está implementado ni probado.
 
 ### Mac
 
-Pendiente de D-01. Opciones: el componente web existente, una app SwiftUI para macOS que comparta código con la de iPhone, o solo acceso a exports y backups. BRAIN-00 asumía la PWA también en Mac.
+Requisito de Manu (2026-09-28): la app de Mac hace lo mismo que la de iPhone (hablar con MANU, proyectos y tareas, archivos y chats, finanzas e informes, configuración de automatizaciones), además de alojar la copia semanal.
+
+Tecnología pendiente de D-01. Recomendación: app SwiftUI para macOS que comparta el núcleo Swift con la de iPhone. Límite importante: el Mac actual es un **Intel i5 de doble núcleo**, así que la app de Mac debe funcionar en la versión de macOS que ese Mac pueda ejecutar (dato pendiente, ver D-04). BRAIN-00 asumía la PWA también en Mac.
 
 ### Distribución y aprovisionamiento (D-03, D-04)
 
-BRAIN-00 registró que una cuenta Apple gratuita permite instalar builds personales con perfiles que caducan a los 7 días, y que la distribución y las capacidades avanzadas requieren Apple Developer Program (99 USD/año). Con la app nativa en el MVP, esto deja de ser un detalle futuro:
+Datos de la documentación de Apple consultada el 2026-09-28 (ver `docs/research/SOURCES.md`):
 
-- **D-03**: decidir si Manu asume Apple Developer Program. Hay que verificar qué capacidades usadas por MANU OS (widgets, App Intents, Live Activities, contenedor compartido con extensiones, notificaciones) funcionan con una cuenta gratuita y cuáles no. `NO_VERIFICADO`; el precio y las condiciones deben comprobarse en la documentación actual de Apple.
-- **D-04**: compilar y probar la app requiere Xcode en un Mac. El entorno de Claude Code en la nube es Linux y no puede compilar ni ejecutar la app iOS; la verificación en dispositivo la hará Manu o un runner de macOS con coste validado contra ADR-0004.
+- Con una cuenta gratuita (Personal Team) se puede probar en el propio dispositivo desde Xcode, con estos límites: hasta 10 App IDs y 3 dispositivos, registros que caducan a los 7 días, y perfiles de aprovisionamiento que también caducan a los 7 días, obligando a recompilar y reinstalar. Cada extensión (widgets, controles, Share Extension, intents) suele necesitar su propio App ID, así que MANU OS puede acercarse al límite de 10 (`NO_VERIFICADO`).
+- TestFlight, App Store Connect y la notarización de apps de Mac requieren Apple Developer Program.
+- WeatherKit requiere Apple Developer Program (incluye 500.000 llamadas al mes por membresía).
+- Todas las versiones actuales de Xcode (26.4.1 a 27.2 beta) requieren **macOS Tahoe 26.2 o posterior**.
+- Según Apple, macOS Tahoe 26 solo es compatible con Macs con Apple silicon y unos pocos Intel recientes (MacBook Pro de 16 pulgadas de 2019, MacBook Pro de 13 pulgadas de 2020 con cuatro puertos Thunderbolt 3, además de otros modelos de sobremesa). **Un Intel i5 de doble núcleo a 3,1 GHz no parece estar en la lista**, pero hay que confirmarlo con el modelo exacto.
+
+Consecuencias:
+
+- **D-03**: decidir si Manu asume Apple Developer Program. Sin él, la app caduca cada 7 días y algunas capacidades (TestFlight, WeatherKit, posiblemente notificaciones push y servicios de iCloud) no están disponibles. El precio y las condiciones deben comprobarse en la documentación actual de Apple.
+- **D-04**: compilar requiere Xcode en un Mac. El entorno de Claude Code en la nube es Linux y no compila apps de Apple. Si el Mac de Manu no puede instalar macOS Tahoe, **no puede ejecutar ningún Xcode actual**. Con un Xcode antiguo no se dispondría del SDK de iOS 18 (controles del Centro de Control) ni del de iOS 26 (AlarmKit), y probablemente no se podría instalar en un iPhone con iOS reciente (`NO_VERIFICADO`). Opciones: otro Mac con Apple silicon, un Mac en la nube o un runner de CI con macOS, con coste validado contra ADR-0004.
 
 ### PWA V1 (BRAIN-00, sustituida como interfaz principal por ADR-0007)
 
@@ -178,7 +223,7 @@ La regla «no reimplementar MANU BRAIN» sigue vigente: si D-01 elige dos implem
 
 ## Capa de agentes y MCP
 
-MIRROR y los agentes usan un `AgentGateway` con cuatro operaciones lógicas:
+El chat MANU en nivel base no usa esta capa (ADR-0009); solo el nivel conversacional opcional pasa por ella. MIRROR y los agentes usan un `AgentGateway` con cuatro operaciones lógicas:
 
 - `search_knowledge(query, filters)`
 - `get_evidence(claim_id)`
@@ -193,11 +238,13 @@ MCP será una interfaz opcional para exponer herramientas de MANU BRAIN a Claude
 
 Todo importador tiene dos fases:
 
-1. **Preservar**: guardar bytes originales, hash, manifiesto, origen, autor y fechas.
-2. **Derivar**: parsear en fragmentos y proponer entidades/afirmaciones. El resultado puede borrarse y regenerarse sin perder el original.
+1. **Preservar**: guardar bytes originales, hash, manifiesto, origen, autor y fechas. Con retención distinta de `FULL` (ADR-0008), preservar significa guardar procedencia y hash cuando sea posible, no los bytes.
+2. **Derivar**: parsear en fragmentos y proponer entidades/afirmaciones. Con retención `FULL`, el resultado puede borrarse y regenerarse sin perder el original. Sin original, los derivados aprobados son la evidencia y no pueden regenerarse.
 
 ChatGPT: importador versionado de `conversations.json` o archivos equivalentes dentro del ZIP.  
 Claude: importador versionado de la exportación descargada.  
+WhatsApp: importador de exportaciones de chats elegidas por Manu; texto completo cifrado (`FULL`), sin multimedia inicialmente.  
+Capturas de pantalla (bandeja diaria): OCR y derivados en el dispositivo; retención `EXTRACTED_ONLY`.  
 Google Workspace: sincronizadores por API con cursores y scopes incrementales, nunca un volcado opaco.
 
 Los parsers se basan en fixtures anonimizados; un cambio de formato debe fallar de forma visible y conservar el archivo.

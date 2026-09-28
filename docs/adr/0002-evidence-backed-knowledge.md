@@ -1,7 +1,10 @@
 # ADR-0002 — Conocimiento basado en afirmaciones y evidencia
 
 Status: **ACCEPTED**  
-Date: **2026-09-28**
+Date: **2026-09-28**  
+Complementado por: **[ADR-0008](0008-source-retention-and-controlled-deletion.md)** (2026-09-28)
+
+> Nota posterior (ADR-0008): «fuentes inmutables» significa que su contenido no se modifica mientras se conserva. Una fuente puede tener retención `EXTRACTED_ONLY`, `REFERENCE_ONLY` o `TRANSIENT`, o eliminarse por decisión confirmada de Manu, dejando registro de procedencia y del evento de eliminación. La regeneración de derivados desde el original solo es posible para fuentes con retención `FULL`. El texto de este ADR se conserva sin cambios.
 
 ## Contexto
 
