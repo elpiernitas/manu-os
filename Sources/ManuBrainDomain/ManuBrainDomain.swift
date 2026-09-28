@@ -12,6 +12,8 @@ public enum ContractError: Error, Equatable, Sendable {
     case incompatibleSupersession
     case unknownFields([String])
     case originalNotRetained
+    case creatorMismatch
+    case claimNotSupersedable(ClaimStatus)
 }
 
 public struct UUIDv7: Codable, Hashable, Sendable {
@@ -44,12 +46,17 @@ public struct UUIDv7: Codable, Hashable, Sendable {
     }
 }
 
+/// ISO-8601 instant in UTC (`YYYY-MM-DDTHH:MM:SS[.fff]Z`).
+///
+/// Equality, hashing and ordering use the instant, not the text, so
+/// `…00Z` and `…00.000Z` are the same timestamp.
 public struct UTCTimestamp: Codable, Hashable, Comparable, Sendable {
     public let rawValue: String
     public let date: Date
 
     public init(rawValue: String) throws {
-        guard rawValue.hasSuffix("Z") else {
+        let pattern = #"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]{1,3})?Z$"#
+        guard rawValue.range(of: pattern, options: .regularExpression) != nil else {
             throw ContractError.invalidUTCTimestamp(rawValue)
         }
         let formatter = ISO8601DateFormatter()
@@ -58,11 +65,30 @@ public struct UTCTimestamp: Codable, Hashable, Comparable, Sendable {
             formatter.formatOptions = [.withInternetDateTime]
             return formatter.date(from: rawValue)
         }()
-        guard let parsed else {
+        guard let parsed, Self.componentsMatch(rawValue, parsed) else {
             throw ContractError.invalidUTCTimestamp(rawValue)
         }
         self.rawValue = rawValue
         self.date = parsed
+    }
+
+    /// Rejects values the formatter normalises instead of refusing,
+    /// such as `2026-02-30T00:00:00Z`.
+    private static func componentsMatch(_ rawValue: String, _ date: Date) -> Bool {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        let parts = calendar.dateComponents([.year, .month, .day, .hour, .minute, .second], from: date)
+        let digits = rawValue.split(whereSeparator: { !$0.isNumber }).prefix(6).compactMap { Int($0) }
+        return digits == [parts.year, parts.month, parts.day, parts.hour, parts.minute, parts.second]
+            .compactMap { $0 }
+    }
+
+    public static func == (lhs: UTCTimestamp, rhs: UTCTimestamp) -> Bool {
+        lhs.date == rhs.date
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(date)
     }
 
     public init(from decoder: Decoder) throws {
@@ -186,8 +212,10 @@ public struct Source: Codable, Equatable, Sendable {
         self.sensitivity = sensitivity
     }
 
+    /// ADR-0008: only a `FULL` source can report an original. Any other
+    /// policy never claims one, whatever `originalRetained` says.
     public var hasOriginal: Bool {
-        originalRetained && rawBlobID != nil
+        retentionPolicy == .full && originalRetained && rawBlobID != nil
     }
 
     public func requireOriginal() throws {
@@ -205,6 +233,28 @@ public struct SourceItem: Codable, Equatable, Sendable {
     public let contentHash: String
     public let metadata: [String: JSONValue]
     public let sensitivity: Sensitivity
+
+    public init(
+        id: UUIDv7,
+        sourceID: UUIDv7,
+        parentItemID: UUIDv7? = nil,
+        occurredAt: UTCTimestamp? = nil,
+        authorAgentID: UUIDv7,
+        rawText: String? = nil,
+        contentHash: String,
+        metadata: [String: JSONValue] = [:],
+        sensitivity: Sensitivity
+    ) {
+        self.id = id
+        self.sourceID = sourceID
+        self.parentItemID = parentItemID
+        self.occurredAt = occurredAt
+        self.authorAgentID = authorAgentID
+        self.rawText = rawText
+        self.contentHash = contentHash
+        self.metadata = metadata
+        self.sensitivity = sensitivity
+    }
 }
 
 public struct Fragment: Codable, Equatable, Sendable {
@@ -213,6 +263,20 @@ public struct Fragment: Codable, Equatable, Sendable {
     public let selector: [String: JSONValue]
     public let excerptHash: String
     public let derivedFromOriginal: Bool
+
+    public init(
+        id: UUIDv7,
+        sourceItemID: UUIDv7,
+        selector: [String: JSONValue],
+        excerptHash: String,
+        derivedFromOriginal: Bool
+    ) {
+        self.id = id
+        self.sourceItemID = sourceItemID
+        self.selector = selector
+        self.excerptHash = excerptHash
+        self.derivedFromOriginal = derivedFromOriginal
+    }
 }
 
 public struct SourceDeletionEvent: Codable, Equatable, Sendable {
@@ -231,6 +295,26 @@ public struct SourceDeletionEvent: Codable, Equatable, Sendable {
     public let result: Result
     public let completedAt: UTCTimestamp?
     public let note: String?
+
+    public init(
+        id: UUIDv7,
+        sourceID: UUIDv7,
+        scope: String,
+        requestedAt: UTCTimestamp,
+        confirmedByAgentID: UUIDv7,
+        result: Result,
+        completedAt: UTCTimestamp? = nil,
+        note: String? = nil
+    ) {
+        self.id = id
+        self.sourceID = sourceID
+        self.scope = scope
+        self.requestedAt = requestedAt
+        self.confirmedByAgentID = confirmedByAgentID
+        self.result = result
+        self.completedAt = completedAt
+        self.note = note
+    }
 }
 
 public enum AgentKind: String, Codable, Sendable {
@@ -273,6 +357,30 @@ public struct Activity: Codable, Equatable, Sendable {
     public let startedAt: UTCTimestamp
     public let endedAt: UTCTimestamp?
     public let status: Status
+
+    public init(
+        id: UUIDv7,
+        kind: String,
+        toolName: String? = nil,
+        toolVersion: String? = nil,
+        modelID: String? = nil,
+        promptHash: String? = nil,
+        parameters: [String: JSONValue] = [:],
+        startedAt: UTCTimestamp,
+        endedAt: UTCTimestamp? = nil,
+        status: Status
+    ) {
+        self.id = id
+        self.kind = kind
+        self.toolName = toolName
+        self.toolVersion = toolVersion
+        self.modelID = modelID
+        self.promptHash = promptHash
+        self.parameters = parameters
+        self.startedAt = startedAt
+        self.endedAt = endedAt
+        self.status = status
+    }
 }
 
 public struct Entity: Codable, Equatable, Sendable {
@@ -287,6 +395,22 @@ public struct Entity: Codable, Equatable, Sendable {
     public let status: Status
     public let createdAt: UTCTimestamp
     public let updatedAt: UTCTimestamp
+
+    public init(
+        id: UUIDv7,
+        entityType: String,
+        canonicalLabel: String,
+        status: Status,
+        createdAt: UTCTimestamp,
+        updatedAt: UTCTimestamp
+    ) {
+        self.id = id
+        self.entityType = entityType
+        self.canonicalLabel = canonicalLabel
+        self.status = status
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
 }
 
 public enum ClaimClassification: String, Codable, Sendable {
@@ -310,18 +434,35 @@ public enum ClaimStatus: String, Codable, Sendable {
 public struct Money: Codable, Equatable, Sendable {
     public let amount: Double
     public let currency: String
+
+    public init(amount: Double, currency: String) {
+        self.amount = amount
+        self.currency = currency
+    }
 }
 
 public struct LocationValue: Codable, Equatable, Sendable {
     public let latitude: Double
     public let longitude: Double
     public let label: String?
+
+    public init(latitude: Double, longitude: Double, label: String? = nil) {
+        self.latitude = latitude
+        self.longitude = longitude
+        self.label = label
+    }
 }
 
 public struct TypedJSON: Codable, Equatable, Sendable {
     public let schema: String
     public let version: Int
     public let value: JSONValue
+
+    public init(schema: String, version: Int, value: JSONValue) {
+        self.schema = schema
+        self.version = version
+        self.value = value
+    }
 }
 
 public enum ClaimValue: Codable, Equatable, Sendable {
@@ -516,6 +657,9 @@ public func validateClaimEvidence(
     evidenceLinks: [EvidenceLink],
     creator: Agent
 ) throws {
+    guard creator.id == claim.createdByAgentID else {
+        throw ContractError.creatorMismatch
+    }
     if let from = claim.validFrom, let until = claim.validUntil, until < from {
         throw ContractError.invalidValidityRange
     }
@@ -537,24 +681,40 @@ public func validateClaimEvidence(
     {
         throw ContractError.evidenceRequired
     }
-    if creator.kind == .model, claim.status == .active {
+    // A model can only propose. ACTIVE, SUPERSEDED and CONTESTED are all
+    // visible to `resolveCurrentClaims`, so none of them may come from a model.
+    if creator.kind == .model,
+       ![.proposed, .rejected, .retracted].contains(claim.status)
+    {
         throw ContractError.modelClaimMustBeProposed
     }
 }
 
+/// Returns true when the `supersedesClaimID` edges form a cycle.
+/// Duplicate claim IDs are allowed: every edge they carry is considered.
 public func detectSupersessionCycle(in claims: [Claim]) -> Bool {
-    let next = Dictionary(uniqueKeysWithValues: claims.compactMap { claim in
-        claim.supersedesClaimID.map { (claim.id, $0) }
-    })
-    for start in next.keys {
-        var seen = Set<UUIDv7>()
-        var cursor: UUIDv7? = start
-        while let current = cursor {
-            guard seen.insert(current).inserted else { return true }
-            cursor = next[current]
+    var edges: [UUIDv7: [UUIDv7]] = [:]
+    for claim in claims {
+        if let target = claim.supersedesClaimID {
+            edges[claim.id, default: []].append(target)
         }
     }
-    return false
+    var finished = Set<UUIDv7>()
+    var inPath = Set<UUIDv7>()
+
+    func visit(_ node: UUIDv7) -> Bool {
+        if inPath.contains(node) { return true }
+        if finished.contains(node) { return false }
+        inPath.insert(node)
+        for target in edges[node, default: []] where visit(target) {
+            return true
+        }
+        inPath.remove(node)
+        finished.insert(node)
+        return false
+    }
+
+    return edges.keys.contains { visit($0) }
 }
 
 public struct SupersessionResult: Equatable, Sendable {
@@ -576,7 +736,17 @@ public func supersedeClaim(
     else {
         throw ContractError.incompatibleSupersession
     }
-    let updatedPrevious = previous.replacing(status: .superseded, validUntil: timestamp)
+    // Superseding marks the claim as visible history, so a proposed,
+    // rejected, retracted or already superseded claim must not be revived.
+    guard previous.status == .active || previous.status == .contested else {
+        throw ContractError.claimNotSupersedable(previous.status)
+    }
+    if let from = previous.validFrom, timestamp < from {
+        throw ContractError.invalidValidityRange
+    }
+    // Close validity only if it was open or ended later; never extend it.
+    let closedUntil = previous.validUntil.map { min($0, timestamp) } ?? timestamp
+    let updatedPrevious = previous.replacing(status: .superseded, validUntil: closedUntil)
     let updatedSuccessor = successor.replacing(supersedesClaimID: previous.id)
     let candidates = existingClaims.filter { $0.id != previous.id && $0.id != successor.id }
         + [updatedPrevious, updatedSuccessor]
@@ -602,8 +772,13 @@ public func resolveCurrentClaims(
     let grouped = Dictionary(grouping: visible) {
         "\($0.subjectEntityID.rawValue)|\($0.predicate)"
     }
-    return grouped.values.compactMap { group in
-        group.max { $0.recordedAt < $1.recordedAt }
+    return grouped.values.flatMap { group -> [Claim] in
+        // A contest is never resolved silently: return every visible claim
+        // of the group so the caller can show the conflict.
+        if group.contains(where: { $0.status == .contested }) {
+            return group
+        }
+        return group.max { $0.recordedAt < $1.recordedAt }.map { [$0] } ?? []
     }.sorted { $0.id.rawValue < $1.id.rawValue }
 }
 

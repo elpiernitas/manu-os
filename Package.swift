@@ -17,5 +17,9 @@ let package = Package(
             name: "ManuBrainDomainTests",
             dependencies: ["ManuBrainDomain"]
         ),
+        .testTarget(
+            name: "ManuBrainDomainPublicAPITests",
+            dependencies: ["ManuBrainDomain"]
+        ),
     ]
 )
