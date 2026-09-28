@@ -101,13 +101,13 @@ textarea { resize: vertical; }
 .topbar { position: fixed; top: 0; left: 0; right: 0; z-index: 9; padding: calc(env(safe-area-inset-top, 0px) + 10px) 16px 10px; text-align: center; font-weight: 600; font-size: 17px; border-radius: 0; border-width: 0 0 1px; opacity: 0; pointer-events: none; transition: opacity .2s; }
 .topbar.show { opacity: 1; }
 
-.tabbar { position: fixed; z-index: 10; left: 50%; transform: translateX(-50%); bottom: calc(env(safe-area-inset-bottom, 0px) + 10px); width: min(calc(100% - 24px), 480px); height: var(--tabbar-h); border-radius: 999px; padding: 6px; display: grid; grid-template-columns: repeat(5, 1fr); }
+.tabbar { position: fixed; z-index: 10; left: max(12px, calc(50% - 260px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 10px); width: min(calc(100% - 24px - var(--tabbar-h) - 10px), 446px); height: var(--tabbar-h); border-radius: 999px; padding: 6px; display: grid; grid-template-columns: repeat(5, 1fr); }
 .tab { border: 0; background: none; border-radius: 999px; display: grid; justify-items: center; align-content: center; gap: 2px; color: var(--muted); font-size: 10.5px; font-weight: 600; cursor: pointer; }
 .tab svg { width: 24px; height: 24px; }
 .tab[aria-selected="true"] { color: var(--accent); background: rgba(255,255,255,.09); }
 .tab .dot { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font: 800 15px var(--display); background: var(--fill); color: #fff; }
 
-.fab { position: fixed; z-index: 11; right: max(16px, calc(50% - 244px)); bottom: calc(env(safe-area-inset-bottom, 0px) + var(--tabbar-h) + 22px); width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; cursor: pointer; color: var(--text); }
+.fab { position: fixed; z-index: 11; right: max(12px, calc(50% - 260px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 10px); width: var(--tabbar-h); height: var(--tabbar-h); border-radius: 50%; display: grid; place-items: center; cursor: pointer; color: var(--text); }
 .fab svg { width: 26px; height: 26px; }
 
 .sheet-bg { position: fixed; inset: 0; z-index: 20; background: rgba(0,0,0,.45); display: grid; align-items: end; }
@@ -147,3 +147,24 @@ h2 svg { width: 15px; height: 15px; vertical-align: -2px; margin-right: 4px; }
 .link { display: inline-flex; align-items: center; gap: 2px; }
 button.chip { border: 1px solid transparent; cursor: pointer; min-height: 36px; padding: 0 14px; background: rgba(255,255,255,.07); }
 button.chip[aria-pressed="true"] { background: rgba(77,141,255,.18); border-color: rgba(77,141,255,.45); }
+a.btn { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
+.hero-tap { position: absolute; inset: 0; border: 0; background: none; cursor: pointer; border-radius: inherit; z-index: 0; }
+.hero > *:not(.hero-tap) { position: relative; z-index: 1; pointer-events: none; }
+.hero .btns, .hero .btns * { pointer-events: auto; }
+.hours { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(48px, 1fr); gap: 4px; overflow-x: auto; scrollbar-width: none; }
+.hours > div { display: grid; justify-items: center; gap: 4px; padding: 4px 0; }
+.hours svg { width: 24px; height: 24px; color: var(--warm); }
+.hours.scroll { grid-auto-columns: 52px; }
+.rain { color: #7FB8FF; font-weight: 600; }
+.weather-head { text-align: center; margin: 8px 0 18px; display: grid; gap: 2px; }
+.temp.xl { font-size: 88px; font-weight: 200; }
+.row.day { display: grid; grid-template-columns: 44px 44px 34px 1fr 34px; gap: 10px; }
+.wd { font-weight: 600; }
+.dicon { display: grid; justify-items: center; }
+.dicon svg { width: 24px; height: 24px; color: var(--warm); }
+.range { position: relative; height: 6px; border-radius: 99px; background: rgba(255,255,255,.08); }
+.range > i { position: absolute; top: 0; bottom: 0; border-radius: 99px; background: linear-gradient(90deg, #4D8DFF, #FFB547); }
+.tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
+.tile-v { font: 400 32px/1.1 var(--display); font-variant-numeric: tabular-nums; }
+.segmented.one { grid-template-columns: 1fr; }
+input[type=time] { width: auto; min-height: 36px; }

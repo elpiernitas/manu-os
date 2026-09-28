@@ -4,6 +4,29 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
+## WEB-04 — tiempo completo, Google Calendar y hora de entrada
+
+Rama `claude/magical-goodall-rf5qoo`, desde `main` (`9ee852d`). Tras probarlo Manu en su iPhone (2026-09-28): el tiempo carga y `shortcuts://run-shortcut` abre Atajos. Falla solo porque el atajo aún no existe.
+
+### Archivos cambiados
+
+- `web/core/weather.js`: previsión por horas (24 h) y 7 días, sensación térmica, humedad, viento, UV, amanecer y atardecer, iconos de noche. El consejo ya no dice «Lluvia» si la probabilidad es baja: corrige la contradicción de la captura de Manu, con test de regresión.
+- `web/core/gcal.js` (nuevo): Google Calendar con el modelo de token de Google Identity Services (sin servidor), lectura de hoy y mañana, creación de eventos y detección de `Client ID`.
+- `web/app.js`: pantalla del tiempo al tocar la tarjeta; tira horaria en Hoy; conexión con Google Calendar (Tú → Google Calendar) con guía; botón de sincronizar en Agenda; «Nuevo evento» en Google; los eventos reales de mañana alimentan la pregunta de la noche y la alarma; hora de entrada configurable; «+» al lado de la barra de pestañas para que no tape contenido; los enlaces con estilo de botón ya no salen subrayados.
+- `web/core/storage.js` (valida `agendaTomorrow`), `web/index.html` (CSP: `accounts.google.com`, `www.googleapis.com`), `web/sw.js` (`manuos-v4`), `web/styles.css`, `web/tests/gcal.test.js` (nuevo), `web/tests/weather-bank.test.js`.
+
+### Comandos ejecutados y resultados reales
+
+- `cd web && npm test`: 33/33 PASS.
+- `curl` a Open-Meteo con los campos ampliados: 200 (valores reales de Gijón).
+- Chromium headless con Open-Meteo simulado: tarjeta del tiempo, pantalla completa con 7 días y tarjetas, validación y guardado del ID de Google, botón de sincronizar en Agenda y el resto del recorrido de WEB-03: todo PASS, 0 errores de consola.
+
+### NO_VERIFICADO
+
+- El inicio de sesión real con Google y la lectura y escritura en su calendario: depende de que Manu cree el ID de cliente.
+- Si Safari en iOS permite la ventana de Google desde la web instalada en la pantalla de inicio.
+- Los nombres exactos de los menús de Google Cloud.
+
 ## WEB-03 — rediseño Liquid Glass, tiempo, noche, alarmas, recordatorios, banco y «Tú» completo
 
 Rama `claude/magical-goodall-rf5qoo`, encima de WEB-02 (mismo PR). Pedido por Manu el 2026-09-28: tiempo de Gijón por defecto y de Oviedo cuando trabaja allí, la pregunta de la noche, alarmas, recordatorios, Salud, Comidas, Personas, Hábitos y Liquid Glass.
