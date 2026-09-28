@@ -1,4 +1,4 @@
-import { words } from "./text.js";
+import { normalise } from "./text.js";
 
 // Amounts are integer cents: never floats for money.
 export const CATEGORIES = {
@@ -9,25 +9,50 @@ export const CATEGORIES = {
   LEISURE: "Ocio",
   HOME: "Casa",
   HEALTH: "Salud",
+  SHOPPING: "Compras",
+  TRANSFERS: "Bizum y transferencias",
+  CASH: "Efectivo",
   OTHER: "Otros",
 };
 
+// Keywords are matched as whole words (or phrases) on the normalised text, so
+// "super" does not match "superior". Order matters: first match wins.
 const RULES = [
-  ["SUBSCRIPTIONS", ["netflix", "spotify", "hbo", "disney", "prime", "icloud", "suscripcion"]],
-  ["GROCERIES", ["mercadona", "carrefour", "lidl", "alcampo", "eroski", "dia", "supermercado", "super"]],
-  ["TRANSPORT", ["gasolina", "gasolinera", "repsol", "cepsa", "bus", "tren", "renfe", "taxi", "parking", "peaje"]],
-  ["FOOD_AND_DRINK", ["cafe", "bar", "restaurante", "cena", "comida", "desayuno", "pizza", "burger", "cerveza"]],
-  ["LEISURE", ["cine", "concierto", "entradas", "libro", "juego"]],
-  ["HEALTH", ["farmacia", "medico", "dentista", "fisio"]],
-  ["HOME", ["luz", "agua", "alquiler", "ikea", "internet"]],
+  ["TRANSFERS", ["bizum", "transferencia", "traspaso"]],
+  ["CASH", ["reintegro", "cajero", "retirada efectivo"]],
+  ["SUBSCRIPTIONS", ["netflix", "spotify", "hbo", "max", "disney", "prime video", "amazon prime", "icloud", "apple com", "google one", "youtube", "dazn", "suscripcion", "chatgpt", "openai", "claude"]],
+  ["GROCERIES", ["mercadona", "carrefour", "lidl", "alcampo", "eroski", "dia", "supermercado", "super", "alimerka", "el arbol", "masymas", "froiz", "aldi", "hipercor", "gadis", "consum", "bm supermercados", "fruteria", "carniceria", "panaderia"]],
+  ["TRANSPORT", ["gasolina", "gasolinera", "repsol", "cepsa", "galp", "bp", "shell", "petronor", "ballenoil", "plenoil", "bus", "emtusa", "alsa", "tren", "renfe", "taxi", "cabify", "uber", "parking", "aparcamiento", "peaje", "autopista", "itv", "taller"]],
+  ["FOOD_AND_DRINK", ["cafe", "cafeteria", "bar", "sidreria", "restaurante", "cena", "comida", "desayuno", "pizza", "pizzeria", "telepizza", "burger", "burger king", "mcdonalds", "kfc", "cerveza", "glovo", "just eat", "uber eats", "tapas", "heladeria", "confiteria", "pasteleria", "pub"]],
+  ["LEISURE", ["cine", "cines", "concierto", "entradas", "ticketmaster", "libro", "libreria", "juego", "steam", "playstation", "nintendo", "gimnasio", "gym", "piscina"]],
+  ["HEALTH", ["farmacia", "medico", "dentista", "clinica", "fisio", "fisioterapia", "optica", "hospital"]],
+  ["HOME", ["luz", "agua", "alquiler", "ikea", "internet", "orange", "movistar", "vodafone", "digi", "jazztel", "iberdrola", "endesa", "edp", "naturgy", "totalenergies", "leroy merlin", "bricomart", "seguro", "seguros", "comunidad"]],
+  ["SHOPPING", ["amazon", "aliexpress", "shein", "zara", "primark", "decathlon", "el corte ingles", "mediamarkt", "pccomponentes", "fnac", "action", "normal", "tiger", "bershka", "pull bear", "h m", "temu"]],
 ];
+const RULE_PATTERNS = RULES.map(([cat, keys]) => [cat, new RegExp(`(^|[^a-z0-9ñ])(${keys.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})(?=$|[^a-z0-9ñ])`)]);
 
-export function categorise(merchant) {
+// Stable key for a merchant in bank concepts: drops card/payment prefixes,
+// numbers and dates, so "COMPRA TARJ. 5540XXXX LA TIENDA-GIJON" and next
+// month's line share the same key.
+const PREFIXES = /^(compra tarj\.?|compra tarjeta|compra|pago con tarjeta|pago|cargo|recibo|adeudo)\s+/;
+export function merchantKey(merchant) {
+  const t = normalise(merchant ?? "")
+    .replace(/[0-9x*]{4,}/g, " ")
+    .replace(/\d+([/.-]\d+)*/g, " ")
+    .replace(/[^a-z0-9ñ]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return t.replace(PREFIXES, "").trim().split(" ").slice(0, 4).join(" ") || null;
+}
+
+// Manu's own corrections win over the built-in rules. They are his decisions,
+// never inferred facts (AGENTS.md).
+export function categorise(merchant, learned = {}) {
   if (!merchant) return "OTHER";
-  const set = new Set(words(merchant));
-  for (const [category, keys] of RULES) {
-    if (keys.some((k) => set.has(k))) return category;
-  }
+  const key = merchantKey(merchant);
+  if (key && learned[key] && learned[key] in CATEGORIES) return learned[key];
+  const text = normalise(merchant).replace(/[^a-z0-9ñ]+/g, " ");
+  for (const [category, re] of RULE_PATTERNS) if (re.test(text)) return category;
   return "OTHER";
 }
 
@@ -46,8 +71,27 @@ export function euros(cents) {
   return `${sign}${whole},${String(abs % 100).padStart(2, "0")} €`;
 }
 
-export function newEntry({ id, cents, merchant, at }) {
-  return { id, cents, merchant: merchant ?? null, at, category: categorise(merchant), inferred: true };
+export function newEntry({ id, cents, merchant, at }, learned = {}) {
+  const key = merchantKey(merchant);
+  const fromManu = Boolean(key && learned[key]);
+  return { id, cents, merchant: merchant ?? null, at, category: categorise(merchant, learned), inferred: !fromManu };
+}
+
+// Manu corrects one entry: remember the rule and apply it to every entry of
+// the same merchant that is still only a proposal.
+export function learnCategory(entries, learned, entryId, category) {
+  if (!(category in CATEGORIES)) throw new Error(`Unknown category ${category}`);
+  const target = entries.find((e) => e.id === entryId);
+  if (!target) return { entries, learned, applied: 0 };
+  const key = merchantKey(target.merchant);
+  const nextLearned = key ? { ...learned, [key]: category } : learned;
+  let applied = 0;
+  const next = entries.map((e) => {
+    if (e.id === entryId) return { ...e, category, inferred: false };
+    if (key && e.inferred && merchantKey(e.merchant) === key) { applied++; return { ...e, category, inferred: false }; }
+    return e;
+  });
+  return { entries: next, learned: nextLearned, applied };
 }
 
 export function correctCategory(entry, category) {

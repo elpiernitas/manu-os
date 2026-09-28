@@ -10,6 +10,34 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
+## WEB-06 — importar el Excel de Sabadell y aprender categorías por comercio
+
+Hecho sobre WEB-05 (PR #13). Manu subió su extracto real de Sabadell al chat. **No está en el repositorio**: solo se usó en local para ver la estructura con los valores ocultos y para contar resultados.
+
+### Archivos cambiados
+
+- `web/vendor/xlsx.full.min.js`: SheetJS CE 0.20.3, Apache-2.0, con licencia, origen y SHA-256 en `web/vendor/README.md`. Se carga bajo demanda. La build «mini» no lee el .xls antiguo (BIFF); comprobado.
+- `web/core/bank.js`: `importStatementRows` (filas de hoja de cálculo); cabeceras de Sabadell «F. Operativa / Concepto / F. Valor / Importe / Saldo»; fechas en número de serie de Excel. Identidad de cada línea: fecha, importe, concepto, **saldo** y número de repetición, para no perder dos compras iguales del mismo día. Reimportar el mismo archivo sigue sin duplicar.
+- `web/core/money.js`: coincidencia por palabras o frases completas; categorías nuevas: Compras, Bizum y transferencias, Efectivo; `merchantKey` y `learnCategory`, para que una corrección de Manu se aplique a todas las propuestas del mismo comercio y a las importaciones futuras. Las entradas ya confirmadas no se sobrescriben.
+- `web/app.js` (Excel o CSV en Dinero, aprendizaje al corregir, versión 6), `web/sw.js` (`manuos-v6`).
+- Tests: `web/tests/bank-xls.test.js` con el fixture **inventado** `web/tests/fixtures-sabadell-ejemplo.xls`; `web/tests/weather-bank.test.js` y `core.test.js` ampliados.
+
+### Comandos ejecutados y resultados reales
+
+- `cd web && npm test`: 50/50 PASS.
+- Archivo real de Manu, solo recuentos y solo en local:
+  - **antes**: 359 gastos, 80 ingresos ignorados, 0 filas inválidas y **9 descartadas por error como «duplicadas»**;
+  - **después**: 368 gastos, 80 ingresos, 0 inválidas, 0 duplicadas;
+  - reimportar el mismo archivo: 0 nuevas, 368 duplicadas;
+  - «Otros» baja de 299 a 190. El resto son comercios locales, que se resuelven con el aprendizaje por comercio.
+- Chromium headless: el fixture .xls se importa (2 gastos, 1 ingreso ignorado), SheetJS se carga bajo demanda y corregir un comercio aprende las dos compras. La regresión de WEB-03 y la de las rondas 1–3 de WEB-05 siguen en PASS.
+
+### NO_VERIFICADO
+
+- Otros bancos o formatos .xlsx reales.
+- La importación de Excel en Safari de iOS.
+- La divergencia con el categorizador Swift (nativo en pausa): las categorías nuevas no existen en Swift.
+
 ## WEB-05 ronda 3 — paginación de Google Tasks y People sin cierres falsos
 
 Defecto demostrado en la ronda 3: `listOpenTasks` leía solo la primera página (100 tareas) y `planTaskSync` marcaba como hecha cualquier tarea enlazada que no apareciera en ella.

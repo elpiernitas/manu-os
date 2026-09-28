@@ -26,9 +26,10 @@ export function parseCsv(text) {
   return rows.map((r) => r.map((c) => c.trim())).filter((r) => r.some((c) => c !== ""));
 }
 
-const DATE_KEYS = ["fecha operacion", "fecha", "f. operacion", "fecha valor", "date"];
+const DATE_KEYS = ["fecha operacion", "f. operativa", "f. operacion", "fecha", "fecha valor", "f. valor", "date"];
 const CONCEPT_KEYS = ["concepto", "descripcion", "movimiento", "detalle", "comercio", "description"];
 const AMOUNT_KEYS = ["importe", "cantidad", "amount", "importe (eur)", "importe eur"];
+const BALANCE_KEYS = ["saldo", "balance"];
 
 function findColumn(header, keys) {
   const h = header.map(normalise);
@@ -56,6 +57,11 @@ export function amountToCents(raw) {
 
 // "28/09/2026", "28-09-26", "2026-09-28" -> "2026-09-28T12:00:00" (local noon), or null.
 export function parseDate(raw) {
+  // Excel serial dates (days since 1899-12-30) from spreadsheets.
+  if (typeof raw === "number" && raw > 20000 && raw < 80000) {
+    const d = new Date(Date.UTC(1899, 11, 30) + Math.round(raw) * 86400000);
+    return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 12).toISOString();
+  }
   const s = String(raw ?? "").trim();
   let y, m, d;
   let t = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
@@ -69,20 +75,29 @@ export function parseDate(raw) {
   return date.toISOString();
 }
 
-function fingerprint(at, cents, concept) {
-  const str = `${at.slice(0, 10)}|${cents}|${normalise(concept)}`;
+// Identity of a bank line. The running balance ("Saldo") tells apart two
+// identical purchases on the same day; without it, the nth repetition inside
+// the same file gets its own index. Re-importing the same file stays idempotent.
+function fingerprint(at, cents, concept, balance, nth) {
+  const str = `${at.slice(0, 10)}|${cents}|${normalise(concept)}|${balance ?? ""}|${nth}`;
   let h = 5381;
   for (let i = 0; i < str.length; i++) h = ((h * 33) ^ str.charCodeAt(i)) >>> 0;
   return `bank-${h.toString(36)}`;
 }
 
 // Returns { entries, skippedIncome, skippedInvalid, duplicates } or { error }.
-export function importStatement(text, existingIds = new Set()) {
-  const rows = parseCsv(text);
+export function importStatement(text, existingIds = new Set(), learned = {}) {
+  return importStatementRows(parseCsv(text), existingIds, learned);
+}
+
+// Same import from already-parsed rows (e.g. an .xls read with SheetJS).
+export function importStatementRows(rawRows, existingIds = new Set(), learned = {}) {
+  const rows = (rawRows ?? []).map((r) => (r ?? []).map((c) => (typeof c === "string" ? c.trim() : c))).filter((r) => r.some((c) => c !== "" && c !== null && c !== undefined));
   const headerIndex = rows.findIndex((r) => findColumn(r, DATE_KEYS) >= 0 && findColumn(r, AMOUNT_KEYS) >= 0);
-  if (headerIndex < 0) return { error: "No encuentro las columnas de fecha e importe. ¿Es el CSV de movimientos del banco?" };
-  const header = rows[headerIndex];
-  const cDate = findColumn(header, DATE_KEYS), cAmount = findColumn(header, AMOUNT_KEYS), cConcept = findColumn(header, CONCEPT_KEYS);
+  if (headerIndex < 0) return { error: "No encuentro las columnas de fecha e importe. ¿Es el archivo de movimientos del banco?" };
+  const header = rows[headerIndex].map((c) => String(c ?? ""));
+  const cDate = findColumn(header, DATE_KEYS), cAmount = findColumn(header, AMOUNT_KEYS), cConcept = findColumn(header, CONCEPT_KEYS), cBalance = findColumn(header, BALANCE_KEYS);
+  const occurrences = new Map();
   const result = { entries: [], skippedIncome: 0, skippedInvalid: 0, duplicates: 0 };
   const seen = new Set(existingIds);
   for (const r of rows.slice(headerIndex + 1)) {
@@ -90,11 +105,15 @@ export function importStatement(text, existingIds = new Set()) {
     const cents = amountToCents(r[cAmount]);
     if (!at || cents === null || cents === 0) { result.skippedInvalid++; continue; }
     if (cents > 0) { result.skippedIncome++; continue; }
-    const concept = (cConcept >= 0 ? r[cConcept] : "").slice(0, 80) || null;
-    const id = fingerprint(at, cents, concept ?? "");
+    const concept = String(cConcept >= 0 ? r[cConcept] ?? "" : "").slice(0, 80) || null;
+    const balance = cBalance >= 0 ? amountToCents(r[cBalance]) : null;
+    const base = `${at.slice(0, 10)}|${cents}|${normalise(concept ?? "")}|${balance ?? ""}`;
+    const nth = occurrences.get(base) ?? 0;
+    occurrences.set(base, nth + 1);
+    const id = fingerprint(at, cents, concept ?? "", balance, nth);
     if (seen.has(id)) { result.duplicates++; continue; }
     seen.add(id);
-    result.entries.push({ ...newEntry({ id, cents: -cents, merchant: concept, at }), source: "BANK" });
+    result.entries.push({ ...newEntry({ id, cents: -cents, merchant: concept, at }, learned), source: "BANK" });
   }
   return result;
 }

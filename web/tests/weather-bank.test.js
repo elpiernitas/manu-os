@@ -63,11 +63,11 @@ test("bank amounts and dates in Spanish formats", () => {
 });
 
 test("statement import: expenses only, dedup, categorised, rejects unknown files", () => {
-  const csv = "Movimientos de la cuenta\nFecha;Concepto;Importe;Saldo\n28/09/2026;COMPRA MERCADONA;-34,50;1000\n28/09/2026;NOMINA;1500,00;2500\n27/09/2026;Pago Spotify;-11,99;988\n27/09/2026;Pago Spotify;-11,99;988\nbasura;;;\n";
+  const csv = "Movimientos de la cuenta\nFecha;Concepto;Importe\n28/09/2026;COMPRA MERCADONA;-34,50\n28/09/2026;NOMINA;1500,00\n27/09/2026;Pago Spotify;-11,99\nbasura;;\n";
   const r = importStatement(csv);
   assert.equal(r.entries.length, 2);
   assert.equal(r.skippedIncome, 1);
-  assert.equal(r.duplicates, 1);
+  assert.equal(r.duplicates, 0);
   assert.equal(r.skippedInvalid, 1);
   const merc = r.entries.find((e) => e.merchant === "COMPRA MERCADONA");
   assert.equal(merc.cents, 3450);
@@ -76,4 +76,45 @@ test("statement import: expenses only, dedup, categorised, rejects unknown files
   const again = importStatement(csv, new Set(r.entries.map((e) => e.id)));
   assert.equal(again.entries.length, 0);
   assert.ok(importStatement("hola,adios\n1,2").error);
+});
+
+test("two identical purchases on the same day are both kept; re-import stays idempotent", () => {
+  const withBalance = "Fecha;Concepto;Importe;Saldo\n28/09/2026;COMPRA TARJ. CAFE;-1,50;100,00\n28/09/2026;COMPRA TARJ. CAFE;-1,50;98,50\n";
+  const a = importStatement(withBalance);
+  assert.equal(a.entries.length, 2);
+  assert.equal(importStatement(withBalance, new Set(a.entries.map((e) => e.id))).entries.length, 0);
+  const noBalance = "Fecha;Concepto;Importe\n28/09/2026;CAFE;-1,50\n28/09/2026;CAFE;-1,50\n";
+  const b = importStatement(noBalance);
+  assert.equal(b.entries.length, 2);
+  assert.equal(importStatement(noBalance, new Set(b.entries.map((e) => e.id))).entries.length, 0);
+});
+
+test("bank concepts: whole-word keywords and new categories", async () => {
+  const { categorise } = await import("../core/money.js");
+  assert.equal(categorise("PAGO BIZUM A PERSONA"), "TRANSFERS");
+  assert.equal(categorise("REINTEGRO CAJERO"), "CASH");
+  assert.equal(categorise("COMPRA TARJ. ALIMERKA GIJON"), "GROCERIES");
+  assert.equal(categorise("COMPRA TARJ. SIDRERIA EJEMPLO"), "FOOD_AND_DRINK");
+  assert.equal(categorise("COMPRA TARJ. AMAZON EU"), "SHOPPING");
+  assert.equal(categorise("TELEFONOS ORANGE"), "HOME");
+  assert.equal(categorise("superior"), "OTHER", "whole words only");
+  assert.equal(categorise("cafetería"), "FOOD_AND_DRINK");
+});
+
+test("Manu's correction is learned per merchant and applied to proposals and future imports", async () => {
+  const { merchantKey, learnCategory, categorise } = await import("../core/money.js");
+  assert.equal(merchantKey("COMPRA TARJ. 5540XXXXXXXX1234 LA TIENDA EJEMPLO-GIJON"), merchantKey("COMPRA TARJ. 5540XXXXXXXX9999 LA TIENDA EJEMPLO-GIJON"));
+  const csv = "Fecha;Concepto;Importe;Saldo\n01/09/2026;COMPRA TARJ. LA TIENDA EJEMPLO;-5,00;10\n02/09/2026;COMPRA TARJ. LA TIENDA EJEMPLO;-7,00;3\n03/09/2026;COMPRA TARJ. OTRA COSA;-1,00;2\n";
+  const first = importStatement(csv);
+  assert.ok(first.entries.every((e) => e.category === "OTHER" && e.inferred));
+  const { entries, learned, applied } = learnCategory(first.entries, {}, first.entries[0].id, "LEISURE");
+  assert.equal(applied, 1);
+  assert.deepEqual(entries.map((e) => e.category), ["LEISURE", "LEISURE", "OTHER"]);
+  assert.equal(entries[2].inferred, true, "other merchants untouched");
+  const later = importStatement("Fecha;Concepto;Importe;Saldo\n01/10/2026;COMPRA TARJ. LA TIENDA EJEMPLO;-9,00;50\n", new Set(), learned);
+  assert.equal(later.entries[0].category, "LEISURE");
+  assert.equal(later.entries[0].inferred, false);
+  assert.equal(categorise("COMPRA TARJ. LA TIENDA EJEMPLO", { "la tienda ejemplo": "NOPE" }), "OTHER", "unknown learned categories are ignored");
+  const manualFix = learnCategory(entries, learned, entries[0].id, "SHOPPING");
+  assert.equal(manualFix.entries[1].category, "LEISURE", "confirmed entries are not overwritten by a later rule");
 });
