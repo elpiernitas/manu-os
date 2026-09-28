@@ -104,3 +104,74 @@ export async function ask({ key, model, payload, confirmed }, fetchImpl = fetch)
   if (!text) throw new Error("Gemini no ha respondido");
   return text;
 }
+
+// ---------- Actions Gemini can PROPOSE (Manu confirms each one in the app) ----------
+export const TOOLS = [{ functionDeclarations: [
+  { name: "anadir_tarea", description: "Propone añadir una tarea pendiente.", parameters: { type: "OBJECT", properties: { texto: { type: "STRING" } }, required: ["texto"] } },
+  { name: "anadir_idea", description: "Propone guardar una idea.", parameters: { type: "OBJECT", properties: { texto: { type: "STRING" } }, required: ["texto"] } },
+  { name: "apuntar_gasto", description: "Propone apuntar un gasto en euros.", parameters: { type: "OBJECT", properties: { importe_euros: { type: "NUMBER" }, concepto: { type: "STRING" } }, required: ["importe_euros"] } },
+  { name: "crear_recordatorio", description: "Propone un recordatorio. 'cuando' en formato AAAA-MM-DD HH:MM, hora local.", parameters: { type: "OBJECT", properties: { texto: { type: "STRING" }, cuando: { type: "STRING" } }, required: ["texto", "cuando"] } },
+  { name: "ir_a", description: "Lleva a una pantalla de MANU.", parameters: { type: "OBJECT", properties: { pantalla: { type: "STRING", enum: ["hoy", "agenda", "dinero", "tu", "tiempo", "google", "ia", "atajos", "habitos", "salud", "comidas", "personas"] } }, required: ["pantalla"] } },
+  { name: "importar_extracto", description: "Ofrece importar el extracto del banco (Excel o CSV) en Dinero.", parameters: { type: "OBJECT", properties: {} } },
+  { name: "sugerir_mejora", description: "Cuando Manu pide un cambio o una mejora de la app MANU, prepara la sugerencia para el desarrollador. No incluyas datos personales.", parameters: { type: "OBJECT", properties: { titulo: { type: "STRING" }, descripcion: { type: "STRING" } }, required: ["titulo", "descripcion"] } },
+] }];
+
+export function actionSystem(now = new Date()) {
+  return `${BASE_SYSTEM}
+Estás dentro de la app MANU OS. Puedes PROPONER acciones con las funciones disponibles (Manu las confirma una a una); nunca digas que ya están hechas.
+Si Manu quiere cambiar o mejorar la app, usa sugerir_mejora con un título corto y una descripción clara, sin datos personales.
+Fecha y hora actuales: ${now.toLocaleString("es-ES", { weekday: "long", day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })}.`;
+}
+
+export function buildActionPayload(message, now = new Date()) {
+  return { ...requestBody(message, [], actionSystem(now)), tools: TOOLS };
+}
+
+const clip = (v, n) => String(v ?? "").replace(/[\u0000-\u001f]/g, " ").trim().slice(0, n);
+
+// Validates what the model proposes; anything malformed is dropped, never executed.
+export function parseCalls(json) {
+  const parts = json?.candidates?.[0]?.content?.parts ?? [];
+  const out = [];
+  for (const p of parts) {
+    const c = p.functionCall;
+    if (!c || typeof c.name !== "string") continue;
+    const a = c.args ?? {};
+    switch (c.name) {
+      case "anadir_tarea": case "anadir_idea": { const t = clip(a.texto, 140); if (t) out.push({ name: c.name, texto: t }); break; }
+      case "apuntar_gasto": { const cents = Math.round(Number(a.importe_euros) * 100); if (Number.isFinite(cents) && cents > 0 && cents < 10000000) out.push({ name: c.name, cents, concepto: clip(a.concepto, 80) || null }); break; }
+      case "crear_recordatorio": { const t = clip(a.texto, 140); const m = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})$/.exec(clip(a.cuando, 16)); if (t && m) { const d = new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]); if (!Number.isNaN(d.getTime())) out.push({ name: c.name, texto: t, at: d.toISOString() }); } break; }
+      case "ir_a": { const ok = TOOLS[0].functionDeclarations.find((f) => f.name === "ir_a").parameters.properties.pantalla.enum; if (ok.includes(a.pantalla)) out.push({ name: c.name, pantalla: a.pantalla }); break; }
+      case "importar_extracto": out.push({ name: c.name }); break;
+      case "sugerir_mejora": { const ti = clip(a.titulo, 100), de = clip(a.descripcion, 1500); if (ti && de) out.push({ name: c.name, titulo: ti, descripcion: de, sensitive: isSensitive(`${ti} ${de}`) }); break; }
+      default: break; // unknown tools are ignored
+    }
+  }
+  return out;
+}
+
+// Suggestions go to the public repository as a prefilled GitHub issue Manu submits himself.
+export function issueUrl({ titulo, descripcion }, version = "") {
+  const p = new URLSearchParams({ title: `[MANU] ${titulo}`, body: `${descripcion}\n\n---\nEnviado desde MANU${version ? ` (versión ${version})` : ""}.` });
+  return `https://github.com/elpiernitas/manu-os/issues/new?${p}`;
+}
+
+// Same privacy gates as ask(): explicit consent (per request or Manu's global opt-in) and no sensitive text.
+export async function askWithActions({ key, model, payload, confirmed }, fetchImpl = fetch) {
+  if (confirmed !== true) throw Object.assign(new Error("Falta tu confirmación"), { code: "unconfirmed" });
+  const texts = (payload?.contents ?? []).flatMap((c) => c.parts.map((p) => p.text));
+  if (texts.some(isSensitive)) throw Object.assign(new Error("sensible"), { code: "sensitive" });
+  const res = await fetchImpl(`${API}/models/${encodeURIComponent(model)}:generateContent`, {
+    method: "POST",
+    headers: { "x-goog-api-key": key, "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (res.status === 429) throw Object.assign(new Error("Límite gratuito de Gemini alcanzado por ahora"), { code: "quota" });
+  if (res.status === 400 || res.status === 403) throw Object.assign(new Error("La clave de Gemini no es válida"), { code: "key" });
+  if (!res.ok) throw new Error(`Gemini respondió ${res.status}`);
+  const json = await res.json();
+  const calls = parseCalls(json);
+  const text = replyText(json);
+  if (!text && !calls.length) throw new Error("Gemini no ha respondido");
+  return { text, calls };
+}
