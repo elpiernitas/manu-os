@@ -168,3 +168,6 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
 .tile-v { font: 400 32px/1.1 var(--display); font-variant-numeric: tabular-nums; }
 .segmented.one { grid-template-columns: 1fr; }
 input[type=time] { width: auto; min-height: 36px; }
+.ai-tag { display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: .06em; padding: 1px 6px; margin-right: 6px; border-radius: 6px; background: rgba(113,82,217,.35); color: #D9CCFF; vertical-align: 1px; }
+ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+.payload { margin: 8px 0 0; padding: 8px 10px; border-radius: 10px; background: rgba(0,0,0,.35); font: 11px/1.35 ui-monospace, Menlo, monospace; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 180px; overflow: auto; color: var(--text); }

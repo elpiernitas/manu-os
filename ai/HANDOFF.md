@@ -1,8 +1,94 @@
 # HANDOFF
 
+## Próximo paso vigente
+
+1. El orquestador revisa el PR #13 (WEB-05, ADR-0013). Es la única implementación activa. Si lo aprueba y lo fusiona, `web.yml` publica la web en GitHub Pages desde `main`.
+2. Manu, en su dispositivo y fuera del repositorio, crea el ID de cliente OAuth de Google (Calendar, Tasks, People y Drive, cada uno activable por separado) y, si quiere, la clave gratuita de Gemini.
+3. La línea nativa (PR #7, #8 y #9) sigue en pausa. D-04B y D-03 son gates futuros.
+
 ## Estado
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
+
+## WEB-05 ronda 3 — paginación de Google Tasks y People sin cierres falsos
+
+Defecto demostrado en la ronda 3: `listOpenTasks` leía solo la primera página (100 tareas) y `planTaskSync` marcaba como hecha cualquier tarea enlazada que no apareciera en ella.
+
+Corrección:
+
+- `paginate()` sigue `nextPageToken` hasta agotarlo. Se detiene como incompleto ante un token repetido, más de 20 páginas o el fallo de una página posterior. Si falla la primera página, es un error, no una lista vacía.
+- `planTaskSync(..., { complete })` solo infiere cierres si el listado está completo. Por defecto se considera incompleto.
+- People también se pagina. `mergePeople` nunca borra a quien no aparece, así que un listado parcial es inocuo.
+- La app muestra «lista incompleta: no cierro nada» cuando ocurre.
+- Actualizados el próximo paso vigente del handoff (el antiguo, del PR #5, queda marcado SUPERSEDED), el cuerpo del PR #13 y QAL-014.
+
+Comandos: `cd web && npm test` → 45/45 PASS. Regresiones:
+
+- 150 tareas en dos páginas: la tarea enlazada `g120` de la segunda página no entra en `closedRemotely`, y sí la que no existe;
+- si falla la segunda página, no se cierra nada;
+- con un token en bucle, se para en 3 llamadas como mucho y no cierra nada;
+- con el límite de páginas, queda incompleto;
+- si falla la primera página, es un error;
+- Contactos se leen en dos páginas y los ausentes se conservan.
+
+## WEB-05 ronda 2 — esquema cerrado del sobre cifrado y estado canónico único
+
+Defectos demostrados en la ronda 2 y corregidos:
+
+1. `isEnvelope` aceptaba campos extra (un marcador en claro podía subirse) y `decryptBackup` usaba sin validar las iteraciones del archivo remoto. Ahora `envelopeProblem` aplica un esquema cerrado: claves exactas en cada nivel, `format` y `v` soportados, `PBKDF2`/`SHA-256`/`AES-GCM` exactos, base64 válido con sal de 16 B, IV de 12 B y texto cifrado de al menos 16 B, e iteraciones enteras entre 100 000 y 2 000 000. `saveBackup` y `decryptBackup` lo aplican antes de cualquier `fetch` o PBKDF2; `encryptBackup` rechaza iteraciones fuera de rango.
+2. Estado canónico con dos semánticas. `ai/CURRENT_TASK.md` tiene ahora una sola tarea activa, y BRAIN-02-PREP queda como historial cerrado que apunta al PR #5. En `ai/PROJECT_STATE.md`, BRAIN-02-PREP figura como fusionada, BRAIN-02 como pausada y el «Siguiente gate» está actualizado. En este handoff, el bloque original de WEB-05 queda marcado como SUPERSEDED.
+
+Comandos y resultados:
+
+- `cd web && npm test`: 43/43 PASS. Nueva regresión: un campo extra con marcador no llega a `fetch` (0 llamadas); iteraciones fuera de rango (`1e12`, 1, 0, −5, 1,5, `"600000"`, 99 999) se rechazan en menos de 50 ms; nombres, IV, sal, versión y texto cifrado inválidos fallan; una cabecera manipulada no se descifra.
+
+## WEB-05 ronda 1 — correcciones de la revisión del PR #13
+
+Defectos demostrados por el orquestador y corregidos:
+
+1. **La copia de Drive iba en claro y automática.** Ahora `web/core/crypto.js` usa AES-256-GCM con la cabecera autenticada y PBKDF2-SHA-256 con 600 000 iteraciones. La frase la elige Manu y no se guarda. `saveBackup` rechaza el texto en claro. Ya no hay subida automática: se sube y restaura a mano, con la frase.
+2. **Gemini recibía mensajes automáticamente, con un filtro que no garantiza nada.** Ahora la app enseña el payload exacto y pide confirmación en cada petición (`ask` exige `confirmed: true`). Por defecto solo va la frase y una instrucción fija. `isSensitive` se amplía con los cuatro ejemplos de la revisión y queda documentado como lista de mejor esfuerzo. La clave vive en `sessionStorage` salvo que Manu active «Recordar»; ese riesgo queda documentado.
+3. **Se pedían los cuatro scopes de golpe.** Ahora hay `SCOPE` por función, interruptores desconectados por defecto, un token por scope y `runServices`, que aísla las denegaciones.
+4. **Estado canónico desactualizado.** Actualizados `ai/CURRENT_TASK.md` (conserva el historial de BRAIN-02-PREP), `ai/PROJECT_STATE.md`, `docs/security/THREAT_MODEL.md`, ADR-0013 y `ai/QA_LESSONS.md` (QAL-010 a QAL-013). La rama estaba creada desde el commit anterior a la fusión squash, así que el PR quedó en conflicto y sin checks (QAL-013). Rebasada sobre `main`; `web.yml` también se ejecuta en `push` a ramas `claude/**` para que el check sea recuperable.
+
+Comandos y resultados:
+
+- `cd web && npm test`: 42/42 PASS.
+- Chromium headless con Google, Drive y Gemini simulados (script de prueba fuera del repo): 15/15 PASS.
+  - Clave de Gemini solo en la sesión por defecto.
+  - Sin llamada a Gemini hasta confirmar; el payload visible no lleva contexto; los cuatro ejemplos sensibles ni se ofrecen ni se envían.
+  - Integraciones desconectadas por defecto; Drive pide solo `drive.appdata`.
+  - La copia subida no contiene marcadores en claro.
+  - En un perfil limpio, la frase incorrecta no restaura y la correcta sí; la copia restaurada no lleva la clave de Gemini.
+  - 0 errores de página.
+- Recorrido general: 21/21 PASS en dos ejecuciones. Una ejecución falló en «birthday soon» porque el script calculaba la fecha en UTC mientras el navegador estaba en Europe/Madrid pasada la medianoche. Corregido en el script calculando la fecha en el propio navegador. No es un fallo de la app.
+
+## [SUPERSEDED] WEB-05 — primera versión, sustituida por las rondas 1 y 2
+
+> **SUPERSEDED.** Este bloque describe la primera versión del PR #13, rechazada en la ronda 1. Ya **no** es el contrato vigente: no hay respaldo automático de IA (se envía solo con confirmación y el payload visible), no se pide un consentimiento con los cuatro scopes (se pide uno por función) y no hay copia en Drive automática ni en claro (es manual y cifrada). La semántica vigente está en «WEB-05 ronda 1», «WEB-05 ronda 2» y en ADR-0013. Se conserva solo como trazabilidad.
+
+
+Rama `claude/magical-goodall-rf5qoo`, desde `main` (`be88f9c`).
+
+### Archivos cambiados
+
+- `web/core/ai.js` (nuevo): filtro `isSensitive`, elección de modelo por lista, `systemPrompt` filtrado, cuerpo de petición sin turnos sensibles, errores 429 y de clave.
+- `web/core/google.js` (nuevo): scopes, plan de sincronización de Tasks en los dos sentidos, cumpleaños desde People API sin duplicados, copia en `appDataFolder` (crear o actualizar) y restauración.
+- `web/app.js`: la IA en el chat solo actúa cuando no hay intención y el texto no es sensible, con etiqueta «IA»; Tú → IA (clave fuera del vault) y Tú → Google (estado por servicio, copia y restauración de Drive con confirmación en la página); la sincronización incluye Tasks, Contactos (cada 24 h) y Drive (cada 6 h).
+- `web/index.html` (CSP con `tasks`, `people` y `generativelanguage`), `web/sw.js` (`manuos-v5`), `web/styles.css`, `web/tests/ai-google.test.js` (nuevo).
+- `docs/adr/0013-optional-gemini-and-google-services.md`, `docs/adr/README.md`.
+
+### Comandos ejecutados y resultados reales
+
+- `cd web && npm test`: 40/40 PASS.
+- Preflight CORS con `Origin: https://elpiernitas.github.io` hacia Calendar, Tasks, People, Drive y Gemini (con cabecera `x-goog-api-key`): permitido. Gemini con clave inválida responde 400 con CORS.
+- Chromium headless con Gemini y Open-Meteo simulados: 26/26 PASS en tres ejecuciones. Comprueba que la clave se prueba y elige `gemini-2.5-flash` de la lista simulada, que la IA responde a lo no reconocido, que el mensaje del médico no sale hacia la IA, que la clave no va en la URL ni en el vault, y la regresión completa.
+
+### NO_VERIFICADO
+
+- Llamadas reales a Gemini, Tasks, People y Drive (sin credenciales de Manu en este entorno).
+- El cupo gratuito y las condiciones actuales de Gemini.
+- El consentimiento de Google en iOS.
 
 ## WEB-04 — tiempo completo, Google Calendar y hora de entrada
 
@@ -362,6 +448,8 @@ Sigue sin haber ninguna decisión pendiente de Manu ahora. D-04B y D-03 son gate
 - Compilación, firma o instalación de una app iOS/macOS.
 - Comportamiento en dispositivos reales.
 
-## Próximo paso
+## [SUPERSEDED] Próximo paso de BRAIN-02-PREP
 
-BRAIN-02-PREP quedó ejecutada por Claude Code conforme a `docs/roadmap/BRAIN_02_TASK.md`, con tres rondas de corrección tras revisión externa (ver "BRAIN-02-PREP — tercera corrección tras revisión externa" arriba, que es el estado vigente). El orquestador revisa el PR #5 y decide el merge; si lo aprueba, debe abrir inmediatamente el siguiente trabajo autorizado (candidato natural: cualquiera de BRAIN-02a–02d, ninguna con bloqueos técnicos pendientes en CI/simulador, solo falta autorización explícita de código de producto). No hay ningún bloqueo humano que señalar ahora: D-04B y D-03 quedan como gates futuros documentados con sus disparadores, no como preguntas activas.
+> **SUPERSEDED.** El PR #5 está fusionado (`ff2f86a`) y la línea nativa (BRAIN-02) está pausada. El próximo paso vigente está en la sección «Próximo paso vigente» al principio de este archivo.
+
+BRAIN-02-PREP quedó ejecutada por Claude Code conforme a `docs/roadmap/BRAIN_02_TASK.md`, con tres rondas de corrección tras revisión externa. El orquestador revisó el PR #5 y lo fusionó.

@@ -44,3 +44,24 @@ Comprobación reproducible usada en MANU OS (heurística, no infalible — un gr
 ### QAL-008 — Un disparador condicional en un documento puede contradecir una ruta ya listada en otro
 
 Al describir una decisión pendiente (D-03, D-04B...) con "solo se activa si X falla", comprobar primero si el propio documento (u otro relacionado) ya lista una ruta alternativa que activa esa misma decisión por un motivo distinto e independiente de X. "Solo si falla la cuenta gratuita" y "TestFlight es una ruta real" no pueden coexistir si TestFlight exige esa misma decisión por sí sola, sin relación con si la cuenta gratuita falló. Antes de escribir "solo si", releer todas las rutas/alternativas ya documentadas para la misma fase y comprobar que ninguna activa la decisión por un camino distinto; si hay más de una, listarlas como disparadores independientes en vez de uno exclusivo. Comprobación reproducible usada en MANU OS: `grep -rn "solo si.*falla" docs ai` — cada coincidencia debe releerse junto con el resto del documento para confirmar que ninguna otra ruta ya documentada activa la misma decisión por un motivo distinto.
+
+### QAL-010 — Una lista de palabras no es una garantía de privacidad
+
+Un clasificador por palabras clave siempre deja pasar textos sensibles que no las contienen («tengo VIH», «me recetaron sertralina», «cobro 1500 al mes», un número de tarjeta). Si una función envía datos a un tercero, la garantía debe ser una confirmación explícita con el payload visible y un contexto mínimo por defecto. La lista de bloqueo solo reduce errores obvios y nunca se presenta como detección exhaustiva. Prueba: `web/tests/ai-google.test.js` («nothing is sent without explicit confirmation»).
+
+### QAL-011 — Comprobar la arquitectura canónica antes de subir datos a la nube
+
+Antes de implementar cualquier copia o sincronización remota, releer `ARCHITECTURE.md` y `THREAT_MODEL.md`: en MANU OS lo remoto es siempre texto cifrado. Un scope restringido (`drive.appdata`) limita quién ve el archivo, pero no sustituye al cifrado en el cliente. Prueba: `web/tests/ai-google.test.js` («remote backup never contains sensitive markers in clear») y la restauración en perfil limpio en el navegador.
+
+### QAL-012 — Permisos incrementales: un scope por función
+
+Pedir todos los scopes en el primer consentimiento contradice el mínimo privilegio y hace que una denegación rompa todo. Cada función pide su scope cuando se usa y falla de forma aislada. Prueba: `runServices` en `web/tests/ai-google.test.js`.
+
+### QAL-013 — Tras una fusión squash, crear la rama siguiente desde el `main` remoto actualizado
+
+Si la rama siguiente parte del commit previo a la fusión squash, el PR nuevo queda en conflicto («dirty») y GitHub no ejecuta los workflows de `pull_request`, así que no hay checks recuperables. Antes de empezar: `git fetch origin main && git checkout -B <rama> origin/main`, y comprobar `git log origin/main..HEAD` antes de abrir el PR.
+
+### QAL-014 — No inferir borrado ni cierre desde un listado parcial
+
+Si una sincronización deduce «ya no existe» o «se cerró» porque un elemento no aparece en la respuesta remota, antes tiene que haber leído la colección completa: paginar hasta agotar el token, protegerse de tokens repetidos y de un límite de páginas, y tratar cualquier listado incompleto como «no sé» (no cerrar ni borrar nada). Prueba: `web/tests/ai-google.test.js` («round 3: tasks on page 2 are never closed»).
+
