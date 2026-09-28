@@ -7,7 +7,7 @@ import { LocalStore, emptyVault, validateVault, wipeDeviceKeys } from "./core/st
 import { notificationStatus, isInstalled, enableNotifications, testNotification } from "./core/notify.js";
 import { launchParams, parseEvents, nextEvent, localDay } from "./core/intake.js";
 import { fetchForecast, searchCities, advice, WEATHER_TTL_MS } from "./core/weather.js";
-import { importStatement, importStatementRows } from "./core/bank.js";
+import { importStatement, importStatementRows, classifiedFromRows, dropCrossSource } from "./core/bank.js";
 import { CITIES, proposeAlarm, shouldAskTomorrow, shortcutUrl, guessCity } from "./core/night.js";
 import { isClientId, listEvents, createEvent, newEventBody, monthGrid, listCalendars, mergeDays } from "./core/gcal.js";
 import { detectRecurring, upcomingRecurring, spendingPattern } from "./core/insights.js";
@@ -36,6 +36,7 @@ let sheet = null; // quick add: { kind }
 let confirmWipe = false;
 let cityResults = null;
 let moneyFilter = null; // "review"
+let moneyMonth = 0; // months back from the current one in Dinero
 let calView = null; // { y, m } month shown in Agenda
 let calSelected = null; // "YYYY-MM-DD"
 let overlay = null; // "weather"
@@ -134,6 +135,12 @@ const I = {
 
 const TABS = [["hoy", "Hoy"], ["agenda", "Agenda"], ["manu", "MANU"], ["dinero", "Dinero"], ["tu", "Tú"]];
 
+function latestMonthOffset() {
+  const last = vault.spending.reduce((m, x) => (x.at > m ? x.at : m), "");
+  if (!last) return 0;
+  const d = new Date(last), t = today();
+  return Math.max(0, (t.getFullYear() - d.getFullYear()) * 12 + t.getMonth() - d.getMonth());
+}
 function monthRange(d = today()) {
   return [new Date(d.getFullYear(), d.getMonth(), 1), new Date(d.getFullYear(), d.getMonth() + 1, 1)];
 }
@@ -456,23 +463,28 @@ const screens = {
       <form class="composer glass" id="composer"><label for="msg" class="sr">Mensaje para MANU</label><input id="msg" autocomplete="off" enterkeyhint="send" placeholder="${refuge ? "Cuéntame" : "Escribe a MANU"}"><button class="btn" type="submit">Enviar</button></form>`;
   },
   dinero() {
-    const [s, e] = monthRange();
+    const ref = today(); ref.setDate(1); ref.setMonth(ref.getMonth() - moneyMonth);
+    const [s, e] = monthRange(ref);
     const month = summary(vault.spending, s, e);
+    const monthName = ref.toLocaleDateString("es-ES", { month: "long", year: "numeric" });
+    const ri = vault.settings.lastRulesImport;
     const toReview = vault.spending.filter((x) => x.review).length;
     const entries = [...vault.spending].filter((x) => moneyFilter !== "review" || x.review).sort((a, b) => (a.at < b.at ? 1 : -1)).slice(0, moneyFilter === "review" ? 500 : 60);
     const rulesCount = Object.keys(vault.settings.categoryRules ?? {}).length;
     const cats = Object.entries(month.byCategory).sort((a, b) => b[1] - a[1]);
     const max = cats[0]?.[1] ?? 1;
     const imp = vault.settings.lastImport;
-    return `<h1>Dinero</h1><p class="subtitle">${esc(cap(today().toLocaleDateString("es-ES", { month: "long", year: "numeric" })))}</p>
+    return `<h1>Dinero</h1><p class="subtitle">${esc(cap(monthName))}</p>
       <div class="stack">
-      <section class="card hero"><h2>Gastado este mes</h2><div class="big-money" data-count-money="${month.total}">${euros(month.total)}</div>
+      <section class="card hero"><div class="row cal-head"><button class="link" data-act="money-prev" aria-label="Mes anterior">${I.back}</button><h2>${moneyMonth === 0 ? "Gastado este mes" : `Gastado en ${esc(monthName.replace(/ de \d{4}$/, ""))}`}</h2><button class="link" data-act="money-next" aria-label="Mes siguiente"${moneyMonth === 0 ? " disabled" : ""}>${I.chev}</button></div><div class="big-money" data-count-money="${month.total}">${euros(month.total)}</div>
         ${cats.map(([c, v]) => `<div class="stack"><div class="row"><span>${esc(CATEGORIES[c])}</span><span class="num">${euros(v)}</span></div><div class="bar"><i data-w="${Math.max(3, Math.round((v / max) * 100))}"></i></div></div>`).join("")}</section>
       <section class="card"><h2>${I.box} Importar del banco</h2>
         <p class="muted small">Descarga los movimientos de tu banco (Sabadell: Excel .xls; también vale CSV) y elígelo aquí. Se analiza en tu móvil y no se envía a nadie. Solo importo gastos y no duplico los que ya tengas. Si corriges la categoría de un comercio, la aprendo para todos sus movimientos.</p>
         <label class="btn ghost" for="bankFile" role="button" tabindex="0">Elegir archivo (Excel o CSV)</label><input id="bankFile" type="file" accept=".xls,.xlsx,.csv,text/csv,text/plain,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="sr">
         <label class="btn ghost" for="rulesFile" role="button" tabindex="0">Importar reglas (Excel de ChatGPT)</label><input id="rulesFile" type="file" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="sr">
         ${rulesCount ? `<p class="muted small">${rulesCount} reglas de categorías guardadas en este móvil.</p>` : ""}
+        ${ri ? `<p class="muted small">Excel de ChatGPT: ${ri.rules} reglas, ${ri.added} gastos nuevos${ri.duplicates ? `, ${ri.duplicates} ya estaban` : ""}${ri.review ? `, ${ri.review} por revisar` : ""}${ri.reclassified ? `, ${ri.reclassified} reclasificados` : ""}.</p>` : ""}
+        ${rulesCount && !vault.spending.length ? '<p class="small"><b>Las reglas solas no son gastos.</b> Importa el extracto del banco o vuelve a elegir el Excel de ChatGPT, que trae la hoja «Gastos clasificados», y verás aquí tus números.</p>' : ""}
         ${imp ? `<p class="muted small">Última importación: ${imp.added} gastos nuevos, ${imp.duplicates} repetidos, ${imp.income} ingresos ignorados${imp.invalid ? `, ${imp.invalid} filas no reconocidas` : ""}.</p>` : ""}</section>
       ${moneyInsights()}
       ${sectionTitle("Movimientos", `${toReview ? `<button class="link small" data-act="money-filter">${moneyFilter === "review" ? "Ver todos" : `Por revisar (${toReview})`}</button>` : ""}${addLink("EXPENSE")}`)}
@@ -979,6 +991,8 @@ document.addEventListener("click", async (e) => {
     }
     case "cal-day": calSelected = a.dataset.day; { const d = new Date(`${calSelected}T12:00:00`); if (calView && (d.getMonth() !== calView.m)) calView = { y: d.getFullYear(), m: d.getMonth() }; } render(); break;
     case "cal-today": calView = null; calSelected = null; render(); break;
+    case "money-prev": moneyMonth++; render(); break;
+    case "money-next": moneyMonth = Math.max(0, moneyMonth - 1); render(); break;
     case "money-filter": moneyFilter = moneyFilter === "review" ? null : "review"; render(); break;
     case "spotify-connect": startSpotifyAuth(); break;
     case "spotify-forget": spotifyStore.tokens = null; render(); toast("Spotify desconectado de este móvil"); break;
@@ -1143,11 +1157,15 @@ document.addEventListener("change", async (e) => {
       const XLSX = await loadSheetJs();
       const wb = XLSX.read(new Uint8Array(await e.target.files[0].arrayBuffer()), { type: "array" });
       let result = { error: "No encuentro reglas en ese Excel." };
+      let classified = null;
       for (const name of wb.SheetNames) {
-        const r = rulesFromRows(XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: true, defval: "" }));
-        if (!r.error) { result = r; break; }
+        const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: true, defval: "" });
+        const r = rulesFromRows(rows);
+        if (!r.error && result.error) result = r;
+        classified ??= classifiedFromRows(rows, vault.spending, vault.settings.categoryRules ?? {});
       }
-      if (result.error) { toast(result.error); return; }
+      if (result.error && !classified?.entries.length) { toast(result.error); return; }
+      if (result.error) result = { rules: {} };
       // Manu's own corrections (plain ids) always win over imported rules.
       const current = vault.settings.categoryRules ?? {};
       const merged = { ...result.rules };
@@ -1155,7 +1173,13 @@ document.addEventListener("change", async (e) => {
       vault.settings.categoryRules = merged;
       const applied = applyRules(vault.spending, merged);
       vault.spending = applied.entries;
-      persist(); render(); toast(`${Object.keys(result.rules).length} reglas importadas · ${applied.changed} gastos reclasificados`);
+      const added = classified?.entries ?? [];
+      vault.spending.push(...added);
+      vault.settings.lastRulesImport = { at: new Date().toISOString(), rules: Object.keys(result.rules).length, reclassified: applied.changed, added: added.length, duplicates: classified?.duplicates ?? 0, review: added.filter((x) => x.review).length };
+      // Show the month with the most recent movement, so the numbers are visible at once.
+      moneyMonth = latestMonthOffset();
+      persist(); render(); scrollTo(0, 0);
+      toast(`${Object.keys(result.rules).length} reglas · ${added.length} gastos importados`);
     } catch { toast("No he podido leer ese Excel."); }
     return;
   }
@@ -1176,7 +1200,10 @@ document.addEventListener("change", async (e) => {
       }
     } catch { toast("No he podido leer ese archivo."); return; }
     if (r.error) { toast(r.error); return; }
+    const cross = dropCrossSource(r.entries, vault.spending, "CHATGPT");
+    r.entries = cross.entries; r.duplicates += cross.duplicates;
     vault.spending.push(...r.entries);
+    moneyMonth = latestMonthOffset();
     vault.settings.lastImport = { at: new Date().toISOString(), added: r.entries.length, duplicates: r.duplicates, income: r.skippedIncome, invalid: r.skippedInvalid };
     persist(); render(); toast(`${r.entries.length} gastos importados`); return;
   }

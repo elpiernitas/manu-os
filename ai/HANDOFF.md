@@ -25,9 +25,19 @@ Revisión pedida por Manu y devuelta el 2026-09-29 sobre `4b19d3e` y `dfb0c56`.
 
 7. **Sincronización automática de Google** (petición de Manu con captura de la Agenda, 2026-09-29). Mientras MANU está abierta y el permiso sigue vigente (unos 60 min tras tocar «Sincronizar»), se resincroniza sola cada 10 minutos y al volver a la app, sin abrir nunca una ventana de Google. Cuando el permiso caduca, espera al siguiente toque. Los tokens siguen solo en memoria (ADR-0013). Sincronizar en segundo plano o con la app cerrada no es posible sin un servidor que guarde un token de refresco.
 
+8. **Excel de ChatGPT con sus gastos** (captura de Manu, 2026-09-29: tras importar las 143 reglas, Dinero seguía a 0 € y sin nada que ver). El Excel trae además la hoja «Gastos clasificados», que MANU ignoraba.
+   - `classifiedFromRows` importa esos gastos como propuestas de regla (`ruled`, `source: "CHATGPT"`), marca «revisar» cuando la hoja dice «Sí» y respeta las correcciones de Manu.
+   - `dropCrossSource` empareja por día e importe, contando repeticiones, para que el extracto del banco y la hoja no se dupliquen, en cualquier orden.
+   - Dinero tiene flechas de mes, salta al último mes con movimientos después de importar y muestra un resumen de la importación. Si solo hay reglas, avisa de que las reglas solas no son gastos.
+
 ### Resultados
 
-- `npm test`: 76/76 PASS (6 tests nuevos en `web/tests/review-web06-08.test.js`).
+- `npm test`: 79/79 PASS (6 tests nuevos en `web/tests/review-web06-08.test.js`).
+- Con los archivos reales de Manu, en local y solo con recuentos (nada entra en el repositorio):
+  - con el Excel de ChatGPT primero, 368 gastos (138 por revisar, 0 en «Otros»); al importar después el .xls de Sabadell, 0 nuevos y 368 repetidos;
+  - en el orden inverso, 368 del banco y luego 0 nuevos del Excel;
+  - reimportar no añade nada.
+- Navegador con un Excel inventado: resumen, salto a septiembre, agosto con 75,20 €, reimportación sin duplicados.
 - Chromium con reloj simulado: sin ventana ni sincronización al abrir sin permiso; la sincronización manual abre 1 ventana; nada antes de 10 min; a los 11 min trae el evento cambiado sin ventana nueva; al caducar se detiene sin abrir ventanas.
 - El ejemplo de colisión de la revisión **no colisiona** en `4b19d3e` ni en `dfb0c56`: se obtienen 2 entradas y 0 duplicados. Se buscó por fuerza bruta una colisión real, que con el importador antiguo da 1 entrada y 1 «duplicado», y es la que usa el test (QAL-019).
 - Navegador: tras borrar solo queda `manuos.vault` vacío, e IA muestra «Sin clave». Las regresiones de WEB-03 a WEB-12 pasan.
