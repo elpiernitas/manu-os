@@ -2,7 +2,7 @@
 
 Status: **REVIEW_PENDING**
 
-Implementación de esta tarea de preparación completada por Claude Code, con dos rondas de corrección tras revisión externa. Ver `ai/HANDOFF.md` para el resultado completo (D-02 decidida por ADR-0011, BRAIN-02 dividida en subfases 02a–02d verificables en CI/simulador, D-03/D-04B precisadas) y el PR #5 para la evidencia. No hay ninguna decisión pendiente de Manu ahora: D-04B queda modelado como un gate futuro (fase de dispositivo real), no como un bloqueo humano actual. Pendiente de revisión del orquestador.
+Implementación de esta tarea de preparación completada por Claude Code, con tres rondas de corrección tras revisión externa. Ver `ai/HANDOFF.md` para el resultado completo (D-02 decidida por ADR-0011, BRAIN-02 dividida en subfases 02a–02d verificables en CI/simulador, D-03/D-04B precisadas) y el PR #5 para la evidencia. No hay ninguna decisión pendiente de Manu ahora: D-04B queda modelado como un gate futuro (fase de dispositivo real), no como un bloqueo humano actual. Pendiente de revisión del orquestador.
 
 ## Tarea activa
 
