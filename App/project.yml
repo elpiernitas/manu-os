@@ -6,6 +6,7 @@ options:
   bundleIdPrefix: local.manuos
   deploymentTarget:
     iOS: "16.0"
+    macOS: "13.0"
 packages:
   ManuBrain:
     path: ..
@@ -29,6 +30,29 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: local.manuos.app
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "6.0"
+        GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGNING_ALLOWED: NO
+  ManuOSMac:
+    type: application
+    platform: macOS
+    sources:
+      - path: ManuOS
+    dependencies:
+      - package: ManuBrain
+        product: ManuOSUI
+    info:
+      path: ManuOSMac/Info.plist
+      properties:
+        CFBundleDisplayName: MANU OS
+        NSHumanReadableCopyright: ""
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: local.manuos.mac
+        PRODUCT_NAME: MANU OS
         MARKETING_VERSION: "0.1.0"
         CURRENT_PROJECT_VERSION: "1"
         SWIFT_VERSION: "6.0"

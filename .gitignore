@@ -16,3 +16,4 @@ test-results/
 .swiftpm/
 App/ManuOS.xcodeproj/
 App/ManuOS/Info.plist
+App/ManuOSMac/Info.plist
