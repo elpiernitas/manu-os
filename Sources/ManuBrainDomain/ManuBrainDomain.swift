@@ -14,7 +14,7 @@ public enum ContractError: Error, Equatable, Sendable {
     case originalNotRetained
 }
 
-public struct UUIDv7: RawRepresentable, Codable, Hashable, Sendable {
+public struct UUIDv7: Codable, Hashable, Sendable {
     public let rawValue: String
 
     public init(rawValue: String) throws {
@@ -44,7 +44,7 @@ public struct UUIDv7: RawRepresentable, Codable, Hashable, Sendable {
     }
 }
 
-public struct UTCTimestamp: RawRepresentable, Codable, Hashable, Comparable, Sendable {
+public struct UTCTimestamp: Codable, Hashable, Comparable, Sendable {
     public let rawValue: String
     public let date: Date
 
