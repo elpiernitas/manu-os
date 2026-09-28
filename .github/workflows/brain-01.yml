@@ -6,6 +6,7 @@ on:
       - Package.swift
       - Sources/**
       - Tests/**
+      - App/**
       - .github/workflows/brain-01.yml
   workflow_dispatch:
 
@@ -42,5 +43,17 @@ jobs:
         run: |
           xcodebuild build \
             -scheme ManuBrain-Package \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO
+      # iPhone app target generated from App/project.yml with XcodeGen.
+      - name: Generate Xcode project
+        run: |
+          brew install xcodegen
+          cd App && xcodegen generate
+      - name: Build iPhone app for iOS Simulator
+        run: |
+          xcodebuild build \
+            -project App/ManuOS.xcodeproj \
+            -scheme ManuOS \
             -destination 'generic/platform=iOS Simulator' \
             CODE_SIGNING_ALLOWED=NO

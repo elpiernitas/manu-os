@@ -1,0 +1,37 @@
+# XcodeGen spec for the MANU OS iPhone app (BRAIN-02b/02d).
+# Generated in CI with `xcodegen generate`; the .xcodeproj is not committed.
+# No signing: CI builds for iOS Simulator with CODE_SIGNING_ALLOWED=NO.
+name: ManuOS
+options:
+  bundleIdPrefix: local.manuos
+  deploymentTarget:
+    iOS: "16.0"
+packages:
+  ManuBrain:
+    path: ..
+targets:
+  ManuOS:
+    type: application
+    platform: iOS
+    sources:
+      - path: ManuOS
+    dependencies:
+      - package: ManuBrain
+        product: ManuOSUI
+    info:
+      path: ManuOS/Info.plist
+      properties:
+        CFBundleDisplayName: MANU OS
+        UILaunchScreen: {}
+        UIUserInterfaceStyle: Dark
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: local.manuos.app
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "6.0"
+        GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGNING_ALLOWED: NO
