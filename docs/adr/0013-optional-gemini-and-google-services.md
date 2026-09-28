@@ -23,7 +23,7 @@ La app web (ADR-0012) funciona sin IA, pero el chat solo entiende órdenes concr
    - `tasks`: sincronización de tareas en los dos sentidos con la lista por defecto.
    - `contacts.readonly`: solo nombres y cumpleaños, guardados en el dispositivo.
    - `drive.appdata`: copia **cifrada en el cliente** en la carpeta privada de la app.
-6. **Copia en Drive siempre cifrada y manual.** Formato `manuos-backup` v1: AES-256-GCM (AEAD) con la cabecera autenticada como datos adicionales; KDF PBKDF2-HMAC-SHA-256 con 600 000 iteraciones y sal aleatoria de 16 bytes; IV de 12 bytes. La frase la elige Manu (mínimo 10 caracteres) y no se guarda ni se sube. Sin la frase no hay recuperación. `saveBackup` rechaza cualquier cosa que no sea un sobre cifrado. No hay subida automática. En web se usa PBKDF2 en lugar del Argon2id de ADR-0011 porque es el KDF nativo de Web Crypto; la desviación queda documentada aquí.
+6. **Copia en Drive siempre cifrada y manual.** Formato `manuos-backup` v1: AES-256-GCM (AEAD) con la cabecera autenticada como datos adicionales; KDF PBKDF2-HMAC-SHA-256 con 600 000 iteraciones y sal aleatoria de 16 bytes; IV de 12 bytes. La frase la elige Manu (mínimo 10 caracteres) y no se guarda ni se sube. Sin la frase no hay recuperación. El sobre sigue un **esquema cerrado** (`envelopeProblem`): claves exactas, algoritmos exactos, base64 con longitudes fijas de sal e IV, versión soportada e iteraciones entre 100 000 y 2 000 000. Se valida antes de subir y antes de derivar la clave, así que un archivo manipulado no puede colar campos en claro ni bloquear la interfaz con iteraciones extremas. No hay subida automática. En web se usa PBKDF2 en lugar del Argon2id de ADR-0011 porque es el KDF nativo de Web Crypto; la desviación queda documentada aquí.
 7. El ID de cliente OAuth es público por diseño. El secreto de cliente no se usa ni se guarda.
 
 ## Consecuencias
@@ -38,6 +38,7 @@ La app web (ADR-0012) funciona sin IA, pero el chat solo entiende órdenes concr
 ## Historial
 
 - Ronda 1 de revisión (PR #13, 2026-09-28): la primera versión subía el vault en claro y automáticamente a Drive, enviaba a Gemini sin confirmación con un filtro de palabras presentado como garantía, y pedía los cuatro scopes de golpe. Corregido en esta versión del ADR.
+- Ronda 2 (PR #13): el sobre aceptaba campos extra y cualquier número de iteraciones. Corregido con el esquema cerrado.
 
 ## Alternativas rechazadas
 

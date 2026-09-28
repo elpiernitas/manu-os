@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { isSensitive, pickModel, requestBody, replyText, ask, systemPrompt, buildPayload, BASE_SYSTEM } from "../core/ai.js";
 import { planTaskSync, birthdaysFrom, mergePeople, saveBackup, SCOPE, runServices } from "../core/google.js";
-import { encryptBackup, decryptBackup, isEnvelope, passphraseProblem } from "../core/crypto.js";
+import { encryptBackup, decryptBackup, isEnvelope, passphraseProblem, envelopeProblem, MIN_ITERATIONS } from "../core/crypto.js";
 
 test("privacy denylist blocks obvious cases, including the four examples from review round 1", () => {
   for (const t of ["tengo VIH", "me recetaron sertralina", "cobro 1500 al mes", "mi tarjeta es 4111 1111 1111 1111",
@@ -66,20 +66,20 @@ test("each service asks only for its own scope; a denial does not break the othe
 
 test("remote backup never contains sensitive markers in clear and restores after decrypting", async () => {
   const vault = { schema: 1, inbox: [], spending: [{ id: "s", cents: 4500, merchant: "MARCADOR_DINERO" }], health: [{ day: "2026-09-28", kind: "SLEEP", value: 7 }], moods: [{ day: "2026-09-28", value: 1 }], chat: [{ from: "me", text: "MARCADOR_SALUD" }] };
-  const env = await encryptBackup(vault, "frase larga de prueba", { iterations: 1000 });
+  const env = await encryptBackup(vault, "frase larga de prueba", { iterations: MIN_ITERATIONS });
   const uploaded = JSON.stringify(env);
   for (const marker of ["MARCADOR_DINERO", "MARCADOR_SALUD", "SLEEP", "4500", "moods"]) assert.ok(!uploaded.includes(marker), marker);
   assert.ok(isEnvelope(env));
   assert.deepEqual(await decryptBackup(env, "frase larga de prueba"), vault);
   await assert.rejects(decryptBackup(env, "otra frase distinta"), /incorrecta/);
-  const tampered = { ...env, kdf: { ...env.kdf, iterations: 999 } };
-  await assert.rejects(decryptBackup(tampered, "frase larga de prueba"));
+  const tampered = { ...env, kdf: { ...env.kdf, iterations: MIN_ITERATIONS + 1 } };
+  await assert.rejects(decryptBackup(tampered, "frase larga de prueba"), /incorrecta o copia dañada/, "header is authenticated");
   assert.ok(passphraseProblem("corta"));
 });
 
 test("saveBackup refuses plaintext and uploads envelopes to appDataFolder", async () => {
   await assert.rejects(saveBackup("t", { schema: 1, inbox: [] }, async () => { throw new Error("no debería llamar"); }), /cifradas/);
-  const env = await encryptBackup({ schema: 1 }, "frase larga de prueba", { iterations: 1000 });
+  const env = await encryptBackup({ schema: 1 }, "frase larga de prueba", { iterations: MIN_ITERATIONS });
   const calls = [];
   const fake = async (url, init = {}) => {
     calls.push({ url, method: init.method ?? "GET", body: init.body });
@@ -99,4 +99,41 @@ test("tasks two-way plan and contacts merge", () => {
   let n = 0;
   const first = mergePeople([], g, () => `p${++n}`);
   assert.equal(mergePeople(first.people, g, () => `p${++n}`).added, 0);
+});
+
+test("round 2: closed envelope schema is enforced before any upload or KDF work", async () => {
+  const env = await encryptBackup({ schema: 1 }, "frase larga de prueba", { iterations: MIN_ITERATIONS });
+  assert.equal(envelopeProblem(env), null);
+  // An extra field carrying a plaintext marker never reaches fetch.
+  let fetched = 0;
+  const spy = async () => { fetched++; return { ok: true, status: 200, json: async () => ({ files: [] }) }; };
+  await assert.rejects(saveBackup("t", { ...env, leak: "MARCADOR_SALUD" }, spy), /campos no válidos/);
+  await assert.rejects(saveBackup("t", { ...env, kdf: { ...env.kdf, extra: "MARCADOR_SALUD" } }, spy), /KDF no válido/);
+  await assert.rejects(saveBackup("t", { ...env, cipher: { ...env.cipher, note: "MARCADOR_SALUD" } }, spy), /cifrado no válido/);
+  assert.equal(fetched, 0);
+  // Out-of-range iterations are rejected quickly, before PBKDF2.
+  for (const iterations of [1e12, 1, 0, -5, 1.5, "600000", MIN_ITERATIONS - 1]) {
+    const t0 = Date.now();
+    await assert.rejects(decryptBackup({ ...env, kdf: { ...env.kdf, iterations } }, "frase larga de prueba"), /Copia no válida/);
+    assert.ok(Date.now() - t0 < 50, `fast rejection for ${iterations}`);
+  }
+  // Wrong names, IV, salt, version, ciphertext.
+  const bad = [
+    { ...env, format: "otro" },
+    { ...env, v: 2 },
+    { ...env, kdf: { ...env.kdf, name: "scrypt" } },
+    { ...env, kdf: { ...env.kdf, hash: "SHA-1" } },
+    { ...env, kdf: { ...env.kdf, salt: "AAAA" } },
+    { ...env, kdf: { ...env.kdf, salt: "no es base64!!" } },
+    { ...env, cipher: { ...env.cipher, name: "AES-CBC" } },
+    { ...env, cipher: { ...env.cipher, iv: "AAAAAAAAAAAAAAAAAAAAAA==" } },
+    { ...env, ct: "" },
+    null,
+    [],
+  ];
+  for (const x of bad) {
+    assert.ok(envelopeProblem(x), JSON.stringify(x)?.slice(0, 60));
+    await assert.rejects(decryptBackup(x, "frase larga de prueba"), /Copia no válida/);
+  }
+  await assert.rejects(encryptBackup({}, "frase larga de prueba", { iterations: 10 }), /fuera de rango/);
 });

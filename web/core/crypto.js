@@ -7,6 +7,8 @@ export const BACKUP_FORMAT = "manuos-backup";
 export const BACKUP_VERSION = 1;
 export const PBKDF2_ITERATIONS = 600000;
 export const MIN_PASSPHRASE = 10;
+export const MIN_ITERATIONS = 100000;
+export const MAX_ITERATIONS = 2000000;
 
 const subtle = () => {
   const s = globalThis.crypto?.subtle;
@@ -29,6 +31,7 @@ export function passphraseProblem(p) {
 export async function encryptBackup(data, passphrase, { iterations = PBKDF2_ITERATIONS } = {}) {
   const problem = passphraseProblem(passphrase);
   if (problem) throw new Error(problem);
+  if (!Number.isInteger(iterations) || iterations < MIN_ITERATIONS || iterations > MAX_ITERATIONS) throw new Error("Iteraciones fuera de rango");
   const salt = globalThis.crypto.getRandomValues(new Uint8Array(16));
   const iv = globalThis.crypto.getRandomValues(new Uint8Array(12));
   const key = await deriveKey(passphrase, salt, iterations);
@@ -39,13 +42,38 @@ export async function encryptBackup(data, passphrase, { iterations = PBKDF2_ITER
   return { ...header, ct: b64(ct) };
 }
 
+const B64 = /^[A-Za-z0-9+/]+={0,2}$/;
+const exactKeys = (o, keys) => o && typeof o === "object" && !Array.isArray(o) && Object.keys(o).length === keys.length && keys.every((k) => Object.prototype.hasOwnProperty.call(o, k));
+function b64Length(s) {
+  if (typeof s !== "string" || s.length === 0 || s.length % 4 !== 0 || !B64.test(s)) return -1;
+  return (s.length / 4) * 3 - (s.endsWith("==") ? 2 : s.endsWith("=") ? 1 : 0);
+}
+
+// Closed schema: exact keys, exact algorithm names, supported version, valid
+// base64 with the right lengths and a safe iteration range. Anything else is
+// rejected before any upload or any PBKDF2 work.
+export function envelopeProblem(x) {
+  if (!exactKeys(x, ["format", "v", "kdf", "cipher", "ct"])) return "campos no válidos";
+  if (x.format !== BACKUP_FORMAT) return "formato no válido";
+  if (x.v !== BACKUP_VERSION) return `versión no soportada (${x.v})`;
+  if (!exactKeys(x.kdf, ["name", "hash", "iterations", "salt"])) return "KDF no válido";
+  if (x.kdf.name !== "PBKDF2" || x.kdf.hash !== "SHA-256") return "algoritmo de KDF no válido";
+  if (!Number.isInteger(x.kdf.iterations) || x.kdf.iterations < MIN_ITERATIONS || x.kdf.iterations > MAX_ITERATIONS) return "iteraciones fuera de rango";
+  if (b64Length(x.kdf.salt) !== 16) return "sal no válida";
+  if (!exactKeys(x.cipher, ["name", "iv"])) return "cifrado no válido";
+  if (x.cipher.name !== "AES-GCM") return "algoritmo de cifrado no válido";
+  if (b64Length(x.cipher.iv) !== 12) return "IV no válido";
+  if (b64Length(x.ct) < 16) return "texto cifrado no válido";
+  return null;
+}
+
 export function isEnvelope(x) {
-  return Boolean(x && x.format === BACKUP_FORMAT && typeof x.ct === "string" && x.kdf?.salt && x.cipher?.iv);
+  return envelopeProblem(x) === null;
 }
 
 export async function decryptBackup(envelope, passphrase) {
-  if (!isEnvelope(envelope)) throw new Error("No es una copia cifrada de MANU OS");
-  if (envelope.v !== BACKUP_VERSION) throw new Error(`Versión de copia no compatible (${envelope.v})`);
+  const problem = envelopeProblem(envelope);
+  if (problem) throw new Error(`Copia no válida: ${problem}`);
   const { format, v, kdf, cipher } = envelope;
   const aad = new TextEncoder().encode(JSON.stringify({ format, v, kdf, cipher }));
   const key = await deriveKey(passphrase, unb64(kdf.salt), kdf.iterations);

@@ -4,6 +4,17 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
+## WEB-05 ronda 2 — esquema cerrado del sobre cifrado y estado canónico único
+
+Defectos demostrados en la ronda 2 y corregidos:
+
+1. `isEnvelope` aceptaba campos extra (un marcador en claro podía subirse) y `decryptBackup` usaba sin validar las iteraciones del archivo remoto. Ahora `envelopeProblem` aplica un esquema cerrado: claves exactas en cada nivel, `format` y `v` soportados, `PBKDF2`/`SHA-256`/`AES-GCM` exactos, base64 válido con sal de 16 B, IV de 12 B y texto cifrado de al menos 16 B, e iteraciones enteras entre 100 000 y 2 000 000. `saveBackup` y `decryptBackup` lo aplican antes de cualquier `fetch` o PBKDF2; `encryptBackup` rechaza iteraciones fuera de rango.
+2. Estado canónico con dos semánticas. `ai/CURRENT_TASK.md` tiene ahora una sola tarea activa, y BRAIN-02-PREP queda como historial cerrado que apunta al PR #5. En `ai/PROJECT_STATE.md`, BRAIN-02-PREP figura como fusionada, BRAIN-02 como pausada y el «Siguiente gate» está actualizado. En este handoff, el bloque original de WEB-05 queda marcado como SUPERSEDED.
+
+Comandos y resultados:
+
+- `cd web && npm test`: 43/43 PASS. Nueva regresión: un campo extra con marcador no llega a `fetch` (0 llamadas); iteraciones fuera de rango (`1e12`, 1, 0, −5, 1,5, `"600000"`, 99 999) se rechazan en menos de 50 ms; nombres, IV, sal, versión y texto cifrado inválidos fallan; una cabecera manipulada no se descifra.
+
 ## WEB-05 ronda 1 — correcciones de la revisión del PR #13
 
 Defectos demostrados por el orquestador y corregidos:
@@ -25,7 +36,10 @@ Comandos y resultados:
   - 0 errores de página.
 - Recorrido general: 21/21 PASS en dos ejecuciones. Una ejecución falló en «birthday soon» porque el script calculaba la fecha en UTC mientras el navegador estaba en Europe/Madrid pasada la medianoche. Corregido en el script calculando la fecha en el propio navegador. No es un fallo de la app.
 
-## WEB-05 — Gemini opcional, Google Tasks, cumpleaños de Contactos y copia en Drive (ADR-0013)
+## [SUPERSEDED] WEB-05 — primera versión, sustituida por las rondas 1 y 2
+
+> **SUPERSEDED.** Este bloque describe la primera versión del PR #13, rechazada en la ronda 1. Ya **no** es el contrato vigente: no hay respaldo automático de IA (se envía solo con confirmación y el payload visible), no se pide un consentimiento con los cuatro scopes (se pide uno por función) y no hay copia en Drive automática ni en claro (es manual y cifrada). La semántica vigente está en «WEB-05 ronda 1», «WEB-05 ronda 2» y en ADR-0013. Se conserva solo como trazabilidad.
+
 
 Rama `claude/magical-goodall-rf5qoo`, desde `main` (`be88f9c`).
 

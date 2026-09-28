@@ -1,4 +1,4 @@
-import { isEnvelope } from "./crypto.js";
+import { envelopeProblem } from "./crypto.js";
 
 // More Google services with the same OAuth consent as Calendar:
 // Tasks (two-way), Contacts birthdays (read) and a Drive backup in the
@@ -105,7 +105,8 @@ export async function findBackup(token, fetchImpl) {
 
 // Only encrypted envelopes are ever uploaded (see core/crypto.js).
 export async function saveBackup(token, envelope, fetchImpl) {
-  if (!isEnvelope(envelope)) throw new Error("Solo se suben copias cifradas");
+  const problem = envelopeProblem(envelope);
+  if (problem) throw new Error(`Solo se suben copias cifradas válidas (${problem})`);
   const body = JSON.stringify(envelope);
   const existing = await findBackup(token, fetchImpl);
   if (existing) {

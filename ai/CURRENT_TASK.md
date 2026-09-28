@@ -2,7 +2,7 @@
 
 Status: **REVIEW_PENDING**
 
-Correcciones de la ronda 1 de revisión del PR #13 implementadas por Claude Code y pendientes de la revisión del orquestador.
+Correcciones de las rondas 1 y 2 de revisión del PR #13 implementadas por Claude Code y pendientes de la revisión del orquestador.
 
 ## Tarea activa
 
@@ -20,12 +20,13 @@ WEB-05 — IA opcional con Gemini y servicios de Google en la app web ([ADR-0013
 - integración opcional con Gemini y con Google (Calendar, Tasks, Contactos, Drive) con consentimiento de Manu en su dispositivo;
 - documentación canónica, ADR, threat model, handoff y QA lessons.
 
-## Criterios de aceptación (ronda 1 del PR #13)
+## Criterios de aceptación (rondas 1 y 2 del PR #13)
 
 - toda copia en Drive se cifra en el cliente (formato versionado, AEAD, KDF, recuperación documentada); sin subida automática; restauración probada en un perfil limpio;
 - ningún envío automático a Gemini: payload exacto visible y confirmación por petición; sin historial, tareas ni agenda por defecto; no se afirma detección exhaustiva; riesgo de la clave documentado;
 - scopes de Google incrementales por función, con interruptores y degradación si se deniegan;
-- regresiones de los cuatro puntos y check de CI recuperable.
+- regresiones de los cuatro puntos y check de CI recuperable;
+- ronda 2: el sobre cifrado se valida con esquema cerrado (sin campos extra, algoritmos exactos, base64 y longitudes válidas, versión soportada, iteraciones en rango) antes de subir o de derivar la clave; una sola tarea activa y una sola semántica vigente en `CURRENT_TASK`, `PROJECT_STATE` y `HANDOFF`.
 
 ## Trabajo prohibido
 
@@ -35,46 +36,6 @@ WEB-05 — IA opcional con Gemini y servicios de Google en la app web ([ADR-0013
 
 ---
 
-## Historial: tarea anterior (BRAIN-02-PREP)
+## Historial (cerrado)
 
-Estado al cerrarse: REVIEW_PENDING (BRAIN-02-PREP, PR #5).
-
-Implementación de esta tarea de preparación completada por Claude Code, con tres rondas de corrección tras revisión externa. Ver `ai/HANDOFF.md` para el resultado completo (D-02 decidida por ADR-0011, BRAIN-02 dividida en subfases 02a–02d verificables en CI/simulador, D-03/D-04B precisadas) y el PR #5 para la evidencia. No hay ninguna decisión pendiente de Manu ahora: D-04B queda modelado como un gate futuro (fase de dispositivo real), no como un bloqueo humano actual. Pendiente de revisión del orquestador.
-
-## Tarea activa
-
-BRAIN-02-PREP — cerrar el contrato técnico y reducir los bloqueos de BRAIN-02 sin iniciar todavía la implementación de las apps.
-
-## Autorización
-
-Manu delegó en ChatGPT/Codex la orquestación técnica, las revisiones y los merges ordinarios. Esta tarea documental está autorizada porque prepara decisiones y criterios verificables sin generar costes, conectar servicios ni usar datos reales.
-
-Claude Code actúa como implementador y revisor externo en la rama `brain/02-preparation`. ChatGPT/Codex verificará el resultado y decidirá el merge.
-
-## Alcance autorizado
-
-- investigar con fuentes oficiales actuales las opciones de almacenamiento local nativo, claves y contenedor compartido;
-- proponer y documentar D-02 mediante un ADR con una recomendación técnica;
-- separar claramente qué parte de BRAIN-02 puede construirse y probarse con coste 0 € sin firma ni dispositivo;
-- convertir D-03 y D-04B en decisiones pequeñas, fechadas y verificables, sin decidir por Manu ningún gasto;
-- crear `docs/roadmap/BRAIN_02_TASK.md` con alcance, fases internas, criterios de aceptación, checks y gates;
-- actualizar documentación canónica, riesgos, threat model, fuentes y handoff cuando sea necesario;
-- detectar contradicciones y corregirlas dentro de este alcance.
-
-## Criterios de aceptación
-
-- D-02 queda decidida técnicamente o se documenta un bloqueo demostrable;
-- D-03 y D-04B muestran opciones, consecuencias y el punto exacto en que necesitarán a Manu;
-- BRAIN-02 queda dividida en unidades comprobables y existe una primera unidad implementable sin coste ni datos reales;
-- todos los enlaces, IDs y checks documentales pasan;
-- no se inicia código de producto;
-- el PR termina con evidencia reproducible y PASS o con un único bloqueo humano concreto.
-
-## Trabajo prohibido
-
-- crear proyectos Xcode, UI, almacenamiento real o código de BRAIN-02;
-- activar Apple Developer Program, runners de pago, TestFlight, WeatherKit, OAuth o facturación;
-- conectar servicios, credenciales, dispositivos o datos personales;
-- resolver por Manu una decisión material de producto o cualquier gasto;
-- hacer merge;
-- iniciar BRAIN-03 o fases posteriores.
+- **BRAIN-02-PREP**: CERRADA. Fusionada en `main` mediante el PR #5 (commit `ff2f86a`). Su definición completa, con el alcance, los criterios y las prohibiciones de entonces, está en ese commit. Ya no rige: la línea de trabajo vigente es la web (ADR-0012 y ADR-0013).
