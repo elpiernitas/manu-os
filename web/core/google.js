@@ -41,22 +41,52 @@ async function call(token, url, init = {}, fetchImpl = fetch) {
   return res.status === 204 ? null : res.json();
 }
 
+// ---- Pagination ----
+// Follows nextPageToken until exhausted. Stops (complete: false) on a repeated
+// token, on too many pages or on any error, so callers never infer deletions
+// or closures from a partial listing.
+export const MAX_PAGES = 20;
+export async function paginate(fetchPage, { maxPages = MAX_PAGES } = {}) {
+  const items = [];
+  const seen = new Set();
+  let token;
+  for (let page = 0; page < maxPages; page++) {
+    let json;
+    try { json = await fetchPage(token); } catch (err) {
+      // No page at all: report the error. A later page failing: keep what we have, marked incomplete.
+      if (page === 0 || err?.code === "auth") throw err;
+      return { items, complete: false };
+    }
+    items.push(...(json?.items ?? []));
+    const next = json?.nextPageToken;
+    if (!next) return { items, complete: true };
+    if (seen.has(next)) return { items, complete: false };
+    seen.add(next);
+    token = next;
+  }
+  return { items, complete: false };
+}
+
 // ---- Tasks ----
-export function planTaskSync(localItems, remoteTasks) {
+// `complete` must be true (the whole open list was read) to infer that a
+// linked task was closed in Google; otherwise nothing is closed locally.
+export function planTaskSync(localItems, remoteTasks, { complete = false } = {}) {
   const remoteIds = new Set(remoteTasks.map((t) => t.id));
   const known = new Set(localItems.filter((i) => i.googleId).map((i) => i.googleId));
   return {
     push: localItems.filter((i) => i.status === "TASK" && !i.done && !i.googleId),
     complete: localItems.filter((i) => i.status === "TASK" && i.done && i.googleId && !i.googleDone),
     // done in Google (no longer in the open list) -> done here
-    closedRemotely: localItems.filter((i) => i.status === "TASK" && !i.done && i.googleId && !remoteIds.has(i.googleId)),
+    closedRemotely: complete ? localItems.filter((i) => i.status === "TASK" && !i.done && i.googleId && !remoteIds.has(i.googleId)) : [],
     pull: remoteTasks.filter((t) => !known.has(t.id) && t.title && t.status !== "completed"),
   };
 }
 
+// Returns { tasks, complete }.
 export async function listOpenTasks(token, fetchImpl) {
-  const json = await call(token, `${TASKS}?showCompleted=false&maxResults=100`, {}, fetchImpl);
-  return (json?.items ?? []).map((t) => ({ id: t.id, title: String(t.title ?? "").slice(0, 140), status: t.status, due: t.due ?? null }));
+  const { items, complete } = await paginate((pageToken) =>
+    call(token, `${TASKS}?showCompleted=false&maxResults=100${pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ""}`, {}, fetchImpl));
+  return { tasks: items.map((t) => ({ id: t.id, title: String(t.title ?? "").slice(0, 140), status: t.status, due: t.due ?? null })), complete };
 }
 
 export const insertTask = (token, title, fetchImpl) =>
@@ -77,8 +107,14 @@ export function birthdaysFrom(json) {
   return out;
 }
 
+// Returns { people, complete }. Merging only adds or updates; nothing is ever
+// deleted because a contact is missing, so a partial listing is harmless.
 export async function contactBirthdays(token, fetchImpl) {
-  return birthdaysFrom(await call(token, PEOPLE, {}, fetchImpl));
+  const { items, complete } = await paginate(async (pageToken) => {
+    const json = await call(token, `${PEOPLE}${pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ""}`, {}, fetchImpl);
+    return { items: json?.connections ?? [], nextPageToken: json?.nextPageToken };
+  });
+  return { people: birthdaysFrom({ connections: items }), complete };
 }
 
 export function mergePeople(people, fromGoogle, makeId) {

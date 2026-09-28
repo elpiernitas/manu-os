@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { isSensitive, pickModel, requestBody, replyText, ask, systemPrompt, buildPayload, BASE_SYSTEM } from "../core/ai.js";
-import { planTaskSync, birthdaysFrom, mergePeople, saveBackup, SCOPE, runServices } from "../core/google.js";
+import { planTaskSync, birthdaysFrom, mergePeople, saveBackup, SCOPE, runServices, listOpenTasks, contactBirthdays, paginate } from "../core/google.js";
 import { encryptBackup, decryptBackup, isEnvelope, passphraseProblem, envelopeProblem, MIN_ITERATIONS } from "../core/crypto.js";
 
 test("privacy denylist blocks obvious cases, including the four examples from review round 1", () => {
@@ -92,7 +92,7 @@ test("saveBackup refuses plaintext and uploads envelopes to appDataFolder", asyn
 });
 
 test("tasks two-way plan and contacts merge", () => {
-  const plan = planTaskSync([{ id: "a", status: "TASK", text: "Nueva" }, { id: "b", status: "TASK", done: true, googleId: "g1" }, { id: "c", status: "TASK", googleId: "g2" }], [{ id: "g1", title: "x" }, { id: "g3", title: "De Google" }]);
+  const plan = planTaskSync([{ id: "a", status: "TASK", text: "Nueva" }, { id: "b", status: "TASK", done: true, googleId: "g1" }, { id: "c", status: "TASK", googleId: "g2" }], [{ id: "g1", title: "x" }, { id: "g3", title: "De Google" }], { complete: true });
   assert.deepEqual([plan.push, plan.complete, plan.closedRemotely].map((l) => l.map((i) => i.id)), [["a"], ["b"], ["c"]]);
   assert.deepEqual(plan.pull.map((t) => t.id), ["g3"]);
   const g = birthdaysFrom({ connections: [{ resourceName: "people/1", names: [{ displayName: "Persona Uno" }], birthdays: [{ date: { month: 3, day: 7 } }] }] });
@@ -136,4 +136,66 @@ test("round 2: closed envelope schema is enforced before any upload or KDF work"
     await assert.rejects(decryptBackup(x, "frase larga de prueba"), /Copia no válida/);
   }
   await assert.rejects(encryptBackup({}, "frase larga de prueba", { iterations: 10 }), /fuera de rango/);
+});
+
+// Fake Google Tasks with 150 open tasks served in pages of 100.
+function tasksServer({ pages, failOn = null, loopToken = false }) {
+  const calls = [];
+  const fetchImpl = async (url) => {
+    calls.push(url);
+    const token = new URL(url).searchParams.get("pageToken");
+    const index = token ? Number(token.replace("p", "")) : 0;
+    if (failOn === index) return { ok: false, status: 500, json: async () => ({}) };
+    const next = loopToken ? "p1" : index + 1 < pages.length ? `p${index + 1}` : undefined;
+    return { ok: true, status: 200, json: async () => ({ items: pages[index], ...(next ? { nextPageToken: next } : {}) }) };
+  };
+  return { fetchImpl, calls };
+}
+const openTasks = (from, n) => Array.from({ length: n }, (_, i) => ({ id: `g${from + i}`, title: `Tarea ${from + i}`, status: "needsAction" }));
+
+test("round 3: tasks on page 2 are never closed; incomplete listings close nothing", async () => {
+  const pages = [openTasks(0, 100), openTasks(100, 50)];
+  const linked = [{ id: "local", status: "TASK", googleId: "g120" }, { id: "gone", status: "TASK", googleId: "g999" }];
+
+  const full = tasksServer({ pages });
+  const all = await listOpenTasks("t", full.fetchImpl);
+  assert.equal(all.tasks.length, 150);
+  assert.equal(all.complete, true);
+  assert.equal(full.calls.length, 2);
+  assert.ok(full.calls[1].includes("pageToken=p1"));
+  const plan = planTaskSync(linked, all.tasks, { complete: all.complete });
+  assert.deepEqual(plan.closedRemotely.map((i) => i.id), ["gone"], "g120 is on page 2 and stays open");
+
+  const failing = tasksServer({ pages, failOn: 1 });
+  const partial = await listOpenTasks("t", failing.fetchImpl);
+  assert.equal(partial.complete, false);
+  assert.deepEqual(planTaskSync(linked, partial.tasks, { complete: partial.complete }).closedRemotely, [], "a failed second page closes nothing");
+
+  const looping = tasksServer({ pages, loopToken: true });
+  const looped = await listOpenTasks("t", looping.fetchImpl);
+  assert.equal(looped.complete, false);
+  assert.ok(looping.calls.length <= 3, "a repeated token stops the loop");
+  assert.deepEqual(planTaskSync(linked, looped.tasks, { complete: looped.complete }).closedRemotely, []);
+
+  assert.deepEqual(planTaskSync(linked, [], {}).closedRemotely, [], "default is incomplete");
+  await assert.rejects(listOpenTasks("t", tasksServer({ pages, failOn: 0 }).fetchImpl), /Google respondió 500/, "a failed first page is an error, not an empty list");
+  const capped = await paginate(async (t) => ({ items: [1], nextPageToken: `n${(Number(t?.slice(1)) || 0) + 1}` }), { maxPages: 5 });
+  assert.equal(capped.complete, false);
+  assert.equal(capped.items.length, 5);
+});
+
+test("round 3: contacts are paginated and a partial listing never deletes people", async () => {
+  const person = (i) => ({ resourceName: `people/${i}`, names: [{ displayName: `Persona ${i}` }], birthdays: [{ date: { month: 1, day: (i % 28) + 1 } }] });
+  const pages = [Array.from({ length: 3 }, (_, i) => person(i)), [person(3)]];
+  const fetchImpl = async (url) => {
+    const token = new URL(url).searchParams.get("pageToken");
+    const index = token ? 1 : 0;
+    return { ok: true, status: 200, json: async () => ({ connections: pages[index], ...(index === 0 ? { nextPageToken: "x" } : {}) }) };
+  };
+  const got = await contactBirthdays("t", fetchImpl);
+  assert.equal(got.people.length, 4);
+  assert.equal(got.complete, true);
+  const existing = [{ id: "p0", name: "Persona Z", googleId: "people/77", birthday: "05-05" }];
+  const merged = mergePeople(existing, got.people.slice(0, 1), () => "new");
+  assert.ok(merged.people.some((p) => p.googleId === "people/77"), "missing contacts are kept");
 });

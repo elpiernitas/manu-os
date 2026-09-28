@@ -1,8 +1,35 @@
 # HANDOFF
 
+## Próximo paso vigente
+
+1. El orquestador revisa el PR #13 (WEB-05, ADR-0013). Es la única implementación activa. Si lo aprueba y lo fusiona, `web.yml` publica la web en GitHub Pages desde `main`.
+2. Manu, en su dispositivo y fuera del repositorio, crea el ID de cliente OAuth de Google (Calendar, Tasks, People y Drive, cada uno activable por separado) y, si quiere, la clave gratuita de Gemini.
+3. La línea nativa (PR #7, #8 y #9) sigue en pausa. D-04B y D-03 son gates futuros.
+
 ## Estado
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
+
+## WEB-05 ronda 3 — paginación de Google Tasks y People sin cierres falsos
+
+Defecto demostrado en la ronda 3: `listOpenTasks` leía solo la primera página (100 tareas) y `planTaskSync` marcaba como hecha cualquier tarea enlazada que no apareciera en ella.
+
+Corrección:
+
+- `paginate()` sigue `nextPageToken` hasta agotarlo. Se detiene como incompleto ante un token repetido, más de 20 páginas o el fallo de una página posterior. Si falla la primera página, es un error, no una lista vacía.
+- `planTaskSync(..., { complete })` solo infiere cierres si el listado está completo. Por defecto se considera incompleto.
+- People también se pagina. `mergePeople` nunca borra a quien no aparece, así que un listado parcial es inocuo.
+- La app muestra «lista incompleta: no cierro nada» cuando ocurre.
+- Actualizados el próximo paso vigente del handoff (el antiguo, del PR #5, queda marcado SUPERSEDED), el cuerpo del PR #13 y QAL-014.
+
+Comandos: `cd web && npm test` → 45/45 PASS. Regresiones:
+
+- 150 tareas en dos páginas: la tarea enlazada `g120` de la segunda página no entra en `closedRemotely`, y sí la que no existe;
+- si falla la segunda página, no se cierra nada;
+- con un token en bucle, se para en 3 llamadas como mucho y no cierra nada;
+- con el límite de páginas, queda incompleto;
+- si falla la primera página, es un error;
+- Contactos se leen en dos páginas y los ausentes se conservan.
 
 ## WEB-05 ronda 2 — esquema cerrado del sobre cifrado y estado canónico único
 
@@ -421,6 +448,8 @@ Sigue sin haber ninguna decisión pendiente de Manu ahora. D-04B y D-03 son gate
 - Compilación, firma o instalación de una app iOS/macOS.
 - Comportamiento en dispositivos reales.
 
-## Próximo paso
+## [SUPERSEDED] Próximo paso de BRAIN-02-PREP
 
-BRAIN-02-PREP quedó ejecutada por Claude Code conforme a `docs/roadmap/BRAIN_02_TASK.md`, con tres rondas de corrección tras revisión externa (ver "BRAIN-02-PREP — tercera corrección tras revisión externa" arriba, que es el estado vigente). El orquestador revisa el PR #5 y decide el merge; si lo aprueba, debe abrir inmediatamente el siguiente trabajo autorizado (candidato natural: cualquiera de BRAIN-02a–02d, ninguna con bloqueos técnicos pendientes en CI/simulador, solo falta autorización explícita de código de producto). No hay ningún bloqueo humano que señalar ahora: D-04B y D-03 quedan como gates futuros documentados con sus disparadores, no como preguntas activas.
+> **SUPERSEDED.** El PR #5 está fusionado (`ff2f86a`) y la línea nativa (BRAIN-02) está pausada. El próximo paso vigente está en la sección «Próximo paso vigente» al principio de este archivo.
+
+BRAIN-02-PREP quedó ejecutada por Claude Code conforme a `docs/roadmap/BRAIN_02_TASK.md`, con tres rondas de corrección tras revisión externa. El orquestador revisó el PR #5 y lo fusionó.

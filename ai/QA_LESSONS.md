@@ -61,3 +61,7 @@ Pedir todos los scopes en el primer consentimiento contradice el mínimo privile
 
 Si la rama siguiente parte del commit previo a la fusión squash, el PR nuevo queda en conflicto («dirty») y GitHub no ejecuta los workflows de `pull_request`, así que no hay checks recuperables. Antes de empezar: `git fetch origin main && git checkout -B <rama> origin/main`, y comprobar `git log origin/main..HEAD` antes de abrir el PR.
 
+### QAL-014 — No inferir borrado ni cierre desde un listado parcial
+
+Si una sincronización deduce «ya no existe» o «se cerró» porque un elemento no aparece en la respuesta remota, antes tiene que haber leído la colección completa: paginar hasta agotar el token, protegerse de tokens repetidos y de un límite de páginas, y tratar cualquier listado incompleto como «no sé» (no cerrar ni borrar nada). Prueba: `web/tests/ai-google.test.js` («round 3: tasks on page 2 are never closed»).
+

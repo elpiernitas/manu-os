@@ -834,18 +834,20 @@ async function syncGoogle() {
       return `${vault.agenda.events.length} hoy · ${vault.agendaTomorrow.events.length} mañana`;
     } },
     { key: "tasks", scope: SCOPE.tasks, run: async (token) => {
-      const plan = planTaskSync(vault.inbox, await listOpenTasks(token));
+      const remote = await listOpenTasks(token);
+      const plan = planTaskSync(vault.inbox, remote.tasks, { complete: remote.complete });
       for (const item of plan.push) { const created = await insertTask(token, item.text); vault.inbox = vault.inbox.map((i) => (i.id === item.id ? { ...i, googleId: created.id } : i)); }
       for (const item of plan.complete) { await completeTask(token, item.googleId); vault.inbox = vault.inbox.map((i) => (i.id === item.id ? { ...i, googleDone: true } : i)); }
       const closed = new Set(plan.closedRemotely.map((i) => i.id));
       vault.inbox = vault.inbox.map((i) => (closed.has(i.id) ? { ...i, done: true, googleDone: true } : i));
       for (const t of plan.pull) vault.inbox.push({ ...capture({ id: uid("c"), text: t.title, at: new Date().toISOString() }), status: "TASK", googleId: t.id });
-      return `↑${plan.push.length} ↓${plan.pull.length} ✓${plan.complete.length + plan.closedRemotely.length}`;
+      return `↑${plan.push.length} ↓${plan.pull.length} ✓${plan.complete.length + plan.closedRemotely.length}${remote.complete ? "" : " (lista incompleta: no cierro nada)"}`;
     } },
     { key: "contacts", scope: SCOPE.contacts, run: async (token) => {
-      const merged = mergePeople(vault.people, await contactBirthdays(token), () => uid("p"));
+      const fromGoogle = await contactBirthdays(token);
+      const merged = mergePeople(vault.people, fromGoogle.people, () => uid("p"));
       vault.people = merged.people;
-      return `${merged.added} nuevos`;
+      return `${merged.added} nuevos${fromGoogle.complete ? "" : " (lista incompleta)"}`;
     } },
   ];
   const enabled = Object.fromEntries(["calendar", "tasks", "contacts"].map((k) => [k, googleOn(k)]));
