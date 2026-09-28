@@ -1,5 +1,5 @@
 import { parse, reply } from "./core/assistant.js";
-import { CATEGORIES, euros, newEntry, correctCategory, summary, toCents } from "./core/money.js";
+import { CATEGORIES, euros, newEntry, learnCategory, summary, toCents } from "./core/money.js";
 import { MODE_TITLES, modeState } from "./core/modes.js";
 import { capture, confirm, markUnclassified, pending, tasks, ideas, toggleDone } from "./core/inbox.js";
 import { initialRefuge, refugeReply } from "./core/refuge.js";
@@ -7,7 +7,7 @@ import { LocalStore, emptyVault, validateVault } from "./core/storage.js";
 import { notificationStatus, isInstalled, enableNotifications, testNotification } from "./core/notify.js";
 import { launchParams, parseEvents, nextEvent, localDay } from "./core/intake.js";
 import { fetchForecast, searchCities, advice, WEATHER_TTL_MS } from "./core/weather.js";
-import { importStatement } from "./core/bank.js";
+import { importStatement, importStatementRows } from "./core/bank.js";
 import { CITIES, proposeAlarm, shouldAskTomorrow, shortcutUrl, guessCity } from "./core/night.js";
 import { isClientId, listEvents, createEvent, newEventBody } from "./core/gcal.js";
 import { SCOPE, runServices, planTaskSync, listOpenTasks, insertTask, completeTask, contactBirthdays, mergePeople, saveBackup, loadBackup } from "./core/google.js";
@@ -15,7 +15,7 @@ import { isSensitive, pickModel, listModels, ask, buildPayload } from "./core/ai
 import { encryptBackup, decryptBackup, passphraseProblem } from "./core/crypto.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "5";
+export const APP_VERSION = "6";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -299,8 +299,8 @@ const screens = {
       <section class="card hero"><h2>Gastado este mes</h2><div class="big-money">${euros(month.total)}</div>
         ${cats.map(([c, v]) => `<div class="stack"><div class="row"><span>${esc(CATEGORIES[c])}</span><span class="num">${euros(v)}</span></div><div class="bar"><i data-w="${Math.max(3, Math.round((v / max) * 100))}"></i></div></div>`).join("")}</section>
       <section class="card"><h2>${I.box} Importar del banco</h2>
-        <p class="muted small">Descarga los movimientos de tu banco en CSV y elígelo aquí. Se analiza en tu móvil y no se envía a nadie. Solo importo gastos y no duplico los que ya tengas.</p>
-        <label class="btn ghost" for="bankFile" role="button" tabindex="0">Elegir archivo CSV</label><input id="bankFile" type="file" accept=".csv,text/csv,text/plain" class="sr">
+        <p class="muted small">Descarga los movimientos de tu banco (Sabadell: Excel .xls; también vale CSV) y elígelo aquí. Se analiza en tu móvil y no se envía a nadie. Solo importo gastos y no duplico los que ya tengas. Si corriges la categoría de un comercio, la aprendo para todos sus movimientos.</p>
+        <label class="btn ghost" for="bankFile" role="button" tabindex="0">Elegir archivo (Excel o CSV)</label><input id="bankFile" type="file" accept=".xls,.xlsx,.csv,text/csv,text/plain,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="sr">
         ${imp ? `<p class="muted small">Última importación: ${imp.added} gastos nuevos, ${imp.duplicates} repetidos, ${imp.income} ingresos ignorados${imp.invalid ? `, ${imp.invalid} filas no reconocidas` : ""}.</p>` : ""}</section>
       ${sectionTitle("Movimientos", addLink("EXPENSE"))}
       <section class="card">${entries.length ? entries.map((x) => `<div class="row"><div class="grow"><div>${esc(x.merchant ?? "Sin concepto")}</div><div class="muted small">${new Date(x.at).toLocaleDateString("es-ES", { day: "numeric", month: "short" })}${x.source === "BANK" ? " · banco" : ""}${x.inferred ? " · categoría propuesta" : ""}</div></div>
@@ -533,7 +533,7 @@ function say(text) {
     return;
   }
   let action = null;
-  if (intent.kind === "expense") vault.spending.push(newEntry({ id: uid("s"), cents: intent.cents, merchant: intent.merchant, at }));
+  if (intent.kind === "expense") vault.spending.push(newEntry({ id: uid("s"), cents: intent.cents, merchant: intent.merchant, at }, vault.settings.categoryRules ?? {}));
   if (intent.kind === "idea") vault.inbox.push(capture({ id: uid("c"), text: intent.text, at }));
   if (intent.kind === "alarm") action = { label: `Poner en el iPhone · ${intent.time}`, href: shortcutUrl(SHORTCUT_ALARM, intent.time) };
   if (intent.kind === "reminder") {
@@ -738,7 +738,7 @@ document.addEventListener("submit", async (e) => {
     else if (k === "EXPENSE") {
       const cents = toCents($("qAmount").value.replace(/\s|€/g, ""));
       if (!cents) { toast("Pon un importe válido, por ejemplo 12,50"); return; }
-      vault.spending.push(newEntry({ id: uid("s"), cents, merchant: text || null, at }));
+      vault.spending.push(newEntry({ id: uid("s"), cents, merchant: text || null, at }, vault.settings.categoryRules ?? {}));
     } else if (k === "EVENT" && text) {
       const minutes = Math.min(1440, Math.max(5, Number($("qMinutes").value) || 60));
       try {
@@ -760,11 +760,26 @@ document.addEventListener("submit", async (e) => {
 document.addEventListener("change", async (e) => {
   if (e.target.id === "workStart" && /^\d{2}:\d{2}$/.test(e.target.value)) { vault.settings.workStart = e.target.value; persist(); toast(`Entrada: ${e.target.value}`); return; }
   if (e.target.dataset.cat) {
-    vault.spending = vault.spending.map((x) => (x.id === e.target.dataset.cat ? correctCategory(x, e.target.value) : x));
+    const r = learnCategory(vault.spending, vault.settings.categoryRules ?? {}, e.target.dataset.cat, e.target.value);
+    vault.spending = r.entries; vault.settings.categoryRules = r.learned;
+    if (r.applied) toast(`Aprendido: ${r.applied} movimiento${r.applied === 1 ? "" : "s"} más del mismo comercio`);
     persist(); render(); return;
   }
   if (e.target.id === "bankFile" && e.target.files?.[0]) {
-    const r = importStatement(await e.target.files[0].text(), new Set(vault.spending.map((x) => x.id)));
+    const file = e.target.files[0];
+    const ids = new Set(vault.spending.map((x) => x.id));
+    const rules = vault.settings.categoryRules ?? {};
+    let r;
+    try {
+      if (/\.xlsx?$/i.test(file.name)) {
+        toast("Leyendo el Excel…");
+        const XLSX = await loadSheetJs();
+        const wb = XLSX.read(new Uint8Array(await file.arrayBuffer()), { type: "array" });
+        r = importStatementRows(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: "" }), ids, rules);
+      } else {
+        r = importStatement(await file.text(), ids, rules);
+      }
+    } catch { toast("No he podido leer ese archivo."); return; }
     if (r.error) { toast(r.error); return; }
     vault.spending.push(...r.entries);
     vault.settings.lastImport = { at: new Date().toISOString(), added: r.entries.length, duplicates: r.duplicates, income: r.skippedIncome, invalid: r.skippedInvalid };
@@ -859,6 +874,18 @@ async function syncGoogle() {
   gcal.busy = false;
   persist(); render();
   toast(failed.length ? "Google: algo no se ha sincronizado" : "Google sincronizado");
+}
+
+// SheetJS (vendor/, Apache-2.0) is loaded only when an Excel file is imported.
+function loadSheetJs() {
+  if (globalThis.XLSX) return Promise.resolve(globalThis.XLSX);
+  return new Promise((resolve, reject) => {
+    const el = document.createElement("script");
+    el.src = "vendor/xlsx.full.min.js";
+    el.onload = () => (globalThis.XLSX ? resolve(globalThis.XLSX) : reject(new Error("SheetJS")));
+    el.onerror = () => reject(new Error("SheetJS"));
+    document.head.appendChild(el);
+  });
 }
 
 function exportBackup() {

@@ -47,7 +47,7 @@ test("money: cents, euros and categories", () => {
   assert.equal(euros(123456), "1.234,56 €");
   assert.equal(euros(5), "0,05 €");
   assert.equal(categorise("Mercadona Centro"), "GROCERIES");
-  assert.equal(categorise("cafetería"), "OTHER", "whole words only");
+  assert.equal(categorise("cafeteros"), "OTHER", "whole words only");
   assert.equal(categorise(null), "OTHER");
   const e = newEntry({ id: "1", cents: 999, merchant: "spotify", at: "2026-09-01T10:00:00Z" });
   assert.equal(e.category, "SUBSCRIPTIONS");
