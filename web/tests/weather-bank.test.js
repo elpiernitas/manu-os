@@ -118,3 +118,9 @@ test("Manu's correction is learned per merchant and applied to proposals and fut
   const manualFix = learnCategory(entries, learned, entries[0].id, "SHOPPING");
   assert.equal(manualFix.entries[1].category, "LEISURE", "confirmed entries are not overwritten by a later rule");
 });
+
+test("a day with rain >= 50 % shows the rain icon even if its code is only cloudy (Manu's screenshot 2026-09-29)", () => {
+  const f = parseForecast({ current: { temperature_2m: 20, weather_code: 0, is_day: 0 }, daily: { time: ["2026-09-29", "2026-09-30"], weather_code: [3, 3], temperature_2m_max: [28, 27], temperature_2m_min: [19, 17], precipitation_probability_max: [70, 43] } });
+  assert.equal(f.days[0].icon, "rain");
+  assert.equal(f.days[1].icon, "cloud");
+});
