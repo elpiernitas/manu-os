@@ -18,6 +18,7 @@ Entorno local: Swift 6.3.3 (`swift-6.3.3-RELEASE`, toolchain oficial de swift.or
 2. Sondeos ejecutables sobre `1941319` que demuestran 10 defectos (tabla siguiente). Uno de ellos aborta el proceso de tests.
 3. Tras las correcciones: `dump-package` PASS, `build --build-tests` PASS sin warnings, `test --parallel` → **31/31 PASS en 3 suites**.
 4. Los tests de regresión nuevos, ejecutados contra el código original, fallan o abortan el proceso.
+5. CI del commit de correcciones `807e6a3` en GitHub Actions `macos-26`: job `contracts` (run `36451712052`) **31/31 PASS en 3 suites**; Foundation check (runs `36451704712` y `36451712092`) PASS.
 
 ## Defectos demostrados y corregidos
 
@@ -53,8 +54,7 @@ Además: `.gitignore` ignora `.build/` y `.swiftpm/`.
 
 ## NO VERIFICADO
 
-- Ejecución de los tests corregidos en macOS 26 (se verá en la CI del PR). En particular, que Foundation de Apple rechace `2026-02-30T00:00:00Z` igual que en Linux: la comprobación de componentes lo rechaza en ambos casos, pero no se ha ejecutado en macOS en esta revisión.
-- Compilación para iOS, firma e instalación en dispositivos.
+- Compilación para iOS, firma e instalación en dispositivos (la CI solo compila y prueba el paquete en macOS).
 - Integración con almacenamiento, cifrado, sync o interfaz.
 
 ## Regla

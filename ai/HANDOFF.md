@@ -62,7 +62,7 @@ Revisión del head `1941319` por Claude Code. Detalle completo en `ai/QA_REPORT.
 - Reproducido 13/13 PASS con Swift 6.3.3 en Linux x86_64.
 - 10 defectos demostrados con pruebas ejecutables y corregidos en esta rama, cada uno con test de regresión: creador de la Claim no comprobado, Claims de modelo visibles, sustitución que invierte o amplía la vigencia o resucita Claims rechazadas, Claims en disputa resueltas en silencio, `hasOriginal` que ignora la política de retención, aborto con IDs duplicados en la detección de ciclos, falta de `init` públicos y timestamps no UTC o imposibles aceptados.
 - Archivos: `Sources/ManuBrainDomain/ManuBrainDomain.swift`, `Package.swift` (target `ManuBrainDomainPublicAPITests`), `Tests/ManuBrainDomainTests/ReviewRegressionTests.swift`, `Tests/ManuBrainDomainPublicAPITests/PublicAPITests.swift`, `.gitignore`, `ai/QA_REPORT.md`, `ai/HANDOFF.md`.
-- Comandos: `swift package dump-package` PASS; `swift build --build-tests` PASS sin warnings; `swift test --parallel` **31/31 PASS en 3 suites**.
+- Comandos: `swift package dump-package` PASS; `swift build --build-tests` PASS sin warnings; `swift test --parallel` **31/31 PASS en 3 suites** (Linux x86_64 en local y GitHub Actions `macos-26`, run `36451712052`).
 - Observaciones no bloqueantes documentadas en `ai/QA_REPORT.md` para BRAIN-02.
 
 ## NO VERIFICADO
@@ -70,7 +70,6 @@ Revisión del head `1941319` por Claude Code. Detalle completo en `ai/QA_REPORT.
 - Integración con almacenamiento, cifrado, sync, UI o extensiones.
 - Compilación, firma o instalación de una app iOS/macOS.
 - Comportamiento en dispositivos reales.
-- Ejecución de las correcciones de la revisión en macOS 26 hasta que termine la CI del PR.
 
 ## Próximo paso
 
