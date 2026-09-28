@@ -158,6 +158,51 @@ Además, se corrigió una atribución técnica incorrecta: CryptoKit **no** expo
 
 Ya no hay ninguna pregunta pendiente a Manu antes de empezar BRAIN-02b: la verificación en CI/simulador de las cuatro subfases no tiene bloqueos técnicos. El único bloqueo humano concreto que queda es, exclusivamente, la fase de dispositivo real: cuando BRAIN-02b–02d estén verificadas en simulador y llegue el momento de firmar e instalar en el iPhone físico de Manu con iOS 27, deberá elegir entre (a) un runner macOS de pago con importe a cotizar en ese momento, (b) esperar a un Mac compatible, o (c) reducir el alcance nativo de la Beta 1.
 
+> **Corregido más abajo.** La opción (a) de este párrafo es un error de categoría: ningún runner de CI, gratuito o de pago, tiene acceso físico al iPhone. Se conserva sin editar por trazabilidad; ver "BRAIN-02-PREP — segunda corrección tras revisión externa" para el estado correcto.
+
+## BRAIN-02-PREP — segunda corrección tras revisión externa (mismo PR #5, commit posterior a `f82a16a`)
+
+Segundo comentario de revisión de @elpiernitas en `f82a16a3e20288694378eb05ef78dc58b784143e` (ronda 2/6 del PR, ronda 1/3 sobre ese head): la separación CI/simulador vs. dispositivo físico y la corrección de PBKDF2 quedaron bien aplicadas, pero D-04B seguía describiendo una salida técnicamente inválida.
+
+### Defecto confirmado
+
+Varios documentos (`docs/roadmap/BRAIN_02_TASK.md`, `ai/PROJECT_STATE.md`, `ai/HANDOFF.md`, `docs/architecture/DECISIONS_AND_OPEN_ITEMS.md`) ofrecían "aceptar el coste de un runner macOS de pago" como una opción para firmar, instalar y probar en el iPhone físico de Manu. Es un error de categoría: un runner de GitHub Actions, por grande o caro que sea, es una máquina virtual efímera sin ningún acceso físico al iPhone. Ningún runner, gratuito o de pago, puede conectar, instalar ni ejecutar QA en un dispositivo que no tiene enchufado. Esperar a que GitHub ofrezca Xcode 27 como imagen estándar tampoco resuelve la instalación física: en el mejor caso solo ampliaría el SDK de simulador disponible en CI.
+
+### Corrección aplicada
+
+- `docs/roadmap/BRAIN_02_TASK.md`: la sección "D-04B — precisada" reemplaza la opción inválida por las tres rutas reales: (1) un Mac de Manu compatible conectado directamente al iPhone (la única con acceso físico real); (2) TestFlight vía D-03, que no necesita un Mac conectado pero introduce un gate propio de credenciales/perfiles de firma, con autorización específica pendiente para cuando se intente; (3) posponer o reducir el alcance nativo de la Beta 1. Se aclara explícitamente que D-04B es un **gate futuro**, no una decisión pendiente de Manu ahora.
+- `docs/architecture/DECISIONS_AND_OPEN_ITEMS.md`: filas D-04 y D-04B reescritas con la misma separación; se aclara que el descarte de `xcode-27-xlarge` por coste es un hecho aparte (afecta al SDK de simulador en CI) y no implica que un runner de pago resolviera la instalación física.
+- `ai/PROJECT_STATE.md`, `ai/DECISIONS.md`, `ai/CURRENT_TASK.md`: alineados a la misma separación; se sustituye "bloqueo humano concreto que queda abierto" por lenguaje de "gate futuro" donde correspondía, para no dar la impresión de que existe una acción pendiente de Manu hoy.
+- `ai/QA_LESSONS.md`: añadida QAL-007 con la distinción generalizable (más abajo) y un comando reproducible de comprobación.
+
+### Comprobación de regresión reproducible
+
+Primer intento de esta corrección: un `grep` que combinaba "runner" y "pago/xlarge" con "iphone/dispositivo físico" en la misma frase. Al ejecutarlo dio **falsos positivos** (coincide también con frases que explican correctamente que el runner *no* resuelve la instalación física) — no se puede afirmar "cero coincidencias" con ese comando, así que se sustituye por uno más preciso en vez de dejar la afirmación incorrecta.
+
+Comando usado (heurística, no infalible):
+
+```bash
+grep -rniE "runner[^.]*(puede|permite|instala|prueba|resuelve)[^.]*iphone" docs ai
+```
+
+Sobre el estado final de esta corrección devuelve coincidencias en `docs/adr/0011-native-local-storage-and-keys.md` (dos), `docs/security/RISK_REGISTER.md`, `ai/DECISIONS.md` y en este mismo `ai/HANDOFF.md` (el propio relato de esta corrección, incluida esta frase, coincide consigo mismo por usar las mismas palabras — eso es un efecto secundario esperable del comando, no una coincidencia nueva que revisar cada vez). Se releyeron todas: hablan de lo que el runner sí resuelve en **simulador** (compilar/probar sin firma) o niegan explícitamente que resuelva la instalación **física** ("no garantiza", "no aplica", "tampoco resuelve"); ninguna repite el error de presentar un runner como capaz de instalar o probar en el iPhone físico. El comando no distingue automáticamente afirmación de negación por sí solo — requiere esta revisión manual de cada coincidencia, documentada aquí como evidencia reproducible en vez de una cifra sin verificar.
+
+Comprobación complementaria, esta sí sin ambigüedad: la frase literal que causó el defecto ("aceptar el coste de un runner ... de pago" como opción) ya no aparece fuera de los dos bloques de `ai/HANDOFF.md` explícitamente marcados como historia superada (líneas 117 y, en esta misma corrección, la cita entre comillas de la línea "Defecto confirmado" de arriba, que la nombra para describir el error, no para repetirlo como recomendación).
+
+### Verificación de la corrección
+
+- Releído cada documento señalado por el revisor y confirmado que la opción "runner de pago" para instalación física no aparece ya como recomendación en ningún documento activo (los bloques de `ai/HANDOFF.md` marcados como superados se conservan sin editar, con una nota que remite a esta sección).
+- Comprobación de enlaces relativos Markdown repetida tras esta corrección: **0 enlaces rotos**.
+- Comando de regresión de arriba ejecutado sobre el estado final: 6 coincidencias, las seis revisadas manualmente y confirmadas como correctas (simulador o negación explícita), no como repetición del defecto.
+
+### NO VERIFICADO (de esta corrección)
+
+- No cambia respecto a la corrección anterior: sigue sin fuente primaria concluyente si registrar App Groups contra un equipo real funciona con cuenta gratuita, y sigue sin ejecutarse el job de CI descrito como criterio de BRAIN-02b.
+
+### Bloqueo humano concreto (estado vigente)
+
+No hay ninguna decisión pendiente de Manu ahora. D-04B es un gate futuro que solo se activará cuando BRAIN-02b–02d estén verificadas en simulador y el equipo intente de verdad la fase de dispositivo real; en ese momento las opciones son (a) que Manu disponga de un Mac compatible conectado al iPhone, (b) TestFlight vía D-03 con su propio gate de credenciales, o (c) posponer/reducir el alcance nativo de la Beta 1 — ninguna resoluble comprando más CI.
+
 ## NO VERIFICADO
 
 - Integración con almacenamiento, cifrado, sync, UI o extensiones.
@@ -166,4 +211,4 @@ Ya no hay ninguna pregunta pendiente a Manu antes de empezar BRAIN-02b: la verif
 
 ## Próximo paso
 
-BRAIN-02-PREP quedó ejecutada por Claude Code conforme a `docs/roadmap/BRAIN_02_TASK.md`, corregida tras revisión externa (ver "BRAIN-02-PREP — corrección tras revisión externa" arriba, que es el estado vigente). El orquestador revisa el PR #5 y decide el merge; si lo aprueba, debe abrir inmediatamente el siguiente trabajo autorizado (candidato natural: cualquiera de BRAIN-02a–02d, ninguna con bloqueos técnicos pendientes en CI/simulador, solo falta autorización explícita de código de producto) o señalar el único bloqueo humano concreto que queda, limitado a la fase de dispositivo real (D-04B, ver arriba).
+BRAIN-02-PREP quedó ejecutada por Claude Code conforme a `docs/roadmap/BRAIN_02_TASK.md`, con dos rondas de corrección tras revisión externa (ver "BRAIN-02-PREP — segunda corrección tras revisión externa" arriba, que es el estado vigente). El orquestador revisa el PR #5 y decide el merge; si lo aprueba, debe abrir inmediatamente el siguiente trabajo autorizado (candidato natural: cualquiera de BRAIN-02a–02d, ninguna con bloqueos técnicos pendientes en CI/simulador, solo falta autorización explícita de código de producto). No hay ningún bloqueo humano que señalar ahora: D-04B queda como gate futuro documentado, no como pregunta activa.

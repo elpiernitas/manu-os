@@ -22,7 +22,7 @@ Los documentos canónicos están en `docs/`. Las tareas activas se controlan med
 
 1. El orquestador revisa y decide el merge del PR #5 (BRAIN-02-PREP).
 2. Cuando se autorice código de producto, BRAIN-02a–02d son implementables en CI/simulador sin coste ni dispositivo; el primer criterio de aceptación de BRAIN-02b es un job de CI que confirme `xcodebuild -version`/`-showsdks` y un build+test contra iOS Simulator sin firma (ver `docs/roadmap/BRAIN_02_TASK.md`).
-3. D-04B solo entra en juego cuando llegue el momento de firmar e instalar en el iPhone físico (runner de pago, Mac compatible o reducir alcance). D-03 solo se pedirá si esa firma demuestra que la cuenta gratuita no permite registrar App Groups.
+3. D-04B es un **gate futuro**, no una decisión pendiente ahora: solo entra en juego cuando BRAIN-02b–02d estén verificadas en simulador y se intente de verdad firmar e instalar en el iPhone físico. Ningún runner de CI, gratuito o de pago, tiene acceso físico al dispositivo; las rutas reales son un Mac de Manu compatible conectado al iPhone, o TestFlight vía D-03 (con su propio gate de credenciales de firma), o reducir el alcance. D-03 solo se pedirá si intentar firmar con la cuenta gratuita demuestra que no permite registrar App Groups.
 
 ## Restricciones vigentes
 
