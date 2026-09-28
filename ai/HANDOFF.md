@@ -2,7 +2,7 @@
 
 ## Próximo paso vigente
 
-1. El orquestador revisa el PR #15 (WEB-06). Es la única implementación activa. WEB-05 ya está fusionada (PR #13). Al fusionarse un PR, `web.yml` publica la web en GitHub Pages desde `main`.
+1. WEB-07/08 en un solo PR. Claude Code lo fusiona con CI en verde (nueva gobernanza decidida por Manu el 2026-09-29) y `web.yml` publica la web en GitHub Pages. La revisión de ChatGPT es posterior y bajo petición.
 2. Manu, en su dispositivo y fuera del repositorio, crea el ID de cliente OAuth de Google (Calendar, Tasks, People y Drive, cada uno activable por separado) y, si quiere, la clave gratuita de Gemini.
 3. La línea nativa (PR #7, #8 y #9) sigue en pausa. D-04B y D-03 son gates futuros.
 
