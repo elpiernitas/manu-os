@@ -247,3 +247,13 @@ Sigue sin haber ninguna decisión pendiente de Manu ahora. D-04B y D-03 son gate
 ## Próximo paso
 
 BRAIN-02-PREP quedó ejecutada por Claude Code conforme a `docs/roadmap/BRAIN_02_TASK.md`, con tres rondas de corrección tras revisión externa (ver "BRAIN-02-PREP — tercera corrección tras revisión externa" arriba, que es el estado vigente). El orquestador revisa el PR #5 y decide el merge; si lo aprueba, debe abrir inmediatamente el siguiente trabajo autorizado (candidato natural: cualquiera de BRAIN-02a–02d, ninguna con bloqueos técnicos pendientes en CI/simulador, solo falta autorización explícita de código de producto). No hay ningún bloqueo humano que señalar ahora: D-04B y D-03 quedan como gates futuros documentados con sus disparadores, no como preguntas activas.
+
+
+## Relevo a BRAIN-02a (2026-09-28)
+
+- BRAIN-02-PREP quedó fusionada en `main` mediante el PR #5, squash commit `ff2f86a`, después de tres rondas de corrección y CI verde.
+- Los PR #4 y #6 se cerraron sin merge por quedar supersedidos; sus cambios útiles ya estaban consolidados en el PR #5.
+- El orquestador autorizó BRAIN-02a como única implementación activa y creó la rama `brain/02a-persistence-and-keys`.
+- El alcance verificable, criterios de aceptación y prohibiciones están en `ai/CURRENT_TASK.md`.
+- Este relevo no autoriza proyecto Xcode, UI, Keychain/App Groups reales, servicios, credenciales, datos personales, firma, dispositivo, publicación ni costes.
+- Claude debe completar esta sección con archivos, comandos, resultados, riesgos y `NO_VERIFICADO` antes de entregar el PR a revisión.

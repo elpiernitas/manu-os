@@ -1,43 +1,51 @@
 # CURRENT TASK
 
-Status: **REVIEW_PENDING**
-
-Implementación de esta tarea de preparación completada por Claude Code, con tres rondas de corrección tras revisión externa. Ver `ai/HANDOFF.md` para el resultado completo (D-02 decidida por ADR-0011, BRAIN-02 dividida en subfases 02a–02d verificables en CI/simulador, D-03/D-04B precisadas) y el PR #5 para la evidencia. No hay ninguna decisión pendiente de Manu ahora: D-04B queda modelado como un gate futuro (fase de dispositivo real), no como un bloqueo humano actual. Pendiente de revisión del orquestador.
+Status: **IN_PROGRESS**
 
 ## Tarea activa
 
-BRAIN-02-PREP — cerrar el contrato técnico y reducir los bloqueos de BRAIN-02 sin iniciar todavía la implementación de las apps.
+BRAIN-02a — núcleo de persistencia y claves, implementado como Swift Package y verificable íntegramente en CI.
+
+Rama: `brain/02a-persistence-and-keys`.
+
+Claude Code actúa como implementador. ChatGPT/Codex revisará de forma independiente el alcance, la arquitectura, la privacidad, las migraciones, las pruebas y CI antes de decidir el merge.
 
 ## Autorización
 
-Manu delegó en ChatGPT/Codex la orquestación técnica, las revisiones y los merges ordinarios. Esta tarea documental está autorizada porque prepara decisiones y criterios verificables sin generar costes, conectar servicios ni usar datos reales.
+El orquestador autoriza esta subfase de código de producto porque está definida por ADR-0011 y `docs/roadmap/BRAIN_02_TASK.md`, tiene coste 0 €, usa solo datos sintéticos y no requiere firma, dispositivo, cuenta Apple, credenciales ni servicios externos.
 
-Claude Code actúa como implementador y revisor externo en la rama `brain/02-preparation`. ChatGPT/Codex verificará el resultado y decidirá el merge.
+## Alcance obligatorio
 
-## Alcance autorizado
-
-- investigar con fuentes oficiales actuales las opciones de almacenamiento local nativo, claves y contenedor compartido;
-- proponer y documentar D-02 mediante un ADR con una recomendación técnica;
-- separar claramente qué parte de BRAIN-02 puede construirse y probarse con coste 0 € sin firma ni dispositivo;
-- convertir D-03 y D-04B en decisiones pequeñas, fechadas y verificables, sin decidir por Manu ningún gasto;
-- crear `docs/roadmap/BRAIN_02_TASK.md` con alcance, fases internas, criterios de aceptación, checks y gates;
-- actualizar documentación canónica, riesgos, threat model, fuentes y handoff cuando sea necesario;
-- detectar contradicciones y corregirlas dentro de este alcance.
+- Añadir un producto y target Swift Package `ManuBrainStorage` (o nombre equivalente claramente justificado) que dependa de `ManuBrainDomain`.
+- Definir adaptadores públicos y pequeños para `LocalStore`, `BlobStore` y `KeyStore`; las capas superiores no deben depender directamente de SQLite, del sistema de archivos ni de una implementación concreta de claves.
+- Implementar almacenamiento SQLite usando el `sqlite3` del sistema, transacciones explícitas, claves foráneas y migraciones versionadas. Debe rechazar de forma segura una versión futura/desconocida.
+- Implementar blobs fuera de SQLite con nombre o dirección por hash y verificación de integridad.
+- Cifrar cada registro y blob con AES-256-GCM, nonce único y metadatos relevantes autenticados. No debe persistirse texto sensible en claro.
+- Derivar la KEK con Argon2id a partir de un secreto de recuperación exclusivamente sintético. Seleccionar una dependencia Swift mínima y mantenida, fijar una versión exacta, justificarla y registrar su superficie/riesgo; no se autoriza código nativo descargado en tiempo de ejecución.
+- Mantener `KeyStore` como protocolo e incluir solo una implementación en memoria para tests. Keychain y App Groups reales pertenecen a BRAIN-02b/02c.
+- Implementar el borrado derivado de `SourceDeletionEvent`: eliminación lógica y física aplicable, `PRAGMA secure_delete` y compactación controlada con `VACUUM`, sin afirmar garantías superiores a las que SQLite y el sistema de archivos pueden demostrar.
+- Actualizar el workflow de CI, documentación técnica y `ai/HANDOFF.md` con evidencia reproducible.
 
 ## Criterios de aceptación
 
-- D-02 queda decidida técnicamente o se documenta un bloqueo demostrable;
-- D-03 y D-04B muestran opciones, consecuencias y el punto exacto en que necesitarán a Manu;
-- BRAIN-02 queda dividida en unidades comprobables y existe una primera unidad implementable sin coste ni datos reales;
-- todos los enlaces, IDs y checks documentales pasan;
-- no se inicia código de producto;
-- el PR termina con evidencia reproducible y PASS o con un único bloqueo humano concreto.
+- `swift package dump-package`, `swift build --build-tests` y `swift test --parallel` pasan en `macos-26`.
+- Existe un test de migración desde cada versión anterior soportada y un test que rechaza una versión futura.
+- Hay tests de commit y rollback transaccional, reapertura del almacén, integridad de blobs y colisiones/duplicados relevantes.
+- Hay tests negativos para clave incorrecta, ciphertext/metadatos manipulados y nonce no reutilizado.
+- Una prueba inspecciona los archivos SQLite/blob y demuestra que los valores sensibles sintéticos usados en el test no aparecen en claro.
+- El flujo de `SourceDeletionEvent` tiene una regresión que demuestra que el registro y blob dejan de ser accesibles, que la política de borrado está activa y que la compactación se ejecuta de forma comprobable.
+- Argon2id tiene vectores de prueba conocidos o evidencia equivalente de interoperabilidad, parámetros explícitos y límites razonables para CI.
+- No se rompe la API ni las 31 pruebas existentes de BRAIN-01.
+- CI usa permisos mínimos, timeout finito, versiones fijadas cuando aplique y no imprime secretos ni material de claves.
+- `ai/HANDOFF.md` enumera archivos, comandos, resultados, riesgos y una sección `NO_VERIFICADO`.
+- Todo defecto confirmado durante la revisión deja prueba de regresión cuando sea técnicamente posible y lección generalizable en `ai/QA_LESSONS.md`.
 
 ## Trabajo prohibido
 
-- crear proyectos Xcode, UI, almacenamiento real o código de BRAIN-02;
-- activar Apple Developer Program, runners de pago, TestFlight, WeatherKit, OAuth o facturación;
-- conectar servicios, credenciales, dispositivos o datos personales;
-- resolver por Manu una decisión material de producto o cualquier gasto;
-- hacer merge;
-- iniciar BRAIN-03 o fases posteriores.
+- Crear proyecto Xcode, app, SwiftUI, navegación o UI.
+- Implementar Keychain real, App Groups, widgets, extensiones o firma.
+- Usar el iPhone o Mac de Manu, datos personales reales, exports, credenciales, secretos o identificadores reales.
+- Conectar servicios, publicar, desplegar, activar Apple Developer Program, TestFlight, runners de pago o facturación.
+- Iniciar BRAIN-02b, BRAIN-03 o fases posteriores.
+- Rebajar gates, borrar historial documental o hacer merge.
+- Modificar semántica pública de `ManuBrainDomain` salvo necesidad demostrada y acompañada de regresiones.
