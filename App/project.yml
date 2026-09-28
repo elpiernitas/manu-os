@@ -19,6 +19,7 @@ targets:
     dependencies:
       - package: ManuBrain
         product: ManuOSUI
+      - target: ManuOSWidget
     info:
       path: ManuOS/Info.plist
       properties:
@@ -56,6 +57,31 @@ targets:
         MARKETING_VERSION: "0.1.0"
         CURRENT_PROJECT_VERSION: "1"
         SWIFT_VERSION: "6.0"
+        GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGNING_ALLOWED: NO
+  ManuOSWidget:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: ManuOSWidget
+    dependencies:
+      - package: ManuBrain
+        product: ManuOSCore
+      - sdk: WidgetKit.framework
+      - sdk: SwiftUI.framework
+    info:
+      path: ManuOSWidget/Info.plist
+      properties:
+        CFBundleDisplayName: MANU
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: local.manuos.app.widget
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "5.0"
         GENERATE_INFOPLIST_FILE: NO
         CODE_SIGN_STYLE: Manual
         CODE_SIGNING_ALLOWED: NO

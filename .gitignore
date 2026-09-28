@@ -17,3 +17,4 @@ test-results/
 App/ManuOS.xcodeproj/
 App/ManuOS/Info.plist
 App/ManuOSMac/Info.plist
+App/ManuOSWidget/Info.plist

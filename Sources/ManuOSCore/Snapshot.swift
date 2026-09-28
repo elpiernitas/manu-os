@@ -67,6 +67,13 @@ public struct SnapshotLine: Codable, Equatable, Sendable {
     public let kind: SurfaceItemKind
     public let text: String
     public let redacted: Bool
+
+    public init(id: String, kind: SurfaceItemKind, text: String, redacted: Bool) {
+        self.id = id
+        self.kind = kind
+        self.text = text
+        self.redacted = redacted
+    }
 }
 
 /// The minimal snapshot that widgets and extensions may read
@@ -74,6 +81,18 @@ public struct SnapshotLine: Codable, Equatable, Sendable {
 public struct SurfaceSnapshot: Codable, Equatable, Sendable {
     public let mode: Mode
     public let lines: [SnapshotLine]
+
+    public init(mode: Mode, lines: [SnapshotLine]) {
+        self.mode = mode
+        self.lines = lines
+    }
+
+    /// Decodes a snapshot written by the app. Anything unreadable is treated
+    /// as "no data", never as a crash in the widget.
+    public static func decode(_ data: Data?) -> SurfaceSnapshot? {
+        guard let data else { return nil }
+        return try? JSONDecoder().decode(SurfaceSnapshot.self, from: data)
+    }
 }
 
 public enum SnapshotBuilder {

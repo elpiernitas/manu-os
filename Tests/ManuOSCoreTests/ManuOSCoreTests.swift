@@ -107,6 +107,16 @@ struct SnapshotTests {
         #expect(SnapshotBuilder.build(items: items, modeState: afternoon, context: .unlocked).lines.isEmpty)
     }
 
+    @Test("Snapshots round-trip and bad data is treated as no data")
+    func decode() throws {
+        let items = [SurfaceItem(id: "w", kind: .weather, title: "18 °C", sensitivity: .normal)]
+        let snapshot = SnapshotBuilder.build(items: items, modeState: work, context: .locked)
+        let data = try JSONEncoder().encode(snapshot)
+        #expect(SurfaceSnapshot.decode(data) == snapshot)
+        #expect(SurfaceSnapshot.decode(Data("not json".utf8)) == nil)
+        #expect(SurfaceSnapshot.decode(nil) == nil)
+    }
+
     @Test("Snapshot respects the limit and priority order")
     func limit() {
         let items = (0..<10).map {
