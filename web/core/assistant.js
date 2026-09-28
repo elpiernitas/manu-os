@@ -18,10 +18,11 @@ export function amountCents(text) {
   return m ? toCents(m[1]) : null;
 }
 
+// Keeps Manu's own spelling ("Café", not "cafe"); categorising normalises later.
 export function merchant(text) {
-  const m = normalise(text).match(/\d(?:[.,]\d{1,2})?\s*(?:€|eur|euros)?\s+en\s+(.+)$/);
+  const m = String(text).trim().match(/\d(?:[.,]\d{1,2})?\s*(?:€|eur|euros)?\s+en\s+(.+)$/i);
   if (!m) return null;
-  const value = m[1].replace(/[ .!]+$/, "").trim();
+  const value = m[1].replace(/[\s.!?]+$/, "").trim().slice(0, 80);
   return value || null;
 }
 
@@ -37,9 +38,22 @@ export function parse(input) {
     const idea = original.slice(prefix.length).replace(/^[\s:,.\-]+|[\s:,.\-]+$/g, "");
     if (idea) return { kind: "idea", text: idea };
   }
+  const alarm = text.match(/^(?:pon(?:me)?|poner|crea|activa) (?:una )?alarma (?:(manana) )?(?:a las |a la |para las )?(\d{1,2})(?:[:.](\d{2}))?/);
+  if (alarm) {
+    const h = Number(alarm[2]), m = Number(alarm[3] ?? 0);
+    if (h < 24 && m < 60) return { kind: "alarm", time: `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}` };
+  }
+  const remind = String(input).trim().match(/^recu[eé]rdame\s+(?:(ma[nñ]ana)\s+)?(.+?)(?:\s+(ma[nñ]ana))?\s+a\s+las?\s+(\d{1,2})(?:[:.](\d{2}))?\s*$/i);
+  if (remind) {
+    const h = Number(remind[4]), m = Number(remind[5] ?? 0);
+    const what = remind[2].replace(/^(que|de)\s+/i, "").trim();
+    if (h < 24 && m < 60 && what) {
+      return { kind: "reminder", text: what, tomorrow: Boolean(remind[1] || remind[3]), time: `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}` };
+    }
+  }
   if (EXPENSE.some((p) => text.includes(p))) {
     const cents = amountCents(text);
-    if (cents) return { kind: "expense", cents, merchant: merchant(text) };
+    if (cents) return { kind: "expense", cents, merchant: merchant(input) };
   }
   if ((text.includes("tiempo") && (text.includes("que tiempo") || text.includes("hace"))) || text.includes("va a llover") || text.includes("llueve")) {
     return { kind: "weather" };
@@ -79,6 +93,10 @@ export function reply(intent, variant = 0) {
         : "Todavía no puedo leer tu calendario. Te llevo a Agenda con tus tareas.";
     case "weather":
       return "Aún no tengo servicio del tiempo (decisión D-06 pendiente), así que no te lo puedo decir.";
+    case "alarm":
+      return `Te preparo la alarma de las ${intent.time}. Toca «Poner en el iPhone» para crearla con tu atajo «MANU Alarma».`;
+    case "reminder":
+      return `Apuntado: «${intent.text}» ${intent.tomorrow ? "mañana" : "hoy"} a las ${intent.time}. Te aviso si tienes MANU abierta; para que suene siempre, añádelo al iPhone.`;
     case "refuge":
       return "Abro el Refugio. Aquí no hay prisa.";
     default:

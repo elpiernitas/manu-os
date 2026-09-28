@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self' https://api.open-meteo.com https://geocoding-api.open-meteo.com; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#050608">
 <meta name="color-scheme" content="dark">
@@ -19,11 +19,15 @@
 <script type="module" src="app.js"></script>
 </head>
 <body>
+<div class="ambient" aria-hidden="true"></div>
+<div class="topbar glass" id="topbar" aria-hidden="true"><span id="topTitle"></span></div>
 <div class="app">
   <div class="banner" id="banner" hidden></div>
   <main id="screen" tabindex="-1"></main>
 </div>
-<div class="tabbar"><nav role="tablist" aria-label="Secciones" id="tabs"></nav></div>
+<button class="fab glass" id="fab" type="button" aria-label="Añadir tarea, idea, gasto o aviso"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+<nav class="tabbar glass" role="tablist" aria-label="Secciones" id="tabs"></nav>
+<div id="sheetRoot"></div>
 <noscript><p>MANU OS necesita JavaScript activado.</p></noscript>
 </body>
 </html>
