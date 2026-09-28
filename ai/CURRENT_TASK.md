@@ -2,17 +2,18 @@
 
 Status: **REVIEW_PENDING**
 
-WEB-11 implementado por Claude Code; se fusiona cuando CI está en verde. La revisión del orquestador es bajo petición.
+WEB-12 implementado por Claude Code; se fusiona cuando CI está en verde. La revisión del orquestador es bajo petición.
 
 ## Tarea activa
 
-WEB-11 — todos los calendarios de Google con sus colores, eventos de varios días como barra y acceso de WhatsApp corregido (`ai/HANDOFF.md`, «WEB-11»).
+WEB-12 — IA integrada que propone acciones en MANU (con confirmación), sugerencias de mejora como petición en GitHub y ajuste opcional «Enviar a Gemini sin preguntar» (`ai/HANDOFF.md`, «WEB-12»; enmienda WEB-12 de ADR-0013).
 
 ## Autorización
 
 - 2026-09-28: Manu decide que la vía operativa es una app web instalable en GitHub Pages (no puede instalar la app nativa sin Mac con Xcode ni pagar). Hace público el repositorio, activa Pages y autoriza a Claude Code a fusionar los PR web #10, #11 y #12.
 - 2026-09-28: Manu autoriza Gemini y «todo» lo posible de Google, a coste 0 €.
 - 2026-09-28: Manu sube su extracto de Sabadell (.xls) para que la app lo lea. El archivo real no entra en el repositorio; solo se usan recuentos en local y un fixture inventado.
+- 2026-09-29: Manu pide una IA integrada a la que decirle cosas de la app y con la que subir sus gastos. El envío sin preguntar queda como ajuste que decide Manu, desactivado por defecto.
 - 2026-09-29: **cambio de gobernanza decidido por Manu.** El orquestador (ChatGPT/Codex) ya no revisa automáticamente, porque frenaba el avance. Claude Code fusiona los PR web cuando `npm test` y los dos workflows remotos están en verde y no hay conflictos. Cuando haga falta una revisión, Claude Code prepara un prompt, Manu se lo pasa a ChatGPT y le devuelve la respuesta; los defectos se corrigen en un PR nuevo con su regresión. Los PR #7, #8 y #9 siguen en borrador o pausa.
 
 ## Alcance autorizado
@@ -39,6 +40,7 @@ WEB-11 — todos los calendarios de Google con sus colores, eventos de varios d�
 
 ## Historial (cerrado)
 
+- **WEB-11** (todos los calendarios con color, WhatsApp): CERRADA. Fusionada mediante el PR #19 (`88b3df3`).
 - **WEB-10** (calendario de mes, cobros fijos, cuándo gastas): CERRADA. Fusionada mediante el PR #18 (`505c6bf`).
 - **WEB-09** (movimiento estilo iOS): CERRADA. Fusionada mediante el PR #17 (`8ca2bbb`).
 - **WEB-07/08** (accesos, Spotify, WhatsApp, reglas, «Conectar Google», Atajos): CERRADAS. Fusionadas en `main` mediante el PR #16 (`dfb0c56`).

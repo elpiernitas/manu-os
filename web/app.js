@@ -12,13 +12,13 @@ import { CITIES, proposeAlarm, shouldAskTomorrow, shortcutUrl, guessCity } from 
 import { isClientId, listEvents, createEvent, newEventBody, monthGrid, listCalendars, mergeDays } from "./core/gcal.js";
 import { detectRecurring, upcomingRecurring, spendingPattern } from "./core/insights.js";
 import { SCOPE, runServices, planTaskSync, listOpenTasks, insertTask, completeTask, contactBirthdays, mergePeople, saveBackup, loadBackup } from "./core/google.js";
-import { isSensitive, pickModel, listModels, ask, buildPayload } from "./core/ai.js";
+import { isSensitive, pickModel, listModels, buildActionPayload, askWithActions, issueUrl } from "./core/ai.js";
 import { encryptBackup, decryptBackup, passphraseProblem } from "./core/crypto.js";
 import { isSpotifyClientId, randomVerifier, challengeFor, authorizeUrl, exchangeCode, refreshTokens, listDevices, findSpeaker, transferTo, DEFAULT_SPEAKER } from "./core/spotify.js";
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "11";
+export const APP_VERSION = "12";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -452,7 +452,7 @@ const screens = {
     return `<h1>MANU</h1><p class="subtitle">Tu asistente · ${aiReady() ? "IA disponible, siempre con tu confirmación" : '<button class="link small" data-sub-go="ia">activar IA</button>'}</p>
       ${refuge ? `<div class="refuge-bar"><span>Refugio · no se guarda</span><button class="link" data-act="leave-refuge">Salir</button></div>` : ""}
       <div class="suggest" aria-label="Sugerencias">${chips.map((s) => `<button data-say="${esc(s)}">${esc(s)}</button>`).join("")}</div>
-      <div class="chat" id="chat" aria-live="polite">${[...history, ...(refuge?.messages ?? [])].map((b) => `<div class="bubble ${b.from}${b.safety ? " safety" : ""}">${b.ai ? '<span class="ai-tag">IA</span>' : ""}${esc(b.text)}${b.proposal ? `<pre class="payload">${esc(JSON.stringify(buildPayload(b.proposal.message), null, 1))}</pre>${b.proposal.state ? `<p class="muted small">${b.proposal.state === "sent" ? "Enviado a Gemini." : "No enviado."}</p>` : `<div class="btns"><button class="btn" data-act="ai-send" data-id="${esc(b.proposal.id)}">Enviar a Gemini</button><button class="btn ghost" data-act="ai-cancel" data-id="${esc(b.proposal.id)}">No</button></div><div class="btns"><button class="link small" data-act="ask-elsewhere" data-app="chatgpt" data-id="${esc(b.proposal.id)}">Preguntar en ChatGPT</button><button class="link small" data-act="ask-elsewhere" data-app="claude" data-id="${esc(b.proposal.id)}">Preguntar en Claude</button></div>`}` : ""}${b.action ? `<div class="btns"><a class="btn" href="${esc(b.action.href)}">${esc(b.action.label)}</a></div>` : ""}</div>`).join("")}</div>
+      <div class="chat" id="chat" aria-live="polite">${[...history, ...(refuge?.messages ?? [])].map((b) => `<div class="bubble ${b.from}${b.safety ? " safety" : ""}">${b.ai ? '<span class="ai-tag">IA</span>' : ""}${esc(b.text)}${b.proposal ? `${b.proposal.state ? `<details><summary class="muted small">Ver lo enviado</summary><pre class="payload">${esc(shownPayload(b.proposal))}</pre></details>` : `<pre class="payload">${esc(shownPayload(b.proposal))}</pre>`}${b.proposal.state ? `<p class="muted small">${b.proposal.state === "sent" ? (b.proposal.auto ? "Enviado a Gemini sin preguntar (lo activaste en Tú → IA)." : "Enviado a Gemini.") : "No enviado."}</p>` : `<div class="btns"><button class="btn" data-act="ai-send" data-id="${esc(b.proposal.id)}">Enviar a Gemini</button><button class="btn ghost" data-act="ai-cancel" data-id="${esc(b.proposal.id)}">No</button></div><div class="btns"><button class="link small" data-act="ask-elsewhere" data-app="chatgpt" data-id="${esc(b.proposal.id)}">Preguntar en ChatGPT</button><button class="link small" data-act="ask-elsewhere" data-app="claude" data-id="${esc(b.proposal.id)}">Preguntar en Claude</button></div>`}` : ""}${b.action ? `<div class="btns"><a class="btn" href="${esc(b.action.href)}">${esc(b.action.label)}</a></div>` : ""}${(b.calls ?? []).map((c, i) => callCard(b, c, i)).join("")}</div>`).join("")}</div>
       <form class="composer glass" id="composer"><label for="msg" class="sr">Mensaje para MANU</label><input id="msg" autocomplete="off" enterkeyhint="send" placeholder="${refuge ? "Cuéntame" : "Escribe a MANU"}"><button class="btn" type="submit">Enviar</button></form>`;
   },
   dinero() {
@@ -637,10 +637,12 @@ const subpages = {
       <section class="card"><h2>Estado</h2><p>${aiReady() ? `Activada con <b>${esc(aiStore.model)}</b>.` : key ? "Clave guardada. Pulsa «Probar clave»." : "Sin clave: MANU funciona sin IA."}</p>
         <form id="aiForm" class="stack"><label for="aiKey" class="muted small">Clave de API de Gemini. Nunca va en las copias. Por defecto solo dura mientras MANU está abierta.</label><input id="aiKey" type="password" value="${esc(key)}" autocomplete="off" spellcheck="false" placeholder="AIza…"><div class="btns"><button class="btn" type="submit">Guardar y probar clave</button>${key ? '<button class="btn danger" type="button" data-act="ai-forget">Borrar clave</button>' : ""}</div></form>
         <div class="row"><div class="grow"><div>Recordar la clave en este móvil</div><div class="muted small">Más cómodo, pero cualquier código que corra en esta web podría leerla (ADR-0013).</div></div><button class="check" data-act="ai-remember" aria-pressed="${aiStore.remember}" aria-label="Recordar clave">${I.check}</button></div>
-        ${key ? `<div class="row"><span>Ofrecer la IA en el chat</span><button class="check" data-act="ai-toggle" aria-pressed="${vault.settings.aiEnabled !== false}" aria-label="Usar IA">${I.check}</button></div>` : ""}</section>
+        ${key ? `<div class="row"><span>Ofrecer la IA en el chat</span><button class="check" data-act="ai-toggle" aria-pressed="${vault.settings.aiEnabled !== false}" aria-label="Usar IA">${I.check}</button></div>
+        <div class="row"><div class="grow"><div>Enviar a Gemini sin preguntar</div><div class="muted small">Desactivado por defecto. Si lo activas, lo que MANU no entienda irá directo a Gemini. Lo que parezca privado (salud, dinero, ánimo, teléfonos…) seguirá sin enviarse nunca.</div></div><button class="check" data-act="ai-auto" aria-pressed="${vault.settings.aiAutoSend === true}" aria-label="Enviar sin preguntar">${I.check}</button></div>` : ""}</section>
+      <section class="card"><h2>Qué puede hacer</h2><p class="muted small">Dile cosas normales: «apúntame llamar al taller», «recuérdame el viernes a las 10 pagar el seguro», «llévame a Hábitos», «quiero importar el extracto» o «me gustaría que el calendario tuviera vista semanal». Gemini <b>propone</b> y tú confirmas cada acción con un toque; nada se hace solo.</p><p class="muted small">Las mejoras de la app se preparan como una petición en GitHub que tú envías y que Claude lee. Ese repositorio es <b>público</b>: no pongas datos personales.</p></section>
       <section class="card"><h2>Privacidad</h2><ul class="muted small">
-        <li>MANU responde primero sin IA. Cuando no entiende algo, te enseña <b>exactamente</b> lo que enviaría y solo lo manda si pulsas «Enviar a Gemini». Nada se envía solo.</li>
-        <li>Solo se envía tu frase y una instrucción fija: ni historial, ni tareas, ni agenda.</li>
+        <li>MANU responde primero sin IA. Cuando no entiende algo, te enseña <b>exactamente</b> lo que enviaría y solo lo manda si pulsas «Enviar a Gemini» (o si activaste «Enviar sin preguntar»).</li>
+        <li>Solo se envía tu frase, una instrucción fija con la fecha y hora, y la lista fija de acciones que puede proponer: ni historial, ni tareas, ni agenda, ni gastos.</li>
         <li>MANU bloquea lo que reconoce como salud, dinero, ánimo, teléfonos, tarjetas o contraseñas, pero ese filtro no es perfecto: revisa siempre lo que vas a enviar.</li>
         <li>Con la clave gratuita, Google puede usar lo que le envías para mejorar sus productos. Consulta sus condiciones en AI Studio.</li>
         <li>Si se acaba el cupo gratuito, MANU sigue funcionando sin IA.</li></ul></section>
@@ -828,7 +830,12 @@ function say(text) {
       vault.chat.push({ from: "me", text: clean, at }, { from: "manu", text: `${reply(intent, variant++)} (Parece privado: no te ofrezco enviarlo a la IA.)`, at });
       persist(); render(); return;
     }
-    vault.chat.push({ from: "me", text: clean, at }, { from: "manu", text: "No lo entiendo sin IA. ¿Se lo pregunto a Gemini? Se enviaría exactamente esto:", at, proposal: { id: uid("q"), message: clean } });
+    const proposal = { id: uid("q"), message: clean, at };
+    if (vault.settings.aiAutoSend === true) {
+      vault.chat.push({ from: "me", text: clean, at }, { from: "manu", text: "Se lo pregunto a Gemini. Se envía exactamente esto:", at, proposal: { ...proposal, auto: true } });
+      askAi(proposal.id, { auto: true }); return;
+    }
+    vault.chat.push({ from: "me", text: clean, at }, { from: "manu", text: "No lo entiendo sin IA. ¿Se lo pregunto a Gemini? Se enviaría exactamente esto:", at, proposal });
     persist(); render(); return;
   }
   vault.chat.push({ from: "me", text: clean, at }, { from: "manu", text: reply(intent, variant++), at, ...(action ? { action } : {}) });
@@ -836,21 +843,83 @@ function say(text) {
   render();
 }
 
-async function askAi(proposalId) {
+// The payload is built from the proposal's own timestamp, so what Manu saw is what is sent.
+const proposalPayload = (p) => buildActionPayload(p.message, new Date(p.at ?? Date.now()));
+function shownPayload(p) {
+  const { tools, ...rest } = proposalPayload(p);
+  return `${JSON.stringify(rest, null, 1)}\n+ lista fija de ${tools[0].functionDeclarations.length} acciones que puede proponer`;
+}
+
+async function askAi(proposalId, { auto = false } = {}) {
   const bubble = vault.chat.find((b) => b.proposal?.id === proposalId);
   if (!bubble || bubble.proposal.state) return;
+  // Consent is the tap on «Enviar a Gemini», or Manu's own opt-in to auto-send.
+  const consent = auto ? vault.settings.aiAutoSend === true : true;
   bubble.proposal.state = "sent";
   const answer = { from: "manu", text: "Pensando…", at: new Date().toISOString(), ai: true };
   vault.chat.push(answer);
-  render();
+  persist(); render();
   try {
-    answer.text = await ask({ key: aiStore.key, model: aiStore.model, payload: buildPayload(bubble.proposal.message), confirmed: true });
+    const { text, calls } = await askWithActions({ key: aiStore.key, model: aiStore.model, payload: proposalPayload(bubble.proposal), confirmed: consent });
+    answer.text = text || (calls.length === 1 ? "Te propongo esto:" : "Te propongo esto (confirma lo que quieras):");
+    if (calls.length) answer.calls = calls.map((c) => ({ ...c, state: null }));
   } catch (err) {
     answer.ai = false;
-    answer.text = err.code === "quota" ? "Hoy ya no queda IA gratuita. Sigo sin IA." : err.code === "key" ? "La clave de Gemini no funciona. Revísala en Tú → IA." : err.code === "sensitive" ? "Eso parece privado: no lo envío." : "La IA no ha respondido ahora.";
+    answer.text = err.code === "quota" ? "Hoy ya no queda IA gratuita. Sigo sin IA." : err.code === "key" ? "La clave de Gemini no funciona. Revísala en Tú → IA." : err.code === "sensitive" ? "Eso parece privado: no lo envío." : err.code === "unconfirmed" ? "No lo envío sin tu permiso." : "La IA no ha respondido ahora.";
   }
   persist();
   if (tab === "manu") render();
+}
+
+const SCREENS = { hoy: ["hoy"], agenda: ["agenda"], dinero: ["dinero"], tu: ["tu"], tiempo: ["hoy", null, "weather"], google: ["tu", "gcal"], ia: ["tu", "ia"], atajos: ["tu", "atajos"], habitos: ["tu", "habitos"], salud: ["tu", "salud"], comidas: ["tu", "comidas"], personas: ["tu", "personas"] };
+const SCREEN_NAMES = { hoy: "Hoy", agenda: "Agenda", dinero: "Dinero", tu: "Tú", tiempo: "El tiempo", google: "Google", ia: "IA", atajos: "Atajos", habitos: "Hábitos", salud: "Salud", comidas: "Comidas", personas: "Personas" };
+
+function callLabel(c) {
+  switch (c.name) {
+    case "anadir_tarea": return `Añadir tarea «${c.texto}»`;
+    case "anadir_idea": return `Guardar idea «${c.texto}»`;
+    case "apuntar_gasto": return `Apuntar gasto de ${euros(c.cents)}${c.concepto ? ` · ${c.concepto}` : ""}`;
+    case "crear_recordatorio": { const d = new Date(c.at); return `Recordatorio «${c.texto}» · ${d.toLocaleDateString("es-ES", { weekday: "short", day: "numeric", month: "short" })} ${hhmm(d)}`; }
+    case "ir_a": return `Ir a ${SCREEN_NAMES[c.pantalla]}`;
+    case "importar_extracto": return "Elegir el extracto del banco";
+    case "sugerir_mejora": return `Mejora: ${c.titulo}`;
+    default: return c.name;
+  }
+}
+
+function callCard(b, c, i) {
+  const at = esc(b.at), n = i;
+  if (c.name === "sugerir_mejora") {
+    if (c.sensitive) return `<div class="ai-call"><b>${esc(callLabel(c))}</b><p class="muted small">Parece que incluye datos privados: no la preparo para GitHub. Díselo sin datos personales.</p></div>`;
+    return `<div class="ai-call"><b>${esc(callLabel(c))}</b><p class="small">${esc(c.descripcion)}</p>${c.state ? `<p class="muted small">${c.state === "done" ? "Abierta en GitHub." : "Descartada."}</p>` : `<p class="muted small">Se abre GitHub con la petición escrita; la envías tú. El repositorio es público.</p><div class="btns"><a class="btn" href="${esc(issueUrl(c, APP_VERSION))}" target="_blank" rel="noopener" data-act="ai-issue" data-at="${at}" data-n="${n}">Abrir en GitHub</a><button class="btn ghost" data-act="ai-skip" data-at="${at}" data-n="${n}">No</button></div>`}</div>`;
+  }
+  return `<div class="ai-call"><b>${esc(callLabel(c))}</b>${c.state ? `<p class="muted small">${c.state === "done" ? "Hecho." : "Descartado."}</p>` : `<div class="btns"><button class="btn" data-act="ai-do" data-at="${at}" data-n="${n}">${c.name === "ir_a" || c.name === "importar_extracto" ? "Ir" : "Hacer"}</button><button class="btn ghost" data-act="ai-skip" data-at="${at}" data-n="${n}">No</button></div>`}</div>`;
+}
+
+const findCall = (el) => { const b = vault.chat.find((x) => x.at === el.dataset.at && x.calls); return b ? b.calls[Number(el.dataset.n)] : null; };
+
+// Runs one action Gemini proposed, only after Manu's tap. Everything stays local.
+function runCall(c) {
+  if (!c || c.state) return;
+  c.state = "done";
+  const at = new Date().toISOString();
+  switch (c.name) {
+    case "anadir_tarea": vault.inbox.push({ ...capture({ id: uid("c"), text: c.texto, at }), status: "TASK" }); toast("Tarea añadida"); break;
+    case "anadir_idea": vault.inbox.push({ ...capture({ id: uid("c"), text: c.texto, at }), status: "IDEA" }); toast("Idea guardada"); break;
+    case "apuntar_gasto": vault.spending.push(newEntry({ id: uid("s"), cents: c.cents, merchant: c.concepto, at }, vault.settings.categoryRules ?? {})); toast("Gasto apuntado"); break;
+    case "crear_recordatorio": vault.reminders.push({ id: uid("r"), text: c.texto, at: c.at, done: false, notified: false }); toast("Recordatorio creado"); break;
+    case "ir_a": case "importar_extracto": {
+      persist();
+      const [t, s2, ov] = c.name === "ir_a" ? SCREENS[c.pantalla] : ["dinero"];
+      go(t);
+      if (s2 || ov) { sub = s2 ?? null; overlay = ov ?? null; render({ focus: true, enter: "page" }); if (ov) refreshWeather(); }
+      // Opening the picker must happen inside this tap; Manu still chooses the file.
+      if (c.name === "importar_extracto") $("bankFile")?.click();
+      return;
+    }
+    default: c.state = null; return;
+  }
+  persist(); render();
 }
 
 // ---------- Events ----------
@@ -895,6 +964,10 @@ document.addEventListener("click", async (e) => {
     case "drive-restore-yes": { const r = validateVault(confirmDriveRestore?.data); confirmDriveRestore = null; if (!r.ok) { toast(r.reason); render(); break; } vault = r.vault; persist(); render(); toast("Copia de Drive restaurada"); break; }
     case "gfeature": { const k = a.dataset.k; vault.settings.google = { ...(vault.settings.google ?? {}), [k]: !googleOn(k) }; if (!googleOn(k)) delete gcal.tokens[SCOPE[k]]; persist(); render(); break; }
     case "ai-send": askAi(id); break;
+    case "ai-do": runCall(findCall(a)); break;
+    case "ai-skip": { const c = findCall(a); if (c && !c.state) { c.state = "no"; persist(); render(); } break; }
+    case "ai-issue": { const c = findCall(a); if (c && !c.state) { c.state = "done"; persist(); setTimeout(render, 300); } break; }
+    case "ai-auto": vault.settings.aiAutoSend = vault.settings.aiAutoSend !== true; persist(); render(); toast(vault.settings.aiAutoSend ? "Enviará sin preguntar (nunca lo privado)" : "Volverá a preguntarte antes de enviar"); break;
     case "music": musicToSpeaker(); break;
     case "shortcut-done": vault.settings.shortcutsDone = { ...(vault.settings.shortcutsDone ?? {}), [id]: true }; persist(); render(); toast("Quitado de pendientes"); break;
     case "shortcut-undo": { const d = { ...(vault.settings.shortcutsDone ?? {}) }; delete d[id]; vault.settings.shortcutsDone = d; persist(); render(); break; }

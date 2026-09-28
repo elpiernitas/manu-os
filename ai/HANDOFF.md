@@ -10,6 +10,44 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
+## WEB-12 — IA integrada que propone acciones
+
+Petición de Manu (2026-09-29): una IA integrada a la que ir diciéndole cosas de la app para mejorarla en el momento, o para subir sus gastos.
+
+### Cambios
+
+- `web/core/ai.js`:
+  - `TOOLS`: lista fija de 7 funciones;
+  - `actionSystem` y `buildActionPayload`: la frase, la instrucción fija con la fecha y hora, y las funciones;
+  - `parseCalls` valida las propuestas y descarta lo desconocido o mal formado;
+  - `issueUrl` prepara la petición de GitHub;
+  - `askWithActions` aplica las mismas puertas que `ask`: consentimiento y filtro de lo sensible.
+- `web/app.js`:
+  - el chat enseña cada acción propuesta con «Hacer» o «Ir» y «No»; se ejecuta en local tras el toque y su estado se guarda;
+  - «Mejora» abre GitHub con la petición rellena y avisa de que el repositorio es público;
+  - la carga útil que se ve es la misma que se envía (se construye con la hora de la propuesta); una vez enviada, queda plegada en «Ver lo enviado»;
+  - ajuste «Enviar a Gemini sin preguntar» en Tú → IA, desactivado por defecto;
+  - versión 12.
+- `web/styles.css`, `web/sw.js` (`manuos-v12`), `web/tests/ai-actions.test.js`, enmienda WEB-12 de ADR-0013.
+
+### Resultados
+
+- `npm test`: 70/70 PASS.
+- Chromium headless con Gemini simulado:
+  - sin envío antes de confirmar; 1 envío con las funciones y solo la frase;
+  - de 3 propuestas, la función desconocida se descarta;
+  - tarea creada tras «Hacer» y recordatorio descartado sin crear;
+  - enlace de GitHub relleno y aviso de repositorio público;
+  - navegación a Hábitos y selector de archivos en Dinero;
+  - con envío automático: se envía sin toque, pero dos frases sensibles no se envían;
+  - los estados persisten tras recargar.
+- Regresiones e2e de WEB-03 a WEB-11 en PASS.
+
+### NO_VERIFICADO
+
+- La llamada de funciones con la clave real de Gemini de Manu, que aún no la ha pegado.
+- En iOS: que el selector de archivos se abra desde la acción y que el enlace de GitHub abra la app o la web de GitHub.
+
 ## WEB-11 — todos los calendarios con color, eventos de varios días y acceso a WhatsApp
 
 Capturas de Manu (2026-09-29):

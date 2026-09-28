@@ -161,7 +161,9 @@ Exportar todo no significa exportar credenciales. OAuth tokens, claves privadas,
 | Riesgo | Impacto | Control | Estado |
 |---|---|---|---|
 | copia en Drive legible por Google o por quien acceda a la cuenta | filtración del vault | cifrado en el cliente AES-256-GCM + PBKDF2 (600 000 iteraciones), frase que nunca se guarda ni se sube, subida solo manual, `saveBackup` rechaza texto en claro | VERIFICADO en navegador con servicios simulados |
-| envío de datos sensibles a Gemini | exposición a un proveedor de modelo | sin envío automático; payload exacto visible; confirmación por petición; sin contexto por defecto; lista de bloqueo de mejor esfuerzo (no exhaustiva) | VERIFICADO en navegador con Gemini simulado |
+| envío de datos sensibles a Gemini | exposición a un proveedor de modelo | payload exacto visible; confirmación por petición, salvo que Manu active «Enviar sin preguntar» (desactivado por defecto, WEB-12); sin contexto por defecto; lista de bloqueo de mejor esfuerzo (no exhaustiva) | VERIFICADO en navegador con Gemini simulado |
+| acción dañina propuesta por Gemini | cambios no deseados en los datos locales | lista cerrada de funciones; `parseCalls` valida y descarta lo desconocido; ninguna acción sin toque de Manu; sin borrar ni enviar datos; importar solo abre el selector | VERIFICADO en navegador con Gemini simulado |
+| sugerencia de mejora con datos personales | publicación en un repositorio público | aviso de repositorio público; no se prepara si el texto parece sensible; Manu revisa y envía la petición en GitHub | DECIDIDO |
 | robo de la clave de Gemini | uso de la cuota de Manu | clave fuera del vault; `sessionStorage` por defecto; `localStorage` solo si Manu lo activa (riesgo aceptado); CSP restrictiva | DECIDIDO |
 | permisos de Google excesivos | acceso innecesario a datos | un scope por función, integraciones desconectadas por defecto, `drive.appdata` en lugar de `drive`, `contacts.readonly` | VERIFICADO (petición de scope) |
 | pérdida del `localStorage` en iOS | pérdida de datos | exportación manual y copia cifrada en Drive con restauración probada en perfil limpio | PARCIAL: no probado en iOS |
