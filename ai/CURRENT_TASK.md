@@ -1,8 +1,21 @@
 # CURRENT TASK
 
-Status: **REVIEW_PENDING**
+Status: **IN_PROGRESS**
 
-Implementación de esta tarea de preparación completada por Claude Code, con dos rondas de corrección tras revisión externa. Ver `ai/HANDOFF.md` para el resultado completo (D-02 decidida por ADR-0011, BRAIN-02 dividida en subfases 02a–02d verificables en CI/simulador, D-03/D-04B precisadas) y el PR #5 para la evidencia. No hay ninguna decisión pendiente de Manu ahora: D-04B queda modelado como un gate futuro (fase de dispositivo real), no como un bloqueo humano actual. Pendiente de revisión del orquestador.
+## Corrección activa — D-03 y TestFlight
+
+La revisión del PR #5 detectó una tercera contradicción bloqueante sobre el head `2530652`.
+
+D-03 debe tener dos disparadores independientes:
+
+- la cuenta gratuita falla de forma demostrable y se quieren conservar las capacidades afectadas;
+- se elige TestFlight como ruta de distribución o prueba física, lo que exige por sí mismo Apple Developer Program y después autorización específica para credenciales, perfiles y App Store Connect.
+
+No es válido mantener simultáneamente “TestFlight vía D-03” y “D-03 solo si falla la cuenta gratuita”.
+
+Claude Code debe alinear `docs/roadmap/BRAIN_02_TASK.md`, `ai/DECISIONS.md`, `ai/PROJECT_STATE.md`, `docs/architecture/DECISIONS_AND_OPEN_ITEMS.md`, `docs/roadmap/BACKLOG.md` y `ai/HANDOFF.md`; añadir una comprobación documental de regresión y una lección en `ai/QA_LESSONS.md`; repetir Foundation check, enlaces e IDs; y publicar evidencia con el nuevo SHA.
+
+D-03 y D-04B siguen siendo gates futuros. No existe una decisión pendiente de Manu ahora y BRAIN-02a–02d siguen desbloqueadas para CI/simulador.
 
 ## Tarea activa
 
@@ -10,34 +23,24 @@ BRAIN-02-PREP — cerrar el contrato técnico y reducir los bloqueos de BRAIN-02
 
 ## Autorización
 
-Manu delegó en ChatGPT/Codex la orquestación técnica, las revisiones y los merges ordinarios. Esta tarea documental está autorizada porque prepara decisiones y criterios verificables sin generar costes, conectar servicios ni usar datos reales.
+Manu delegó en ChatGPT/Codex la orquestación técnica, las revisiones y los merges ordinarios. Esta corrección documental está autorizada y no genera costes, conecta servicios ni usa datos reales.
 
-Claude Code actúa como implementador y revisor externo en la rama `brain/02-preparation`. ChatGPT/Codex verificará el resultado y decidirá el merge.
-
-## Alcance autorizado
-
-- investigar con fuentes oficiales actuales las opciones de almacenamiento local nativo, claves y contenedor compartido;
-- proponer y documentar D-02 mediante un ADR con una recomendación técnica;
-- separar claramente qué parte de BRAIN-02 puede construirse y probarse con coste 0 € sin firma ni dispositivo;
-- convertir D-03 y D-04B en decisiones pequeñas, fechadas y verificables, sin decidir por Manu ningún gasto;
-- crear `docs/roadmap/BRAIN_02_TASK.md` con alcance, fases internas, criterios de aceptación, checks y gates;
-- actualizar documentación canónica, riesgos, threat model, fuentes y handoff cuando sea necesario;
-- detectar contradicciones y corregirlas dentro de este alcance.
+Claude Code implementa la corrección en `fix/brain-02-prep-d03-gates`. ChatGPT/Codex verificará el resultado, fusionará este PR de corrección en `brain/02-preparation` y después cerrará el PR #5 si todo queda demostrado.
 
 ## Criterios de aceptación
 
-- D-02 queda decidida técnicamente o se documenta un bloqueo demostrable;
-- D-03 y D-04B muestran opciones, consecuencias y el punto exacto en que necesitarán a Manu;
-- BRAIN-02 queda dividida en unidades comprobables y existe una primera unidad implementable sin coste ni datos reales;
-- todos los enlaces, IDs y checks documentales pasan;
-- no se inicia código de producto;
-- el PR termina con evidencia reproducible y PASS o con un único bloqueo humano concreto.
+- D-03 queda descrita con los dos disparadores independientes en todos los documentos activos;
+- no queda ninguna frase “solo si falla” que contradiga la alternativa TestFlight;
+- D-03/D-04B se conservan como gates futuros sin pedir una decisión actual a Manu;
+- BRAIN-02a–02d siguen desbloqueadas para CI/simulador;
+- existe una regresión documental y una lección generalizable;
+- Foundation check, enlaces e IDs pasan;
+- el PR termina con evidencia reproducible y PASS.
 
 ## Trabajo prohibido
 
-- crear proyectos Xcode, UI, almacenamiento real o código de BRAIN-02;
-- activar Apple Developer Program, runners de pago, TestFlight, WeatherKit, OAuth o facturación;
-- conectar servicios, credenciales, dispositivos o datos personales;
-- resolver por Manu una decisión material de producto o cualquier gasto;
+- crear código de producto o proyecto Xcode;
+- activar Apple Developer Program, TestFlight, servicios, credenciales o facturación;
+- usar dispositivos o datos personales;
 - hacer merge;
 - iniciar BRAIN-03 o fases posteriores.
