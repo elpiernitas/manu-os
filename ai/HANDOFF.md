@@ -10,6 +10,40 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
+## WEB-08 — reglas de categorías de ChatGPT, «Conectar Google» en un paso y sección de Atajos
+
+### Contexto
+
+Prueba real de Manu en su iPhone con la versión 5: Calendar funciona («0 hoy · 1 mañana»); Tasks y Contactos fallan con «Se cerró la ventana de Google» (QAL-015). ChatGPT generó un Excel con 152 reglas de categorías a partir del extracto de Sabadell de Manu. Ni el Excel ni sus reglas están en el repositorio: la app las importa en el dispositivo.
+
+### Archivos cambiados
+
+- `web/core/money.js`: taxonomía ampliada (Ocio nocturno, Tabaco, Viajes, Servicios, Finanzas, Administración, Donaciones), subcategoría, `ruleFor`, `categoryId` (nombres en español a IDs), `rulesFromRows` (hoja «Reglas MANU OS»), `applyRules` (reclasifica solo propuestas y marca «revisar» cuando «¿Preguntar?» es «Sí»). Las correcciones de Manu siempre ganan.
+- `web/app.js`:
+  - Dinero: «Importar reglas (Excel de ChatGPT)», filtro «Por revisar», subcategoría visible.
+  - Google: ID de cliente por defecto; «Conectar Google» (Calendar, Tasks y Contactos con un gesto); `googleConsent` pide juntos los scopes activados en una ventana; `cachedToken` para no abrir ventanas durante la sincronización; GIS precargado.
+  - Tú → **Atajos** con pendientes y creados, «Probar» y «Ya lo tengo».
+  - Versión 8.
+- `web/sw.js` (`manuos-v8`), `web/styles.css`, `web/tests/rules.test.js` y el fixture **inventado** `web/tests/fixtures-reglas-ejemplo.xlsx`.
+- ADR-0013 (enmienda) y QAL-015.
+
+### Comandos ejecutados y resultados reales
+
+- `cd web && npm test`: 58/58 PASS.
+- En local, sin subir nada, con el extracto real y las reglas reales de Manu (solo recuentos): 143 reglas importadas; de 368 gastos, **5 quedan en «Otros»** y 124 se marcan «revisar».
+- Chromium headless: 8/8 PASS.
+  - ID prellenado; todo desconectado al empezar.
+  - **Una sola** ventana de consentimiento con los tres scopes activados, sin Drive.
+  - Calendar y Tasks correctos aunque se deniegue Contactos (sin llamar a People).
+  - Reglas importadas y aplicadas (subcategoría y «revisar»); el filtro «Por revisar» funciona.
+  - Atajos: 4 pendientes; marcar uno lo mueve a «Creados».
+- Regresiones de WEB-03, WEB-05, WEB-06 y WEB-07: PASS. Se actualizó una expectativa de WEB-03: con el ID por defecto, un ID inválido no se guarda, pero los servicios se muestran.
+
+### NO_VERIFICADO
+
+- Consentimiento conjunto en el iPhone real.
+- Instalar atajos automáticamente: Apple no lo permite desde una web, así que se crean a mano y la app lleva la lista.
+
 ## WEB-07 — accesos por modo, Spotify en el altavoz «baño», WhatsApp y otros asistentes (ADR-0014)
 
 ### Archivos cambiados

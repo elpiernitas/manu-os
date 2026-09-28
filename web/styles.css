@@ -174,3 +174,5 @@ ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
 .apps { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 10px; }
 .app-link { display: grid; justify-items: center; gap: 4px; text-decoration: none; color: var(--text); min-height: 64px; }
 .app-link .ico { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 18px; }
+.review { color: var(--warm); font-weight: 600; }
+details.card > summary { list-style: none; }

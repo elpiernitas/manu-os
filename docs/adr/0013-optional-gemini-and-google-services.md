@@ -35,6 +35,11 @@ La app web (ADR-0012) funciona sin IA, pero el chat solo entiende órdenes concr
 - `NO_VERIFICADO`: la ventana de consentimiento de Google desde la web instalada en iOS; el cupo real gratuito de Gemini; `google.accounts.oauth2.hasGrantedAllScopes` con las cuentas reales.
 - `VERIFICADO` (Chromium headless, servicios simulados): copia cifrada subida sin marcadores en claro; restauración en un perfil limpio con la frase correcta; rechazo con una frase incorrecta; una sola petición de scope por función; sin llamadas a Gemini sin confirmación.
 
+## Enmienda (2026-09-29, WEB-08)
+
+- **Una sola ventana de consentimiento por toque.** En el iPhone de Manu, Tasks y Contactos fallaban con «Se cerró la ventana de Google»: iOS solo permite una ventana emergente por gesto, y la app abría una por scope en cadena. Ahora, al sincronizar, los scopes de las funciones **que Manu ha activado** se piden juntos en una ventana. Cada scope se guarda solo si Google lo concede (`hasGrantedAllScopes`), así que un «no» parcial sigue afectando únicamente a su función. Las integraciones siguen empezando desconectadas; «Conectar Google» activa Calendar, Tasks y Contactos con un único gesto explícito. Drive sigue pidiéndose solo al hacer una copia.
+- **ID de cliente por defecto.** La app trae el ID de cliente OAuth del proyecto de Manu (`manu-os-510021`) para que no tenga que pegarlo. Es público por diseño, solo funciona desde el origen autorizado `https://elpiernitas.github.io` y el secreto de cliente no se usa. Manu puede sustituirlo en Tú → Google.
+
 ## Historial
 
 - Ronda 1 de revisión (PR #13, 2026-09-28): la primera versión subía el vault en claro y automáticamente a Drive, enviaba a Gemini sin confirmación con un filtro de palabras presentado como garantía, y pedía los cuatro scopes de golpe. Corregido en esta versión del ADR.

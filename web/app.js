@@ -1,5 +1,5 @@
 import { parse, reply } from "./core/assistant.js";
-import { CATEGORIES, euros, newEntry, learnCategory, summary, toCents } from "./core/money.js";
+import { CATEGORIES, euros, newEntry, learnCategory, summary, toCents, rulesFromRows, applyRules } from "./core/money.js";
 import { MODE_TITLES, modeState } from "./core/modes.js";
 import { capture, confirm, markUnclassified, pending, tasks, ideas, toggleDone } from "./core/inbox.js";
 import { initialRefuge, refugeReply } from "./core/refuge.js";
@@ -17,10 +17,13 @@ import { isSpotifyClientId, randomVerifier, challengeFor, authorizeUrl, exchange
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "7";
+export const APP_VERSION = "8";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
+// Public OAuth client of Manu's Google Cloud project "MANU OS" (not a secret:
+// it only works from the authorised origin https://elpiernitas.github.io).
+const DEFAULT_GOOGLE_CLIENT_ID = "531306255339-r6gmmrvd0otte4ee4rr9rivb25le09ko.apps.googleusercontent.com";
 
 const store = new LocalStore(globalThis.localStorage ?? { getItem: () => null, setItem: () => { throw new Error("no storage"); } });
 const loaded = store.load();
@@ -31,6 +34,7 @@ let refuge = null; // Refugio lives only in memory
 let sheet = null; // quick add: { kind }
 let confirmWipe = false;
 let cityResults = null;
+let moneyFilter = null; // "review"
 let overlay = null; // "weather"
 const gcal = { tokens: {}, busy: false, error: null };
 let confirmDriveRestore = null;
@@ -53,6 +57,7 @@ const aiStore = {
 };
 const GOOGLE_FEATURES = [["calendar", "Calendar", "Ver tu agenda y crear eventos"], ["tasks", "Tasks", "Sincronizar tus tareas"], ["contacts", "Contactos", "Leer nombres y cumpleaños"], ["drive", "Drive", "Guardar una copia cifrada (solo cuando tú lo pidas)"]];
 const googleOn = (k) => Boolean(vault.settings.google?.[k]);
+const gClientId = () => vault.settings.gcalClientId || DEFAULT_GOOGLE_CLIENT_ID;
 // Spotify tokens: device storage only, never in the vault or backups.
 const spotifyStore = {
   get tokens() { try { return JSON.parse(localStorage.getItem("manuos.spotify.tokens") || "null"); } catch { return null; } },
@@ -211,6 +216,33 @@ function weatherPage() {
     <p class="muted small">Datos de Open-Meteo · actualizado ${new Date(w.at).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}</p>`;
 }
 
+// ---------- iOS Shortcuts Manu creates once ----------
+const SHORTCUTS = [
+  { id: "alarm", name: SHORTCUT_ALARM, purpose: "poner alarmas desde MANU", test: shortcutUrl(SHORTCUT_ALARM, "07:00"), steps: [
+    "Abre <b>Atajos</b> → <b>+</b> → toca el nombre y escribe <b>MANU Alarma</b>.",
+    "Añade la acción <b>«Obtener fechas de»</b> y elige <b>Entrada del atajo</b>.",
+    "Añade <b>«Crear alarma»</b> (Reloj) y en la hora elige la variable <b>Fechas</b>.",
+    "Listo. «Probar» debería crear una alarma a las 07:00 (bórrala después)."] },
+  { id: "reminder", name: SHORTCUT_REMINDER, purpose: "recordatorios que suenan aunque MANU esté cerrada", test: shortcutUrl(SHORTCUT_REMINDER, "Prueba de MANU | mañana 10:00"), steps: [
+    "Nuevo atajo llamado <b>MANU Recordatorio</b>.",
+    "<b>«Dividir texto»</b> la Entrada del atajo con separador personalizado <code>|</code>.",
+    "<b>«Obtener elemento de la lista»</b> → primer elemento (el texto).",
+    "<b>«Obtener elemento de la lista»</b> → último elemento → <b>«Obtener fechas de»</b>.",
+    "<b>«Añadir nuevo recordatorio»</b> con el texto y la alerta en esa fecha."] },
+  { id: "agenda", name: "MANU Agenda", purpose: "traer tus eventos de hoy (si no usas Google)", test: null, steps: [
+    "Nuevo atajo llamado <b>MANU Agenda</b>.",
+    "<b>«Buscar eventos del calendario»</b> con fecha de inicio hoy.",
+    "<b>«Repetir con cada»</b> → <b>«Texto»</b>: hora de inicio (HH:mm), espacio y título.",
+    "<b>«Combinar texto»</b> con saltos de línea → <b>«Copiar al portapapeles»</b>.",
+    "Abre MANU → Agenda → «Pegar eventos de hoy»."] },
+  { id: "siri", name: "Apuntar en MANU", purpose: "decirle a Siri algo para MANU", test: null, steps: [
+    "Nuevo atajo llamado <b>Apuntar en MANU</b>.",
+    "<b>«Solicitar entrada»</b> (texto).",
+    `<b>«URL»</b>: <code>${esc(SITE)}?di=</code> seguido de la variable Entrada proporcionada.`,
+    "<b>«Abrir URL»</b>. Aviso: se abre en Safari, que guarda sus datos aparte del icono de MANU (NO_VERIFICADO)."] },
+];
+const shortcutsPending = () => SHORTCUTS.filter((x) => !(vault.settings.shortcutsDone ?? {})[x.id]).length;
+
 // ---------- Hub: shortcuts to Manu's apps by moment of the day ----------
 function hubCard(mode) {
   const s = vault.settings;
@@ -329,9 +361,9 @@ const screens = {
     const done = vault.inbox.filter((i) => i.status === "TASK" && i.done).slice(-10);
     const idea = ideas(vault.inbox);
     const rems = vault.reminders.filter((r) => !r.done).sort((a, b) => (a.at < b.at ? -1 : 1));
-    const g = isClientId(vault.settings.gcalClientId) && GOOGLE_FEATURES.some(([k]) => googleOn(k));
+    const g = isClientId(gClientId()) && GOOGLE_FEATURES.some(([k]) => googleOn(k));
     const synced = vault.settings.gcalSyncedAt ? new Date(vault.settings.gcalSyncedAt).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }) : null;
-    const gCal = isClientId(vault.settings.gcalClientId) && googleOn("calendar");
+    const gCal = isClientId(gClientId()) && googleOn("calendar");
     return `<h1>Agenda</h1><p class="subtitle">${esc(longDate())}</p>
       ${g ? `<div class="btns"><button class="btn ghost" data-act="gcal-sync">${gcal.busy ? "Sincronizando…" : "Sincronizar con Google"}</button></div><p class="muted small">${synced ? `Última sincronización: ${synced}` : "Aún sin sincronizar."}${gcal.error ? ` · ${esc(gcal.error)}` : ""}</p>` : `<p class="muted small"><button class="link small" data-act="goto-gcal">Conectar Google (Calendar, Tasks, Contactos y Drive)</button></p>`}
       ${sectionTitle("Hoy", gCal ? addLink("EVENT", "Nuevo evento") : "")}
@@ -359,7 +391,9 @@ const screens = {
   dinero() {
     const [s, e] = monthRange();
     const month = summary(vault.spending, s, e);
-    const entries = [...vault.spending].sort((a, b) => (a.at < b.at ? 1 : -1)).slice(0, 60);
+    const toReview = vault.spending.filter((x) => x.review).length;
+    const entries = [...vault.spending].filter((x) => moneyFilter !== "review" || x.review).sort((a, b) => (a.at < b.at ? 1 : -1)).slice(0, moneyFilter === "review" ? 500 : 60);
+    const rulesCount = Object.keys(vault.settings.categoryRules ?? {}).length;
     const cats = Object.entries(month.byCategory).sort((a, b) => b[1] - a[1]);
     const max = cats[0]?.[1] ?? 1;
     const imp = vault.settings.lastImport;
@@ -370,9 +404,11 @@ const screens = {
       <section class="card"><h2>${I.box} Importar del banco</h2>
         <p class="muted small">Descarga los movimientos de tu banco (Sabadell: Excel .xls; también vale CSV) y elígelo aquí. Se analiza en tu móvil y no se envía a nadie. Solo importo gastos y no duplico los que ya tengas. Si corriges la categoría de un comercio, la aprendo para todos sus movimientos.</p>
         <label class="btn ghost" for="bankFile" role="button" tabindex="0">Elegir archivo (Excel o CSV)</label><input id="bankFile" type="file" accept=".xls,.xlsx,.csv,text/csv,text/plain,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="sr">
+        <label class="btn ghost" for="rulesFile" role="button" tabindex="0">Importar reglas (Excel de ChatGPT)</label><input id="rulesFile" type="file" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="sr">
+        ${rulesCount ? `<p class="muted small">${rulesCount} reglas de categorías guardadas en este móvil.</p>` : ""}
         ${imp ? `<p class="muted small">Última importación: ${imp.added} gastos nuevos, ${imp.duplicates} repetidos, ${imp.income} ingresos ignorados${imp.invalid ? `, ${imp.invalid} filas no reconocidas` : ""}.</p>` : ""}</section>
-      ${sectionTitle("Movimientos", addLink("EXPENSE"))}
-      <section class="card">${entries.length ? entries.map((x) => `<div class="row"><div class="grow"><div>${esc(x.merchant ?? "Sin concepto")}</div><div class="muted small">${new Date(x.at).toLocaleDateString("es-ES", { day: "numeric", month: "short" })}${x.source === "BANK" ? " · banco" : ""}${x.inferred ? " · categoría propuesta" : ""}</div></div>
+      ${sectionTitle("Movimientos", `${toReview ? `<button class="link small" data-act="money-filter">${moneyFilter === "review" ? "Ver todos" : `Por revisar (${toReview})`}</button>` : ""}${addLink("EXPENSE")}`)}
+      <section class="card">${entries.length ? entries.map((x) => `<div class="row"><div class="grow"><div>${esc(x.merchant ?? "Sin concepto")}</div><div class="muted small">${new Date(x.at).toLocaleDateString("es-ES", { day: "numeric", month: "short" })}${x.sub ? ` · ${esc(x.sub)}` : ""}${x.source === "BANK" ? " · banco" : ""}${x.review ? ' · <b class="review">revisar</b>' : x.inferred ? " · categoría propuesta" : ""}</div></div>
           <div class="stack"><span class="num">${euros(x.cents)}</span><label class="sr" for="cat-${esc(x.id)}">Categoría</label><select id="cat-${esc(x.id)}" data-cat="${esc(x.id)}">${Object.entries(CATEGORIES).map(([k, t]) => `<option value="${k}"${k === x.category ? " selected" : ""}>${esc(t)}</option>`).join("")}</select></div></div>`).join("")
         : '<p class="muted">Sin gastos. Toca «+», escribe a MANU «gasté 12,50 en café» o importa el CSV del banco.</p>'}</section>
       </div>`;
@@ -401,10 +437,11 @@ const screens = {
       ${sectionTitle("Ajustes")}
       <div class="list">
         ${item("tiempo", "pin", "blue", "Tiempo y ciudades", `Casa: ${(vault.settings.homeCity ?? CITIES.GIJON).name}`)}
-        ${item("gcal", "google", "blue", "Google", isClientId(vault.settings.gcalClientId) ? "Calendar, Tasks, Contactos y Drive" : "Conectar tus servicios de Google")}
+        ${item("gcal", "google", "blue", "Google", isClientId(gClientId()) ? "Calendar, Tasks, Contactos y Drive" : "Conectar tus servicios de Google")}
         ${item("spotify", "leaf", "green", "Spotify", spotifyReady() ? (spotifyStore.tokens ? `Conectado · altavoz «${vault.settings.spotifySpeaker || DEFAULT_SPEAKER}»` : "Configurado, sin conectar") : "Música en tu altavoz")}
         ${item("ia", "bolt", "purple", "IA (Gemini)", aiReady() ? `Activada · ${aiStore.model}` : "Chat con IA opcional")}
-        ${item("avisos", "bell", "red", "Avisos, alarmas y Atajos", "Recordatorios que suenan en el iPhone")}
+        ${item("atajos", "bolt", "orange", "Atajos del iPhone", shortcutsPending() ? `${shortcutsPending()} pendientes de crear` : "Todos creados")}
+        ${item("avisos", "bell", "red", "Avisos", "Notificaciones de MANU")}
         ${item("datos", "box", "gray", "Tus datos", "Copia, restaurar y borrar")}
       </div>
       <p class="muted small">MANU OS web · versión ${APP_VERSION} · datos solo en este dispositivo</p>`;
@@ -474,13 +511,15 @@ const subpages = {
       <p class="muted small">Datos del tiempo: Open-Meteo. Solo se envían las coordenadas de la ciudad.</p>`;
   },
   gcal() {
-    const id = vault.settings.gcalClientId ?? "";
+    const id = gClientId();
     const ok = isClientId(id);
     const st = vault.settings.googleStatus ?? {};
+    const anyOn = GOOGLE_FEATURES.some(([k]) => googleOn(k));
     return `${backBar("Google")}
       <section class="card"><h2>ID de cliente</h2>
         <form id="gcalForm" class="stack"><label for="gcalId" class="muted small">ID de cliente OAuth (termina en .apps.googleusercontent.com). No es una contraseña.</label><input id="gcalId" value="${esc(id)}" autocomplete="off" spellcheck="false" placeholder="123-abc.apps.googleusercontent.com"><button class="btn ghost" type="submit">Guardar ID</button></form></section>
-      ${ok ? `<section class="card"><h2>Servicios</h2><p class="muted small">Todo empieza desconectado. Cada servicio pide su propio permiso la primera vez que lo usas; si lo rechazas, los demás siguen funcionando.</p>
+      ${ok && !anyOn ? `<section class="card"><h2>Conectar Google</h2><p class="muted small">Activa Calendar, Tasks y los cumpleaños de Contactos y pide los permisos en una sola ventana. Puedes desactivar cualquiera después.</p><button class="btn block" data-act="google-connect-all">Conectar Google</button></section>` : ""}
+      ${ok ? `<section class="card"><h2>Servicios</h2><p class="muted small">Cada servicio pide solo su permiso. Al sincronizar, los que actives se piden juntos en una sola ventana; si rechazas uno, los demás siguen funcionando.</p>
         ${GOOGLE_FEATURES.map(([k, label, desc]) => `<div class="row"><div class="grow"><div>${label}</div><div class="muted small">${esc(desc)}${st[k] && st[k] !== "off" ? ` · ${esc(st[k].replace(/^ok: /, "").replace(/^error: /, "⚠︎ "))}` : ""}</div></div><button class="check" data-act="gfeature" data-k="${k}" aria-pressed="${googleOn(k)}" aria-label="${label}">${I.check}</button></div>`).join("")}
         ${["calendar", "tasks", "contacts"].some(googleOn) ? `<button class="btn" data-act="gcal-sync">${gcal.busy ? "Sincronizando…" : "Sincronizar ahora"}</button>` : ""}</section>` : ""}
       ${ok && googleOn("drive") ? `<section class="card"><h2>Copia cifrada en Drive</h2>
@@ -495,6 +534,19 @@ const subpages = {
         <li>«Credenciales» → «Crear credenciales» → <b>ID de cliente de OAuth</b> → «Aplicación web».</li>
         <li>«Orígenes de JavaScript autorizados»: <code>https://elpiernitas.github.io</code></li>
         <li>Copia el <b>ID de cliente</b> y pégalo arriba. El «secreto de cliente» no se usa: no lo pegues en ningún sitio.</li></ol></section>`;
+  },
+  atajos() {
+    const done = vault.settings.shortcutsDone ?? {};
+    const pending = SHORTCUTS.filter((x) => !done[x.id]);
+    const created = SHORTCUTS.filter((x) => done[x.id]);
+    const card = (x) => `<details class="card"${done[x.id] ? "" : " open"}><summary><b>${esc(x.name)}</b> · <span class="muted small">${esc(x.purpose)}</span></summary>
+      <ol class="muted small">${x.steps.map((st) => `<li>${st}</li>`).join("")}</ol>
+      <div class="btns">${x.test ? `<a class="btn ghost" href="${esc(x.test)}">Probar</a>` : ""}${done[x.id] ? `<button class="btn ghost" data-act="shortcut-undo" data-id="${x.id}">Marcar como pendiente</button>` : `<button class="btn" data-act="shortcut-done" data-id="${x.id}">Ya lo tengo</button>`}</div></details>`;
+    return `${backBar("Atajos")}
+      <p class="muted small">Apple no deja que una web instale atajos por ti: cada uno se crea una vez en la app Atajos con el nombre exacto (unos 2 minutos). Pulsa «Probar» para comprobarlo y «Ya lo tengo» para quitarlo de pendientes. Los nombres de las acciones pueden variar según tu iOS.</p>
+      ${sectionTitle(`Pendientes (${pending.length})`)}
+      <div class="stack">${pending.map(card).join("") || '<p class="muted">Nada pendiente.</p>'}</div>
+      ${created.length ? `${sectionTitle(`Creados (${created.length})`)}<div class="stack">${created.map(card).join("")}</div>` : ""}`;
   },
   spotify() {
     const id = vault.settings.spotifyClientId ?? "";
@@ -533,7 +585,8 @@ const subpages = {
       <section class="card"><h2>${I.bell} Avisos de MANU</h2><p class="muted">${esc(status)}</p>
         <div class="btns">${n === "default" ? '<button class="btn" data-act="notify-on">Activar avisos</button>' : ""}${n === "granted" ? '<button class="btn ghost" data-act="notify-test">Probar un aviso</button>' : ""}</div>
         <p class="muted small">Los recordatorios avisan mientras MANU está abierta. Para que suenen siempre, mándalos al iPhone con los atajos de abajo.</p></section>
-      <section class="card"><h2>${I.bolt} Atajos (se crean una vez)</h2>
+      <section class="card"><h2>${I.bolt} Atajos</h2><p class="muted small">Los atajos del iPhone tienen ahora su propia sección.</p><button class="btn ghost" data-sub-go="atajos">Ir a Atajos</button></section>
+      <section class="card" hidden><h2>${I.bolt} Atajos (se crean una vez)</h2>
         <p class="muted small">Crea estos atajos en la app Atajos con el nombre exacto. Los nombres de las acciones pueden variar según tu iOS. NO_VERIFICADO en tu iPhone.</p>
         <details><summary>«${SHORTCUT_ALARM}»: alarmas</summary><ol class="muted small"><li>Nuevo atajo llamado <b>${SHORTCUT_ALARM}</b>.</li><li>Acción «Obtener fechas de» → Entrada del atajo.</li><li>Acción «Crear alarma» (Reloj) con esa hora.</li><li>En MANU, «Poner alarma» abre este atajo con la hora.</li></ol></details>
         <details><summary>«${SHORTCUT_REMINDER}»: recordatorios que suenan</summary><ol class="muted small"><li>Nuevo atajo llamado <b>${SHORTCUT_REMINDER}</b>.</li><li>«Dividir texto» la Entrada del atajo por el separador personalizado <code>|</code>.</li><li>«Obtener elemento de la lista» → primer elemento (el texto).</li><li>«Obtener elemento de la lista» → último elemento → «Obtener fechas de».</li><li>«Añadir nuevo recordatorio» con el texto y alerta en esa fecha.</li></ol></details>
@@ -577,7 +630,7 @@ function render({ focus = false } = {}) {
   $("screen").innerHTML = overlay === "weather" ? weatherPage() : (screens[tab] ?? screens.hoy)();
   $("screen").querySelectorAll(".bar > i[data-w]").forEach((el) => { el.style.width = `${el.dataset.w}%`; });
   $("screen").querySelectorAll(".range > i").forEach((el) => { el.style.left = `${el.dataset.l}%`; el.style.width = `${el.dataset.w}%`; });
-  $("topTitle").textContent = sub ? { habitos: "Hábitos", salud: "Salud", comidas: "Comidas", personas: "Personas", tiempo: "Tiempo", avisos: "Avisos", datos: "Tus datos", gcal: "Google", ia: "IA", spotify: "Spotify" }[sub] : TABS.find(([id]) => id === tab)[1];
+  $("topTitle").textContent = sub ? { habitos: "Hábitos", salud: "Salud", comidas: "Comidas", personas: "Personas", tiempo: "Tiempo", avisos: "Avisos", datos: "Tus datos", gcal: "Google", ia: "IA", spotify: "Spotify", atajos: "Atajos" }[sub] : TABS.find(([id]) => id === tab)[1];
   $("fab").hidden = tab === "manu" || Boolean(sheet);
   $("sheetRoot").innerHTML = sheetHtml();
   if (sheet) $("qText")?.focus();
@@ -700,11 +753,15 @@ document.addEventListener("click", async (e) => {
     case "overlay-close": overlay = null; render({ focus: true }); scrollTo(0, 0); break;
     case "goto-gcal": tab = "tu"; sub = "gcal"; render({ focus: true }); scrollTo(0, 0); break;
     case "gcal-sync": syncGoogle(); break;
+    case "google-connect-all": vault.settings.google = { ...(vault.settings.google ?? {}), calendar: true, tasks: true, contacts: true }; persist(); syncGoogle(); break;
     case "drive-restore-no": confirmDriveRestore = null; render(); break;
     case "drive-restore-yes": { const r = validateVault(confirmDriveRestore?.data); confirmDriveRestore = null; if (!r.ok) { toast(r.reason); render(); break; } vault = r.vault; persist(); render(); toast("Copia de Drive restaurada"); break; }
     case "gfeature": { const k = a.dataset.k; vault.settings.google = { ...(vault.settings.google ?? {}), [k]: !googleOn(k) }; if (!googleOn(k)) delete gcal.tokens[SCOPE[k]]; persist(); render(); break; }
     case "ai-send": askAi(id); break;
     case "music": musicToSpeaker(); break;
+    case "shortcut-done": vault.settings.shortcutsDone = { ...(vault.settings.shortcutsDone ?? {}), [id]: true }; persist(); render(); toast("Quitado de pendientes"); break;
+    case "shortcut-undo": { const d = { ...(vault.settings.shortcutsDone ?? {}) }; delete d[id]; vault.settings.shortcutsDone = d; persist(); render(); break; }
+    case "money-filter": moneyFilter = moneyFilter === "review" ? null : "review"; render(); break;
     case "spotify-connect": startSpotifyAuth(); break;
     case "spotify-forget": spotifyStore.tokens = null; render(); toast("Spotify desconectado de este móvil"); break;
     case "ask-elsewhere": { const b = vault.chat.find((x) => x.proposal?.id === id); if (b) { try { await navigator.clipboard.writeText(b.proposal.message); } catch {} window.open(askElsewhereUrl(a.dataset.app, b.proposal.message), "_blank", "noopener"); } break; }
@@ -763,7 +820,7 @@ document.addEventListener("submit", async (e) => {
   if (f === "gcalForm") {
     const id = $("gcalId").value.trim();
     if (id && !isClientId(id)) { toast("Ese no parece un ID de cliente de Google"); return; }
-    vault.settings.gcalClientId = id || null; gcal.client = null; gcal.token = null;
+    vault.settings.gcalClientId = id && id !== DEFAULT_GOOGLE_CLIENT_ID ? id : null; gcal.client = null; gcal.token = null;
     persist(); render(); toast(id ? "ID guardado" : "Google Calendar desconectado"); return;
   }
   if (f === "workStartForm") return;
@@ -863,6 +920,27 @@ document.addEventListener("change", async (e) => {
     if (r.applied) toast(`Aprendido: ${r.applied} movimiento${r.applied === 1 ? "" : "s"} más del mismo comercio`);
     persist(); render(); return;
   }
+  if (e.target.id === "rulesFile" && e.target.files?.[0]) {
+    try {
+      const XLSX = await loadSheetJs();
+      const wb = XLSX.read(new Uint8Array(await e.target.files[0].arrayBuffer()), { type: "array" });
+      let result = { error: "No encuentro reglas en ese Excel." };
+      for (const name of wb.SheetNames) {
+        const r = rulesFromRows(XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: true, defval: "" }));
+        if (!r.error) { result = r; break; }
+      }
+      if (result.error) { toast(result.error); return; }
+      // Manu's own corrections (plain ids) always win over imported rules.
+      const current = vault.settings.categoryRules ?? {};
+      const merged = { ...result.rules };
+      for (const [k, v] of Object.entries(current)) if (typeof v === "string" || !merged[k]) merged[k] = v;
+      vault.settings.categoryRules = merged;
+      const applied = applyRules(vault.spending, merged);
+      vault.spending = applied.entries;
+      persist(); render(); toast(`${Object.keys(result.rules).length} reglas importadas · ${applied.changed} gastos reclasificados`);
+    } catch { toast("No he podido leer ese Excel."); }
+    return;
+  }
   if (e.target.id === "bankFile" && e.target.files?.[0]) {
     const file = e.target.files[0];
     const ids = new Set(vault.spending.map((x) => x.id));
@@ -905,27 +983,43 @@ function loadGis() {
   });
 }
 
-// One token per scope: each feature asks only for its own permission.
-async function googleToken(scope) {
-  const t = gcal.tokens[scope];
-  if (t && Date.now() < t.expires - 60000) return t.token;
-  const id = vault.settings.gcalClientId;
-  if (!isClientId(id)) throw new Error("Configura Google en Tú → Google");
+// One token per scope. Scopes of the features Manu enabled are requested
+// together in ONE consent window (iOS allows one popup per tap); each scope is
+// cached only if Google granted it, so a partial "no" degrades per feature.
+async function googleConsent(scopes) {
+  const missing = scopes.filter((sc) => { const t = gcal.tokens[sc]; return !(t && Date.now() < t.expires - 60000); });
+  if (!missing.length) return scopes;
+  if (!isClientId(gClientId())) throw new Error("Configura Google en Tú → Google");
   await loadGis();
   return new Promise((resolve, reject) => {
     const client = google.accounts.oauth2.initTokenClient({
-      client_id: id,
-      scope,
+      client_id: gClientId(),
+      scope: missing.join(" "),
       include_granted_scopes: false,
       callback: (resp) => {
-        if (resp.error || !resp.access_token || !google.accounts.oauth2.hasGrantedAllScopes(resp, scope)) { reject(new Error("Permiso no concedido")); return; }
-        gcal.tokens[scope] = { token: resp.access_token, expires: Date.now() + (Number(resp.expires_in) || 3600) * 1000 };
-        resolve(resp.access_token);
+        if (resp.error || !resp.access_token) { reject(new Error("Permiso no concedido")); return; }
+        const granted = missing.filter((sc) => google.accounts.oauth2.hasGrantedAllScopes(resp, sc));
+        for (const sc of granted) gcal.tokens[sc] = { token: resp.access_token, expires: Date.now() + (Number(resp.expires_in) || 3600) * 1000 };
+        resolve(granted);
       },
       error_callback: () => reject(new Error("Se cerró la ventana de Google")),
     });
     client.requestAccessToken({ prompt: "" });
   });
+}
+
+async function googleToken(scope) {
+  await googleConsent([scope]);
+  const t = gcal.tokens[scope];
+  if (!t) throw new Error("Permiso no concedido");
+  return t.token;
+}
+
+// Never opens a window: used inside a sync, after googleConsent.
+function cachedToken(scope) {
+  const t = gcal.tokens[scope];
+  if (t && Date.now() < t.expires - 60000) return Promise.resolve(t.token);
+  return Promise.reject(new Error("Permiso no concedido"));
 }
 
 async function withRetry(scope, fn) {
@@ -940,7 +1034,7 @@ async function syncGoogle() {
     { key: "calendar", scope: SCOPE.calendar, run: async () => {
       const start = new Date(); start.setHours(0, 0, 0, 0);
       const end = new Date(start); end.setDate(end.getDate() + 2);
-      const days = await withRetry(SCOPE.calendar, (tk) => listEvents(tk, start, end));
+      const days = await listEvents(await cachedToken(SCOPE.calendar), start, end);
       const t = localDay(); const tk = tomorrowKey();
       vault.agenda = { day: t, events: days.get(t) ?? [], importedAt: new Date().toISOString(), source: "GOOGLE" };
       vault.agendaTomorrow = { day: tk, events: days.get(tk) ?? [] };
@@ -964,7 +1058,8 @@ async function syncGoogle() {
     } },
   ];
   const enabled = Object.fromEntries(["calendar", "tasks", "contacts"].map((k) => [k, googleOn(k)]));
-  const status = await runServices(services, enabled, (scope) => googleToken(scope));
+  try { await googleConsent(Object.keys(enabled).filter((k) => enabled[k]).map((k) => SCOPE[k])); } catch { /* each service reports its own missing permission */ }
+  const status = await runServices(services, enabled, cachedToken);
   vault.settings.googleStatus = { ...(vault.settings.googleStatus ?? {}), ...status };
   if (status.calendar?.startsWith("ok")) vault.settings.gcalSyncedAt = new Date().toISOString();
   const failed = Object.values(status).filter((v) => v.startsWith("error"));
@@ -1044,6 +1139,7 @@ if (launch.say || launch.events) {
 }
 render();
 refreshWeather();
+if (isClientId(gClientId()) && GOOGLE_FEATURES.some(([k]) => googleOn(k))) loadGis().catch(() => {});
 checkReminders();
 setInterval(checkReminders, 30000);
 setInterval(() => { if (tab === "hoy" && !sheet && !document.activeElement?.matches("input, textarea")) render(); }, 60000);
