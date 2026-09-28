@@ -1,6 +1,6 @@
 # 08 — Decisiones y puntos abiertos
 
-> Revisado el 2026-09-28 por [ADR-0007](../adr/0007-native-iphone-first.md) y, el mismo día, por las decisiones de producto de Manu ([ADR-0008](../adr/0008-source-retention-and-controlled-deletion.md), [ADR-0009](../adr/0009-manu-assistant-without-mandatory-ai.md), `docs/product/EXPERIENCE.md`). Las decisiones sustituidas se marcan, no se borran.
+> Revisado el 2026-09-28 por [ADR-0007](../adr/0007-native-iphone-first.md) y, el mismo día, por las decisiones de producto de Manu ([ADR-0008](../adr/0008-source-retention-and-controlled-deletion.md), [ADR-0009](../adr/0009-manu-assistant-without-mandatory-ai.md), `docs/product/EXPERIENCE.md`). Revisado de nuevo el mismo día para cerrar D-02 y precisar D-03/D-04B ([ADR-0011](../adr/0011-native-local-storage-and-keys.md), `docs/roadmap/BRAIN_02_TASK.md`). Las decisiones sustituidas se marcan, no se borran.
 
 ## Decisiones cerradas por BRAIN-00
 
@@ -47,16 +47,16 @@ Comunicadas directamente por Manu. Detalle en `docs/product/EXPERIENCE.md`.
 ## Decisiones cerradas tras verificar los dispositivos (2026-09-28)
 
 - **D-01 — DECIDIDA**: núcleo MANU BRAIN en Swift y apps SwiftUI para iPhone y Mac, sin componente web en la Beta 1. Manu delegó la elección técnica y aceptó la recomendación.
-- **D-04 — PARCIALMENTE RESUELTA**: el Mac local no es entorno de compilación. BRAIN-01 se compila y prueba como Swift Package en un runner estándar `macos-26` de GitHub Actions con Xcode 26.6, ejecución manual o por PR y presupuesto de gasto 0 €. Esto desbloquea BRAIN-01. La compilación y prueba de la app en el iPhone con iOS 27 sigue bloqueada: Xcode 27 está en vista previa en un runner `xcode-27-xlarge`, que no se adopta por coste, y TestFlight requiere D-03. No se usará un Mac prestado y no se actualizará el Mac actual a Tahoe para este proyecto.
+- **D-04 — PARCIALMENTE RESUELTA**: el Mac local no es entorno de compilación. BRAIN-01 se compila y prueba como Swift Package en un runner estándar `macos-26` de GitHub Actions con Xcode 26.6, ejecución manual o por PR y presupuesto de gasto 0 €. Esto desbloquea BRAIN-01, y por el mismo motivo desbloquea BRAIN-02a (ver [ADR-0011](../adr/0011-native-local-storage-and-keys.md) y `docs/roadmap/BRAIN_02_TASK.md`), que tampoco necesita proyecto Xcode. La compilación y prueba de un proyecto Xcode real (BRAIN-02b en adelante, y la app en el iPhone con iOS 27) sigue bloqueada: Xcode 27 está en vista previa en un runner `xcode-27-xlarge`, que la documentación de facturación de GitHub Actions confirma como runner "xlarge" cobrado siempre (no cubierto por minutos incluidos, ni siquiera en repos públicos) y por tanto queda descartado por ADR-0004 sin necesidad de decisión de Manu; TestFlight requiere D-03. No se usará un Mac prestado y no se actualizará el Mac actual a Tahoe para este proyecto.
 - Si el runner gratuito deja de estar disponible o consume los minutos incluidos, el workflow se detiene; no se activa facturación automáticamente.
+- **D-02 — DECIDIDA (2026-09-28, [ADR-0011](../adr/0011-native-local-storage-and-keys.md))**: SQLite del sistema tras un adaptador `LocalStore` propio (no SwiftData ni Core Data), blobs fuera de la base por hash, protección de archivo `NSFileProtectionCompleteUntilFirstUserAuthentication`, DEK/KEK de ADR-0003 con Argon2id (única dependencia externa justificada por seguridad) y la clave desenvuelta en Keychain (`kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`). El contenedor compartido con extensiones usa un App Group; su disponibilidad con una cuenta Apple gratuita queda `NO_VERIFICADO` y solo bloquea la subfase BRAIN-02c, no el resto de D-02.
 
 ## Decisiones pendientes
 
 | ID | Decisión | Opciones | Quién decide | Bloquea |
 | --- | --- | --- | --- | --- |
-| **D-02** | Almacenamiento local nativo, gestión de claves y contenedor compartido con extensiones | por evaluar tras D-01 | propuesta técnica + ADR | BRAIN-02 |
-| **D-03** | Asumir o no Apple Developer Program | cuenta gratuita (perfiles de 7 días, 10 App IDs, sin TestFlight ni WeatherKit) o programa de pago | Manu | BRAIN-02, parte de BRAIN-03, D-06, D-07 |
-| **D-04B** | Ruta de compilación, firma e instalación de la app integrada en el iPhone con iOS 27 | esperar runner estándar con Xcode 27; aprobar runner de pago; aprobar Apple Developer Program/TestFlight; reducir o retrasar la Beta nativa | Manu cuando BRAIN-02 la necesite | BRAIN-02 y Beta 1 |
+| **D-03** | Asumir o no Apple Developer Program | cuenta gratuita (perfiles de 7 días, 10 App IDs, sin TestFlight ni WeatherKit; App Groups `NO_VERIFICADO` con esta cuenta) o programa de pago | Manu, y solo si BRAIN-02c demuestra que la cuenta gratuita falla | BRAIN-02c, parte de BRAIN-03, D-06, D-07 |
+| **D-04B** | Ruta de compilación, firma e instalación de la app integrada en el iPhone con iOS 27 | esperar runner estándar con Xcode 27 (el runner en vista previa `xcode-27-xlarge` queda descartado por coste, ver más abajo); aprobar runner de pago con importe concreto; disponer de un Mac compatible; reducir o retrasar la Beta nativa | Manu, antes de empezar BRAIN-02b | BRAIN-02b, 02c, 02d y Beta 1 |
 | D-05 | Fuente de calendario para Agenda y el modo Trabajo | EventKit, Google Calendar read-only o ambos | Manu | BRAIN-09 |
 | D-06 | Servicio meteorológico | WeatherKit (requiere D-03), API pública gratuita, organismo oficial | propuesta técnica + Manu | BRAIN-10 |
 | D-07 | Transporte de la sincronización cifrada iPhone ↔ Mac | Drive `appDataFolder`, servicio mínimo propio, servicio de Apple (puede requerir D-03) | propuesta técnica + Manu | BRAIN-06 |
@@ -151,8 +151,8 @@ Si Manu no acepta la recomendación, la alternativa menos costosa es (c) solo si
 
 ## Intervención de Manu necesaria
 
-- D-01 ya está decidida y D-04 resuelta para BRAIN-01.
-- Decidir D-03 y D-04B cuando sean necesarias para instalar la app integrada. D-02 se definirá para Swift.
+- D-01 ya está decidida, D-02 ya está decidida ([ADR-0011](../adr/0011-native-local-storage-and-keys.md)) y D-04 resuelta para BRAIN-01 y BRAIN-02a.
+- Decidir D-04B antes de empezar BRAIN-02b (proyecto Xcode real); decidir D-03 solo si BRAIN-02c demuestra que App Groups falla con la cuenta gratuita.
 - Indicar si tiene Spotify Premium (afecta a la rutina de la mañana).
 - Autorizar explícitamente BRAIN-01 cuando corresponda.
 

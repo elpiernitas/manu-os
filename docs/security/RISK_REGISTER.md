@@ -48,6 +48,7 @@ Los riesgos R-24 a R-40 se añadieron el mismo día tras las decisiones de produ
 | R-38 | interfaz lenta en el iPhone 14 o en el Mac Intel; Manu deja de usarla | 3 | 4 | 12 | presupuesto de rendimiento medido en BRAIN-02; pruebas en los dispositivos reales | OPEN |
 | R-39 | detectar la llegada a casa exige ubicación en segundo plano: privacidad y batería | 3 | 3 | 9 | D-09; preferir automatización de Atajos o activación manual; permiso explícito | OPEN |
 | R-40 | con cuenta gratuita, el límite de 10 App IDs y la caducidad de 7 días chocan con una app con varias extensiones | 4 | 3 | 12 | D-03; contar extensiones antes de BRAIN-03 | OPEN |
+| R-41 | la derivación de clave Argon2id (D-02, [ADR-0011](../adr/0011-native-local-storage-and-keys.md)) depende de una dependencia Swift de terceros no fusionada todavía en `swift-crypto`; una vulnerabilidad o abandono de ese paquete afecta directamente a la protección del secreto de recuperación | 2 | 5 | 10 | fijar versión exacta y revisar el código antes de integrarla; alternativa nativa documentada (PBKDF2-HMAC-SHA256) si se prefiere cero dependencias; migrar a Argon2id nativo si `swift-crypto` lo incorpora | OPEN |
 
 ## Revisión
 

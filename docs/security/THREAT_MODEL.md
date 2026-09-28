@@ -1,6 +1,6 @@
 # 04 — Privacidad, threat model, backups y exportación
 
-> Revisado el 2026-09-28 por [ADR-0007](../adr/0007-native-iphone-first.md): se añaden activos, fronteras y amenazas de la app nativa, sus extensiones, finanzas y grabaciones. Revisado de nuevo el mismo día por las decisiones de producto de Manu ([ADR-0008](../adr/0008-source-retention-and-controlled-deletion.md), [ADR-0009](../adr/0009-manu-assistant-without-mandatory-ai.md)): borrado controlado de fuentes, asistente, Refugio, salud, personas y ausencia de bloqueo interno. Los controles nuevos están marcados `PENDIENTE`; no están implementados.
+> Revisado el 2026-09-28 por [ADR-0007](../adr/0007-native-iphone-first.md): se añaden activos, fronteras y amenazas de la app nativa, sus extensiones, finanzas y grabaciones. Revisado de nuevo el mismo día por las decisiones de producto de Manu ([ADR-0008](../adr/0008-source-retention-and-controlled-deletion.md), [ADR-0009](../adr/0009-manu-assistant-without-mandatory-ai.md)): borrado controlado de fuentes, asistente, Refugio, salud, personas y ausencia de bloqueo interno. Revisado de nuevo el mismo día por [ADR-0011](../adr/0011-native-local-storage-and-keys.md): diseño concreto del contenedor compartido y de la protección de archivo. Los controles nuevos están marcados `PENDIENTE`; no están implementados.
 
 ## Activos de mayor sensibilidad
 
@@ -54,7 +54,7 @@
 | modelo inventa conocimiento | falsedad presentada como hecho | salida `PROPOSED`, clasificación visible, evidencia obligatoria, revisión humana | DECIDIDO |
 | telemetría revela intimidad | metadatos sensibles | sin analítica de terceros; logs minimizados, redacción y corta retención | DECIDIDO |
 | lectura de la pantalla bloqueada por otra persona | exposición de calendario, finanzas, contactos o tareas | snapshot mínimo; clasificación de sensibilidad por tipo de dato; redacción por defecto con el iPhone bloqueado; G-09 | PENDIENTE |
-| extensión con acceso excesivo | una extensión comprometida o con fallo lee el vault completo | las extensiones solo leen el snapshot del modo activo; sin claves del vault en el contenedor compartido | PENDIENTE (D-02) |
+| extensión con acceso excesivo | una extensión comprometida o con fallo lee el vault completo | las extensiones solo leen el snapshot del modo activo; sin claves del vault en el contenedor compartido (App Group, D-02 decidida por ADR-0011) | PENDIENTE (implementación en BRAIN-02c) |
 | App Intent invocado sin intención de Manu | acción ejecutada desde Siri, Atajos o automatización | intents de lectura y captura sin efectos externos; cualquier escritura sensible pide confirmación; nada destructivo sin la app desbloqueada | PENDIENTE |
 | grabación sin consentimiento | infracción legal y daño a terceros | G-08; consentimiento explícito de todos los participantes; aviso visible; revisión legal aplicable | PENDIENTE |
 | filtración de transcripciones | exposición de conversaciones y datos de terceros | transcripción en el dispositivo; envío a modelos solo con aprobación del lote; retención definida | PENDIENTE |

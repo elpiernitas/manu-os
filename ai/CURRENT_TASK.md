@@ -1,6 +1,8 @@
 # CURRENT TASK
 
-Status: **IN_PROGRESS**
+Status: **REVIEW_PENDING**
+
+Implementación de esta tarea de preparación completada por Claude Code. Ver `ai/HANDOFF.md` para el resultado completo (D-02 decidida por ADR-0011, BRAIN-02 dividida en subfases 02a–02d, D-03/D-04B precisadas) y el PR #5 para la evidencia y el bloqueo humano concreto que queda abierto. Pendiente de revisión del orquestador.
 
 ## Tarea activa
 

@@ -10,7 +10,7 @@ Solo puede existir una tarea de implementación `IN_PROGRESS`. Una fase no empie
 | --- | --- | --- | --- | --- |
 | BRAIN-00 | fundación documental; revisiones ADR-0007 a ADR-0009 | — | — | COMPLETED |
 | BRAIN-01 | contratos de Source (con retención), Claim, Evidence y tiempo | BRAIN-00, D-01 | sí | COMPLETED |
-| BRAIN-02 | apps nativas mínimas, vault local, cinco pestañas | BRAIN-01, D-02, D-03, D-04 | sí | BLOCKED |
+| BRAIN-02 | apps nativas mínimas, vault local, cinco pestañas (02a sin Xcode; 02b–02d con Xcode real) | BRAIN-01; 02a sin bloqueo adicional; 02b–02d: D-04B y, para el contenedor compartido, posiblemente D-03 | sí | BLOCKED (02a implementable en cuanto se autorice código; 02b–02d BLOCKED por D-04B) |
 | BRAIN-03 | superficies del sistema y modos | BRAIN-02 | sí | BLOCKED |
 | BRAIN-04 | búsqueda, relaciones y explicación | BRAIN-02 | sí | BLOCKED |
 | BRAIN-05 | export, restore y copia semanal en el Mac | BRAIN-04 | sí | BLOCKED |
@@ -55,9 +55,9 @@ Detalle y recomendación en `docs/architecture/DECISIONS_AND_OPEN_ITEMS.md`.
 | ID | Decisión | Bloquea |
 | --- | --- | --- |
 | D-01 | reparto SwiftUI/web, lenguaje del núcleo y tecnología de la app de Mac | BRAIN-01, BRAIN-02 |
-| D-02 | almacenamiento local nativo y contenedor compartido con extensiones | BRAIN-02 |
-| D-03 | Apple Developer Program: sí o no | BRAIN-02, parte de BRAIN-03, D-06, D-07 |
-| D-04 | entorno de compilación y pruebas (faltan datos del Mac) | BRAIN-02 |
+| ~~D-02~~ | ~~almacenamiento local nativo y contenedor compartido con extensiones~~ **DECIDIDA** ([ADR-0011](../adr/0011-native-local-storage-and-keys.md)) | — |
+| D-03 | Apple Developer Program: sí o no | BRAIN-02c (solo si falla la cuenta gratuita), parte de BRAIN-03, D-06, D-07 |
+| D-04B | entorno de compilación, firma e instalación de un proyecto Xcode real | BRAIN-02b, 02c, 02d |
 | D-05 | fuente de calendario | BRAIN-09 |
 | D-06 | servicio meteorológico | BRAIN-10 |
 | D-07 | transporte de sync cifrado | BRAIN-06 |
@@ -66,4 +66,4 @@ Detalle y recomendación en `docs/architecture/DECISIONS_AND_OPEN_ITEMS.md`.
 
 ## Completado
 
-BRAIN-01 fue fusionado mediante el PR #2 tras revisión externa, corrección de 11 defectos y 31/31 tests en 3 suites. El siguiente trabajo permitido es la preparación documental de BRAIN-02; su implementación continúa bloqueada por D-02, D-03 y D-04.
+BRAIN-01 fue fusionado mediante el PR #2 tras revisión externa, corrección de 11 defectos y 31/31 tests en 3 suites. BRAIN-02-PREP (PR #5) cerró D-02 ([ADR-0011](../adr/0011-native-local-storage-and-keys.md)) y dividió BRAIN-02 en subfases 02a–02d; la implementación de BRAIN-02a sigue sin autorizar hasta que Manu o el orquestador la habiliten explícitamente, y 02b–02d siguen bloqueadas por D-04B (D-03 solo si BRAIN-02c lo demuestra necesario).

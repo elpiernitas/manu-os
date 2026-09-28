@@ -24,7 +24,7 @@ Source (con retención), Fragment, Entity, Claim, Evidence, temporalidad, sustit
 
 ### BRAIN-02 — apps nativas mínimas y vault local
 
-App SwiftUI de iPhone y, según D-01, app de Mac. Persistencia local detrás de `LocalStore` (D-02), migraciones, transacciones y hashes. Captura de texto offline e Inbox. Navegación de cinco pestañas vacía con la identidad visual. Tests de cierre/reapertura. Requiere D-01 a D-04.
+App SwiftUI de iPhone y, según D-01, app de Mac. Persistencia local detrás de `LocalStore` (D-02, decidida por [ADR-0011](../adr/0011-native-local-storage-and-keys.md)), migraciones, transacciones y hashes. Captura de texto offline e Inbox. Navegación de cinco pestañas vacía con la identidad visual. Tests de cierre/reapertura. Dividida en subfases 02a–02d en `BRAIN_02_TASK.md`; 02a (persistencia y claves, sin Xcode) se verifica en CI como BRAIN-01, sin bloqueo; 02b–02d requieren D-04B y, para el contenedor compartido, posiblemente D-03.
 
 ### BRAIN-03 — superficies del sistema y modos
 

@@ -1,0 +1,96 @@
+# ADR-0011 — Almacenamiento local nativo, claves y contenedor compartido (D-02)
+
+- Status: **ACCEPTED**
+- Date: **2026-09-28**
+
+## Contexto
+
+D-01 decidió el núcleo MANU BRAIN en Swift, sin componente web en la Beta 1 ([DECISIONS_AND_OPEN_ITEMS.md](../architecture/DECISIONS_AND_OPEN_ITEMS.md)). ADR-0010 implementó BRAIN-01 como Swift Package sin dependencias externas, sin almacenamiento ni interfaz. D-02 queda como la decisión pendiente que bloquea BRAIN-02: qué usa MANU OS para persistir el vault en iOS/macOS, cómo gestiona sus claves y cómo comparte un subconjunto mínimo con las extensiones del sistema (ADR-0007).
+
+Restricciones que siguen vigentes y condicionan la decisión:
+
+- Cifrado en cliente obligatorio (ADR-0003): DEK de 256 bits por vault, AES-256-GCM, KEK envuelta derivada del secreto de recuperación de Manu.
+- Sin bloqueo interno de Face ID (decisión de producto, R-33 `ACCEPTED`): la protección del sistema operativo (passcode/Face ID del dispositivo) es la única barrera adicional a la del cifrado propio; MANU OS no puede asumir que el vault está "cerrado" mientras el dispositivo está desbloqueado.
+- Coste 0 €, sin dependencias que exijan facturación (ADR-0004).
+- El entorno de Claude Code en la nube no compila para Apple; BRAIN-01 se verifica en el runner `macos-26` de GitHub Actions sin firma ni dispositivo (D-04). D-02 debe separar qué puede probarse ahí de lo que necesita firma y un iPhone real (D-04B).
+- Las extensiones solo pueden leer un snapshot mínimo, nunca el vault completo (ARCHITECTURE.md, THREAT_MODEL.md).
+
+### Fuentes consultadas (2026-09-28)
+
+Registradas también en `docs/research/SOURCES.md`. Resumen relevante:
+
+- Apple documenta cuatro clases de protección de archivos (`NSFileProtectionComplete`, `CompleteUnlessOpen`, `CompleteUntilFirstUserAuthentication`, `NoProtection`); `CompleteUntilFirstUserAuthentication` es la que Apple aplica por defecto a los contenedores de datos de apps y de grupo, y permite acceso continuo tras el primer desbloqueo, incluida ejecución en segundo plano de extensiones y posibles daemons.
+- Los atributos `kSecAttrAccessible*` de Keychain Services siguen existiendo como familia con y sin sufijo `ThisDeviceOnly` (sincronizable vía iCloud Keychain o no). No se encontró una fuente primaria concluyente en esta revisión sobre el estado exacto de deprecación de `kSecAttrAccessibleAlways`/`kSecAttrAccessibleAlwaysThisDeviceOnly`; se tratan como **no recomendados** por buenas prácticas (accesibles incluso antes del primer desbloqueo) y no se usan.
+- App Groups es el mecanismo estándar de Apple para compartir un contenedor de archivos, `UserDefaults` y un grupo de acceso de Keychain entre una app y sus extensiones.
+- Sobre si la entitlement de App Groups funciona con una cuenta Apple gratuita (Personal Team, la que usaría Manu mientras D-03 no esté decidida): la evidencia encontrada es contradictoria entre foros oficiales de Apple Developer y no hay una fuente primaria concluyente verificada en esta revisión. Queda como `NO_VERIFICADO`.
+- CryptoKit de Apple ofrece AES-GCM, SHA-2 y HKDF de forma nativa, pero **no** ofrece Argon2id: hay una propuesta abierta (no fusionada) para añadirlo a `swift-crypto`. Argon2id sigue sin estar disponible como API nativa de Apple en esta revisión.
+- SwiftData exige iOS 17+/macOS 14+ como mínimo de despliegue y está pensado para sincronizar con CloudKit; Core Data comparte el mismo motor SQLite subyacente pero con un modelo de objetos administrados más pesado. Ambos son soluciones de Apple, no dependencias externas, pero ninguno es requisito para usar SQLite directamente.
+
+Ninguna de estas fuentes se ha probado en el iPhone o el Mac de Manu; se documentan como lectura de documentación oficial o de foros oficiales, no como comportamiento verificado en el dispositivo.
+
+## Decisión
+
+### 1. Persistencia estructurada: SQLite del sistema tras un adaptador `LocalStore`
+
+MANU OS usa la librería `sqlite3` ya incluida en iOS y macOS (no es una dependencia nueva, es parte del sistema operativo) a través de un wrapper Swift propio y mínimo, detrás del puerto `LocalStore` ya previsto en `ARCHITECTURE.md`. No se adopta SwiftData ni Core Data para el MVP:
+
+- SwiftData exige una versión mínima de iOS/macOS más alta de la necesaria y está orientado a sincronizar con CloudKit, que no es el transporte elegido para D-07 hoy.
+- Core Data añade un modelo de objetos administrados y un runtime que MANU OS no necesita; su generación de esquema es más difícil de auditar campo a campo que SQL explícito.
+- Ambos atarían el motor de datos a frameworks de Apple con menos control sobre migraciones deterministas, que BRAIN-01 ya exige por contrato (StrictJSON, validación en el límite del dominio).
+
+**Regla de salida reversible**: si el wrapper manual sobre `sqlite3` crece de forma desproporcionada o aparecen errores de gestión de memoria/hilos difíciles de mantener, se adopta `GRDB.swift` (una única dependencia Swift delgada y ampliamente auditada) como sustituto del wrapper, manteniendo el mismo contrato `LocalStore`. Esta decisión queda documentada aquí para no reabrir D-02 solo por ese motivo.
+
+### 2. Blobs fuera de la base estructurada
+
+Los blobs (originales con retención `FULL`, adjuntos) se guardan como archivos independientes en el contenedor de la app, referenciados por hash SHA-256 desde SQLite, no como columnas `BLOB`. Evita inflar la base y bloquear operaciones de lectura/escritura durante backups o VACUUM. Coincide con lo ya anotado en `ARCHITECTURE.md`.
+
+### 3. Protección de archivo del sistema
+
+Cada archivo del vault (base de datos y blobs) se marca con `NSFileProtectionCompleteUntilFirstUserAuthentication`, no con `NSFileProtectionComplete`:
+
+- Es el valor por defecto de Apple para contenedores de datos de apps y de grupo, y es compatible con acceso en segundo plano de extensiones tras el primer desbloqueo del dispositivo.
+- `NSFileProtectionComplete` bloquearía la lectura mientras el dispositivo está bloqueado, lo que rompería widgets, Live Activities y sincronización en segundo plano.
+- Como R-33 acepta que cualquier persona con el dispositivo desbloqueado accede a todo, la protección de archivo del sistema es una capa adicional (protege el dato en reposo si el dispositivo está apagado, en reinicio o robado y bloqueado), no la barrera principal. La barrera principal sigue siendo el cifrado propio de contenido (ADR-0003) y el bloqueo del propio dispositivo.
+
+### 4. Gestión de claves
+
+- Se mantiene el esquema ya decidido en ADR-0003: DEK de 256 bits por vault, AES-256-GCM con nonce único por registro/blob, KEK envuelta derivada del secreto de recuperación.
+- **Derivación de la KEK**: se recomienda Argon2id (RFC 9106) mediante una única dependencia Swift Package mínima y auditada, por su resistencia a ataques con GPU/ASIC frente a PBKDF2. Esta es la única excepción de dependencia externa que este ADR autoriza, justificada por seguridad; se fija la versión exacta y se revisa su código antes de integrarla en la subfase que la implemente. Si en esa subfase Manu prefiere cero dependencias externas sin excepción, la alternativa nativa es PBKDF2-HMAC-SHA256 con un número alto de iteraciones vía CryptoKit/CommonCrypto, documentando el cambio como debilidad aceptada frente a Argon2id.
+- **Persistencia de la clave desenvuelta**: Keychain de iOS/macOS, atributo `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly` — no sincronizable con iCloud Keychain, ligado a este dispositivo, accesible tras el primer desbloqueo sin exigir que la app esté en primer plano. Se descarta `WhenUnlocked` (impediría operar en segundo plano tras el primer desbloqueo) y se descartan `Always`/`AlwaysThisDeviceOnly` (expondrían la clave incluso antes del primer desbloqueo tras un reinicio).
+- La KEK-wrapped DEK (la clave todavía envuelta) puede guardarse también como archivo si conviene evitar una dependencia total de Keychain para el arranque; la clave sin envolver nunca se escribe en disco fuera de Keychain.
+
+### 5. Contenedor compartido con extensiones
+
+El contenedor compartido usa un **App Group** (`group.<bundle-id-base>`) con su Keychain access group asociado, siguiendo el patrón estándar de Apple. Las extensiones no reciben el vault ni la DEK: reciben solo el snapshot mínimo (cifrado o en claro según la sensibilidad del dato, ver `DATA_MODEL.md`) que la app principal escribe explícitamente para el modo activo — mismo principio ya fijado en `ARCHITECTURE.md` y `THREAT_MODEL.md`.
+
+**Bloqueo documentado, no resuelto por este ADR**: ni la disponibilidad de App Groups con una cuenta gratuita (Personal Team) ni el comportamiento del contenedor compartido pueden verificarse en el runner de CI, que no firma código ni tiene dispositivo. Por eso el contenedor compartido **no** forma parte de la primera subfase de BRAIN-02 (ver sección "Subfases" en `docs/roadmap/BRAIN_02_TASK.md`): se implementa y prueba en una subfase posterior, en un dispositivo real, momento en el que también se confirmará si esa capacidad concreta necesita D-03 resuelta como cuenta de pago.
+
+### 6. Migraciones
+
+Cada base de datos lleva `schema_version`. Las migraciones son funciones puras y versionadas, aplicadas en orden, con un test de migración desde cada versión anterior soportada — mismo patrón de disciplina que StrictJSON en BRAIN-01.
+
+### 7. Borrado
+
+`SourceDeletionEvent` (BRAIN-01) para una fuente con retención no-`FULL` se traduce en: borrado físico del blob referenciado y `DELETE` de la fila correspondiente con `PRAGMA secure_delete = ON` activado para minimizar restos recuperables en el archivo de base de datos. SQLite no garantiza por sí solo que un `DELETE` borre físicamente el contenido sin `secure_delete` o `VACUUM`; se documenta como paso explícito y comprobable por test (el archivo no contiene el texto borrado en claro tras la operación).
+
+### 8. Recuperación y backup
+
+No cambia lo ya descrito en `THREAT_MODEL.md` (manifest.json, JSONL, blobs por hash, checksums): se genera leyendo SQLite con la DEK en memoria durante la operación de export.
+
+## Alternativas consideradas
+
+- **SwiftData**: rechazada para el MVP por el mínimo de versión de SO y el acoplamiento a CloudKit; puede reconsiderarse si D-07 elige iCloud como transporte y si el Mac de Manu deja de limitar la versión mínima de despliegue.
+- **Core Data**: descartada por complejidad de un modelo administrado que MANU OS no necesita, con el mismo argumento de control fino que llevó a BRAIN-01 a un Swift Package puro (ADR-0010).
+- **Realm u otro motor NoSQL embebido**: descartado; añade una dependencia binaria grande sin ventaja clara sobre SQLite más un wrapper propio para el volumen de datos esperado.
+- **Cifrar la base completa con SQLCipher** en vez de cifrar campo a campo con AES-GCM: no se elige ahora porque duplicaría la gestión de claves (clave de SQLCipher además de la DEK de ADR-0003) sin necesidad clara; puede revisarse si el cifrado campo a campo demuestra ser demasiado costoso en dispositivo.
+
+## Consecuencias
+
+- BRAIN-02 puede dividirse en una primera subfase de solo lógica y persistencia (Swift Package + `sqlite3` del sistema, sin proyecto Xcode, sin App Group, sin Keychain, verificable en el runner `macos-26` con coste 0 € y sin dispositivo) y subfases posteriores que sí necesitan firma, App Group y un iPhone real.
+- Se añade una dependencia externa mínima y justificada (Argon2id) al proyecto, rompiendo por primera vez el "cero dependencias" de ADR-0010; ese ADR seguía limitado a BRAIN-01 y no impedía esta excepción puntual y documentada.
+- La disponibilidad de App Groups con cuenta gratuita sigue como bloqueo `NO_VERIFICADO` que D-03/D-04B deben cerrar antes de esa subfase concreta, no antes de empezar BRAIN-02.
+- Se añade R-41 al registro de riesgos (dependencia de terceros para Argon2id) y se actualiza R-40/D-02 en `DECISIONS_AND_OPEN_ITEMS.md`.
+
+## Verificación
+
+Nada de este ADR está implementado. La primera subfase (persistencia y cifrado sin App Group) es la única parte que este ADR considera comprobable en CI sin dispositivo ni firma; el resto queda `TEÓRICAMENTE_POSIBLE` hasta probarse en el iPhone y el Mac reales de Manu.
