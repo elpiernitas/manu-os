@@ -1,0 +1,52 @@
+name: Foundation check
+
+on:
+  pull_request:
+  push:
+
+permissions:
+  contents: read
+
+jobs:
+  repository-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify canonical documents
+        shell: bash
+        run: |
+          set -euo pipefail
+          required=(
+            AGENTS.md
+            docs/product/PRODUCT_CHARTER.md
+            docs/architecture/ARCHITECTURE.md
+            docs/architecture/DATA_MODEL.md
+            docs/security/THREAT_MODEL.md
+            docs/integrations/INTEGRATIONS.md
+            docs/roadmap/ROADMAP.md
+            ai/PROJECT_STATE.md
+            ai/CURRENT_TASK.md
+            ai/HANDOFF.md
+            ai/QA_REPORT.md
+            ai/DECISIONS.md
+          )
+          for path in "${required[@]}"; do
+            test -s "$path" || { echo "Missing or empty: $path"; exit 1; }
+          done
+
+      - name: Reject tracked environment files
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-files | grep -E '(^|/)\.env($|\.)' | grep -vE '(^|/)\.env\.example$'; then
+            echo "A real environment file is tracked."
+            exit 1
+          fi
+
+      - name: Require explicit task status
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Eq '^Status: \*\*(READY|IN_PROGRESS|PAUSED|BLOCKED|COMPLETED|NOT_AUTHORIZED)\*\*$' ai/CURRENT_TASK.md
