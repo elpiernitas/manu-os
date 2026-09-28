@@ -9,7 +9,7 @@ import { launchParams, parseEvents, nextEvent, localDay } from "./core/intake.js
 import { fetchForecast, searchCities, advice, WEATHER_TTL_MS } from "./core/weather.js";
 import { importStatement, importStatementRows } from "./core/bank.js";
 import { CITIES, proposeAlarm, shouldAskTomorrow, shortcutUrl, guessCity } from "./core/night.js";
-import { isClientId, listEvents, createEvent, newEventBody, monthGrid } from "./core/gcal.js";
+import { isClientId, listEvents, createEvent, newEventBody, monthGrid, listCalendars, mergeDays } from "./core/gcal.js";
 import { detectRecurring, upcomingRecurring, spendingPattern } from "./core/insights.js";
 import { SCOPE, runServices, planTaskSync, listOpenTasks, insertTask, completeTask, contactBirthdays, mergePeople, saveBackup, loadBackup } from "./core/google.js";
 import { isSensitive, pickModel, listModels, ask, buildPayload } from "./core/ai.js";
@@ -18,7 +18,7 @@ import { isSpotifyClientId, randomVerifier, challengeFor, authorizeUrl, exchange
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "10";
+export const APP_VERSION = "11";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -363,11 +363,11 @@ function calendarCard(canCreate) {
   return `<section class="card cal" aria-label="Calendario">
       <div class="row cal-head"><button class="link" data-act="cal-prev" aria-label="Mes anterior">${I.back}</button><strong class="cal-title">${esc(title)}</strong><button class="link" data-act="cal-next" aria-label="Mes siguiente">${I.chev}</button></div>
       <div class="cal-grid" id="calGrid">${["L", "M", "X", "J", "V", "S", "D"].map((d) => `<span class="cal-dow">${d}</span>`).join("")}
-        ${grid.map((d) => { const n = eventsFor(d.day).length; return `<button class="cal-day${d.inMonth ? "" : " out"}${d.day === localDay() ? " today" : ""}${d.day === selected ? " sel" : ""}" data-act="cal-day" data-day="${d.day}" aria-label="${d.day}${n ? `, ${n} eventos` : ""}"><span>${d.date}</span><i class="dots">${"<b></b>".repeat(Math.min(3, n))}</i></button>`; }).join("")}</div>
+        ${grid.map((d) => { const evs = eventsFor(d.day); const n = evs.length; return `<button class="cal-day${d.inMonth ? "" : " out"}${d.day === localDay() ? " today" : ""}${d.day === selected ? " sel" : ""}" data-act="cal-day" data-day="${d.day}" aria-label="${d.day}${n ? `, ${n} eventos` : ""}"><span class="num-d">${d.date}</span><span class="chips">${evs.slice(0, 3).map((ev) => `<i class="ev${ev.multi ? " multi" : ""}${ev.multi && !ev.first ? " cont" : ""}${ev.multi && !ev.last ? " open" : ""}" data-c="${esc(ev.color ?? "")}">${ev.multi && !ev.first && (new Date(`${d.day}T12:00:00`).getDay() !== 1) ? "&nbsp;" : esc(ev.title)}</i>`).join("")}${n > 3 ? `<i class="more">+${n - 3}</i>` : ""}</span></button>`; }).join("")}</div>
       ${d0(selected) ? "" : `<button class="link small" data-act="cal-today">Hoy</button>`}
     </section>
     ${sectionTitle(esc(cap(selDate.toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" }))), canCreate ? addLink("EVENT", "Nuevo evento") : "")}
-    <section class="card">${events.length || tasksDue.length ? events.map((ev) => `<div class="row event"><span class="ev-bar"></span><div class="grow"><div>${esc(ev.title)}</div><div class="muted small">${esc(ev.time ? ev.time + (ev.end ? " – " + ev.end : "") : "Todo el día")}${ev.location ? ` · ${esc(ev.location)}` : ""}</div></div></div>`).join("") + tasksDue.map(reminderRow).join("")
+    <section class="card">${events.length || tasksDue.length ? events.map((ev) => `<div class="row event"><span class="ev-bar" data-c="${esc(ev.color ?? "")}"></span><div class="grow"><div>${esc(ev.title)}</div><div class="muted small">${esc(ev.time ? ev.time + (ev.end ? " – " + ev.end : "") : "Todo el día")}${ev.location ? ` · ${esc(ev.location)}` : ""}${ev.calendar ? ` · ${esc(ev.calendar)}` : ""}</div></div></div>`).join("") + tasksDue.map(reminderRow).join("")
       : `<p class="muted">${vault.calendar ? "Nada este día." : "Conecta Google para ver tu calendario completo."}</p>`}</section>`;
 }
 const d0 = (day) => day === localDay() && (!calView || (calView.y === today().getFullYear() && calView.m === today().getMonth()));
@@ -752,6 +752,7 @@ function render({ focus = false, enter = null } = {}) {
   $("screen").querySelectorAll(".bar > i[data-w]").forEach((el) => { el.style.width = `${el.dataset.w}%`; });
   $("screen").querySelectorAll(".range > i").forEach((el) => { el.style.left = `${el.dataset.l}%`; el.style.width = `${el.dataset.w}%`; });
   $("screen").querySelectorAll(".week-bars i[data-h]").forEach((el) => { el.style.height = `${el.dataset.h}%`; });
+  $("screen").querySelectorAll("[data-c]").forEach((el) => { if (/^#[0-9a-f]{6}$/i.test(el.dataset.c)) el.style.setProperty("--ev", el.dataset.c); });
   $("topTitle").textContent = sub ? { habitos: "Hábitos", salud: "Salud", comidas: "Comidas", personas: "Personas", tiempo: "Tiempo", avisos: "Avisos", datos: "Tus datos", gcal: "Google", ia: "IA", spotify: "Spotify", atajos: "Atajos" }[sub] : TABS.find(([id]) => id === tab)[1];
   $("fab").hidden = tab === "manu" || Boolean(sheet);
   const sheetKey = sheet ? sheet.kind : null;
@@ -1179,12 +1180,16 @@ async function syncGoogle() {
       const now = new Date();
       const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
       const end = new Date(now.getFullYear(), now.getMonth() + 2, 1);
-      const days = await listEvents(await cachedToken(SCOPE.calendar), start, end);
+      const calToken = await cachedToken(SCOPE.calendar);
+      const listToken = await cachedToken(SCOPE.calendarList).catch(() => null);
+      const calendars = listToken ? await listCalendars(listToken).catch(() => []) : [];
+      const sources = calendars.length ? calendars : [{ id: "primary", color: null, name: null }];
+      const days = mergeDays(await Promise.all(sources.map((c) => listEvents(calToken, start, end, fetch, { calendarId: c.id, color: c.color, calendar: c.name }).catch(() => new Map()))));
       vault.calendar = { from: localDay(start), to: localDay(end), days: Object.fromEntries(days), syncedAt: new Date().toISOString() };
       const t = localDay(); const tk = tomorrowKey();
       vault.agenda = { day: t, events: days.get(t) ?? [], importedAt: new Date().toISOString(), source: "GOOGLE" };
       vault.agendaTomorrow = { day: tk, events: days.get(tk) ?? [] };
-      return `${vault.agenda.events.length} hoy · ${vault.agendaTomorrow.events.length} mañana`;
+      return `${sources.length} calendario${sources.length === 1 ? "" : "s"} · ${vault.agenda.events.length} hoy · ${vault.agendaTomorrow.events.length} mañana`;
     } },
     { key: "tasks", scope: SCOPE.tasks, run: async (token) => {
       const remote = await listOpenTasks(token);
@@ -1204,7 +1209,9 @@ async function syncGoogle() {
     } },
   ];
   const enabled = Object.fromEntries(["calendar", "tasks", "contacts"].map((k) => [k, googleOn(k)]));
-  try { await googleConsent(Object.keys(enabled).filter((k) => enabled[k]).map((k) => SCOPE[k])); } catch { /* each service reports its own missing permission */ }
+  const wanted = Object.keys(enabled).filter((k) => enabled[k]).map((k) => SCOPE[k]);
+  if (enabled.calendar) wanted.push(SCOPE.calendarList); // to show all of Manu's calendars
+  try { await googleConsent(wanted); } catch { /* each service reports its own missing permission */ }
   const status = await runServices(services, enabled, cachedToken);
   vault.settings.googleStatus = { ...(vault.settings.googleStatus ?? {}), ...status };
   if (status.calendar?.startsWith("ok")) vault.settings.gcalSyncedAt = new Date().toISOString();

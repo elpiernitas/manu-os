@@ -10,6 +10,37 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
+## WEB-11 — todos los calendarios con color, eventos de varios días y acceso a WhatsApp
+
+Capturas de Manu (2026-09-29):
+- Su Google Calendar muestra eventos de varios calendarios como barras de color, entre ellos «Vacaciones…» y «Campaña…». MANU solo leía el calendario principal y mostraba puntos.
+- El acceso de WhatsApp abría `wa.me/` sin número y WhatsApp respondía «No se pudo abrir este enlace».
+- Las mismas capturas confirman que los enlaces universales (Google Calendar) abren la app nativa desde la web instalada, con «◀ MANU» para volver.
+
+### Cambios
+
+- `web/core/gcal.js`:
+  - `listCalendars`: calendarios visibles con su color, con el scope de solo lectura `calendar.calendarlist.readonly`;
+  - `listEvents` por calendario;
+  - `groupByDay` reparte los eventos de varios días por cada día que ocupan (`end.date` exclusivo; un evento que termina a las 00:00 no pasa al día siguiente), con color, calendario y marcas first/last;
+  - `mergeDays`;
+  - colores saneados (`#rrggbb`).
+- `web/core/google.js`: `SCOPE.calendarList`, que se pide junto a Calendar en la misma ventana.
+- `web/core/hub.js`: WhatsApp con `whatsapp://`.
+- `web/app.js`: el mes muestra dentro de cada día hasta 3 eventos de color con su título; los eventos de varios días se dibujan como una barra continua; la lista del día indica el calendario; el color se aplica con una variable CSS desde JS, respetando la CSP; versión 11.
+- `web/styles.css`, `web/sw.js` (`manuos-v11`).
+
+### Resultados
+
+- `npm test`: 66/66 PASS.
+- Preflight CORS de `calendarList`: permitido.
+- Chromium headless (Europe/Madrid): 2 calendarios; vacaciones de 3 días como barra; 3 eventos hoy; color del calendario aplicado; estado «2 calendarios»; regresiones de WEB-03 a WEB-10 en PASS.
+
+### NO_VERIFICADO
+
+- El scope `calendarlist.readonly` con la cuenta real (Google volverá a pedir permiso una vez).
+- `whatsapp://` en el iPhone de Manu.
+
 ## WEB-10 — calendario de mes, cobros fijos, «cuándo gastas» y contactos explicados
 
 Prueba real de Manu con la versión 8: Google sincroniza (Calendar sí, Tasks trae su tarea, Contactos «0 nuevos»).

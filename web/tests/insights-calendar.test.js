@@ -61,3 +61,35 @@ test("contacts report how many were read, not only birthdays", async () => {
   assert.equal(r.total, 1);
   assert.equal(r.people.length, 0);
 });
+
+import { groupByDay, mergeDays, listCalendars } from "../core/gcal.js";
+import { APPS } from "../core/hub.js";
+
+test("multi-day events cover every day (end.date exclusive) and keep colour and calendar", () => {
+  const days = groupByDay({ items: [
+    { id: "v", summary: "Vacaciones de ejemplo", start: { date: "2026-09-28" }, end: { date: "2026-10-01" } },
+    { id: "m", summary: "Reunión", start: { dateTime: new Date(2026, 8, 29, 10).toISOString() }, end: { dateTime: new Date(2026, 8, 29, 11).toISOString() } },
+    { id: "n", summary: "Noche", start: { dateTime: new Date(2026, 8, 29, 23).toISOString() }, end: { dateTime: new Date(2026, 8, 30, 0).toISOString() } },
+  ] }, { color: "#9e69af", calendar: "Equipo" });
+  assert.deepEqual([...days.keys()].sort(), ["2026-09-28", "2026-09-29", "2026-09-30"]);
+  const d29 = days.get("2026-09-29");
+  assert.equal(d29[0].title, "Vacaciones de ejemplo", "multi-day first");
+  assert.equal(d29[0].first, false);
+  assert.equal(days.get("2026-09-30")[0].last, true);
+  assert.equal(d29[0].color, "#9e69af");
+  assert.equal(d29[0].calendar, "Equipo");
+  assert.ok(!days.get("2026-09-30").some((e) => e.id === "n"), "an event ending at 00:00 does not spill into the next day");
+  assert.equal(groupByDay({ items: [{ summary: "x", start: { date: "2026-09-28" } }] }, { color: "javascript:alert(1)" }).get("2026-09-28")[0].color, null, "colours are sanitised");
+  const merged = mergeDays([days, groupByDay({ items: [{ id: "p", summary: "Personal", start: { date: "2026-09-29" }, end: { date: "2026-09-30" } }] })]);
+  assert.equal(merged.get("2026-09-29").length, 4);
+});
+
+test("calendar list keeps visible calendars with safe colours; WhatsApp access opens the app", async () => {
+  const cals = await listCalendars("t", async () => ({ ok: true, status: 200, json: async () => ({ items: [
+    { id: "a@x", summary: "Personal", backgroundColor: "#4285f4", primary: true },
+    { id: "b@x", summary: "Oculto", selected: false },
+    { id: "c@x", summary: "Equipo", backgroundColor: "red" },
+  ] }) }));
+  assert.deepEqual(cals.map((c) => [c.name, c.color]), [["Personal", "#4285f4"], ["Equipo", null]]);
+  assert.equal(APPS.whatsapp.url, "whatsapp://");
+});

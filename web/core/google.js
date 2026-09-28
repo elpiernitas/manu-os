@@ -6,6 +6,7 @@ import { envelopeProblem } from "./crypto.js";
 // One scope per feature, requested only when that feature is switched on and used.
 export const SCOPE = {
   calendar: "https://www.googleapis.com/auth/calendar.events",
+  calendarList: "https://www.googleapis.com/auth/calendar.calendarlist.readonly",
   tasks: "https://www.googleapis.com/auth/tasks",
   contacts: "https://www.googleapis.com/auth/contacts.readonly",
   drive: "https://www.googleapis.com/auth/drive.appdata",
