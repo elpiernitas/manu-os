@@ -5,7 +5,7 @@
 ## Estado actual
 
 - BRAIN-00: **COMPLETED Y FUSIONADO** en `main` mediante el PR #1.
-- BRAIN-01: **IN PROGRESS**, autorizado por Manu el 2026-09-28 en la rama `brain/01-knowledge-contracts`, revalidado para Swift y ADR-0008.
+- BRAIN-01: **REVIEW PENDING** en el PR #2. Compila y supera 13/13 tests en GitHub Actions con Swift 6.3.3; no está fusionado.
 - BRAIN-02 y siguientes: no autorizados.
 - Implementación de producto: iniciado solo el núcleo Swift de BRAIN-01. No existe UI, proyecto Xcode, base de datos, red ni infraestructura.
 - Claude Code: con acceso al repositorio desde el 2026-09-28, solo para tareas documentales autorizadas por Manu.
@@ -19,8 +19,8 @@ Los documentos canónicos están en `docs/`. Las tareas activas se controlan med
 
 ## Siguiente gate
 
-1. Implementar y verificar BRAIN-01 con los tests obligatorios.
-2. Revisión externa del PR de BRAIN-01; no fusionarlo automáticamente.
+1. Revisión externa del PR #2; no fusionarlo automáticamente.
+2. Tras aprobación, merge y cierre de BRAIN-01.
 3. D-03 y D-04B siguen aplazadas hasta BRAIN-02.
 
 ## Restricciones vigentes

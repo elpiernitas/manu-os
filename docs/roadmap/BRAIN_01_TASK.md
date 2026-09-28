@@ -1,6 +1,6 @@
 # CURRENT TASK — BRAIN-01
 
-Status: **IN_PROGRESS**. Autorizado por Manu el 2026-09-28 tras el merge del PR #1.
+Status: **IMPLEMENTED_AWAITING_REVIEW**. Los 13 tests pasan en el run `36446466658`; falta revisión externa y merge.
 
 > **Revalidación cerrada (2026-09-28).** D-01 elige un núcleo Swift y apps SwiftUI. BRAIN-01 se implementa como Swift Package independiente de UI y se verifica en GitHub Actions `macos-26`. Se conservan los invariantes y los 12 tests, y se añaden los contratos de retención de ADR-0008.
 
