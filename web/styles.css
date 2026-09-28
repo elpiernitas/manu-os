@@ -168,3 +168,5 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
 .tile-v { font: 400 32px/1.1 var(--display); font-variant-numeric: tabular-nums; }
 .segmented.one { grid-template-columns: 1fr; }
 input[type=time] { width: auto; min-height: 36px; }
+.ai-tag { display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: .06em; padding: 1px 6px; margin-right: 6px; border-radius: 6px; background: rgba(113,82,217,.35); color: #D9CCFF; vertical-align: 1px; }
+ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }

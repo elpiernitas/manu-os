@@ -23,3 +23,4 @@ Estados permitidos:
 - [ADR-0010 — Contratos de conocimiento en Swift](0010-swift-knowledge-contracts.md)
 - [ADR-0011 — Almacenamiento local nativo, claves y contenedor compartido (D-02)](0011-native-local-storage-and-keys.md)
 - [ADR-0012 — App web instalable como vía operativa mientras la nativa no se puede instalar](0012-installable-web-app-as-operational-path.md) — modifica D-01 y ADR-0007
+- [ADR-0013 — IA opcional con Gemini y servicios de Google en la app web](0013-optional-gemini-and-google-services.md) — complementa ADR-0009 y ADR-0012

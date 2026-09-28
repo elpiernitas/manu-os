@@ -4,6 +4,30 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
+## WEB-05 — Gemini opcional, Google Tasks, cumpleaños de Contactos y copia en Drive (ADR-0013)
+
+Rama `claude/magical-goodall-rf5qoo`, desde `main` (`be88f9c`).
+
+### Archivos cambiados
+
+- `web/core/ai.js` (nuevo): filtro `isSensitive`, elección de modelo por lista, `systemPrompt` filtrado, cuerpo de petición sin turnos sensibles, errores 429 y de clave.
+- `web/core/google.js` (nuevo): scopes, plan de sincronización de Tasks en los dos sentidos, cumpleaños desde People API sin duplicados, copia en `appDataFolder` (crear o actualizar) y restauración.
+- `web/app.js`: la IA en el chat solo actúa cuando no hay intención y el texto no es sensible, con etiqueta «IA»; Tú → IA (clave fuera del vault) y Tú → Google (estado por servicio, copia y restauración de Drive con confirmación en la página); la sincronización incluye Tasks, Contactos (cada 24 h) y Drive (cada 6 h).
+- `web/index.html` (CSP con `tasks`, `people` y `generativelanguage`), `web/sw.js` (`manuos-v5`), `web/styles.css`, `web/tests/ai-google.test.js` (nuevo).
+- `docs/adr/0013-optional-gemini-and-google-services.md`, `docs/adr/README.md`.
+
+### Comandos ejecutados y resultados reales
+
+- `cd web && npm test`: 40/40 PASS.
+- Preflight CORS con `Origin: https://elpiernitas.github.io` hacia Calendar, Tasks, People, Drive y Gemini (con cabecera `x-goog-api-key`): permitido. Gemini con clave inválida responde 400 con CORS.
+- Chromium headless con Gemini y Open-Meteo simulados: 26/26 PASS en tres ejecuciones. Comprueba que la clave se prueba y elige `gemini-2.5-flash` de la lista simulada, que la IA responde a lo no reconocido, que el mensaje del médico no sale hacia la IA, que la clave no va en la URL ni en el vault, y la regresión completa.
+
+### NO_VERIFICADO
+
+- Llamadas reales a Gemini, Tasks, People y Drive (sin credenciales de Manu en este entorno).
+- El cupo gratuito y las condiciones actuales de Gemini.
+- El consentimiento de Google en iOS.
+
 ## WEB-04 — tiempo completo, Google Calendar y hora de entrada
 
 Rama `claude/magical-goodall-rf5qoo`, desde `main` (`9ee852d`). Tras probarlo Manu en su iPhone (2026-09-28): el tiempo carga y `shortcuts://run-shortcut` abre Atajos. Falla solo porque el atajo aún no existe.
