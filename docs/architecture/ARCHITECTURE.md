@@ -173,7 +173,7 @@ R2 tiene una franquicia gratuita amplia, pero cobra por exceso en cuentas factur
 - extensiones: widgets de inicio y pantalla bloqueada, App Intents (Atajos y Siri; botón de acción solo en iPhones que lo tengan), controles del Centro de Control y Live Activities (el iPhone 14 estándar no tiene Dynamic Island, así que se verían en la pantalla bloqueada; confirmar el modelo exacto);
 - Share Extension para capturar desde otras apps;
 - acceso con permiso, pedido en el momento de uso, a calendario y recordatorios, fotos, micrófono y reconocimiento de voz;
-- datos compartidos con las extensiones mediante un contenedor común (App Group) limitado al snapshot mínimo — **DECIDIDO en su diseño por D-02/ADR-0011**; su disponibilidad con cuenta Apple gratuita sigue `NO_VERIFICADO` y se prueba en BRAIN-02c;
+- datos compartidos con las extensiones mediante un contenedor común (App Group) limitado al snapshot mínimo — **DECIDIDO en su diseño por D-02/ADR-0011**; se prueba en simulador (sin firma ni cuenta) en BRAIN-02c; solo **registrar** el App Group contra un equipo de desarrollador real, necesario para firmar e instalar en un iPhone físico, sigue `NO_VERIFICADO` con cuenta Apple gratuita;
 - Dynamic Type, VoiceOver, modo oscuro y convenciones de navegación de iOS desde el primer incremento.
 
 Nada de esta lista está implementado ni probado.
@@ -197,7 +197,7 @@ Datos de la documentación de Apple consultada el 2026-09-28 (ver `docs/research
 Consecuencias:
 
 - **D-03**: decidir si Manu asume Apple Developer Program. Sin él, la app caduca cada 7 días y algunas capacidades (TestFlight, WeatherKit, posiblemente notificaciones push y servicios de iCloud) no están disponibles. El precio y las condiciones deben comprobarse en la documentación actual de Apple.
-- **D-04 (parcialmente resuelta)**: el Mac de Manu no se usa para compilar. BRAIN-01 se compila y prueba como Swift Package en GitHub Actions, runner estándar `macos-26` con Xcode 26.6, presupuesto de gasto 0 € y workflows breves/manuales. Esto no valida la app en el iPhone 14 con iOS 27. Xcode 27 está en vista previa en el runner `xcode-27-xlarge`, no adoptado por coste; la ruta de firma e instalación de la Beta queda como D-04B. No se usará un Mac prestado ni se actualizará este Mac a Tahoe para el proyecto.
+- **D-04 (parcialmente resuelta)**: el Mac de Manu no se usa para compilar. BRAIN-01 se compila y prueba como Swift Package en GitHub Actions, runner estándar `macos-26` con Xcode 26.6, presupuesto de gasto 0 € y workflows breves/manuales. El mismo runner, al traer SDKs e imágenes de iOS Simulator, también compila y prueba un proyecto Xcode real (BRAIN-02b–02d, incluido Keychain, App Group y extensiones) sin firma ni Apple ID, porque el simulador no aplica la autorización de entitlements por perfil de aprovisionamiento ([ADR-0011](../adr/0011-native-local-storage-and-keys.md)). Lo que ninguno de los dos valida es la app en el iPhone 14 físico con iOS 27. Xcode 27 está en vista previa en el runner `xcode-27-xlarge`, no adoptado por coste; la ruta de firma e instalación de la Beta en ese dispositivo físico queda como D-04B. No se usará un Mac prestado ni se actualizará este Mac a Tahoe para el proyecto.
 
 ### PWA V1 (BRAIN-00, sustituida como interfaz principal por ADR-0007)
 

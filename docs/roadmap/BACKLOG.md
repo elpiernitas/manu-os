@@ -10,7 +10,7 @@ Solo puede existir una tarea de implementación `IN_PROGRESS`. Una fase no empie
 | --- | --- | --- | --- | --- |
 | BRAIN-00 | fundación documental; revisiones ADR-0007 a ADR-0009 | — | — | COMPLETED |
 | BRAIN-01 | contratos de Source (con retención), Claim, Evidence y tiempo | BRAIN-00, D-01 | sí | COMPLETED |
-| BRAIN-02 | apps nativas mínimas, vault local, cinco pestañas (02a sin Xcode; 02b–02d con Xcode real) | BRAIN-01; 02a sin bloqueo adicional; 02b–02d: D-04B y, para el contenedor compartido, posiblemente D-03 | sí | BLOCKED (02a implementable en cuanto se autorice código; 02b–02d BLOCKED por D-04B) |
+| BRAIN-02 | apps nativas mínimas, vault local, cinco pestañas (02a–02d verificables en CI/simulador; fase de dispositivo real aparte) | BRAIN-01; sin bloqueo adicional para 02a–02d en simulador; la fase de dispositivo real (firma/instalación en el iPhone) depende de D-04B y, solo si falla, D-03 | sí | BLOCKED (02a–02d implementables en cuanto se autorice código de producto; la fase de dispositivo real sigue BLOCKED por D-04B) |
 | BRAIN-03 | superficies del sistema y modos | BRAIN-02 | sí | BLOCKED |
 | BRAIN-04 | búsqueda, relaciones y explicación | BRAIN-02 | sí | BLOCKED |
 | BRAIN-05 | export, restore y copia semanal en el Mac | BRAIN-04 | sí | BLOCKED |
@@ -56,8 +56,8 @@ Detalle y recomendación en `docs/architecture/DECISIONS_AND_OPEN_ITEMS.md`.
 | --- | --- | --- |
 | D-01 | reparto SwiftUI/web, lenguaje del núcleo y tecnología de la app de Mac | BRAIN-01, BRAIN-02 |
 | ~~D-02~~ | ~~almacenamiento local nativo y contenedor compartido con extensiones~~ **DECIDIDA** ([ADR-0011](../adr/0011-native-local-storage-and-keys.md)) | — |
-| D-03 | Apple Developer Program: sí o no | BRAIN-02c (solo si falla la cuenta gratuita), parte de BRAIN-03, D-06, D-07 |
-| D-04B | entorno de compilación, firma e instalación de un proyecto Xcode real | BRAIN-02b, 02c, 02d |
+| D-03 | Apple Developer Program: sí o no | fase de dispositivo real de BRAIN-02 (solo si firmar con la cuenta gratuita en el iPhone físico falla), parte de BRAIN-03, D-06, D-07 |
+| D-04B | firma e instalación de un proyecto Xcode real en el iPhone físico (su compilación/prueba en simulador no la necesita, ver D-04) | fase de dispositivo real de BRAIN-02b, 02c, 02d |
 | D-05 | fuente de calendario | BRAIN-09 |
 | D-06 | servicio meteorológico | BRAIN-10 |
 | D-07 | transporte de sync cifrado | BRAIN-06 |
@@ -66,4 +66,4 @@ Detalle y recomendación en `docs/architecture/DECISIONS_AND_OPEN_ITEMS.md`.
 
 ## Completado
 
-BRAIN-01 fue fusionado mediante el PR #2 tras revisión externa, corrección de 11 defectos y 31/31 tests en 3 suites. BRAIN-02-PREP (PR #5) cerró D-02 ([ADR-0011](../adr/0011-native-local-storage-and-keys.md)) y dividió BRAIN-02 en subfases 02a–02d; la implementación de BRAIN-02a sigue sin autorizar hasta que Manu o el orquestador la habiliten explícitamente, y 02b–02d siguen bloqueadas por D-04B (D-03 solo si BRAIN-02c lo demuestra necesario).
+BRAIN-01 fue fusionado mediante el PR #2 tras revisión externa, corrección de 11 defectos y 31/31 tests en 3 suites. BRAIN-02-PREP (PR #5) cerró D-02 ([ADR-0011](../adr/0011-native-local-storage-and-keys.md)) y dividió BRAIN-02 en subfases 02a–02d, verificables en CI/simulador sin firma ni dispositivo (corrección tras revisión externa del propio PR #5: una versión anterior las daba por bloqueadas en bloque por D-04B). Ninguna subfase está autorizada para implementarse todavía; solo la fase de dispositivo real (firma e instalación en el iPhone físico) sigue bloqueada por D-04B, con D-03 como pregunta condicional si esa firma falla con la cuenta gratuita.

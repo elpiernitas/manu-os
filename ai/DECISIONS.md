@@ -40,12 +40,12 @@
 
 - D-01: **DECIDIDA**. Núcleo Swift y apps SwiftUI para iPhone y Mac; Manu aceptó la recomendación. *(Esta sección corrige una entrada anterior de este archivo que seguía describiéndola como pendiente después de cerrarse.)*
 - D-02: **DECIDIDA** ([ADR-0011](../docs/adr/0011-native-local-storage-and-keys.md)). SQLite del sistema tras `LocalStore`, Argon2id + Keychain para claves, App Group para el contenedor compartido (disponibilidad con cuenta gratuita `NO_VERIFICADO`, no bloquea el cierre de D-02).
-- D-04: **PARCIALMENTE RESUELTA**. BRAIN-01 y BRAIN-02a se verifican en el runner `macos-26` sin coste; un proyecto Xcode real (BRAIN-02b en adelante) sigue bloqueado por D-04B.
+- D-04: **PARCIALMENTE RESUELTA**. BRAIN-01 y las cuatro subfases de BRAIN-02 (incluido un proyecto Xcode real con Keychain, App Group y extensiones) se verifican en el runner `macos-26` contra iOS Simulator sin firma ni coste; solo firmar e instalar en el iPhone físico sigue bloqueado por D-04B (corrección del 2026-09-28 tras revisión externa del PR #5).
 
 ## Pendientes
 
-- D-03: Apple Developer Program. Solo se pedirá a Manu si BRAIN-02c demuestra que App Groups falla con la cuenta gratuita.
-- D-04B: entorno de compilación, firma e instalación de un proyecto Xcode real; el Mac de Manu no cumple los requisitos oficiales de ningún Xcode actual y el runner `xcode-27-xlarge` queda descartado por coste.
+- D-03: Apple Developer Program. Solo se pedirá a Manu si firmar en el iPhone físico con la cuenta gratuita demuestra que App Groups falla.
+- D-04B: firma e instalación de un proyecto Xcode real en el iPhone físico (no su compilación/prueba en simulador, ya desbloqueada por D-04); el Mac de Manu no cumple los requisitos oficiales de ningún Xcode actual y el runner `xcode-27-xlarge` queda descartado por coste.
 - D-05: fuente de calendario.
 - D-06: servicio meteorológico.
 - D-07: transporte de sync.
