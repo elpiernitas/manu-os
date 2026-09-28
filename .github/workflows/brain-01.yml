@@ -6,6 +6,7 @@ on:
       - Package.swift
       - Sources/**
       - Tests/**
+      - App/**
       - .github/workflows/brain-01.yml
   workflow_dispatch:
 
@@ -30,3 +31,67 @@ jobs:
         run: swift build --build-tests
       - name: Test
         run: swift test --parallel
+      # BRAIN-02b first criterion: prove the runner's Xcode and iOS SDKs, and
+      # compile the package (including the SwiftUI shell) for iOS Simulator.
+      # No signing, no Apple account, no device, no cost beyond this job.
+      - name: Xcode and SDKs
+        run: |
+          xcodebuild -version
+          xcodebuild -showsdks
+          xcodebuild -list
+      - name: Build for iOS Simulator
+        run: |
+          xcodebuild build \
+            -scheme ManuBrain-Package \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO
+      # iPhone app target generated from App/project.yml with XcodeGen.
+      - name: Generate Xcode project
+        run: |
+          brew install xcodegen
+          cd App && xcodegen generate
+      - name: Build iPhone app for iOS Simulator
+        run: |
+          xcodebuild build \
+            -project App/ManuOS.xcodeproj \
+            -scheme ManuOS \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO
+      - name: Build Mac app
+        run: |
+          xcodebuild build \
+            -project App/ManuOS.xcodeproj \
+            -scheme ManuOSMac \
+            -destination 'generic/platform=macOS' \
+            CODE_SIGNING_ALLOWED=NO
+      # Launch the iPhone app in a simulator and capture one screenshot per
+      # tab, so the interface can be reviewed without a device.
+      - name: Screenshots in iOS Simulator
+        run: |
+          set -euo pipefail
+          xcodebuild build \
+            -project App/ManuOS.xcodeproj \
+            -scheme ManuOS \
+            -sdk iphonesimulator \
+            -derivedDataPath build/sim \
+            CODE_SIGNING_ALLOWED=NO
+          APP=build/sim/Build/Products/Debug-iphonesimulator/ManuOS.app
+          DEVICE=$(xcrun simctl list devices available -j \
+            | python3 -c 'import json,sys; d=json.load(sys.stdin)["devices"]; print(next(x["udid"] for k,v in d.items() if "iOS" in k for x in v if x["name"].startswith("iPhone")))')
+          xcrun simctl boot "$DEVICE"
+          xcrun simctl bootstatus "$DEVICE" -b
+          xcrun simctl ui "$DEVICE" appearance dark
+          xcrun simctl install "$DEVICE" "$APP"
+          mkdir -p screenshots
+          for tab in today agenda manu money you; do
+            xcrun simctl launch --terminate-running-process "$DEVICE" local.manuos.app -tab "$tab"
+            sleep 4
+            xcrun simctl io "$DEVICE" screenshot "screenshots/$tab.png"
+          done
+          ls -la screenshots
+      - name: Upload screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: manu-os-screenshots
+          path: screenshots/
+          retention-days: 7
