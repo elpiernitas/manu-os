@@ -28,7 +28,7 @@ flowchart TD
 
 MANU BRAIN Core no depende de ninguna interfaz, nube ni IA. Define comandos, eventos, validación, resolución temporal, retención y exportación. Las apps, sus extensiones, la sincronización y los agentes consumen ese núcleo mediante interfaces.
 
-**Pendiente (D-01)**: el lenguaje y la ubicación del núcleo. BRAIN-00 lo definió como TypeScript. Opciones: núcleo en Swift, núcleo en TypeScript ejecutado en el dispositivo, o contrato compartido implementado en ambos lenguajes. **Recomendación técnica documentada (no cerrada)**: núcleo en Swift y apps SwiftUI para iPhone y Mac, sin duplicar el núcleo en TypeScript; ver `DECISIONS_AND_OPEN_ITEMS.md`. La decisión es de Manu y debe tomarse antes de autorizar BRAIN-01.
+**DECIDIDO (D-01, 2026-09-28)**: núcleo MANU BRAIN en Swift y apps SwiftUI para iPhone y Mac, sin duplicar el núcleo en TypeScript y sin componente web en la Beta 1. BRAIN-01 se implementará como Swift Package independiente de la interfaz.
 
 ## Superficies nativas y modos
 
@@ -182,7 +182,7 @@ Nada de esta lista está implementado ni probado.
 
 Requisito de Manu (2026-09-28): la app de Mac hace lo mismo que la de iPhone (hablar con MANU, proyectos y tareas, archivos y chats, finanzas e informes, configuración de automatizaciones), además de alojar la copia semanal.
 
-Tecnología pendiente de D-01. Recomendación: app SwiftUI para macOS que comparta el núcleo Swift con la de iPhone. Límite importante: el Mac actual es un **Intel i5 de doble núcleo**, así que la app de Mac debe funcionar en la versión de macOS que ese Mac pueda ejecutar (dato pendiente, ver D-04). BRAIN-00 asumía la PWA también en Mac.
+Decisión D-01: app SwiftUI para macOS que comparte el núcleo Swift con la de iPhone. El Mac actual es un **MacBook Pro 13 pulgadas de 2017 (`MacBookPro14,2`), Intel i5 de doble núcleo, 8 GB**, con Sonoma 14.8.7 en una configuración no soportada oficialmente por Apple. La app de Mac deberá fijar un deployment target compatible con ese equipo o aplazarse si la compatibilidad perjudica la Beta 1.
 
 ### Distribución y aprovisionamiento (D-03, D-04)
 
@@ -197,7 +197,7 @@ Datos de la documentación de Apple consultada el 2026-09-28 (ver `docs/research
 Consecuencias:
 
 - **D-03**: decidir si Manu asume Apple Developer Program. Sin él, la app caduca cada 7 días y algunas capacidades (TestFlight, WeatherKit, posiblemente notificaciones push y servicios de iCloud) no están disponibles. El precio y las condiciones deben comprobarse en la documentación actual de Apple.
-- **D-04**: compilar requiere Xcode en un Mac. El entorno de Claude Code en la nube es Linux y no compila apps de Apple. Si el Mac de Manu no puede instalar macOS Tahoe, **no puede ejecutar ningún Xcode actual**. Con un Xcode antiguo no se dispondría del SDK de iOS 18 (controles del Centro de Control) ni del de iOS 26 (AlarmKit), y probablemente no se podría instalar en un iPhone con iOS reciente (`NO_VERIFICADO`). Opciones: otro Mac con Apple silicon, un Mac en la nube o un runner de CI con macOS, con coste validado contra ADR-0004.
+- **D-04 (parcialmente resuelta)**: el Mac de Manu no se usa para compilar. BRAIN-01 se compila y prueba como Swift Package en GitHub Actions, runner estándar `macos-26` con Xcode 26.6, presupuesto de gasto 0 € y workflows breves/manuales. Esto no valida la app en el iPhone 14 con iOS 27. Xcode 27 está en vista previa en el runner `xcode-27-xlarge`, no adoptado por coste; la ruta de firma e instalación de la Beta queda como D-04B. No se usará un Mac prestado ni se actualizará este Mac a Tahoe para el proyecto.
 
 ### PWA V1 (BRAIN-00, sustituida como interfaz principal por ADR-0007)
 

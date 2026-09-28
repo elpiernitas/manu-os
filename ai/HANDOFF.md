@@ -30,13 +30,13 @@ Ver la sección de verificación del PR #1 y el informe de la tarea. Comprobacio
 
 - Los valores P/I de R-15 a R-40 son estimaciones iniciales sin evidencia.
 - Varias conclusiones técnicas dependen de documentación de Apple y Spotify consultada el 2026-09-28; pueden cambiar.
-- La compatibilidad del Mac con macOS Tahoe se deduce del procesador descrito; hace falta el modelo exacto.
+- El entorno local está verificado: `MacBookPro14,2` de 2017, oficialmente limitado a Ventura, ejecutando Sonoma 14.8.7 mediante un mecanismo no verificado. No se usará para compilar ni se actualizará a Tahoe para este proyecto.
 
 ## NO VERIFICADO
 
 - No se ha implementado ni probado nada de MANU BRAIN, las apps ni sus extensiones.
-- Modelo exacto del Mac, versión de macOS máxima y posibilidad de compilar con algún Xcode.
-- Modelo exacto y versión de iOS del iPhone 14.
+- Compilación, firma e instalación de la app integrada en el iPhone 14 con iOS 27 (D-04B).
+- Compatibilidad real de la futura app de Mac con `MacBookPro14,2`.
 - Capacidades disponibles con cuenta gratuita (HealthKit, contenedor compartido, notificaciones push) frente a Apple Developer Program.
 - Controles del Centro de Control, AlarmKit, disparadores de Atajos y borrado en Fotos en el iPhone de Manu.
 - Spotify DJ, Chromecast, batería de AirPods, Toque posterior y disparador de transacciones de Wallet.
@@ -46,4 +46,4 @@ Ver la sección de verificación del PR #1 y el informe de la tarea. Comprobacio
 
 ## Próximo paso
 
-Revisión del PR #1 por Manu. Datos del Mac y del iPhone para D-04. Decisiones D-01, D-03 y D-04. Solo con autorización explícita, revalidar y autorizar BRAIN-01.
+Revisión y merge del PR #1. D-01 está decidida (Swift/SwiftUI) y D-04 permite verificar BRAIN-01 en GitHub Actions. D-03 y D-04B se aplazan hasta BRAIN-02. Solo con autorización explícita, revalidar y autorizar BRAIN-01.

@@ -20,9 +20,9 @@ Los documentos canónicos están en `docs/`. Las tareas activas se controlan med
 ## Siguiente gate
 
 1. Revisión y merge del PR #1 por Manu (o revisor externo).
-2. Datos del Mac y del iPhone para D-04 (lista en `docs/architecture/DECISIONS_AND_OPEN_ITEMS.md`).
-3. Decisiones D-01 (hay recomendación documentada), D-03 y D-04.
-4. Manu debe autorizar explícitamente el inicio de BRAIN-01 cuando Claude termine el proyecto de la web de Luis. Hasta entonces solo se permite preparar y revisar documentación fundacional.
+2. D-01 cerrada: núcleo Swift y apps SwiftUI. D-04 resuelta para BRAIN-01 mediante GitHub Actions `macos-26`/Xcode 26.6 con presupuesto 0 €; D-04B queda pendiente para la app integrada.
+3. D-03 y D-04B se decidirán antes de BRAIN-02.
+4. Tras el merge, Manu debe autorizar explícitamente BRAIN-01. Hasta entonces solo se permite preparar y revisar documentación fundacional.
 
 ## Restricciones vigentes
 

@@ -44,23 +44,28 @@ Comunicadas directamente por Manu. Detalle en `docs/product/EXPERIENCE.md`.
 - Fuera de alcance: armario digital, dieta y calorías, diagnósticos o terapia.
 - Mantenimiento operativo semanal por ChatGPT: requisito futuro, no se crea hasta que exista un servidor accesible.
 
+## Decisiones cerradas tras verificar los dispositivos (2026-09-28)
+
+- **D-01 — DECIDIDA**: núcleo MANU BRAIN en Swift y apps SwiftUI para iPhone y Mac, sin componente web en la Beta 1. Manu delegó la elección técnica y aceptó la recomendación.
+- **D-04 — PARCIALMENTE RESUELTA**: el Mac local no es entorno de compilación. BRAIN-01 se compila y prueba como Swift Package en un runner estándar `macos-26` de GitHub Actions con Xcode 26.6, ejecución manual o por PR y presupuesto de gasto 0 €. Esto desbloquea BRAIN-01. La compilación y prueba de la app en el iPhone con iOS 27 sigue bloqueada: Xcode 27 está en vista previa en un runner `xcode-27-xlarge`, que no se adopta por coste, y TestFlight requiere D-03. No se usará un Mac prestado y no se actualizará el Mac actual a Tahoe para este proyecto.
+- Si el runner gratuito deja de estar disponible o consume los minutos incluidos, el workflow se detiene; no se activa facturación automáticamente.
+
 ## Decisiones pendientes
 
 | ID | Decisión | Opciones | Quién decide | Bloquea |
 | --- | --- | --- | --- | --- |
-| **D-01** | Qué parte será SwiftUI nativa y qué parte, si existe, seguirá siendo web; lenguaje del núcleo; tecnología de la app de Mac | (a) núcleo Swift + apps SwiftUI iPhone y Mac; (b) núcleo TypeScript, UI nativa en iPhone y web en Mac; (c) contrato compartido con implementaciones Swift y TypeScript | Manu, con la recomendación de abajo | BRAIN-01, BRAIN-02 |
 | **D-02** | Almacenamiento local nativo, gestión de claves y contenedor compartido con extensiones | por evaluar tras D-01 | propuesta técnica + ADR | BRAIN-02 |
 | **D-03** | Asumir o no Apple Developer Program | cuenta gratuita (perfiles de 7 días, 10 App IDs, sin TestFlight ni WeatherKit) o programa de pago | Manu | BRAIN-02, parte de BRAIN-03, D-06, D-07 |
-| **D-04** | Dónde se compila y se prueba la app | Mac de Manu (si admite un Xcode válido), otro Mac con Apple silicon, Mac en la nube o runner CI con macOS | Manu, con los datos de abajo | BRAIN-02 |
+| **D-04B** | Ruta de compilación, firma e instalación de la app integrada en el iPhone con iOS 27 | esperar runner estándar con Xcode 27; aprobar runner de pago; aprobar Apple Developer Program/TestFlight; reducir o retrasar la Beta nativa | Manu cuando BRAIN-02 la necesite | BRAIN-02 y Beta 1 |
 | D-05 | Fuente de calendario para Agenda y el modo Trabajo | EventKit, Google Calendar read-only o ambos | Manu | BRAIN-09 |
 | D-06 | Servicio meteorológico | WeatherKit (requiere D-03), API pública gratuita, organismo oficial | propuesta técnica + Manu | BRAIN-10 |
 | D-07 | Transporte de la sincronización cifrada iPhone ↔ Mac | Drive `appDataFolder`, servicio mínimo propio, servicio de Apple (puede requerir D-03) | propuesta técnica + Manu | BRAIN-06 |
 | D-08 | Fuente de modelo para el nivel conversacional de MANU y para descripciones ricas | ninguna (solo nivel base); API gratuita con restricciones de datos; API de pago (decisión explícita); modelo local en el Mac (`NO_VERIFICADO`) | Manu | nivel conversacional (BRAIN-11) |
 | D-09 | Detección de llegada a casa | automatización de Atajos por llegada; ubicación «Siempre» en la app; activación manual | Manu | bandeja diaria automática, aviso de llegada |
 
-### Recomendación técnica para D-01 (no cerrada)
+### Decisión técnica D-01 (cerrada)
 
-**Recomendación**: núcleo MANU BRAIN en **Swift** y apps **SwiftUI** para iPhone y Mac, sin duplicar el núcleo en TypeScript y sin componente web en la Beta 1.
+**DECIDIDO**: núcleo MANU BRAIN en **Swift** y apps **SwiftUI** para iPhone y Mac, sin duplicar el núcleo en TypeScript y sin componente web en la Beta 1.
 
 Motivos:
 
@@ -79,18 +84,16 @@ Evidencia en contra o riesgos que hay que aceptar:
 
 Si Manu no acepta la recomendación, la alternativa menos costosa es (c) solo si aparece un requisito web real; (b) no se recomienda porque la app de Mac perdería integración con el sistema.
 
-### Datos del Mac necesarios para D-04
+### Datos verificados para D-04
 
-Para saber si el Mac de Manu puede compilar e instalar la app, hacen falta estos datos. Casi todos están en el menú Apple → **Acerca de este Mac** → **Más información** → **Informe del sistema**:
-
-1. **Modelo exacto y año** (por ejemplo «MacBook Pro (13 pulgadas, 2017, cuatro puertos Thunderbolt 3)») y el **identificador de modelo** (por ejemplo `MacBookPro14,2`).
-2. **Versión de macOS instalada** (número completo).
-3. **Última versión de macOS** que ofrece Actualización de software para ese Mac.
-4. **Memoria RAM** y **espacio libre en disco** (Xcode necesita decenas de GB).
-5. Si hay **Xcode instalado** y su versión.
-6. **Versión de iOS del iPhone 14** (Ajustes → General → Información) y si es iPhone 14 estándar, Plus, Pro o Pro Max.
-
-Con el modelo exacto y la versión máxima de macOS se puede determinar qué Xcode es instalable, qué SDK de iOS incluye y si puede instalar apps en la versión de iOS del iPhone.
+- MacBook Pro (13 pulgadas, 2017, cuatro puertos Thunderbolt 3), identificador `MacBookPro14,2`.
+- Intel Core i5 de doble núcleo a 3,1 GHz, 8 GB de RAM y unos 36,9 GB libres.
+- macOS Sonoma 14.8.7 instalado. Apple fija macOS Ventura como última versión oficialmente compatible con este modelo; el mecanismo usado para ejecutar Sonoma no está verificado.
+- Actualización de software ofrece macOS Tahoe 26.7, pero Apple no incluye este modelo entre los compatibles. No se actualizará para MANU OS.
+- Xcode no está instalado y no aparece en la App Store para esta configuración.
+- iPhone 14 estándar con iOS 27.0 y unos 4,4 GB libres.
+- GitHub ofrece el runner estándar `macos-26` con Xcode 26.6. Xcode 27 está en vista previa mediante `xcode-27-xlarge`; no se adopta porque puede generar coste.
+- Conclusión: el Mac sirve para Git, documentación y gestión del proyecto; el núcleo Swift se verifica en CI. La app integrada y la instalación real quedan en D-04B.
 
 ## Contradicciones resueltas
 
@@ -112,7 +115,7 @@ Con el modelo exacto y la versión máxima de macOS se puede determinar qué Xco
 
 ## Contradicciones y preguntas abiertas
 
-1. **Entorno de compilación** (D-04): el Mac actual probablemente no sirve para compilar con Xcode actual. Sin otro Mac o un servicio macOS, no hay ruta a la Beta 1. Cualquier servicio macOS debe ser 0 € o aprobado explícitamente.
+1. **Entorno de compilación de la Beta** (D-04B): BRAIN-01 sí tiene ruta con GitHub Actions, pero la app integrada para iOS 27 todavía necesita un Xcode 27 aceptable dentro de coste 0 € o una aprobación explícita de coste.
 2. **Pruebas en dispositivo antes de la Beta 1**: si el único iPhone es el de Manu, parte de la QA interna necesita su dispositivo aunque no quiera instalar prototipos semanales.
 3. **Coste 0 € frente a Apple Developer Program**: sin él, la Beta 1 caduca cada 7 días, no hay TestFlight ni WeatherKit y puede faltar alguna capacidad (D-03).
 4. **Personalidad «tipo Chatty» sin modelo** (D-08): el nivel base no alcanzará la misma naturalidad.
@@ -148,8 +151,8 @@ Con el modelo exacto y la versión máxima de macOS se puede determinar qué Xco
 
 ## Intervención de Manu necesaria
 
-- Enviar los datos del Mac y del iPhone listados arriba (D-04).
-- Decidir D-01 (con la recomendación), D-03 y D-04. D-02 depende de D-01.
+- D-01 ya está decidida y D-04 resuelta para BRAIN-01.
+- Decidir D-03 y D-04B cuando sean necesarias para instalar la app integrada. D-02 se definirá para Swift.
 - Indicar si tiene Spotify Premium (afecta a la rutina de la mañana).
 - Autorizar explícitamente BRAIN-01 cuando corresponda.
 
