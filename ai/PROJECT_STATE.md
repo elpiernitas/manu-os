@@ -21,11 +21,11 @@ Los documentos canónicos están en `docs/`. Las tareas activas se controlan med
 
 1. Preparar BRAIN-02 y cerrar sus decisiones bloqueantes sin iniciar código de producto.
 2. Convertir cada decisión cerrada en criterios verificables y gates.
-3. D-03 y D-04 siguen requiriendo datos o autorización específica de Manu si implican coste o acceso a sus dispositivos.
+3. D-03 y D-04B siguen requiriendo datos o autorización específica de Manu si implican coste o acceso a sus dispositivos.
 
 ## Restricciones vigentes
 
-- BRAIN-01 está cerrado. BRAIN-02 no puede implementarse hasta cerrar D-02, D-03 y D-04 y cumplir sus gates.
+- BRAIN-01 está cerrado. BRAIN-02 no puede implementarse hasta cerrar D-02, D-03 y D-04B y cumplir sus gates.
 - No configurar OAuth, APIs, hosting o facturación.
 - No crear todavía interfaz, proyecto Xcode, almacenamiento real ni integraciones de BRAIN-02.
 - No activar servicios de pago ni revisiones sin límite de rondas.
