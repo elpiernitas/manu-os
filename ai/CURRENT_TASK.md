@@ -15,7 +15,7 @@ El 2026-09-28 Manu delegó en el orquestador técnico de ChatGPT/Codex la decisi
 ## Alcance autorizado
 
 - actualizar estado, handoff y documentación de gobierno;
-- preparar BRAIN-02 y convertir D-02, D-03 y D-04 en decisiones verificables;
+- preparar BRAIN-02 y convertir D-02, D-03 y D-04B en decisiones verificables;
 - encargar y revisar trabajo de Claude con alcance cerrado;
 - abrir, corregir y fusionar PRs cuando exista revisión externa y checks suficientes.
 
@@ -29,7 +29,7 @@ El 2026-09-28 Manu delegó en el orquestador técnico de ChatGPT/Codex la decisi
 
 ## Trabajo todavía prohibido
 
-- iniciar la implementación de BRAIN-02 antes de cerrar sus decisiones y gates;
+- iniciar la implementación de BRAIN-02 antes de cerrar D-02, D-03, D-04B y sus gates;
 - conectar servicios, credenciales o datos reales;
 - saltarse revisión externa o checks;
 - merge automático basado solo en que Claude declare PASS.
