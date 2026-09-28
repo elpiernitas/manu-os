@@ -19,7 +19,7 @@ Entorno local: Swift 6.3.3 (`swift-6.3.3-RELEASE`, toolchain oficial de swift.or
 3. Tras las correcciones: `dump-package` PASS, `build --build-tests` PASS sin warnings, `test --parallel` → **31/31 PASS en 3 suites**.
 4. Los tests de regresión nuevos, ejecutados contra el código original, fallan o abortan el proceso.
 5. CI del commit de correcciones `807e6a3` en GitHub Actions `macos-26`: job `contracts` (run `36451712052`) **31/31 PASS en 3 suites**; Foundation check (runs `36451704712` y `36451712092`) PASS.
-6. Revisión del orquestador sobre `807e6a3`: detectó que `REJECTED` y `RETRACTED` seguían permitidos para modelos. La validación queda cerrada a `PROPOSED` y el test parametrizado cubre los cinco estados no permitidos. La evidencia de CI del commit posterior se registrará al finalizar GitHub Actions.
+6. Revisión del orquestador sobre `807e6a3`: detectó que `REJECTED` y `RETRACTED` seguían permitidos para modelos. Corregido en `72aa272`: la validación queda cerrada a `PROPOSED` y el test parametrizado cubre los cinco estados no permitidos. CI `macos-26` (run `36452298444`) **31/31 PASS en 3 suites**; Foundation check (run `36452298319`) PASS.
 
 ## Defectos demostrados y corregidos
 
