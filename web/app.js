@@ -13,9 +13,11 @@ import { isClientId, listEvents, createEvent, newEventBody } from "./core/gcal.j
 import { SCOPE, runServices, planTaskSync, listOpenTasks, insertTask, completeTask, contactBirthdays, mergePeople, saveBackup, loadBackup } from "./core/google.js";
 import { isSensitive, pickModel, listModels, ask, buildPayload } from "./core/ai.js";
 import { encryptBackup, decryptBackup, passphraseProblem } from "./core/crypto.js";
+import { isSpotifyClientId, randomVerifier, challengeFor, authorizeUrl, exchangeCode, refreshTokens, listDevices, findSpeaker, transferTo, DEFAULT_SPEAKER } from "./core/spotify.js";
+import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "6";
+export const APP_VERSION = "7";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -51,6 +53,12 @@ const aiStore = {
 };
 const GOOGLE_FEATURES = [["calendar", "Calendar", "Ver tu agenda y crear eventos"], ["tasks", "Tasks", "Sincronizar tus tareas"], ["contacts", "Contactos", "Leer nombres y cumpleaños"], ["drive", "Drive", "Guardar una copia cifrada (solo cuando tú lo pidas)"]];
 const googleOn = (k) => Boolean(vault.settings.google?.[k]);
+// Spotify tokens: device storage only, never in the vault or backups.
+const spotifyStore = {
+  get tokens() { try { return JSON.parse(localStorage.getItem("manuos.spotify.tokens") || "null"); } catch { return null; } },
+  set tokens(v) { try { v ? localStorage.setItem("manuos.spotify.tokens", JSON.stringify(v)) : localStorage.removeItem("manuos.spotify.tokens"); } catch {} },
+};
+const spotifyReady = () => isSpotifyClientId(vault.settings.spotifyClientId);
 const aiReady = () => Boolean(aiStore.key && aiStore.model && vault.settings.aiEnabled !== false);
 let variant = vault.chat.length;
 const weather = { loading: false, error: null };
@@ -203,6 +211,66 @@ function weatherPage() {
     <p class="muted small">Datos de Open-Meteo · actualizado ${new Date(w.at).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}</p>`;
 }
 
+// ---------- Hub: shortcuts to Manu's apps by moment of the day ----------
+function hubCard(mode) {
+  const s = vault.settings;
+  const oviedoToday = (s.tomorrow?.day === localDay() && s.tomorrow.work && s.tomorrow.city === "OVIEDO") || (mode === "NIGHT" && s.tomorrow?.day === tomorrowKey() && s.tomorrow.work && s.tomorrow.city === "OVIEDO");
+  const apps = appsFor(mode, { oviedoToday });
+  const speaker = s.spotifySpeaker || DEFAULT_SPEAKER;
+  return `<section class="card"><h2>Accesos</h2>
+    ${mode !== "WORK" ? `<button class="btn block" data-act="music">Música en el ${esc(speaker)}</button>` : ""}
+    <div class="apps">${apps.map((a) => `<a class="app-link" href="${esc(a.url)}" target="_blank" rel="noopener"><span class="ico ${a.color}">${esc(a.label.slice(0, 1))}</span><span class="small">${esc(a.label)}</span></a>`).join("")}</div></section>`;
+}
+
+async function spotifyToken() {
+  let t = spotifyStore.tokens;
+  if (!t) return null;
+  if (Date.now() > t.expires - 60000) {
+    if (!t.refresh) return null;
+    t = await refreshTokens({ clientId: vault.settings.spotifyClientId, refresh: t.refresh });
+    spotifyStore.tokens = t;
+  }
+  return t.access;
+}
+
+async function startSpotifyAuth() {
+  const verifier = randomVerifier();
+  const state = randomVerifier(24);
+  try { localStorage.setItem("manuos.spotify.pkce", JSON.stringify({ verifier, state, at: Date.now() })); } catch {}
+  location.assign(authorizeUrl({ clientId: vault.settings.spotifyClientId, redirectUri: SITE, challenge: await challengeFor(verifier), state }));
+}
+
+function openSpotifyApp() {
+  location.href = "spotify:";
+}
+
+async function musicToSpeaker() {
+  if (!spotifyReady()) { openSpotifyApp(); return; }
+  try {
+    const token = await spotifyToken();
+    if (!token) { await startSpotifyAuth(); return; }
+    const speakerName = vault.settings.spotifySpeaker || DEFAULT_SPEAKER;
+    const device = findSpeaker(await listDevices(token), speakerName);
+    if (!device) { toast(`No veo el altavoz «${speakerName}». Enciéndelo o ábrelo una vez en Spotify.`); openSpotifyApp(); return; }
+    await transferTo(token, device.id);
+    toast(`Spotify en «${device.name}». Elige qué poner.`);
+  } catch (err) {
+    if (err.code === "auth") { spotifyStore.tokens = null; toast("Vuelve a conectar Spotify en Tú → Spotify"); }
+    else toast(err.message || "Spotify no ha respondido");
+  }
+  setTimeout(openSpotifyApp, 600);
+}
+
+async function finishSpotifyAuth(params) {
+  let pkce = null;
+  try { pkce = JSON.parse(localStorage.getItem("manuos.spotify.pkce") || "null"); localStorage.removeItem("manuos.spotify.pkce"); } catch {}
+  if (!pkce || pkce.state !== params.get("state") || Date.now() - pkce.at > 15 * 60000) { toast("No he podido conectar Spotify (sesión caducada). Inténtalo otra vez."); return; }
+  try {
+    spotifyStore.tokens = await exchangeCode({ clientId: vault.settings.spotifyClientId, code: params.get("code"), redirectUri: SITE, verifier: pkce.verifier });
+    toast("Spotify conectado");
+  } catch { toast("Spotify no ha dado permiso"); }
+}
+
 // ---------- Night question ----------
 function nightCard() {
   const s = vault.settings;
@@ -250,8 +318,9 @@ const screens = {
       ${rems.length ? `<section class="card"><h2>${I.bell} Recordatorios de hoy</h2>${rems.map(reminderRow).join("")}</section>` : ""}
       ${inbox.length ? `<section class="card"><h2>Bandeja · ${inbox.length}</h2>${inbox.map((c) => `<div class="stack"><div>${esc(c.text)}</div><div class="btns">
           <button class="btn" data-act="task" data-id="${esc(c.id)}">Tarea</button><button class="btn ghost" data-act="idea" data-id="${esc(c.id)}">Idea</button><button class="btn ghost" data-act="forget" data-id="${esc(c.id)}">No recuerdo</button></div></div>`).join("")}</section>` : ""}
+      ${hubCard(m.mode)}
       <section class="card"><div class="row"><h2>Tareas</h2>${addLink("TASK")}</div>${open.length ? open.slice(0, 5).map(taskRow).join("") + (open.length > 5 ? `<p class="muted small">Y ${open.length - 5} más en Agenda.</p>` : "") : '<p class="muted">Nada pendiente. Toca «+» para añadir.</p>'}</section>
-      ${bdays.length ? `<section class="card"><h2>${I.people} Cumpleaños</h2>${bdays.map((b) => `<div class="row"><span class="grow">${esc(b.person.name)}</span><span class="muted">${b.days === 0 ? "¡Hoy!" : b.days === 1 ? "Mañana" : `En ${b.days} días`}</span></div>`).join("")}</section>` : ""}
+      ${bdays.length ? `<section class="card"><h2>${I.people} Cumpleaños</h2>${bdays.map((b) => { const wa = b.days === 0 ? whatsappUrl(b.person.phone, `¡Feliz cumpleaños, ${b.person.name.split(" ")[0]}! 🎉`) : null; return `<div class="row"><span class="grow">${esc(b.person.name)}</span>${wa ? `<a class="btn" href="${esc(wa)}" target="_blank" rel="noopener">Felicitar por WhatsApp</a>` : `<span class="muted">${b.days === 0 ? "¡Hoy!" : b.days === 1 ? "Mañana" : `En ${b.days} días`}</span>`}</div>`; }).join("")}</section>` : ""}
       <section class="card"><div class="row"><h2>Este mes</h2><button class="link small" data-tab="dinero">Ver dinero</button></div><div class="big-money">${euros(month.total)}</div></section>
       </div>`;
   },
@@ -284,7 +353,7 @@ const screens = {
     return `<h1>MANU</h1><p class="subtitle">Tu asistente · ${aiReady() ? "IA disponible, siempre con tu confirmación" : '<button class="link small" data-sub-go="ia">activar IA</button>'}</p>
       ${refuge ? `<div class="refuge-bar"><span>Refugio · no se guarda</span><button class="link" data-act="leave-refuge">Salir</button></div>` : ""}
       <div class="suggest" aria-label="Sugerencias">${chips.map((s) => `<button data-say="${esc(s)}">${esc(s)}</button>`).join("")}</div>
-      <div class="chat" id="chat" aria-live="polite">${[...history, ...(refuge?.messages ?? [])].map((b) => `<div class="bubble ${b.from}${b.safety ? " safety" : ""}">${b.ai ? '<span class="ai-tag">IA</span>' : ""}${esc(b.text)}${b.proposal ? `<pre class="payload">${esc(JSON.stringify(buildPayload(b.proposal.message), null, 1))}</pre>${b.proposal.state ? `<p class="muted small">${b.proposal.state === "sent" ? "Enviado a Gemini." : "No enviado."}</p>` : `<div class="btns"><button class="btn" data-act="ai-send" data-id="${esc(b.proposal.id)}">Enviar a Gemini</button><button class="btn ghost" data-act="ai-cancel" data-id="${esc(b.proposal.id)}">No</button></div>`}` : ""}${b.action ? `<div class="btns"><a class="btn" href="${esc(b.action.href)}">${esc(b.action.label)}</a></div>` : ""}</div>`).join("")}</div>
+      <div class="chat" id="chat" aria-live="polite">${[...history, ...(refuge?.messages ?? [])].map((b) => `<div class="bubble ${b.from}${b.safety ? " safety" : ""}">${b.ai ? '<span class="ai-tag">IA</span>' : ""}${esc(b.text)}${b.proposal ? `<pre class="payload">${esc(JSON.stringify(buildPayload(b.proposal.message), null, 1))}</pre>${b.proposal.state ? `<p class="muted small">${b.proposal.state === "sent" ? "Enviado a Gemini." : "No enviado."}</p>` : `<div class="btns"><button class="btn" data-act="ai-send" data-id="${esc(b.proposal.id)}">Enviar a Gemini</button><button class="btn ghost" data-act="ai-cancel" data-id="${esc(b.proposal.id)}">No</button></div><div class="btns"><button class="link small" data-act="ask-elsewhere" data-app="chatgpt" data-id="${esc(b.proposal.id)}">Preguntar en ChatGPT</button><button class="link small" data-act="ask-elsewhere" data-app="claude" data-id="${esc(b.proposal.id)}">Preguntar en Claude</button></div>`}` : ""}${b.action ? `<div class="btns"><a class="btn" href="${esc(b.action.href)}">${esc(b.action.label)}</a></div>` : ""}</div>`).join("")}</div>
       <form class="composer glass" id="composer"><label for="msg" class="sr">Mensaje para MANU</label><input id="msg" autocomplete="off" enterkeyhint="send" placeholder="${refuge ? "Cuéntame" : "Escribe a MANU"}"><button class="btn" type="submit">Enviar</button></form>`;
   },
   dinero() {
@@ -333,6 +402,7 @@ const screens = {
       <div class="list">
         ${item("tiempo", "pin", "blue", "Tiempo y ciudades", `Casa: ${(vault.settings.homeCity ?? CITIES.GIJON).name}`)}
         ${item("gcal", "google", "blue", "Google", isClientId(vault.settings.gcalClientId) ? "Calendar, Tasks, Contactos y Drive" : "Conectar tus servicios de Google")}
+        ${item("spotify", "leaf", "green", "Spotify", spotifyReady() ? (spotifyStore.tokens ? `Conectado · altavoz «${vault.settings.spotifySpeaker || DEFAULT_SPEAKER}»` : "Configurado, sin conectar") : "Música en tu altavoz")}
         ${item("ia", "bolt", "purple", "IA (Gemini)", aiReady() ? `Activada · ${aiStore.model}` : "Chat con IA opcional")}
         ${item("avisos", "bell", "red", "Avisos, alarmas y Atajos", "Recordatorios que suenan en el iPhone")}
         ${item("datos", "box", "gray", "Tus datos", "Copia, restaurar y borrar")}
@@ -385,10 +455,11 @@ const subpages = {
       ${quiet.length ? `<section class="card"><h2>Hace tiempo que no hablas con</h2>${quiet.map((p) => `<div class="row"><span class="grow">${esc(p.name)}</span><button class="link small" data-act="talked" data-id="${esc(p.id)}">Hablé hoy</button></div>`).join("")}</section>` : ""}
       ${sectionTitle("Todas")}
       <div class="list">${vault.people.length ? vault.people.map((p) => { const d = daysUntilBirthday(p.birthday); return `<details><summary class="item"><span class="ico purple">${esc(p.name.slice(0, 1).toUpperCase())}</span><span class="grow"><span>${esc(p.name)}</span><br><span class="muted small">${d !== null ? `Cumple en ${d} días` : "Sin cumpleaños"}${p.lastContact ? ` · última vez ${new Date(p.lastContact).toLocaleDateString("es-ES", { day: "numeric", month: "short" })}` : ""}</span></span></summary>
-        <div class="inner">${p.notes ? `<p>${esc(p.notes)}</p>` : '<p class="muted small">Sin notas.</p>'}<div class="btns"><button class="btn ghost" data-act="talked" data-id="${esc(p.id)}">Hablé hoy</button><button class="btn danger" data-act="del" data-list="people" data-id="${esc(p.id)}">Quitar</button></div></div></details>`; }).join("") : '<p class="muted item">Aún no hay nadie.</p>'}</div>
+        <div class="inner">${p.notes ? `<p>${esc(p.notes)}</p>` : '<p class="muted small">Sin notas.</p>'}<div class="btns">${whatsappUrl(p.phone, "") ? `<a class="btn ghost" href="${esc(whatsappUrl(p.phone, `¡Hola, ${p.name.split(" ")[0]}!`))}" target="_blank" rel="noopener">WhatsApp</a>` : ""}<button class="btn ghost" data-act="talked" data-id="${esc(p.id)}">Hablé hoy</button><button class="btn danger" data-act="del" data-list="people" data-id="${esc(p.id)}">Quitar</button></div></div></details>`; }).join("") : '<p class="muted item">Aún no hay nadie.</p>'}</div>
       <form class="card" id="addPerson"><h2>Añadir persona</h2>
         <label for="pName" class="muted small">Nombre</label><input id="pName" maxlength="60" required>
         <label for="pBirthday" class="muted small">Cumpleaños (el año no hace falta)</label><input id="pBirthday" type="date">
+        <label for="pPhone" class="muted small">Móvil (opcional, para felicitar por WhatsApp; se queda en este móvil)</label><input id="pPhone" inputmode="tel" maxlength="20">
         <label for="pNotes" class="muted small">Detalles (gustos, regalos, planes)</label><textarea id="pNotes" rows="2" maxlength="300"></textarea>
         <button class="btn" type="submit">Guardar</button></form>`;
   },
@@ -424,6 +495,21 @@ const subpages = {
         <li>«Credenciales» → «Crear credenciales» → <b>ID de cliente de OAuth</b> → «Aplicación web».</li>
         <li>«Orígenes de JavaScript autorizados»: <code>https://elpiernitas.github.io</code></li>
         <li>Copia el <b>ID de cliente</b> y pégalo arriba. El «secreto de cliente» no se usa: no lo pegues en ningún sitio.</li></ol></section>`;
+  },
+  spotify() {
+    const id = vault.settings.spotifyClientId ?? "";
+    return `${backBar("Spotify")}
+      <section class="card"><h2>Estado</h2><p>${spotifyReady() ? (spotifyStore.tokens ? "Conectado." : "Configurado. Conéctalo para elegir el altavoz.") : "Sin configurar: «Música» solo abre Spotify."}</p>
+        <form id="spotifyForm" class="stack">
+          <label for="spId" class="muted small">Client ID de tu app de Spotify for Developers (32 caracteres). No es una contraseña.</label><input id="spId" value="${esc(id)}" autocomplete="off" spellcheck="false">
+          <label for="spSpeaker" class="muted small">Nombre del altavoz</label><input id="spSpeaker" value="${esc(vault.settings.spotifySpeaker || DEFAULT_SPEAKER)}" maxlength="40">
+          <div class="btns"><button class="btn ghost" type="submit">Guardar</button>${spotifyReady() ? `<button class="btn" type="button" data-act="spotify-connect">${spotifyStore.tokens ? "Reconectar" : "Conectar"}</button>` : ""}${spotifyStore.tokens ? '<button class="btn danger" type="button" data-act="spotify-forget">Desconectar</button>' : ""}</div></form></section>
+      <section class="card"><h2>Cómo crear la app (una vez, desde el ordenador)</h2><ol class="muted small">
+        <li>Entra en <b>developer.spotify.com/dashboard</b> con tu cuenta de Spotify y crea una app «MANU OS».</li>
+        <li>En «Redirect URIs» añade exactamente <code>${esc(SITE)}</code>.</li>
+        <li>Marca «Web API». No hace falta el «Client secret»: no lo copies.</li>
+        <li>Copia el <b>Client ID</b> aquí y pulsa «Conectar».</li></ol>
+        <p class="muted small">MANU solo pide ver y cambiar el altavoz de reproducción. Cambiar de altavoz desde fuera de Spotify suele requerir Premium.</p></section>`;
   },
   ia() {
     const key = aiStore.key;
@@ -491,7 +577,7 @@ function render({ focus = false } = {}) {
   $("screen").innerHTML = overlay === "weather" ? weatherPage() : (screens[tab] ?? screens.hoy)();
   $("screen").querySelectorAll(".bar > i[data-w]").forEach((el) => { el.style.width = `${el.dataset.w}%`; });
   $("screen").querySelectorAll(".range > i").forEach((el) => { el.style.left = `${el.dataset.l}%`; el.style.width = `${el.dataset.w}%`; });
-  $("topTitle").textContent = sub ? { habitos: "Hábitos", salud: "Salud", comidas: "Comidas", personas: "Personas", tiempo: "Tiempo", avisos: "Avisos", datos: "Tus datos", gcal: "Google", ia: "IA" }[sub] : TABS.find(([id]) => id === tab)[1];
+  $("topTitle").textContent = sub ? { habitos: "Hábitos", salud: "Salud", comidas: "Comidas", personas: "Personas", tiempo: "Tiempo", avisos: "Avisos", datos: "Tus datos", gcal: "Google", ia: "IA", spotify: "Spotify" }[sub] : TABS.find(([id]) => id === tab)[1];
   $("fab").hidden = tab === "manu" || Boolean(sheet);
   $("sheetRoot").innerHTML = sheetHtml();
   if (sheet) $("qText")?.focus();
@@ -618,6 +704,10 @@ document.addEventListener("click", async (e) => {
     case "drive-restore-yes": { const r = validateVault(confirmDriveRestore?.data); confirmDriveRestore = null; if (!r.ok) { toast(r.reason); render(); break; } vault = r.vault; persist(); render(); toast("Copia de Drive restaurada"); break; }
     case "gfeature": { const k = a.dataset.k; vault.settings.google = { ...(vault.settings.google ?? {}), [k]: !googleOn(k) }; if (!googleOn(k)) delete gcal.tokens[SCOPE[k]]; persist(); render(); break; }
     case "ai-send": askAi(id); break;
+    case "music": musicToSpeaker(); break;
+    case "spotify-connect": startSpotifyAuth(); break;
+    case "spotify-forget": spotifyStore.tokens = null; render(); toast("Spotify desconectado de este móvil"); break;
+    case "ask-elsewhere": { const b = vault.chat.find((x) => x.proposal?.id === id); if (b) { try { await navigator.clipboard.writeText(b.proposal.message); } catch {} window.open(askElsewhereUrl(a.dataset.app, b.proposal.message), "_blank", "noopener"); } break; }
     case "ai-cancel": { const b = vault.chat.find((x) => x.proposal?.id === id); if (b) { b.proposal.state = "cancelled"; persist(); render(); } break; }
     case "ai-remember": { const k = aiStore.key; aiStore.remember = !aiStore.remember; aiStore.key = k; render(); break; }
     case "ai-forget": aiStore.key = ""; aiStore.model = ""; render(); toast("Clave borrada de este móvil"); break;
@@ -677,6 +767,14 @@ document.addEventListener("submit", async (e) => {
     persist(); render(); toast(id ? "ID guardado" : "Google Calendar desconectado"); return;
   }
   if (f === "workStartForm") return;
+  if (f === "spotifyForm") {
+    const id = $("spId").value.trim();
+    if (id && !isSpotifyClientId(id)) { toast("Ese no parece un Client ID de Spotify"); return; }
+    vault.settings.spotifyClientId = id || null;
+    vault.settings.spotifySpeaker = $("spSpeaker").value.trim().slice(0, 40) || DEFAULT_SPEAKER;
+    if (!id) spotifyStore.tokens = null;
+    persist(); render(); toast("Spotify guardado"); return;
+  }
   if (f === "driveForm") {
     const pass = $("drivePass").value;
     const problem = passphraseProblem(pass);
@@ -714,7 +812,7 @@ document.addEventListener("submit", async (e) => {
     const name = $("pName").value.trim();
     if (!name) return;
     const b = $("pBirthday").value; // YYYY-MM-DD
-    vault.people.push({ id: uid("p"), name: name.slice(0, 60), birthday: b ? b.slice(5) : null, notes: $("pNotes").value.trim().slice(0, 300) || null, lastContact: null });
+    vault.people.push({ id: uid("p"), name: name.slice(0, 60), birthday: b ? b.slice(5) : null, phone: $("pPhone").value.trim().slice(0, 20) || null, notes: $("pNotes").value.trim().slice(0, 300) || null, lastContact: null });
     persist(); render(); toast("Persona guardada"); return;
   }
   if (f === "healthForm") {
@@ -924,6 +1022,18 @@ if ("serviceWorker" in navigator) {
   const hadController = Boolean(navigator.serviceWorker.controller);
   navigator.serviceWorker.addEventListener("controllerchange", () => { if (hadController) toast("MANU se ha actualizado"); });
   navigator.serviceWorker.register("sw.js").catch(() => {});
+}
+
+// Spotify redirect back (Authorization Code with PKCE).
+const returned = new URLSearchParams(location.search);
+if (returned.has("code") && returned.has("state")) {
+  history.replaceState(null, "", location.pathname);
+  tab = "tu"; sub = "spotify";
+  finishSpotifyAuth(returned).then(() => render());
+} else if (returned.has("error") && returned.has("state")) {
+  history.replaceState(null, "", location.pathname);
+  try { localStorage.removeItem("manuos.spotify.pkce"); } catch {}
+  toast("Has cancelado la conexión con Spotify");
 }
 
 const launch = launchParams(location.search);

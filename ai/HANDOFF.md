@@ -10,6 +10,34 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
+## WEB-07 — accesos por modo, Spotify en el altavoz «baño», WhatsApp y otros asistentes (ADR-0014)
+
+### Archivos cambiados
+
+- `web/core/spotify.js` (nuevo): PKCE S256 (verificado con el vector de la RFC 7636, apéndice B, y con Python), URL de autorización, intercambio y refresco de tokens sin secreto, `findSpeaker` sin distinguir mayúsculas ni tildes, `transferTo` con `play: false`, errores 401/403/404 explicados.
+- `web/core/hub.js` (nuevo): accesos por modo (las mañanas de Oviedo, primero la ruta y ALSA; en modo Trabajo no hay música), `wa.me` con número español normalizado, «preguntar en ChatGPT/Claude».
+- `web/app.js`: tarjeta «Accesos» en Hoy con «Música en el baño»; Tú → Spotify (Client ID, altavoz, conectar y desconectar, guía); vuelta del redirect PKCE con validación de `state` y caducidad de 15 minutos; teléfono opcional en Personas y «Felicitar por WhatsApp» el día del cumpleaños; «Preguntar en ChatGPT/Claude» en la propuesta de IA. Versión 7.
+- `web/index.html` (CSP con `accounts.spotify.com` y `api.spotify.com`), `web/sw.js` (`manuos-v7`), `web/styles.css`, `web/tests/spotify-hub.test.js` (nuevo).
+- `docs/adr/0014-spotify-and-app-hub.md`, `docs/adr/README.md`, `docs/security/THREAT_MODEL.md`.
+
+### Comandos ejecutados y resultados reales
+
+- `cd web && npm test`: 55/55 PASS.
+- Preflight CORS hacia `accounts.spotify.com/api/token` y `api.spotify.com/v1/me/player*` con `Origin: https://elpiernitas.github.io`: permitido.
+- Chromium headless con Spotify simulado: 6/6 PASS.
+  - tarjeta de accesos visible;
+  - ida y vuelta PKCE (`code_verifier` enviado, sin `client_secret`) y URL limpia al volver;
+  - los tokens no están en el vault;
+  - transferencia `PUT` a «Baño» con `play: false` y el token correcto.
+- Las regresiones de WEB-03, WEB-05 y WEB-06 siguen en PASS.
+
+### NO_VERIFICADO
+
+- Cuenta real de Spotify (requisito de Premium y visibilidad del altavoz en Connect).
+- El redirect dentro de la web instalada en iOS.
+- La apertura de apps nativas desde enlaces universales.
+- El prellenado `?q=` de ChatGPT y Claude.
+
 ## WEB-06 — importar el Excel de Sabadell y aprender categorías por comercio
 
 Hecho sobre WEB-05 (PR #13). Manu subió su extracto real de Sabadell al chat. **No está en el repositorio**: solo se usó en local para ver la estructura con los valores ocultos y para contar resultados.
