@@ -4,6 +4,42 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
+## WEB-03 — rediseño Liquid Glass, tiempo, noche, alarmas, recordatorios, banco y «Tú» completo
+
+Rama `claude/magical-goodall-rf5qoo`, encima de WEB-02 (mismo PR). Pedido por Manu el 2026-09-28: tiempo de Gijón por defecto y de Oviedo cuando trabaja allí, la pregunta de la noche, alarmas, recordatorios, Salud, Comidas, Personas, Hábitos y Liquid Glass.
+
+### Archivos cambiados
+
+- `web/core/weather.js`: Open-Meteo (sin clave), códigos WMO, consejo del día y adaptador `fetch` inyectable.
+- `web/core/bank.js`: CSV del banco (delimitador `;`, `,` o tabulador; comillas; BOM), importes y fechas en formato español, solo gastos, deduplicación por huella.
+- `web/core/night.js`: port de `NightPlanner` (ciudad y alarma), la pregunta desde las 18:00 y el enlace `shortcuts://run-shortcut`.
+- `web/core/life.js`: hábitos con racha, cumpleaños, «hace tiempo que no hablas», comidas por franja y habituales, medias de salud, ánimo y recordatorios vencidos.
+- `web/core/assistant.js`: intenciones `alarm` («pon una alarma a las 7:15») y `reminder` («recuérdame X mañana a las 9»); la crisis sigue ganando.
+- `web/core/storage.js`: secciones opcionales nuevas, compatibles con copias antiguas, con validación de IDs duplicados entre secciones.
+- `web/app.js`, `web/styles.css`, `web/index.html`: barra de pestañas flotante, botón «+», hoja modal y barra superior al hacer scroll en Liquid Glass (solo en la capa funcional, según la guía HIG), fondo por modo, «+» para tarea/idea/gasto/aviso, «Tú» con subpáginas. La CSP permite solo los dos hosts de Open-Meteo.
+- `web/sw.js`: caché `manuos-v3`.
+- Tests: `web/tests/weather-bank.test.js`, `web/tests/night-life.test.js`, y ampliación de `core.test.js`.
+
+### Comandos ejecutados y resultados reales
+
+- `cd web && npm test`: 29/29 PASS.
+- `curl` a `geocoding-api.open-meteo.com` y `api.open-meteo.com`: 200 con `access-control-allow-origin: *` (2026-09-28). Coordenadas de Gijón y Oviedo sacadas de esa API.
+- Chromium headless (perfil iPhone 13, Europe/Madrid), 16 comprobaciones PASS en dos ejecuciones: tarea, gasto y aviso con «+»; recordatorio con enlace a Atajos; alarma desde el chat; importación CSV y deduplicación; ánimo, hábito, persona con cumpleaños, comida y salud; persistencia tras recargar; sin scroll horizontal; 0 errores de consola.
+- En el navegador del sandbox, el tiempo no carga porque el proxy intercepta TLS. No se probó la carga real del tiempo en navegador.
+
+### Riesgos y regresiones posibles
+
+- Los atajos «MANU Alarma» y «MANU Recordatorio» dependen de que Manu los cree con esos nombres. Los nombres de las acciones de Atajos en español no están verificados.
+- La alarma supone entrada a las 09:00 porque la web no conoce el horario real.
+- El CSV de cada banco es distinto: los formatos no reconocidos se rechazan con un motivo.
+
+### NO_VERIFICADO
+
+- El tiempo en el iPhone real.
+- El esquema `shortcuts://run-shortcut` y los atajos en iOS.
+- Las notificaciones de recordatorios en iOS con la app abierta o en segundo plano.
+- El CSV concreto del banco de Manu.
+
 ## WEB-02 — agenda pegada, enlaces de Atajos y aviso de actualización
 
 Rama `claude/magical-goodall-rf5qoo`, desde `main` (`e797aba`, WEB-01 ya publicada en GitHub Pages).

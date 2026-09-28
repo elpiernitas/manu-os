@@ -132,3 +132,22 @@ test("backups with duplicate ids or bad amounts are rejected", () => {
   assert.equal(validateVault({ schema: 99, inbox: [], spending: [], chat: [] }).ok, false);
   assert.equal(validateVault(null).ok, false);
 });
+
+test("vault: new optional sections default to empty and are validated", () => {
+  const old = { schema: 1, inbox: [], spending: [], chat: [] };
+  const r = validateVault(old);
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.vault.habits, []);
+  assert.equal(validateVault({ ...old, habits: "x" }).ok, false);
+  assert.equal(validateVault({ ...old, people: [{ id: "a" }], meals: [{ id: "a" }] }).ok, false, "duplicate ids across sections");
+});
+
+test("alarms and reminders from the chat", () => {
+  assert.deepEqual(parse("Pon una alarma a las 7:15"), { kind: "alarm", time: "07:15" });
+  assert.deepEqual(parse("ponme alarma mañana a las 6"), { kind: "alarm", time: "06:00" });
+  assert.equal(parse("pon alarma a las 25").kind, "unknown");
+  assert.deepEqual(parse("Recuérdame llamar al taller a las 17:30"), { kind: "reminder", text: "llamar al taller", tomorrow: false, time: "17:30" });
+  assert.deepEqual(parse("recuérdame mañana que compre pan a las 9"), { kind: "reminder", text: "compre pan", tomorrow: true, time: "09:00" });
+  assert.deepEqual(parse("recuérdame sacar la basura mañana a las 21"), { kind: "reminder", text: "sacar la basura", tomorrow: true, time: "21:00" });
+  assert.equal(parse("recuérdame no quiero vivir a las 9").kind, "crisis", "crisis still wins");
+});
