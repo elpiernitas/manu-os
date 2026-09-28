@@ -24,8 +24,12 @@ jobs:
             docs/architecture/ARCHITECTURE.md
             docs/architecture/DATA_MODEL.md
             docs/security/THREAT_MODEL.md
+            docs/security/RISK_REGISTER.md
             docs/integrations/INTEGRATIONS.md
             docs/roadmap/ROADMAP.md
+            docs/roadmap/BACKLOG.md
+            docs/product/MVP_ACCEPTANCE.md
+            docs/adr/README.md
             ai/PROJECT_STATE.md
             ai/CURRENT_TASK.md
             ai/HANDOFF.md

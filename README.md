@@ -20,6 +20,8 @@ No conectes servicios, claves ni datos personales reales en esta fase.
 6. `ai/PROJECT_STATE.md`
 7. `ai/CURRENT_TASK.md`
 
+También están disponibles el [contrato verificable del MVP](docs/product/MVP_ACCEPTANCE.md), el [backlog técnico](docs/roadmap/BACKLOG.md), el [registro de riesgos](docs/security/RISK_REGISTER.md) y los [ADRs](docs/adr/README.md).
+
 ## Flujo
 
 Todo cambio sustancial se realiza en una rama, se verifica y se revisa mediante PR antes de llegar a la rama por defecto. Claude no está conectado ni autorizado para trabajar en este repositorio todavía.
