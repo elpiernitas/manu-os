@@ -2,7 +2,7 @@
 
 ## Estado
 
-BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está implementado en `brain/01-knowledge-contracts` y pendiente de revisión externa en el PR #2. No está fusionado.
+BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
 ## BRAIN-01 — resultado
 
@@ -74,4 +74,4 @@ Revisión del head `1941319` por Claude Code. Detalle completo en `ai/QA_REPORT.
 
 ## Próximo paso
 
-Aprobación de Manu del PR #2 tras la revisión externa. No fusionar automáticamente. BRAIN-02 sigue sin autorizar.
+Preparar BRAIN-02 y cerrar D-02, D-03 y D-04 antes de implementar. Manu delegó en el orquestador técnico la decisión final sobre revisiones y merges; siguen requiriendo autorización específica los costes, servicios externos, datos reales, permisos sensibles y decisiones materiales de producto.

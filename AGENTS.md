@@ -20,6 +20,9 @@ Si `ai/CURRENT_TASK.md` está marcado como `PAUSED`, `BLOCKED` o `NOT_AUTHORIZED
 - Nunca hagas cambios sustanciales directamente sobre la rama por defecto.
 - Crea una rama por tarea y mantén el alcance pequeño.
 - No hagas merge sin revisión externa.
+- Manu delegó en el orquestador técnico de ChatGPT/Codex la decisión final sobre cambios, revisiones y merges desde el 2026-09-28. El orquestador puede aceptar, corregir o rechazar aportaciones de Claude y fusionar un PR cuando la evidencia y los checks sean suficientes.
+- Esta delegación no autoriza costes, despliegues públicos, publicación de datos personales, conexión de servicios, ampliaciones sensibles de permisos ni decisiones materiales de producto; esos puntos siguen requiriendo autorización específica de Manu.
+- El orquestador no puede rebajar los gates, omitir una revisión externa ni presentar como verificado algo que no lo esté.
 - No despliegues, conectes servicios ni actives facturación sin autorización explícita de Manu.
 - No añadas datos personales reales a código, fixtures, logs, issues o PRs.
 - No guardes secretos, API keys, tokens OAuth ni credenciales en Git.
