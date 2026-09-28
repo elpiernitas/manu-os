@@ -114,7 +114,7 @@ export async function contactBirthdays(token, fetchImpl) {
     const json = await call(token, `${PEOPLE}${pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ""}`, {}, fetchImpl);
     return { items: json?.connections ?? [], nextPageToken: json?.nextPageToken };
   });
-  return { people: birthdaysFrom({ connections: items }), complete };
+  return { people: birthdaysFrom({ connections: items }), total: items.length, complete };
 }
 
 export function mergePeople(people, fromGoogle, makeId) {

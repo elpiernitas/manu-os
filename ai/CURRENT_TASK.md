@@ -2,11 +2,11 @@
 
 Status: **REVIEW_PENDING**
 
-WEB-09 implementado por Claude Code; se fusiona cuando CI está en verde. La revisión del orquestador es bajo petición.
+WEB-10 implementado por Claude Code; se fusiona cuando CI está en verde. La revisión del orquestador es bajo petición.
 
 ## Tarea activa
 
-WEB-09 — movimiento estilo iOS (pestañas, hojas, entradas, iconos del tiempo, contadores) con movimiento reducido, e icono de lluvia fiable (`ai/HANDOFF.md`, «WEB-09»).
+WEB-10 — calendario de mes estilo Apple con Google Calendar, cobros fijos, «cuándo gastas» y estado de contactos comprensible (`ai/HANDOFF.md`, «WEB-10»).
 
 ## Autorización
 
@@ -39,6 +39,7 @@ WEB-09 — movimiento estilo iOS (pestañas, hojas, entradas, iconos del tiempo,
 
 ## Historial (cerrado)
 
+- **WEB-09** (movimiento estilo iOS): CERRADA. Fusionada mediante el PR #17 (`8ca2bbb`).
 - **WEB-07/08** (accesos, Spotify, WhatsApp, reglas, «Conectar Google», Atajos): CERRADAS. Fusionadas en `main` mediante el PR #16 (`dfb0c56`).
 - **WEB-06** (Excel de Sabadell y aprendizaje por comercio): CERRADA. Fusionada en `main` mediante el PR #15 (`4b19d3e`).
 - **WEB-05** (Gemini opcional y servicios de Google, ADR-0013): CERRADA. Fusionada en `main` mediante el PR #13 (`7c16024`) tras tres rondas de revisión.

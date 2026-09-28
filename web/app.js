@@ -9,7 +9,8 @@ import { launchParams, parseEvents, nextEvent, localDay } from "./core/intake.js
 import { fetchForecast, searchCities, advice, WEATHER_TTL_MS } from "./core/weather.js";
 import { importStatement, importStatementRows } from "./core/bank.js";
 import { CITIES, proposeAlarm, shouldAskTomorrow, shortcutUrl, guessCity } from "./core/night.js";
-import { isClientId, listEvents, createEvent, newEventBody } from "./core/gcal.js";
+import { isClientId, listEvents, createEvent, newEventBody, monthGrid } from "./core/gcal.js";
+import { detectRecurring, upcomingRecurring, spendingPattern } from "./core/insights.js";
 import { SCOPE, runServices, planTaskSync, listOpenTasks, insertTask, completeTask, contactBirthdays, mergePeople, saveBackup, loadBackup } from "./core/google.js";
 import { isSensitive, pickModel, listModels, ask, buildPayload } from "./core/ai.js";
 import { encryptBackup, decryptBackup, passphraseProblem } from "./core/crypto.js";
@@ -17,7 +18,7 @@ import { isSpotifyClientId, randomVerifier, challengeFor, authorizeUrl, exchange
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "9";
+export const APP_VERSION = "10";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -35,6 +36,8 @@ let sheet = null; // quick add: { kind }
 let confirmWipe = false;
 let cityResults = null;
 let moneyFilter = null; // "review"
+let calView = null; // { y, m } month shown in Agenda
+let calSelected = null; // "YYYY-MM-DD"
 let overlay = null; // "weather"
 const gcal = { tokens: {}, busy: false, error: null };
 let confirmDriveRestore = null;
@@ -305,6 +308,70 @@ async function finishSpotifyAuth(params) {
   } catch { toast("Spotify no ha dado permiso"); }
 }
 
+// ---------- Money insights ----------
+function moneyInsights() {
+  if (!vault.spending.length) return "";
+  const rec = detectRecurring(vault.spending);
+  const soon = new Set(upcomingRecurring(rec).map((r) => r.key));
+  const p = spendingPattern(vault.spending);
+  const maxW = Math.max(1, ...p.byWeekday.map((x) => x.cents));
+  const maxP = Math.max(1, ...p.byMonthPart.map((x) => x.cents));
+  return `${rec.length ? `<section class="card"><h2>Cobros fijos</h2>${rec.map((r) => `<div class="row"><div class="grow"><div>${esc(r.merchant)}</div><div class="muted small">Día ${r.dayOfMonth} de cada mes · próximo ${new Date(r.nextExpected).toLocaleDateString("es-ES", { day: "numeric", month: "short" })}${soon.has(r.key) ? ' · <b class="review">esta semana</b>' : ""}</div></div><span class="num">${euros(r.cents)}</span></div>`).join("")}<div class="row"><strong>Al mes</strong><strong class="num">${euros(rec.reduce((a, r) => a + r.cents, 0))}</strong></div></section>` : ""}
+    <section class="card"><h2>Cuándo gastas</h2>
+      <div class="week-bars">${p.byWeekday.map((d) => `<div><i data-h="${Math.max(4, Math.round((d.cents / maxW) * 100))}"></i><span class="small muted">${d.label}</span></div>`).join("")}</div>
+      ${p.byMonthPart.map((x) => `<div class="stack"><div class="row"><span>${x.label}</span><span class="num">${euros(x.cents)}</span></div><div class="bar"><i data-w="${Math.max(3, Math.round((x.cents / maxP) * 100))}"></i></div></div>`).join("")}
+      ${p.byMoment ? `<p class="muted small">Por momento del día (solo gastos apuntados a mano): ${p.byMoment.map((x) => `${x.label.toLowerCase()} ${euros(x.cents)}`).join(" · ")}</p>` : `<p class="muted small">El banco no da la hora de cada pago; los que apuntes en MANU sí la guardan.</p>`}
+      ${p.topWeekday ? `<p class="small">Tu día de más gasto: <b>${esc(p.topWeekday)}</b>.</p>` : ""}</section>`;
+}
+
+// ---------- Month calendar (Apple Calendar style) ----------
+function animateCal(dir) {
+  const g = $("calGrid");
+  if (!g || reduceMotion()) return;
+  g.style.setProperty("--dir", String(dir));
+  g.classList.remove("slide"); void g.offsetWidth; g.classList.add("slide");
+}
+// Swipe left/right on the month to change it.
+let touchX = null;
+document.addEventListener("touchstart", (e) => { if (e.target.closest("#calGrid")) touchX = e.touches[0].clientX; }, { passive: true });
+document.addEventListener("touchend", (e) => {
+  if (touchX === null) return;
+  const dx = e.changedTouches[0].clientX - touchX; touchX = null;
+  if (Math.abs(dx) < 50) return;
+  const base = calView ?? { y: today().getFullYear(), m: today().getMonth() };
+  const d = new Date(base.y, base.m + (dx < 0 ? 1 : -1), 1);
+  calView = { y: d.getFullYear(), m: d.getMonth() };
+  render(); animateCal(dx < 0 ? 1 : -1);
+}, { passive: true });
+function eventsFor(day) {
+  const fromGoogle = vault.calendar?.days?.[day];
+  if (fromGoogle) return fromGoogle;
+  if (vault.agenda?.day === day) return vault.agenda.events;
+  if (vault.agendaTomorrow?.day === day) return vault.agendaTomorrow.events;
+  return [];
+}
+
+function calendarCard(canCreate) {
+  const now = today();
+  const view = calView ?? { y: now.getFullYear(), m: now.getMonth() };
+  const selected = calSelected ?? localDay();
+  const grid = monthGrid(view.y, view.m);
+  const title = cap(new Date(view.y, view.m, 1).toLocaleDateString("es-ES", { month: "long", year: "numeric" }));
+  const tasksDue = vault.reminders.filter((r) => !r.done && dayKey(new Date(r.at)) === selected);
+  const events = eventsFor(selected);
+  const selDate = new Date(`${selected}T12:00:00`);
+  return `<section class="card cal" aria-label="Calendario">
+      <div class="row cal-head"><button class="link" data-act="cal-prev" aria-label="Mes anterior">${I.back}</button><strong class="cal-title">${esc(title)}</strong><button class="link" data-act="cal-next" aria-label="Mes siguiente">${I.chev}</button></div>
+      <div class="cal-grid" id="calGrid">${["L", "M", "X", "J", "V", "S", "D"].map((d) => `<span class="cal-dow">${d}</span>`).join("")}
+        ${grid.map((d) => { const n = eventsFor(d.day).length; return `<button class="cal-day${d.inMonth ? "" : " out"}${d.day === localDay() ? " today" : ""}${d.day === selected ? " sel" : ""}" data-act="cal-day" data-day="${d.day}" aria-label="${d.day}${n ? `, ${n} eventos` : ""}"><span>${d.date}</span><i class="dots">${"<b></b>".repeat(Math.min(3, n))}</i></button>`; }).join("")}</div>
+      ${d0(selected) ? "" : `<button class="link small" data-act="cal-today">Hoy</button>`}
+    </section>
+    ${sectionTitle(esc(cap(selDate.toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" }))), canCreate ? addLink("EVENT", "Nuevo evento") : "")}
+    <section class="card">${events.length || tasksDue.length ? events.map((ev) => `<div class="row event"><span class="ev-bar"></span><div class="grow"><div>${esc(ev.title)}</div><div class="muted small">${esc(ev.time ? ev.time + (ev.end ? " – " + ev.end : "") : "Todo el día")}${ev.location ? ` · ${esc(ev.location)}` : ""}</div></div></div>`).join("") + tasksDue.map(reminderRow).join("")
+      : `<p class="muted">${vault.calendar ? "Nada este día." : "Conecta Google para ver tu calendario completo."}</p>`}</section>`;
+}
+const d0 = (day) => day === localDay() && (!calView || (calView.y === today().getFullYear() && calView.m === today().getMonth()));
+
 // ---------- Night question ----------
 function nightCard() {
   const s = vault.settings;
@@ -368,12 +435,10 @@ const screens = {
     const gCal = isClientId(gClientId()) && googleOn("calendar");
     return `<h1>Agenda</h1><p class="subtitle">${esc(longDate())}</p>
       ${g ? `<div class="btns"><button class="btn ghost" data-act="gcal-sync">${gcal.busy ? "Sincronizando…" : "Sincronizar con Google"}</button></div><p class="muted small">${synced ? `Última sincronización: ${synced}` : "Aún sin sincronizar."}${gcal.error ? ` · ${esc(gcal.error)}` : ""}</p>` : `<p class="muted small"><button class="link small" data-act="goto-gcal">Conectar Google (Calendar, Tasks, Contactos y Drive)</button></p>`}
-      ${sectionTitle("Hoy", gCal ? addLink("EVENT", "Nuevo evento") : "")}
-      <section class="card">${agendaToday()
-        ? (vault.agenda.events.length ? vault.agenda.events.map((ev) => `<div class="row"><span class="num chip">${esc(ev.time ? ev.time + (ev.end ? "–" + ev.end : "") : "Todo el día")}</span><span class="grow">${esc(ev.title)}</span></div>`).join("") : '<p class="muted">Hoy no tienes eventos.</p>')
-        : '<p class="muted">La web no puede leer el Calendario de Apple. Pega tus eventos o usa el atajo (Tú → Atajos del iPhone).</p>'}
-        <details><summary>Pegar eventos de hoy</summary><form id="pasteEvents" class="stack"><label for="eventsText" class="muted small">Uno por línea: «09:30 Dentista», «10:00-11:00 Reunión», «todo el día Cumpleaños».</label><textarea id="eventsText" rows="3" placeholder="09:30 Dentista"></textarea><button class="btn ghost" type="submit">Guardar agenda de hoy</button></form></details>
-      </section>
+      ${calendarCard(gCal)}
+      <details class="card"><summary class="muted small">Sin Google: pegar los eventos de hoy</summary><p class="muted small">Si tu calendario no es de Google, pega aquí tus eventos (o usa el atajo «MANU Agenda»).</p>${agendaToday() && vault.agenda.source !== "GOOGLE"
+        ? (vault.agenda.events.length ? vault.agenda.events.map((ev) => `<div class="row"><span class="num chip">${esc(ev.time ? ev.time + (ev.end ? "–" + ev.end : "") : "Todo el día")}</span><span class="grow">${esc(ev.title)}</span></div>`).join("") : "") : ""}
+      <form id="pasteEvents" class="stack"><label for="eventsText" class="muted small">Uno por línea: «09:30 Dentista», «10:00-11:00 Reunión», «todo el día Cumpleaños».</label><textarea id="eventsText" rows="3" placeholder="09:30 Dentista"></textarea><button class="btn ghost" type="submit">Guardar agenda de hoy</button></form></details>
       ${sectionTitle("Recordatorios", addLink("REMINDER"))}
       <section class="card">${rems.length ? rems.map(reminderRow).join("") : '<p class="muted">Sin recordatorios. Dile a MANU «recuérdame … a las 18».</p>'}</section>
       ${sectionTitle("Tareas", addLink("TASK"))}
@@ -409,6 +474,7 @@ const screens = {
         <label class="btn ghost" for="rulesFile" role="button" tabindex="0">Importar reglas (Excel de ChatGPT)</label><input id="rulesFile" type="file" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="sr">
         ${rulesCount ? `<p class="muted small">${rulesCount} reglas de categorías guardadas en este móvil.</p>` : ""}
         ${imp ? `<p class="muted small">Última importación: ${imp.added} gastos nuevos, ${imp.duplicates} repetidos, ${imp.income} ingresos ignorados${imp.invalid ? `, ${imp.invalid} filas no reconocidas` : ""}.</p>` : ""}</section>
+      ${moneyInsights()}
       ${sectionTitle("Movimientos", `${toReview ? `<button class="link small" data-act="money-filter">${moneyFilter === "review" ? "Ver todos" : `Por revisar (${toReview})`}</button>` : ""}${addLink("EXPENSE")}`)}
       <section class="card">${entries.length ? entries.map((x) => `<div class="row"><div class="grow"><div>${esc(x.merchant ?? "Sin concepto")}</div><div class="muted small">${new Date(x.at).toLocaleDateString("es-ES", { day: "numeric", month: "short" })}${x.sub ? ` · ${esc(x.sub)}` : ""}${x.source === "BANK" ? " · banco" : ""}${x.review ? ' · <b class="review">revisar</b>' : x.inferred ? " · categoría propuesta" : ""}</div></div>
           <div class="stack"><span class="num">${euros(x.cents)}</span><label class="sr" for="cat-${esc(x.id)}">Categoría</label><select id="cat-${esc(x.id)}" data-cat="${esc(x.id)}">${Object.entries(CATEGORIES).map(([k, t]) => `<option value="${k}"${k === x.category ? " selected" : ""}>${esc(t)}</option>`).join("")}</select></div></div>`).join("")
@@ -685,6 +751,7 @@ function render({ focus = false, enter = null } = {}) {
   animateEnter(enter);
   $("screen").querySelectorAll(".bar > i[data-w]").forEach((el) => { el.style.width = `${el.dataset.w}%`; });
   $("screen").querySelectorAll(".range > i").forEach((el) => { el.style.left = `${el.dataset.l}%`; el.style.width = `${el.dataset.w}%`; });
+  $("screen").querySelectorAll(".week-bars i[data-h]").forEach((el) => { el.style.height = `${el.dataset.h}%`; });
   $("topTitle").textContent = sub ? { habitos: "Hábitos", salud: "Salud", comidas: "Comidas", personas: "Personas", tiempo: "Tiempo", avisos: "Avisos", datos: "Tus datos", gcal: "Google", ia: "IA", spotify: "Spotify", atajos: "Atajos" }[sub] : TABS.find(([id]) => id === tab)[1];
   $("fab").hidden = tab === "manu" || Boolean(sheet);
   const sheetKey = sheet ? sheet.kind : null;
@@ -830,6 +897,14 @@ document.addEventListener("click", async (e) => {
     case "music": musicToSpeaker(); break;
     case "shortcut-done": vault.settings.shortcutsDone = { ...(vault.settings.shortcutsDone ?? {}), [id]: true }; persist(); render(); toast("Quitado de pendientes"); break;
     case "shortcut-undo": { const d = { ...(vault.settings.shortcutsDone ?? {}) }; delete d[id]; vault.settings.shortcutsDone = d; persist(); render(); break; }
+    case "cal-prev": case "cal-next": {
+      const base = calView ?? { y: today().getFullYear(), m: today().getMonth() };
+      const d = new Date(base.y, base.m + (a.dataset.act === "cal-next" ? 1 : -1), 1);
+      calView = { y: d.getFullYear(), m: d.getMonth() };
+      render(); animateCal(a.dataset.act === "cal-next" ? 1 : -1); break;
+    }
+    case "cal-day": calSelected = a.dataset.day; { const d = new Date(`${calSelected}T12:00:00`); if (calView && (d.getMonth() !== calView.m)) calView = { y: d.getFullYear(), m: d.getMonth() }; } render(); break;
+    case "cal-today": calView = null; calSelected = null; render(); break;
     case "money-filter": moneyFilter = moneyFilter === "review" ? null : "review"; render(); break;
     case "spotify-connect": startSpotifyAuth(); break;
     case "spotify-forget": spotifyStore.tokens = null; render(); toast("Spotify desconectado de este móvil"); break;
@@ -1101,9 +1176,11 @@ async function syncGoogle() {
   gcal.busy = true; gcal.error = null; render();
   const services = [
     { key: "calendar", scope: SCOPE.calendar, run: async () => {
-      const start = new Date(); start.setHours(0, 0, 0, 0);
-      const end = new Date(start); end.setDate(end.getDate() + 2);
+      const now = new Date();
+      const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const end = new Date(now.getFullYear(), now.getMonth() + 2, 1);
       const days = await listEvents(await cachedToken(SCOPE.calendar), start, end);
+      vault.calendar = { from: localDay(start), to: localDay(end), days: Object.fromEntries(days), syncedAt: new Date().toISOString() };
       const t = localDay(); const tk = tomorrowKey();
       vault.agenda = { day: t, events: days.get(t) ?? [], importedAt: new Date().toISOString(), source: "GOOGLE" };
       vault.agendaTomorrow = { day: tk, events: days.get(tk) ?? [] };
@@ -1123,7 +1200,7 @@ async function syncGoogle() {
       const fromGoogle = await contactBirthdays(token);
       const merged = mergePeople(vault.people, fromGoogle.people, () => uid("p"));
       vault.people = merged.people;
-      return `${merged.added} nuevos${fromGoogle.complete ? "" : " (lista incompleta)"}`;
+      return `${fromGoogle.total} leídos · ${fromGoogle.people.length} con cumpleaños · ${merged.added} nuevos${fromGoogle.complete ? "" : " (lista incompleta)"}`;
     } },
   ];
   const enabled = Object.fromEntries(["calendar", "tasks", "contacts"].map((k) => [k, googleOn(k)]));

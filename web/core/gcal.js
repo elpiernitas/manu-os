@@ -9,7 +9,7 @@ export function isClientId(id) {
 }
 
 export function eventsUrl(from, to) {
-  const p = new URLSearchParams({ timeMin: from.toISOString(), timeMax: to.toISOString(), singleEvents: "true", orderBy: "startTime", maxResults: "50" });
+  const p = new URLSearchParams({ timeMin: from.toISOString(), timeMax: to.toISOString(), singleEvents: "true", orderBy: "startTime", maxResults: "250" });
   return `${API}?${p}`;
 }
 
@@ -47,11 +47,35 @@ export function newEventBody({ title, start, minutes = 60 }) {
   return { summary: String(title).slice(0, 200), start: { dateTime: s.toISOString(), timeZone: tz }, end: { dateTime: e.toISOString(), timeZone: tz } };
 }
 
+// Paginated: follows nextPageToken (max 10 pages) so a busy month is complete.
 export async function listEvents(token, from, to, fetchImpl = fetch) {
-  const res = await fetchImpl(eventsUrl(from, to), { headers: { Authorization: `Bearer ${token}` } });
-  if (res.status === 401) throw Object.assign(new Error("Sesión de Google caducada"), { code: "auth" });
-  if (!res.ok) throw new Error(`Google Calendar respondió ${res.status}`);
-  return groupByDay(await res.json());
+  const items = [];
+  let pageToken = null;
+  for (let page = 0; page < 10; page++) {
+    const url = eventsUrl(from, to) + (pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : "");
+    const res = await fetchImpl(url, { headers: { Authorization: `Bearer ${token}` } });
+    if (res.status === 401) throw Object.assign(new Error("Sesión de Google caducada"), { code: "auth" });
+    if (!res.ok) throw new Error(`Google Calendar respondió ${res.status}`);
+    const json = await res.json();
+    items.push(...(json.items ?? []));
+    pageToken = json.nextPageToken;
+    if (!pageToken) break;
+  }
+  return groupByDay({ items });
+}
+
+// Month grid (weeks starting on Monday) for the calendar view.
+export function monthGrid(year, month) {
+  const first = new Date(year, month, 1);
+  const lead = (first.getDay() + 6) % 7;
+  const start = new Date(year, month, 1 - lead);
+  const days = [];
+  for (let i = 0; i < 42; i++) {
+    const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
+    days.push({ day: localDay(d), date: d.getDate(), inMonth: d.getMonth() === month });
+  }
+  // Drop a trailing week that belongs entirely to the next month.
+  return days.slice(35).every((d) => !d.inMonth) ? days.slice(0, 35) : days;
 }
 
 export async function createEvent(token, body, fetchImpl = fetch) {

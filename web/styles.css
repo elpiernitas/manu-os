@@ -221,3 +221,26 @@ details.card > summary { list-style: none; }
   .wx *, .wx { animation: none !important; }
   .toast { transition: opacity 150ms ease !important; transform: translate(-50%, 0); }
 }
+
+/* Month calendar */
+.cal { gap: 6px; }
+.cal-head .link { min-width: 44px; justify-content: center; }
+.cal-title { font: 600 20px var(--display); }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; text-align: center; }
+.cal-grid.slide { animation: cal-slide 260ms var(--ease-out); }
+@keyframes cal-slide { from { opacity: 0; transform: translateX(calc(var(--dir, 1) * 24px)); } }
+.cal-dow { font-size: 11px; font-weight: 600; color: var(--muted); padding: 4px 0; }
+.cal-day { border: 0; background: none; min-height: 46px; display: grid; justify-items: center; align-content: center; gap: 2px; cursor: pointer; border-radius: 12px; font-variant-numeric: tabular-nums; }
+.cal-day span { width: 32px; height: 32px; line-height: 32px; border-radius: 50%; font-size: 16px; }
+.cal-day.out span { color: var(--muted); opacity: .45; }
+.cal-day.today span { color: var(--accent); font-weight: 700; }
+.cal-day.sel span { background: var(--fill); color: #fff; font-weight: 700; }
+.cal-day.today.sel span { background: #FF453A; }
+.cal-day .dots { display: flex; gap: 2px; height: 5px; }
+.cal-day .dots b { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); display: block; }
+.cal-day.sel .dots b { background: var(--text); }
+.event .ev-bar { width: 4px; align-self: stretch; border-radius: 2px; background: var(--fill); flex: none; }
+.week-bars { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; height: 110px; align-items: end; }
+.week-bars > div { display: grid; grid-template-rows: 1fr auto; justify-items: center; height: 100%; align-items: end; }
+.week-bars i { width: 70%; max-width: 26px; border-radius: 6px 6px 3px 3px; background: linear-gradient(180deg, var(--accent), var(--fill)); display: block; transition: height 500ms var(--ease-out); }
+@media (prefers-reduced-motion: reduce) { .cal-grid.slide { animation: none; } .week-bars i { transition: none; } }
