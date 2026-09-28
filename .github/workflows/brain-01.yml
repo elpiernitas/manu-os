@@ -30,3 +30,17 @@ jobs:
         run: swift build --build-tests
       - name: Test
         run: swift test --parallel
+      # BRAIN-02b first criterion: prove the runner's Xcode and iOS SDKs, and
+      # compile the package (including the SwiftUI shell) for iOS Simulator.
+      # No signing, no Apple account, no device, no cost beyond this job.
+      - name: Xcode and SDKs
+        run: |
+          xcodebuild -version
+          xcodebuild -showsdks
+          xcodebuild -list
+      - name: Build for iOS Simulator
+        run: |
+          xcodebuild build \
+            -scheme ManuBrain-Package \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO
