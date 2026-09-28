@@ -25,7 +25,7 @@ El 2026-09-28 Manu delegó en el orquestador técnico de ChatGPT/Codex la decisi
 - despliegue público o publicación de datos;
 - permisos sensibles, credenciales o conexión de servicios externos;
 - acceso a datos personales reales o dispositivos;
-- decisiones materiales de producto sin una recomendación claramente dominante.
+- decisiones materiales de producto.
 
 ## Trabajo todavía prohibido
 
