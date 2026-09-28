@@ -22,3 +22,4 @@ Estados permitidos:
 - [ADR-0009 — Asistente MANU con núcleo determinista y modelos opcionales](0009-manu-assistant-without-mandatory-ai.md)
 - [ADR-0010 — Contratos de conocimiento en Swift](0010-swift-knowledge-contracts.md)
 - [ADR-0011 — Almacenamiento local nativo, claves y contenedor compartido (D-02)](0011-native-local-storage-and-keys.md)
+- [ADR-0012 — App web instalable como vía operativa mientras la nativa no se puede instalar](0012-installable-web-app-as-operational-path.md) — modifica D-01 y ADR-0007

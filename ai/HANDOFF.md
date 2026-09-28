@@ -4,6 +4,36 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
+## WEB-01 — app web instalable (ADR-0012)
+
+Rama `claude/magical-goodall-rf5qoo`, desde `main` (`ff2f86a`). Decisión de Manu: sin Mac capaz de ejecutar Xcode y sin pagar el Apple Developer Program, la app nativa no se puede instalar; se añade una web instalable publicada con GitHub Pages.
+
+### Archivos cambiados
+
+- `web/`: `index.html`, `styles.css`, `app.js`, `sw.js`, `manifest.webmanifest`, `package.json`, `icons/` (PNG generados), `core/` (`text`, `money`, `modes`, `assistant`, `inbox`, `refuge`, `storage`, `notify`) y `tests/core.test.js`.
+- `.github/workflows/web.yml`: tests en PR; despliegue a Pages solo desde `main`.
+- `docs/adr/0012-installable-web-app-as-operational-path.md`, `docs/adr/README.md`, `docs/architecture/DECISIONS_AND_OPEN_ITEMS.md` (nota en D-01).
+
+### Comandos ejecutados y resultados reales
+
+- `cd web && npm test`: 11/11 PASS (Node 22.22.2).
+- `node --check` de `app.js`, `sw.js` y `core/*.js`: sin errores.
+- Prueba en Chromium headless (Playwright 1.56.1, perfil iPhone 13, servidor local): gasto por chat → Dinero y total del mes; idea → bandeja → tarea → Agenda; persistencia tras recargar; corrección de categoría; crisis con 112/024 y burbuja de seguridad; la crisis no se guarda tras recargar; *service worker* registrado; sin scroll horizontal; 0 errores de consola (la CSP no bloquea nada). El script de la prueba no se incluye en el repo.
+
+### Riesgos y regresiones posibles
+
+- La lógica está duplicada en Swift (`brain/02d-app-core`) y JavaScript: pueden divergir.
+- `localStorage` puede perderse si Manu borra los datos de Safari; hay copia en JSON manual.
+- El despliegue falla hasta que Manu haga público el repositorio y active Pages con «GitHub Actions» como fuente.
+
+### NO_VERIFICADO
+
+- Instalación en la pantalla de inicio y funcionamiento en el iPhone 14 real.
+- Avisos web en iOS (requiere la web añadida a la pantalla de inicio, iOS 16.4 o posterior).
+- Conservación a largo plazo del `localStorage` en iOS.
+- Despliegue real en GitHub Pages (depende de ajustes que solo Manu puede cambiar).
+- Descarga de la copia en JSON desde Safari de iOS.
+
 ## BRAIN-01 — resultado
 
 Se implementó un Swift Package sin dependencias externas, UI, almacenamiento, red ni proveedor de IA.

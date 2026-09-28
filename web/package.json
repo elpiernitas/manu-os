@@ -1,0 +1,9 @@
+{
+  "name": "manu-os-web",
+  "private": true,
+  "type": "module",
+  "description": "MANU OS como app web instalable (ADR-0012). Sin dependencias.",
+  "scripts": {
+    "test": "node --test tests/*.test.js"
+  }
+}
