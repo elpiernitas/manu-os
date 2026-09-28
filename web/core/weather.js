@@ -60,10 +60,15 @@ export function parseForecast(json) {
   if (!c || !d || !Array.isArray(d.time) || d.time.length === 0) throw new Error("Respuesta del tiempo no válida");
   const day = (i) => {
     const date = new Date(`${d.time[i]}T12:00:00`);
+    const rain = d.precipitation_probability_max?.[i] ?? null;
+    const desc = describe(d.weather_code[i]);
+    // A likely-rain day shows rain even if the daily code is only "cloudy".
+    const icon = rain !== null && rain >= 50 && (desc.icon === "cloud" || desc.icon === "cloud-sun") ? "rain" : desc.icon;
     return {
       date: d.time[i],
       weekday: i === 0 ? "Hoy" : WEEKDAYS[date.getDay()],
-      ...describe(d.weather_code[i]),
+      ...desc,
+      icon,
       max: round(d.temperature_2m_max[i]),
       min: round(d.temperature_2m_min[i]),
       rain: d.precipitation_probability_max?.[i] ?? null,

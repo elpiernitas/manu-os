@@ -12,6 +12,9 @@
   --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
   --display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
   --tabbar-h: 64px;
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
   --bottom-space: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px) + 28px);
   color-scheme: dark;
 }
@@ -44,7 +47,7 @@ h2 { font: 600 13px/1.2 var(--font); text-transform: uppercase; letter-spacing: 
 .num { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .chip { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; padding: 5px 11px; border-radius: 999px; background: rgba(77,141,255,.14); color: var(--accent); }
 button, input, select, textarea { font: inherit; color: inherit; }
-.btn { min-height: 44px; padding: 0 18px; border-radius: 999px; border: 0; background: var(--fill); color: #fff; font-weight: 600; font-size: 15px; cursor: pointer; }
+.btn { display: inline-flex; align-items: center; justify-content: center; text-align: center; min-height: 44px; padding: 0 18px; border-radius: 999px; border: 0; background: var(--fill); color: #fff; font-weight: 600; font-size: 15px; cursor: pointer; }
 .btn.ghost { background: rgba(255,255,255,.07); color: var(--accent); }
 .btn.danger { background: rgba(255,107,107,.12); color: var(--danger); }
 .btn.block { width: 100%; }
@@ -136,12 +139,7 @@ textarea { resize: vertical; }
 details > summary { cursor: pointer; }
 ol { margin: 4px 0 0; padding-left: 20px; display: grid; gap: 4px; }
 code { font-size: 12px; overflow-wrap: anywhere; color: var(--text); }
-@media (prefers-reduced-motion: no-preference) {
-  .sheet { animation: up .28s cubic-bezier(.2,.9,.3,1.1); }
-  @keyframes up { from { transform: translateY(40px); opacity: .5; } }
-  .tab, .btn, .check, .mood button { transition: transform .12s, background .2s; }
-  .tab:active, .btn:active, .fab:active, .mood button:active { transform: scale(.94); }
-}
+
 h2 svg { width: 15px; height: 15px; vertical-align: -2px; margin-right: 4px; }
 .link svg { width: 18px; height: 18px; vertical-align: -4px; }
 .link { display: inline-flex; align-items: center; gap: 2px; }
@@ -176,3 +174,50 @@ ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
 .app-link .ico { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 18px; }
 .review { color: var(--warm); font-weight: 600; }
 details.card > summary { list-style: none; }
+
+/* ---------- Motion ---------- */
+.tabbar { position: fixed; }
+.tab { position: relative; z-index: 1; }
+.tab[aria-selected="true"] { background: none; }
+.tab-pill { position: absolute; z-index: 0; top: 6px; bottom: 6px; left: 6px; width: calc((100% - 12px) / 5); border-radius: 999px; background: rgba(255,255,255,.10); box-shadow: inset 0 1px 0 rgba(255,255,255,.12); transform: translateX(calc(var(--tab-index, 0) * 100%)); transition: transform 320ms var(--ease-drawer); }
+.toast { opacity: 0; transform: translate(-50%, -8px) scale(.97); transition: opacity 200ms var(--ease-out), transform 250ms var(--ease-out); }
+.toast.show { opacity: 1; transform: translate(-50%, 0) scale(1); }
+.sheet-bg { transition: background-color 250ms var(--ease-out); }
+.sheet-bg[data-state="opening"], .sheet-bg[data-state="closing"] { background-color: rgba(0,0,0,0); }
+.sheet { transition: transform 420ms var(--ease-drawer); }
+.sheet-bg[data-state="opening"] .sheet, .sheet-bg[data-state="closing"] .sheet { transform: translateY(100%); }
+.sheet-bg[data-state="closing"] .sheet { transition-duration: 260ms; }
+.check svg { stroke-dasharray: 24; stroke-dashoffset: 24; transition: stroke-dashoffset 220ms var(--ease-out), opacity 0s; }
+.check[aria-pressed="true"] svg { stroke-dashoffset: 0; }
+.check { transition: background-color 180ms var(--ease-out), border-color 180ms var(--ease-out), transform 160ms var(--ease-out); }
+.btn, .tab, .fab, .mood button, .app-link, .item, .chip { transition: transform 140ms var(--ease-out), background-color 180ms var(--ease-out); }
+@media (hover: none) { .btn:active, .fab:active, .mood button:active, .check:active, .app-link:active, .item:active, button.chip:active { transform: scale(.97); } }
+@media (hover: hover) { .btn:active, .fab:active, .mood button:active, .check:active, .app-link:active, button.chip:active { transform: scale(.97); } }
+#screen.enter-tab > * { animation: fade-up 220ms var(--ease-out) both; }
+#screen.enter-page .card, #screen.enter-page .list, #screen.enter-page .section-title, #screen.enter-page h1, #screen.enter-page .subtitle, #screen.enter-page .weather-head { animation: fade-up 320ms var(--ease-out) both; }
+#screen.enter-page .stack > :nth-child(2), #screen.enter-page > :nth-child(2) { animation-delay: 40ms; }
+#screen.enter-page .stack > :nth-child(3), #screen.enter-page > :nth-child(3) { animation-delay: 80ms; }
+#screen.enter-page .stack > :nth-child(4), #screen.enter-page > :nth-child(4) { animation-delay: 120ms; }
+#screen.enter-page .stack > :nth-child(5), #screen.enter-page > :nth-child(5) { animation-delay: 160ms; }
+#screen.enter-page .stack > :nth-child(n+6), #screen.enter-page > :nth-child(n+6) { animation-delay: 200ms; }
+@keyframes fade-up { from { opacity: 0; transform: translateY(8px); } }
+.bubble.pop { animation: bubble-in 240ms var(--ease-out) both; transform-origin: bottom left; }
+.bubble.me.pop { transform-origin: bottom right; }
+@keyframes bubble-in { from { opacity: 0; transform: translateY(6px) scale(.97); } }
+.bar > i, .range > i { transition: width 500ms var(--ease-out); }
+/* Weather icons: slow ambient motion, never distracting */
+.wx { overflow: visible; }
+.wx-sun .rays { transform-origin: 12px 12px; animation: spin 24s linear infinite; }
+.wx-cloud .cloud, .wx-rain .cloud { animation: drift 5s var(--ease-in-out) infinite alternate; }
+.wx-rain .drops { animation: rain 1.2s linear infinite; }
+.wx-moon { animation: glow 4s ease-in-out infinite alternate; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes drift { from { transform: translateX(-1px); } to { transform: translateX(1.5px); } }
+@keyframes rain { 0% { transform: translateY(-2px); opacity: 0; } 30% { opacity: 1; } 100% { transform: translateY(3px); opacity: 0; } }
+@keyframes glow { from { filter: drop-shadow(0 0 0 rgba(255,181,71,0)); } to { filter: drop-shadow(0 0 4px rgba(255,181,71,.55)); } }
+@media (prefers-reduced-motion: reduce) {
+  .tab-pill, .sheet, .sheet-bg, .toast, .check, .check svg, .btn, .bar > i, .range > i { transition-duration: 0s !important; }
+  #screen.enter-tab > *, #screen.enter-page *, .bubble.pop { animation: none !important; }
+  .wx *, .wx { animation: none !important; }
+  .toast { transition: opacity 150ms ease !important; transform: translate(-50%, 0); }
+}

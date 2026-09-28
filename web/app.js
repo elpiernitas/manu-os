@@ -17,7 +17,7 @@ import { isSpotifyClientId, randomVerifier, challengeFor, authorizeUrl, exchange
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "8";
+export const APP_VERSION = "9";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -81,12 +81,14 @@ function persist() {
 }
 
 function toast(msg) {
+  document.querySelectorAll(".toast").forEach((old) => old.remove()); // one at a time, the newest wins
   const t = document.createElement("div");
   t.className = "toast glass";
   t.setAttribute("role", "status");
   t.textContent = msg;
   document.body.appendChild(t);
-  setTimeout(() => t.remove(), 2400);
+  requestAnimationFrame(() => requestAnimationFrame(() => t.classList.add("show")));
+  setTimeout(() => { t.classList.remove("show"); setTimeout(() => t.remove(), 250); }, 2400);
 }
 
 // ---------- Icons (inline SVG, stroke) ----------
@@ -100,15 +102,15 @@ const I = {
   check: svg('<path d="M5 12.5l4.5 4.5L19 7.5"/>', 'stroke-width="3"'),
   chev: svg('<path d="M9 6l6 6-6 6"/>'),
   back: svg('<path d="M15 6l-6 6 6 6"/>'),
-  sun: svg('<circle cx="12" cy="12" r="4.5"/><path d="M12 1.5v2.5M12 20v2.5M3.5 3.5l1.8 1.8M18.7 18.7l1.8 1.8M1.5 12H4M20 12h2.5M3.5 20.5l1.8-1.8M18.7 5.3l1.8-1.8"/>'),
-  "cloud-sun": svg('<path d="M7 18h10a4 4 0 0 0 0-8 5.5 5.5 0 0 0-10.4 1.6A3.3 3.3 0 0 0 7 18z"/><path d="M15 4.5l.7-1.6M19.5 7l1.6-.7"/>'),
-  cloud: svg('<path d="M7 19h10a4.5 4.5 0 0 0 0-9 6 6 0 0 0-11.4 1.8A3.6 3.6 0 0 0 7 19z"/>'),
+  sun: svg('<circle cx="12" cy="12" r="4.5"/><path class="rays" d="M12 1.5v2.5M12 20v2.5M3.5 3.5l1.8 1.8M18.7 18.7l1.8 1.8M1.5 12H4M20 12h2.5M3.5 20.5l1.8-1.8M18.7 5.3l1.8-1.8"/>', 'class="wx wx-sun"'),
+  "cloud-sun": svg('<path class="cloud" d="M7 18h10a4 4 0 0 0 0-8 5.5 5.5 0 0 0-10.4 1.6A3.3 3.3 0 0 0 7 18z"/><path class="rays" d="M15 4.5l.7-1.6M19.5 7l1.6-.7"/>', 'class="wx wx-cloud"'),
+  cloud: svg('<path class="cloud" d="M7 19h10a4.5 4.5 0 0 0 0-9 6 6 0 0 0-11.4 1.8A3.6 3.6 0 0 0 7 19z"/>', 'class="wx wx-cloud"'),
   fog: svg('<path d="M4 9h16M2 13h20M5 17h14"/>'),
-  rain: svg('<path d="M7 15h10a4 4 0 0 0 0-8 5.5 5.5 0 0 0-10.4 1.6A3.3 3.3 0 0 0 7 15z"/><path d="M9 18l-1 3M13 18l-1 3M17 18l-1 3"/>'),
+  rain: svg('<path class="cloud" d="M7 15h10a4 4 0 0 0 0-8 5.5 5.5 0 0 0-10.4 1.6A3.3 3.3 0 0 0 7 15z"/><path class="drops" d="M9 18l-1 3M13 18l-1 3M17 18l-1 3"/>', 'class="wx wx-rain"'),
   snow: svg('<path d="M7 14h10a4 4 0 0 0 0-8 5.5 5.5 0 0 0-10.4 1.6A3.3 3.3 0 0 0 7 14z"/><path d="M9 18h.01M13 20h.01M17 18h.01"/>', 'stroke-width="2.6"'),
   storm: svg('<path d="M7 14h10a4 4 0 0 0 0-8 5.5 5.5 0 0 0-10.4 1.6A3.3 3.3 0 0 0 7 14z"/><path d="M12 14l-2 4h4l-2 4"/>'),
-  moon: svg('<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>'),
-  "cloud-moon": svg('<path d="M7 19h10a4 4 0 0 0 0-8 5.5 5.5 0 0 0-10.4 1.6A3.3 3.3 0 0 0 7 19z"/><path d="M17 3.5a4 4 0 0 0 3.5 5.5"/>'),
+  moon: svg('<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>', 'class="wx wx-moon"'),
+  "cloud-moon": svg('<path class="cloud" d="M7 19h10a4 4 0 0 0 0-8 5.5 5.5 0 0 0-10.4 1.6A3.3 3.3 0 0 0 7 19z"/><path d="M17 3.5a4 4 0 0 0 3.5 5.5"/>', 'class="wx wx-cloud"'),
   drop: svg('<path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z"/>'),
   wind: svg('<path d="M3 9h11a3 3 0 1 0-3-3M3 15h15a3 3 0 1 1-3 3"/>'),
   sunrise: svg('<path d="M4 18h16M7 14a5 5 0 0 1 10 0M12 3v5M9 6l3-3 3 3"/>'),
@@ -201,7 +203,7 @@ function weatherPage() {
   const lo = Math.min(...f.days.map((d) => d.min)), hi = Math.max(...f.days.map((d) => d.max));
   const span = Math.max(1, hi - lo);
   return `<button class="link" data-act="overlay-close">${I.back} Hoy</button>
-    <div class="weather-head"><p class="muted">${esc(city.name)}</p><div class="temp xl">${f.now.temp}°</div><p>${esc(f.now.text)}</p><p class="muted">Máx. ${f.today.max}° · Mín. ${f.today.min}°</p></div>
+    <div class="weather-head"><p class="muted">${esc(city.name)}</p><div class="temp xl"><span data-count="${f.now.temp}">${f.now.temp}</span>°</div><p>${esc(f.now.text)}</p><p class="muted">Máx. ${f.today.max}° · Mín. ${f.today.min}°</p></div>
     <section class="card"><p class="small">${esc(advice(f))}</p><div class="hours scroll">${f.hours.map((h) => `<div><span class="muted small">${esc(h.time)}</span>${I[h.icon] ?? I.cloud}${h.rain >= 20 ? `<span class="rain small">${h.rain}%</span>` : ""}<b>${h.temp}°</b></div>`).join("")}</div></section>
     ${sectionTitle("Próximos 7 días")}
     <section class="card">${f.days.map((d) => `<div class="row day"><span class="wd">${esc(d.weekday)}</span><span class="dicon">${I[d.icon] ?? I.cloud}${d.rain >= 20 ? `<span class="rain small">${d.rain}%</span>` : ""}</span><span class="num muted">${d.min}°</span><span class="range"><i data-l="${Math.round(((d.min - lo) / span) * 100)}" data-w="${Math.max(6, Math.round(((d.max - d.min) / span) * 100))}"></i></span><span class="num">${d.max}°</span></div>`).join("")}</section>
@@ -399,7 +401,7 @@ const screens = {
     const imp = vault.settings.lastImport;
     return `<h1>Dinero</h1><p class="subtitle">${esc(cap(today().toLocaleDateString("es-ES", { month: "long", year: "numeric" })))}</p>
       <div class="stack">
-      <section class="card hero"><h2>Gastado este mes</h2><div class="big-money">${euros(month.total)}</div>
+      <section class="card hero"><h2>Gastado este mes</h2><div class="big-money" data-count-money="${month.total}">${euros(month.total)}</div>
         ${cats.map(([c, v]) => `<div class="stack"><div class="row"><span>${esc(CATEGORIES[c])}</span><span class="num">${euros(v)}</span></div><div class="bar"><i data-w="${Math.max(3, Math.round((v / max) * 100))}"></i></div></div>`).join("")}</section>
       <section class="card"><h2>${I.box} Importar del banco</h2>
         <p class="muted small">Descarga los movimientos de tu banco (Sabadell: Excel .xls; también vale CSV) y elígelo aquí. Se analiza en tu móvil y no se envía a nadie. Solo importo gastos y no duplico los que ya tengas. Si corriges la categoría de un comercio, la aprendo para todos sus movimientos.</p>
@@ -624,17 +626,84 @@ function sheetHtml() {
 }
 
 // ---------- Render ----------
-function render({ focus = false } = {}) {
+// ---------- Motion (QAL/animate rules: ease-out entrances, <300ms UI, reduced motion) ----------
+const reduceMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+let lastChatLength = 0;
+let renderedSheetKind = null;
+
+function renderTabs() {
+  const nav = $("tabs");
+  if (!nav.querySelector(".tab")) {
+    nav.innerHTML = `<span class="tab-pill" aria-hidden="true"></span>` + TABS.map(([id, label]) => `<button class="tab" role="tab" data-tab="${id}">${id === "manu" ? '<span class="dot" aria-hidden="true">M</span>' : I[id]}<span>${label}</span></button>`).join("");
+  }
+  const index = TABS.findIndex(([id]) => id === tab);
+  nav.querySelectorAll(".tab").forEach((b, i) => b.setAttribute("aria-selected", String(i === index)));
+  nav.style.setProperty("--tab-index", String(index));
+}
+
+function countUp(el, to, format) {
+  if (reduceMotion()) return;
+  const start = performance.now();
+  const dur = 600;
+  const step = (now) => {
+    const p = Math.min(1, (now - start) / dur);
+    const eased = 1 - Math.pow(1 - p, 3);
+    el.textContent = format(Math.round(to * eased));
+    if (p < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+
+function animateEnter(kind) {
+  if (reduceMotion() || !kind) return;
+  const screen = $("screen");
+  screen.classList.remove("enter-tab", "enter-page");
+  void screen.offsetWidth; // restart the animation
+  screen.classList.add(kind === "tab" ? "enter-tab" : "enter-page");
+  if (kind === "page") {
+    screen.querySelectorAll("[data-count]").forEach((el) => countUp(el, Number(el.dataset.count), (v) => String(v)));
+    screen.querySelectorAll("[data-count-money]").forEach((el) => countUp(el, Number(el.dataset.countMoney), euros));
+  }
+}
+
+function openSheet(kind) {
+  sheet = { kind };
+  render();
+}
+
+function closeSheet() {
+  const bg = $("sheetBg");
+  if (!bg || reduceMotion()) { sheet = null; render(); return; }
+  bg.dataset.state = "closing";
+  setTimeout(() => { sheet = null; render(); }, 280);
+}
+
+function render({ focus = false, enter = null } = {}) {
   document.body.dataset.mode = modeState(today(), undefined, vault.settings.override).mode;
-  $("tabs").innerHTML = TABS.map(([id, label]) => `<button class="tab" role="tab" data-tab="${id}" aria-selected="${tab === id}">${id === "manu" ? '<span class="dot" aria-hidden="true">M</span>' : I[id]}<span>${label}</span></button>`).join("");
+  renderTabs();
   $("screen").innerHTML = overlay === "weather" ? weatherPage() : (screens[tab] ?? screens.hoy)();
+  animateEnter(enter);
   $("screen").querySelectorAll(".bar > i[data-w]").forEach((el) => { el.style.width = `${el.dataset.w}%`; });
   $("screen").querySelectorAll(".range > i").forEach((el) => { el.style.left = `${el.dataset.l}%`; el.style.width = `${el.dataset.w}%`; });
   $("topTitle").textContent = sub ? { habitos: "Hábitos", salud: "Salud", comidas: "Comidas", personas: "Personas", tiempo: "Tiempo", avisos: "Avisos", datos: "Tus datos", gcal: "Google", ia: "IA", spotify: "Spotify", atajos: "Atajos" }[sub] : TABS.find(([id]) => id === tab)[1];
   $("fab").hidden = tab === "manu" || Boolean(sheet);
-  $("sheetRoot").innerHTML = sheetHtml();
-  if (sheet) $("qText")?.focus();
-  if (tab === "manu") $("chat")?.lastElementChild?.scrollIntoView({ block: "end" });
+  const sheetKey = sheet ? sheet.kind : null;
+  if (sheetKey !== renderedSheetKind || !sheet) {
+    const wasOpen = Boolean(renderedSheetKind);
+    $("sheetRoot").innerHTML = sheetHtml();
+    renderedSheetKind = sheetKey;
+    const bg = $("sheetBg");
+    if (bg && !wasOpen && !reduceMotion()) { bg.dataset.state = "opening"; requestAnimationFrame(() => requestAnimationFrame(() => { bg.dataset.state = "open"; })); }
+    else if (bg) bg.dataset.state = "open";
+    if (sheet) $("qText")?.focus();
+  }
+  if (tab === "manu") {
+    const chat = $("chat");
+    const count = chat?.children.length ?? 0;
+    if (count > lastChatLength && lastChatLength > 0 && !reduceMotion()) [...chat.children].slice(lastChatLength - count).forEach((b) => b.classList.add("pop"));
+    lastChatLength = count;
+    chat?.lastElementChild?.scrollIntoView({ block: "end", behavior: reduceMotion() ? "auto" : "smooth" });
+  } else lastChatLength = 0;
   if (focus) $("screen").focus();
 }
 
@@ -643,7 +712,7 @@ function go(newTab) {
   sub = null;
   overlay = null;
   sessionStorage.setItem("manuos.tab", tab);
-  render({ focus: true });
+  render({ focus: true, enter: "tab" });
   scrollTo(0, 0);
   if (tab === "hoy") refreshWeather();
 }
@@ -729,11 +798,11 @@ document.addEventListener("click", async (e) => {
   const sg = e.target.closest("[data-sub-go]");
   if (sg) { tab = "tu"; sub = sg.dataset.subGo; render({ focus: true }); scrollTo(0, 0); return; }
   const sb = e.target.closest("[data-sub]");
-  if (sb) { sub = sb.dataset.sub; cityResults = null; render({ focus: true }); scrollTo(0, 0); return; }
+  if (sb) { sub = sb.dataset.sub; cityResults = null; render({ focus: true, enter: "page" }); scrollTo(0, 0); return; }
   const s = e.target.closest("[data-say]");
   if (s) { say(s.dataset.say); return; }
-  if (e.target.id === "fab" || e.target.closest("#fab")) { sheet = { kind: tab === "dinero" ? "EXPENSE" : "TASK" }; render(); return; }
-  if (e.target.id === "sheetBg") { sheet = null; render(); return; }
+  if (e.target.id === "fab" || e.target.closest("#fab")) { openSheet(tab === "dinero" ? "EXPENSE" : "TASK"); return; }
+  if (e.target.id === "sheetBg") { closeSheet(); return; }
   const a = e.target.closest("[data-act]");
   if (!a) return;
   const id = a.dataset.id;
@@ -744,13 +813,13 @@ document.addEventListener("click", async (e) => {
     case "forget": updateItem(id, markUnclassified); break;
     case "toggle": updateItem(id, toggleDone); break;
     case "rem-done": vault.reminders = vault.reminders.map((r) => (r.id === id ? { ...r, done: !r.done } : r)); persist(); render(); break;
-    case "sheet": sheet = { kind: a.dataset.kind }; render(); break;
-    case "sheet-close": sheet = null; render(); break;
+    case "sheet": openSheet(a.dataset.kind); break;
+    case "sheet-close": closeSheet(); break;
     case "refuge": refuge = { state: initialRefuge(), messages: [{ from: "manu", text: "Estoy aquí. ¿Qué te vendría mejor ahora: entender por qué estás así, buscar una solución o cambiar de aire?" }] }; go("manu"); break;
     case "leave-refuge": refuge = null; render(); break;
-    case "back": sub = null; render({ focus: true }); break;
-    case "weather-open": overlay = "weather"; render({ focus: true }); scrollTo(0, 0); refreshWeather(); break;
-    case "overlay-close": overlay = null; render({ focus: true }); scrollTo(0, 0); break;
+    case "back": sub = null; render({ focus: true, enter: "tab" }); break;
+    case "weather-open": overlay = "weather"; render({ focus: true, enter: "page" }); scrollTo(0, 0); refreshWeather(); break;
+    case "overlay-close": overlay = null; render({ focus: true, enter: "tab" }); scrollTo(0, 0); break;
     case "goto-gcal": tab = "tu"; sub = "gcal"; render({ focus: true }); scrollTo(0, 0); break;
     case "gcal-sync": syncGoogle(); break;
     case "google-connect-all": vault.settings.google = { ...(vault.settings.google ?? {}), calendar: true, tasks: true, contacts: true }; persist(); syncGoogle(); break;
@@ -1137,7 +1206,7 @@ if (launch.say || launch.events) {
   if (launch.events) { vault.agenda = { day: localDay(), events: launch.events, importedAt: new Date().toISOString() }; persist(); tab = "agenda"; }
   if (launch.say) { tab = "manu"; say(launch.say); }
 }
-render();
+render({ enter: "page" });
 refreshWeather();
 if (isClientId(gClientId()) && GOOGLE_FEATURES.some(([k]) => googleOn(k))) loadGis().catch(() => {});
 checkReminders();

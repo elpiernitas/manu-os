@@ -2,13 +2,46 @@
 
 ## Próximo paso vigente
 
-1. WEB-07/08 en un solo PR. Claude Code lo fusiona con CI en verde (nueva gobernanza decidida por Manu el 2026-09-29) y `web.yml` publica la web en GitHub Pages. La revisión de ChatGPT es posterior y bajo petición.
+1. WEB-07/08 fusionadas (PR #16). WEB-09 (movimiento) sigue el mismo flujo: Claude Code fusiona con CI en verde y `web.yml` publica. La revisión de ChatGPT es bajo petición.
 2. Manu, en su dispositivo y fuera del repositorio, crea el ID de cliente OAuth de Google (Calendar, Tasks, People y Drive, cada uno activable por separado) y, si quiere, la clave gratuita de Gemini.
 3. La línea nativa (PR #7, #8 y #9) sigue en pausa. D-04B y D-03 son gates futuros.
 
 ## Estado
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
+
+## WEB-09 — movimiento estilo iOS y detalles
+
+Manu pidió animaciones y detalles como en el iPhone. Se aplicaron las reglas de la skill de animación: la frecuencia de uso decide si algo se anima; curvas `ease-out` en las entradas, 300 ms como máximo en la interfaz, una curva de tipo cajón para las hojas, sin `scale(0)`, transiciones y no fotogramas clave en lo que se dispara a menudo, y `prefers-reduced-motion` desde el primer momento.
+
+### Cambios
+
+- `web/app.js`:
+  - pestañas construidas una sola vez, con una cápsula de cristal que se desliza (320 ms);
+  - entrada suave al cambiar de pestaña (220 ms);
+  - entrada escalonada solo en lo ocasional: primera apertura, página del tiempo y subpáginas;
+  - hoja del «+» con apertura y cierre animados;
+  - contadores del tiempo y del gasto del mes en la entrada de página;
+  - las burbujas nuevas del chat aparecen suavemente;
+  - avisos que entran y salen, uno cada vez;
+  - versión 9.
+- `web/styles.css`:
+  - tokens `--ease-out`, `--ease-in-out` y `--ease-drawer`;
+  - pulsación a `scale(.97)` y check que se dibuja;
+  - iconos del tiempo con movimiento ambiental lento (sol, nubes, lluvia, luna);
+  - variante de movimiento reducido sin desplazamientos;
+  - los botones hechos con `label` quedan centrados.
+- `web/core/weather.js`: un día con probabilidad de lluvia de al menos el 50 % muestra el icono de lluvia. Venía de la captura de Manu, que marcaba 70 % con icono de nube; tiene su regresión.
+- `web/sw.js` (`manuos-v9`).
+
+### Resultados
+
+- `npm test`: 59/59 PASS.
+- Chromium headless, con y sin movimiento reducido: la cápsula se desplaza (0,32 s, y 0 s con movimiento reducido), la hoja abre y cierra, entrada escalonada y 0 errores. Las regresiones de WEB-03 a WEB-08 pasan.
+
+### NO_VERIFICADO
+
+- Cómo se sienten las animaciones en el iPhone real (fluidez a 60/120 Hz y rendimiento del `backdrop-filter`).
 
 ## WEB-08 — reglas de categorías de ChatGPT, «Conectar Google» en un paso y sección de Atajos
 

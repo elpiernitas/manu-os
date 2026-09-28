@@ -2,11 +2,11 @@
 
 Status: **REVIEW_PENDING**
 
-WEB-07 y WEB-08 implementados por Claude Code en un único PR, que se fusiona cuando CI está en verde. La revisión del orquestador es posterior y bajo petición.
+WEB-09 implementado por Claude Code; se fusiona cuando CI está en verde. La revisión del orquestador es bajo petición.
 
 ## Tarea activa
 
-WEB-07/08 — accesos por modo, Spotify en el altavoz «baño», WhatsApp y otros asistentes ([ADR-0014](../docs/adr/0014-spotify-and-app-hub.md)); reglas de categorías importables, «Conectar Google» en una sola ventana y sección de Atajos (`ai/HANDOFF.md`, «WEB-07» y «WEB-08»).
+WEB-09 — movimiento estilo iOS (pestañas, hojas, entradas, iconos del tiempo, contadores) con movimiento reducido, e icono de lluvia fiable (`ai/HANDOFF.md`, «WEB-09»).
 
 ## Autorización
 
@@ -39,6 +39,7 @@ WEB-07/08 — accesos por modo, Spotify en el altavoz «baño», WhatsApp y otro
 
 ## Historial (cerrado)
 
+- **WEB-07/08** (accesos, Spotify, WhatsApp, reglas, «Conectar Google», Atajos): CERRADAS. Fusionadas en `main` mediante el PR #16 (`dfb0c56`).
 - **WEB-06** (Excel de Sabadell y aprendizaje por comercio): CERRADA. Fusionada en `main` mediante el PR #15 (`4b19d3e`).
 - **WEB-05** (Gemini opcional y servicios de Google, ADR-0013): CERRADA. Fusionada en `main` mediante el PR #13 (`7c16024`) tras tres rondas de revisión.
 - **BRAIN-02-PREP**: CERRADA. Fusionada en `main` mediante el PR #5 (commit `ff2f86a`). Su definición completa, con el alcance, los criterios y las prohibiciones de entonces, está en ese commit. Ya no rige: la línea de trabajo vigente es la web (ADR-0012 y ADR-0013).
