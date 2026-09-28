@@ -49,16 +49,21 @@ export function merchantKey(merchant) {
     .replace(/[^a-z0-9ñ]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
-  return t.replace(PREFIXES, "").trim().split(" ").slice(0, 4).join(" ") || null;
+  // The whole cleaned name: cutting it to a few words made different shops
+  // (e.g. "… LOCAL UNO" / "… LOCAL DOS") share a key and overwrite each other.
+  return t.replace(PREFIXES, "").trim().slice(0, 80) || null;
 }
+
+// Keys saved before WEB-13 used only the first four words. Still read, never written.
+const legacyKey = (key) => key.split(" ").slice(0, 4).join(" ");
 
 // A learned rule is either a category id (Manu's correction) or
 // { category, sub, ask } (imported rules). Unknown categories are ignored.
 export function ruleFor(merchant, learned = {}) {
   const key = merchantKey(merchant);
-  const r = key ? learned[key] : null;
+  const r = key ? learned[key] ?? (legacyKey(key) !== key ? learned[legacyKey(key)] : null) : null;
   if (!r) return null;
-  const rule = typeof r === "string" ? { category: r } : r;
+  const rule = typeof r === "string" ? { category: r, manual: true } : r;
   return rule.category in CATEGORIES ? rule : null;
 }
 
@@ -91,6 +96,8 @@ export function euros(cents) {
 export function newEntry({ id, cents, merchant, at }, learned = {}) {
   const rule = ruleFor(merchant, learned);
   const entry = { id, cents, merchant: merchant ?? null, at, category: categorise(merchant, learned), inferred: !rule || Boolean(rule.ask) };
+  // An imported rule is not Manu's decision: later rule versions may still change it.
+  if (rule && !rule.manual) entry.ruled = true;
   if (rule?.sub) entry.sub = rule.sub;
   if (rule?.ask) entry.review = true;
   return entry;
@@ -128,16 +135,19 @@ export function rulesFromRows(rows) {
   return { rules, skipped };
 }
 
-// Re-applies rules to entries that are still proposals; confirmed ones are kept.
+// Only Manu's own corrections are final (inferred: false and not ruled).
+export const isConfirmed = (e) => !e.inferred && !e.ruled;
+
+// Re-applies rules to entries Manu has not decided; his decisions are kept.
 export function applyRules(entries, learned) {
   let changed = 0;
   const next = entries.map((e) => {
-    if (!e.inferred) return e;
+    if (isConfirmed(e)) return e;
     const rule = ruleFor(e.merchant, learned);
     if (!rule) return e;
     changed++;
-    const { sub, review, ...rest } = e;
-    return { ...rest, category: rule.category, inferred: Boolean(rule.ask), ...(rule.sub ? { sub: rule.sub } : {}), ...(rule.ask ? { review: true } : {}) };
+    const { sub, review, ruled, ...rest } = e;
+    return { ...rest, category: rule.category, inferred: Boolean(rule.ask), ...(rule.manual ? {} : { ruled: true }), ...(rule.sub ? { sub: rule.sub } : {}), ...(rule.ask ? { review: true } : {}) };
   });
   return { entries: next, changed };
 }
@@ -152,8 +162,8 @@ export function learnCategory(entries, learned, entryId, category) {
   const nextLearned = key ? { ...learned, [key]: category } : learned;
   let applied = 0;
   const next = entries.map((e) => {
-    if (e.id === entryId) { const { review, ...rest } = e; return { ...rest, category, inferred: false }; }
-    if (key && e.inferred && merchantKey(e.merchant) === key) { applied++; const { review, ...rest } = e; return { ...rest, category, inferred: false }; }
+    if (e.id === entryId) { const { review, ruled, ...rest } = e; return { ...rest, category, inferred: false }; }
+    if (key && !isConfirmed(e) && merchantKey(e.merchant) === key) { applied++; const { review, ruled, ...rest } = e; return { ...rest, category, inferred: false }; }
     return e;
   });
   return { entries: next, learned: nextLearned, applied };
@@ -161,7 +171,8 @@ export function learnCategory(entries, learned, entryId, category) {
 
 export function correctCategory(entry, category) {
   if (!(category in CATEGORIES)) throw new Error(`Unknown category ${category}`);
-  return { ...entry, category, inferred: false };
+  const { ruled, ...rest } = entry;
+  return { ...rest, category, inferred: false };
 }
 
 // Totals for entries with start <= at < end (ISO strings or Dates).

@@ -69,3 +69,19 @@ Si una sincronización deduce «ya no existe» o «se cerró» porque un element
 
 Safari de iOS solo permite abrir una ventana emergente, como el consentimiento OAuth, dentro del gesto del usuario. Encadenar varias peticiones de permiso tras `await` de red hace que la segunda y las siguientes fallen con «ventana cerrada». Hay que pedir en una sola ventana todo lo que ese gesto necesita, precargar el script del proveedor antes del toque y no abrir ventanas desde procesos en segundo plano. Evidencia: captura del iPhone de Manu (2026-09-29, Tasks y Contactos con «Se cerró la ventana de Google»). Prueba: el recorrido de navegador de WEB-08, «ONE consent window».
 
+
+### QAL-016 — «Borrar todo» cubre también lo que vive fuera del vault
+
+Si hay secretos guardados a propósito fuera del almacén principal, para que no entren en las copias (clave de Gemini, tokens y PKCE de Spotify), la acción «Borrar todos los datos» tiene que eliminarlos explícitamente de `localStorage` y `sessionStorage`. Reiniciar el vault no basta. Prueba: `web/tests/review-web06-08.test.js` (1) y el recorrido de navegador de WEB-13.
+
+### QAL-017 — Distinguir la decisión humana de la inferencia importada
+
+Un mismo campo (`inferred: false`) no puede significar a la vez «lo decidió Manu» y «lo dijo una regla importada»: la segunda regla corregida ya no se aplicaba. Las procedencias se marcan por separado (`ruled`) y solo la corrección de Manu es definitiva. Prueba: `review-web06-08.test.js` (3).
+
+### QAL-018 — Identidades que no se reducen a un hash corto
+
+Si un id sirve para descartar duplicados, un hash de 32 bits puede hacer que dos registros distintos colisionen y uno se pierda en silencio. Se usa la identidad completa como id, y los ids antiguos solo se aceptan si el registro guardado coincide de verdad. Prueba: `review-web06-08.test.js` (4 y 4b), con una colisión real encontrada por fuerza bruta.
+
+### QAL-019 — Reproducir el ejemplo de un hallazgo externo antes de usarlo como fixture
+
+En la revisión de ChatGPT del 2026-09-29, el defecto (posible colisión) era real, pero la pareja de filas de ejemplo no colisionaba en los commits revisados. Un fixture sin comprobar habría dado una regresión que pasa sin probar nada. Antes de convertir el ejemplo de un hallazgo en test, hay que ejecutarlo contra el código antiguo y ver que falla.

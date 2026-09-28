@@ -2,11 +2,11 @@
 
 Status: **REVIEW_PENDING**
 
-WEB-12 implementado por Claude Code; se fusiona cuando CI está en verde. La revisión del orquestador es bajo petición.
+WEB-13 implementado por Claude Code. **Bloqueo registrado:** no se fusiona hasta que Manu decida si enmienda AGENTS.md para reflejar la gobernanza del 2026-09-29 (hallazgo 6 de la revisión de ChatGPT).
 
 ## Tarea activa
 
-WEB-12 — IA integrada que propone acciones en MANU (con confirmación), sugerencias de mejora como petición en GitHub y ajuste opcional «Enviar a Gemini sin preguntar» (`ai/HANDOFF.md`, «WEB-12»; enmienda WEB-12 de ADR-0013).
+WEB-13 — correcciones de los hallazgos 1–5 de la revisión de ChatGPT sobre los PR #15/#16, con regresiones (`ai/HANDOFF.md`, «WEB-13»).
 
 ## Autorización
 
@@ -40,6 +40,7 @@ WEB-12 — IA integrada que propone acciones en MANU (con confirmación), sugere
 
 ## Historial (cerrado)
 
+- **WEB-12** (IA que propone acciones): CERRADA. Fusionada mediante el PR #20 (`9a5bf6f`).
 - **WEB-11** (todos los calendarios con color, WhatsApp): CERRADA. Fusionada mediante el PR #19 (`88b3df3`).
 - **WEB-10** (calendario de mes, cobros fijos, cuándo gastas): CERRADA. Fusionada mediante el PR #18 (`505c6bf`).
 - **WEB-09** (movimiento estilo iOS): CERRADA. Fusionada mediante el PR #17 (`8ca2bbb`).

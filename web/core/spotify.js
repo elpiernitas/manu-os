@@ -10,6 +10,16 @@ const API = "https://api.spotify.com/v1/me/player";
 export const SPOTIFY_SCOPES = "user-read-playback-state user-modify-playback-state";
 export const DEFAULT_SPEAKER = "baño";
 
+// PKCE login state is valid only for its own state value and at most 15
+// minutes old (ADR-0014). Future, missing or non-numeric times are rejected.
+export const PKCE_MAX_AGE_MS = 15 * 60000;
+export function pkceValid(pkce, state, now = Date.now()) {
+  if (!pkce || typeof pkce.verifier !== "string" || typeof state !== "string" || pkce.state !== state) return false;
+  if (typeof pkce.at !== "number" || !Number.isFinite(pkce.at)) return false;
+  const age = now - pkce.at;
+  return age >= 0 && age <= PKCE_MAX_AGE_MS;
+}
+
 export const isSpotifyClientId = (id) => /^[0-9a-f]{32}$/i.test(String(id ?? "").trim());
 
 const b64url = (bytes) => btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");

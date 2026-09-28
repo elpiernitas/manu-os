@@ -10,6 +10,29 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
+## WEB-13 — correcciones de la revisión de ChatGPT (PR #15/#16)
+
+Revisión pedida por Manu y devuelta el 2026-09-29 sobre `4b19d3e` y `dfb0c56`.
+
+### Cambios
+
+1. «Borrar todos los datos» elimina además todas las claves `manuos.*` de `localStorage` y `sessionStorage`: la clave, el modelo y el «recordar» de Gemini, y los tokens y el PKCE de Spotify. También vacía los tokens de Google en memoria (`wipeDeviceKeys`).
+2. `merchantKey` usa el nombre completo limpio, no sus 4 primeras palabras. Las reglas guardadas con la clave antigua se siguen leyendo, pero ya no se escriben.
+3. Las entradas categorizadas por una regla importada llevan `ruled: true` y siguen aceptando versiones nuevas de la regla. Solo la corrección de Manu es definitiva (`isConfirmed`). En Dinero se muestran como «según tus reglas».
+4. Id bancario sin hash (`bank:fecha|importe|concepto|saldo|n`). Los ids antiguos (`bank-…`) solo cuentan como duplicado si el gasto guardado coincide en día, importe y concepto.
+5. `pkceValid`: el estado tiene que coincidir, y la hora tiene que ser un número finito, no futura y de 15 minutos como máximo.
+6. **No corregido en código, bloqueo registrado:** HANDOFF autoriza fusionar con CI en verde, mientras que AGENTS.md exige revisión externa antes de fusionar. Es la decisión de gobernanza de Manu del 2026-09-29, pero AGENTS.md no se ha cambiado. Hasta que Manu decida si se enmienda, prevalece lo más restrictivo (CLAUDE.md) y este PR no se fusiona.
+
+### Resultados
+
+- `npm test`: 76/76 PASS (6 tests nuevos en `web/tests/review-web06-08.test.js`).
+- El ejemplo de colisión de la revisión **no colisiona** en `4b19d3e` ni en `dfb0c56`: se obtienen 2 entradas y 0 duplicados. Se buscó por fuerza bruta una colisión real, que con el importador antiguo da 1 entrada y 1 «duplicado», y es la que usa el test (QAL-019).
+- Navegador: tras borrar solo queda `manuos.vault` vacío, e IA muestra «Sin clave». Las regresiones de WEB-03 a WEB-12 pasan.
+
+### Límite conocido
+
+- Las entradas ya importadas antes de WEB-13 con una regla sin «preguntar» quedaron como `inferred: false` sin marca de procedencia. No se pueden distinguir de una corrección de Manu, así que se tratan como suyas. Solo afecta a movimientos ya importados.
+
 ## WEB-12 — IA integrada que propone acciones
 
 Petición de Manu (2026-09-29): una IA integrada a la que ir diciéndole cosas de la app para mejorarla en el momento, o para subir sus gastos.

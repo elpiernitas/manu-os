@@ -3,7 +3,7 @@ import { CATEGORIES, euros, newEntry, learnCategory, summary, toCents, rulesFrom
 import { MODE_TITLES, modeState } from "./core/modes.js";
 import { capture, confirm, markUnclassified, pending, tasks, ideas, toggleDone } from "./core/inbox.js";
 import { initialRefuge, refugeReply } from "./core/refuge.js";
-import { LocalStore, emptyVault, validateVault } from "./core/storage.js";
+import { LocalStore, emptyVault, validateVault, wipeDeviceKeys } from "./core/storage.js";
 import { notificationStatus, isInstalled, enableNotifications, testNotification } from "./core/notify.js";
 import { launchParams, parseEvents, nextEvent, localDay } from "./core/intake.js";
 import { fetchForecast, searchCities, advice, WEATHER_TTL_MS } from "./core/weather.js";
@@ -14,11 +14,11 @@ import { detectRecurring, upcomingRecurring, spendingPattern } from "./core/insi
 import { SCOPE, runServices, planTaskSync, listOpenTasks, insertTask, completeTask, contactBirthdays, mergePeople, saveBackup, loadBackup } from "./core/google.js";
 import { isSensitive, pickModel, listModels, buildActionPayload, askWithActions, issueUrl } from "./core/ai.js";
 import { encryptBackup, decryptBackup, passphraseProblem } from "./core/crypto.js";
-import { isSpotifyClientId, randomVerifier, challengeFor, authorizeUrl, exchangeCode, refreshTokens, listDevices, findSpeaker, transferTo, DEFAULT_SPEAKER } from "./core/spotify.js";
+import { isSpotifyClientId, pkceValid, randomVerifier, challengeFor, authorizeUrl, exchangeCode, refreshTokens, listDevices, findSpeaker, transferTo, DEFAULT_SPEAKER } from "./core/spotify.js";
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "12";
+export const APP_VERSION = "13";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -301,7 +301,7 @@ async function musicToSpeaker() {
 async function finishSpotifyAuth(params) {
   let pkce = null;
   try { pkce = JSON.parse(localStorage.getItem("manuos.spotify.pkce") || "null"); localStorage.removeItem("manuos.spotify.pkce"); } catch {}
-  if (!pkce || pkce.state !== params.get("state") || Date.now() - pkce.at > 15 * 60000) { toast("No he podido conectar Spotify (sesión caducada). Inténtalo otra vez."); return; }
+  if (!pkceValid(pkce, params.get("state"))) { toast("No he podido conectar Spotify (sesión caducada). Inténtalo otra vez."); return; }
   try {
     spotifyStore.tokens = await exchangeCode({ clientId: vault.settings.spotifyClientId, code: params.get("code"), redirectUri: SITE, verifier: pkce.verifier });
     toast("Spotify conectado");
@@ -476,7 +476,7 @@ const screens = {
         ${imp ? `<p class="muted small">Última importación: ${imp.added} gastos nuevos, ${imp.duplicates} repetidos, ${imp.income} ingresos ignorados${imp.invalid ? `, ${imp.invalid} filas no reconocidas` : ""}.</p>` : ""}</section>
       ${moneyInsights()}
       ${sectionTitle("Movimientos", `${toReview ? `<button class="link small" data-act="money-filter">${moneyFilter === "review" ? "Ver todos" : `Por revisar (${toReview})`}</button>` : ""}${addLink("EXPENSE")}`)}
-      <section class="card">${entries.length ? entries.map((x) => `<div class="row"><div class="grow"><div>${esc(x.merchant ?? "Sin concepto")}</div><div class="muted small">${new Date(x.at).toLocaleDateString("es-ES", { day: "numeric", month: "short" })}${x.sub ? ` · ${esc(x.sub)}` : ""}${x.source === "BANK" ? " · banco" : ""}${x.review ? ' · <b class="review">revisar</b>' : x.inferred ? " · categoría propuesta" : ""}</div></div>
+      <section class="card">${entries.length ? entries.map((x) => `<div class="row"><div class="grow"><div>${esc(x.merchant ?? "Sin concepto")}</div><div class="muted small">${new Date(x.at).toLocaleDateString("es-ES", { day: "numeric", month: "short" })}${x.sub ? ` · ${esc(x.sub)}` : ""}${x.source === "BANK" ? " · banco" : ""}${x.review ? ' · <b class="review">revisar</b>' : x.inferred ? " · categoría propuesta" : x.ruled ? " · según tus reglas" : ""}</div></div>
           <div class="stack"><span class="num">${euros(x.cents)}</span><label class="sr" for="cat-${esc(x.id)}">Categoría</label><select id="cat-${esc(x.id)}" data-cat="${esc(x.id)}">${Object.entries(CATEGORIES).map(([k, t]) => `<option value="${k}"${k === x.category ? " selected" : ""}>${esc(t)}</option>`).join("")}</select></div></div>`).join("")
         : '<p class="muted">Sin gastos. Toca «+», escribe a MANU «gasté 12,50 en café» o importa el CSV del banco.</p>'}</section>
       </div>`;
@@ -1011,7 +1011,7 @@ document.addEventListener("click", async (e) => {
     case "export": exportBackup(); break;
     case "wipe": confirmWipe = true; render(); break;
     case "wipe-no": confirmWipe = false; render(); break;
-    case "wipe-yes": vault = emptyVault(); confirmWipe = false; persist(); render(); toast("Datos borrados de este dispositivo"); break;
+    case "wipe-yes": { let ss = null, ls = null; try { ss = sessionStorage; ls = localStorage; } catch {} wipeDeviceKeys([ls, ss]); gcal.tokens = {}; vault = emptyVault(); confirmWipe = false; persist(); render(); toast("Datos borrados de este dispositivo"); break; }
   }
 });
 
@@ -1162,6 +1162,7 @@ document.addEventListener("change", async (e) => {
   if (e.target.id === "bankFile" && e.target.files?.[0]) {
     const file = e.target.files[0];
     const ids = new Set(vault.spending.map((x) => x.id));
+    const legacy = new Map(vault.spending.filter((x) => /^bank-[0-9a-z]+$/.test(x.id)).map((x) => [x.id, x]));
     const rules = vault.settings.categoryRules ?? {};
     let r;
     try {
@@ -1169,9 +1170,9 @@ document.addEventListener("change", async (e) => {
         toast("Leyendo el Excel…");
         const XLSX = await loadSheetJs();
         const wb = XLSX.read(new Uint8Array(await file.arrayBuffer()), { type: "array" });
-        r = importStatementRows(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: "" }), ids, rules);
+        r = importStatementRows(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: "" }), ids, rules, legacy);
       } else {
-        r = importStatement(await file.text(), ids, rules);
+        r = importStatement(await file.text(), ids, rules, legacy);
       }
     } catch { toast("No he podido leer ese archivo."); return; }
     if (r.error) { toast(r.error); return; }
