@@ -681,11 +681,9 @@ public func validateClaimEvidence(
     {
         throw ContractError.evidenceRequired
     }
-    // A model can only propose. ACTIVE, SUPERSEDED and CONTESTED are all
-    // visible to `resolveCurrentClaims`, so none of them may come from a model.
-    if creator.kind == .model,
-       ![.proposed, .rejected, .retracted].contains(claim.status)
-    {
+    // A model may only create a proposal. Every other state requires
+    // confirmation or a deterministic, audited transition.
+    if creator.kind == .model, claim.status != .proposed {
         throw ContractError.modelClaimMustBeProposed
     }
 }

@@ -19,13 +19,14 @@ Entorno local: Swift 6.3.3 (`swift-6.3.3-RELEASE`, toolchain oficial de swift.or
 3. Tras las correcciones: `dump-package` PASS, `build --build-tests` PASS sin warnings, `test --parallel` → **31/31 PASS en 3 suites**.
 4. Los tests de regresión nuevos, ejecutados contra el código original, fallan o abortan el proceso.
 5. CI del commit de correcciones `807e6a3` en GitHub Actions `macos-26`: job `contracts` (run `36451712052`) **31/31 PASS en 3 suites**; Foundation check (runs `36451704712` y `36451712092`) PASS.
+6. Revisión del orquestador sobre `807e6a3`: detectó que `REJECTED` y `RETRACTED` seguían permitidos para modelos. La validación queda cerrada a `PROPOSED` y el test parametrizado cubre los cinco estados no permitidos. La evidencia de CI del commit posterior se registrará al finalizar GitHub Actions.
 
 ## Defectos demostrados y corregidos
 
 | # | Defecto en `1941319` | Regla incumplida | Corrección | Test |
 | --- | --- | --- | --- | --- |
 | 1 | `validateClaimEvidence` aceptaba una Claim ACTIVE creada por un modelo si se pasaba otro agente como `creator` | «Una Claim creada por modelo entra como PROPOSED» | exige `creator.id == claim.createdByAgentID` (`creatorMismatch`) | `creatorMustMatchClaim` |
-| 2 | un modelo podía crear Claims `CONTESTED` o `SUPERSEDED`, que `resolveCurrentClaims` muestra como vigentes | ídem; ADR-0002 | un modelo solo crea `PROPOSED` (o `REJECTED`/`RETRACTED`, no visibles) | `modelCannotCreateVisibleClaims` |
+| 2 | un modelo podía crear cualquier estado distinto de `PROPOSED`, incluidos estados finales `REJECTED` y `RETRACTED` | ídem; ADR-0002 | un modelo solo puede crear `PROPOSED`; cualquier otro estado requiere confirmación o transición determinista auditada | `modelCannotCreateNonProposedClaims`, `modelCanPropose` |
 | 3 | `supersedeClaim` en una fecha anterior a `validFrom` producía `validUntil < validFrom` | invariante `valid_until >= valid_from` | lanza `invalidValidityRange` | `supersedeBeforeValidFrom` |
 | 4 | `supersedeClaim` sobrescribía un `validUntil` anterior y ampliaba la vigencia | DATA_MODEL: «se cierra su valid_until si no existía» | usa `min(validUntil, timestamp)` | `supersedeKeepsEarlierValidUntil` |
 | 5 | se podía sustituir una Claim `REJECTED`, `PROPOSED`, `RETRACTED` o ya `SUPERSEDED`, que pasaba a ser visible | rechazos y propuestas no deben reaparecer | solo `ACTIVE` o `CONTESTED` (`claimNotSupersedable`) | `nonVisibleClaimsCannotBeSuperseded` |

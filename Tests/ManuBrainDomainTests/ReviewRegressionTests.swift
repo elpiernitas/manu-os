@@ -65,10 +65,16 @@ struct ReviewRegressionTests {
     }
 
     @Test(
-        "A model cannot create claims that resolveCurrentClaims would show",
-        arguments: [ClaimStatus.active, .superseded, .contested]
+        "A model can create only proposed claims",
+        arguments: [
+            ClaimStatus.active,
+            .superseded,
+            .contested,
+            .rejected,
+            .retracted,
+        ]
     )
-    func modelCannotCreateVisibleClaims(status: ClaimStatus) {
+    func modelCannotCreateNonProposedClaims(status: ClaimStatus) {
         let output = claim(id: id(302), value: "Generated", status: status, creator: modelID)
         #expect(throws: ContractError.modelClaimMustBeProposed) {
             try validateClaimEvidence(output, evidenceLinks: [evidence(for: output.id)], creator: model)
