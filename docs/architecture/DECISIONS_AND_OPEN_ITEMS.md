@@ -145,16 +145,16 @@ Si Manu no acepta la recomendación, la alternativa menos costosa es (c) solo si
 
 ## Estado de acceso y autorizaciones
 
-- El repositorio privado `elpiernitas/manu-os` existe. Claude Code tiene acceso desde el 2026-09-28 y lo usa para tareas documentales autorizadas explícitamente por Manu.
-- Claude **no** está autorizado a implementar: BRAIN-01 y BRAIN-02 siguen sin autorizar.
+- El repositorio privado `elpiernitas/manu-os` existe. Claude Code tiene acceso desde el 2026-09-28 y puede ejecutar o revisar tareas de alcance cerrado que le asigne el orquestador dentro de la autorización vigente.
+- BRAIN-01 está completado. BRAIN-02 solo está autorizado para preparación documental; su implementación sigue bloqueada por D-02, D-03 y D-04B.
 - No hacen falta todavía API keys, OAuth, Apple Developer, tarjeta, dominio ni exportaciones personales.
 
 ## Intervención de Manu necesaria
 
-- D-01 ya está decidida y D-04 resuelta para BRAIN-01.
-- Decidir D-03 y D-04B cuando sean necesarias para instalar la app integrada. D-02 se definirá para Swift.
-- Indicar si tiene Spotify Premium (afecta a la rutina de la mañana).
-- Autorizar explícitamente BRAIN-01 cuando corresponda.
+- D-01 ya está decidida y D-04 quedó resuelta para el paquete Swift de BRAIN-01.
+- D-02 puede prepararse como propuesta técnica y ADR, sin implementar BRAIN-02.
+- Manu debe decidir D-03 y D-04B antes de firmar, instalar o distribuir la app integrada.
+- Indicar si tiene Spotify Premium cuando se prepare la rutina de la mañana.
 
 ## Intervenciones futuras, no ahora
 
