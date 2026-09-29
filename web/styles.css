@@ -527,3 +527,4 @@ body.kb .tabbar, body.kb #fab { opacity: 0; pointer-events: none; transform: tra
 body.kb .composer { bottom: 8px; }
 body.kb .chat-attach { bottom: 70px; }
 .proposal-what { margin: 8px 0 4px; }
+.ai-call.done { border-color: rgba(61,220,151,.35); } .ai-offer { gap: 6px; margin-bottom: 8px; }

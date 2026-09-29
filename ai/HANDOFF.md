@@ -10,6 +10,39 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
+## WEB-27 — modo conversación: MANU con Gemini integrado
+
+Manu (2026-09-29): «quiero hablar con MANU como si fuera Gemini integrado dentro y que lo sepa todo, que lo maneje él las cosas».
+
+### Cambios
+
+- `web/core/ai.js`:
+  - `sensitiveKinds` agrupa lo sensible en salud, dinero, ánimo y secreto (`isSensitive` no cambia);
+  - `askWithActions` acepta `permit`;
+  - nueva función `completar_tarea`; ya hay 8 funciones.
+- `web/core/converse.js`:
+  - `CONTEXT_CATEGORIES`, `BASIC_CONTEXT` y `FULL_CONTEXT`;
+  - `allowedToSend` (lo secreto nunca), `buildContext` (texto breve por categoría) y `buildConversationPayload` (instrucción con el contexto, historial filtrado de 10 turnos y funciones);
+  - `AUTO_SAFE`.
+- `web/app.js`:
+  - en modo conversación, `say` envía a Gemini lo que MANU no resuelve sola, incluidas las frases de más de 8 palabras. Las órdenes cortas siguen siendo locales, y la crisis y el Refugio también;
+  - `converse` envía la conversación; `lifeSnapshot` recoge los datos para el contexto;
+  - con acciones sin preguntar, las seguras se ejecutan y muestran «✓ … Deshacer» (`undoCall`);
+  - `completar_tarea` busca la tarea por su texto;
+  - hay tarjeta del modo en Tú → IA (activar, categorías con 🔒 en las sensibles, acciones sin preguntar) e invitación en el chat; el subtítulo pasa a «Gemini integrado · conversación»;
+  - en modo conversación, «qué tengo hoy» ya no te saca a Agenda;
+  - versión 27.
+- Enmienda WEB-27 de ADR-0013 y threat model.
+
+### Resultados
+
+- `npm test`: 104/104 PASS (`web/tests/converse.test.js`). `node --check` pasa.
+- Chromium con Gemini simulado: 14 checks en PASS. Cubren la invitación; el modo básico; el envío directo sin propuesta; que el contexto trae las tareas y no el dinero; que recuerda la conversación; que una pregunta de dinero no se envía en el modo básico y se explica el motivo; que un secreto nunca se envía; que con dinero permitido va el contexto de dinero; que completa y crea tareas solo, mientras el gasto pide confirmación; y que «Deshacer» reabre la tarea. Todos los recorridos anteriores en PASS.
+
+### NO_VERIFICADO
+
+- Con la clave real de Manu: la calidad de las respuestas y el consumo del cupo gratuito, porque cada mensaje es una llamada.
+
 ## WEB-26 — chat más claro y teclado
 
 Capturas de Manu (2026-09-29, aún con una versión antigua en caché):

@@ -2,11 +2,11 @@
 
 Status: **REVIEW_PENDING**
 
-WEB-26 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
+WEB-27 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
 
 ## Tarea activa
 
-WEB-26 — chat más claro (saludos, agenda y tiempo sin IA, propuesta legible) y teclado (`ai/HANDOFF.md`, «WEB-26»).
+WEB-27 — modo conversación: MANU con Gemini integrado y contexto elegido por Manu (`ai/HANDOFF.md`, «WEB-27»; enmienda WEB-27 de ADR-0013).
 
 ## Autorización
 
@@ -16,6 +16,7 @@ WEB-26 — chat más claro (saludos, agenda y tiempo sin IA, propuesta legible) 
 - 2026-09-29: Manu pide una IA integrada a la que decirle cosas de la app y con la que subir sus gastos. El envío sin preguntar queda como ajuste que decide Manu, desactivado por defecto.
 - 2026-09-29: Manu ordena «cambia agents.md para que tú puedas decidir cuándo fusionar y cuándo no». `AGENTS.md` y `CLAUDE.md` recogen la regla de fusión, lo que resuelve el hallazgo 6 de la revisión de ChatGPT.
 - 2026-09-29: Manu elige que la IA pueda leer capturas y vídeos compartidos (TikTok, reels), con el aviso de que la imagen se envía a Google.
+- 2026-09-29: Manu pide hablar con MANU «como si fuera Gemini integrado, que lo sepa todo y lo maneje él». Se implementa como un modo que Manu activa, con las categorías sensibles solo si él las marca.
 - 2026-09-29: **cambio de gobernanza decidido por Manu.** El orquestador (ChatGPT/Codex) ya no revisa automáticamente, porque frenaba el avance. Claude Code fusiona los PR web cuando `npm test` y los dos workflows remotos están en verde y no hay conflictos. Cuando haga falta una revisión, Claude Code prepara un prompt, Manu se lo pasa a ChatGPT y le devuelve la respuesta; los defectos se corrigen en un PR nuevo con su regresión. Los PR #7, #8 y #9 siguen en borrador o pausa.
 
 ## Alcance autorizado
@@ -42,6 +43,7 @@ WEB-26 — chat más claro (saludos, agenda y tiempo sin IA, propuesta legible) 
 
 ## Historial (cerrado)
 
+- **WEB-26** (chat y teclado): CERRADA. Fusionada mediante el PR #34 (`1a02cd9`).
 - **WEB-25** (proyectos y capturas en el chat): CERRADA. Fusionada mediante el PR #33 (`a6a7a01`).
 - **WEB-24** (calendario al abrir): CERRADA. Fusionada mediante el PR #32 (`817802b`).
 - **WEB-23** (capturas y enlaces): CERRADA. Fusionada mediante el PR #31 (`6b95cf1`).
