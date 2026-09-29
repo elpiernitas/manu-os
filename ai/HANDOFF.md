@@ -10,6 +10,37 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
+## WEB-16 — escenas vivas
+
+Propuesta de ChatGPT que Manu pasó el 2026-09-29: una app oscura y elegante, pero con color, movimiento y humor que reaccionen a su vida. Se siguió su orden de prioridad.
+
+### Cambios
+
+- `web/core/scene.js` (nuevo): `weatherEmoji`, `sceneFor`, `PARTICLES` y `MONEY_EMOJI`. `CATEGORY_EMOJI` en `money.js` y `emoji` en `MOODS` (`life.js`).
+- **Tiempo:**
+  - emojis grandes en lugar de iconos de línea, y la temperatura cuenta desde 0;
+  - la tarjeta y la cabecera del tiempo tienen una escena: sol con halo, nubes que se desplazan, lluvia (14 gotas), tormenta con relámpago, nieve, niebla y noche con estrellas;
+  - el fondo de toda la app hereda el clima (`body[data-wx]`).
+- **Dinero:**
+  - al entrar, una lluvia breve de 💶 💸 🪙 (unos 3 s, sin repetirse);
+  - el total sube desde 0 y las barras se llenan;
+  - las categorías llevan emoji en las barras, los movimientos y el selector.
+- **MANU:**
+  - una esfera con la M que respira; va más rápido mientras escribes y gira mientras la IA piensa;
+  - 6 tarjetas con emoji que empiezan la frase o la envían.
+- **Ánimo:** 😣 😕 🙂 🤩, con un rebote al elegir y un tono de fondo (`body[data-mood]`).
+- **Agenda:** «Lo próximo» (48 h de eventos y recordatorios en línea temporal) antes del mes. El mes se compacta cuando no tiene eventos.
+- Todo el movimiento se desactiva con «Reducir movimiento». La barra inferior no cambia. Versión 16.
+
+### Resultados
+
+- `npm test`: 81/81 PASS (2 tests nuevos en `web/tests/scene.test.js`).
+- Chromium con Open-Meteo simulado: 13 checks en PASS. Cubren las escenas de lluvia y noche, el fondo según el clima, los emojis de los 7 días, la lluvia de dinero, los emojis de categoría, la esfera y las tarjetas, el emoji y el tono del ánimo, «Lo próximo» y «Reducir movimiento» sin animaciones ni lluvia. Regresiones de WEB-03 a WEB-15 en PASS.
+
+### NO_VERIFICADO
+
+- El rendimiento y el aspecto en el iPhone real: los emojis de Apple se ven distintos a los de Chromium.
+
 ## WEB-15 — Spotify conectado con un toque
 
 Manu creó con Claude en Chrome la app «MANU OS» en Spotify for Developers (2026-09-29): modo Development, redirección a la web publicada, solo Web API y un usuario, el propio Manu. El secreto no se copió.

@@ -82,10 +82,10 @@ export function healthSummary(entries, today = new Date()) {
 
 // ---- Mood ----
 export const MOODS = [
-  { value: 1, label: "Mal" },
-  { value: 2, label: "Regular" },
-  { value: 3, label: "Bien" },
-  { value: 4, label: "Muy bien" },
+  { value: 1, label: "Mal", emoji: "😣" },
+  { value: 2, label: "Regular", emoji: "😕" },
+  { value: 3, label: "Bien", emoji: "🙂" },
+  { value: 4, label: "Muy bien", emoji: "🤩" },
 ];
 
 export function setMood(moods, day, value) {
