@@ -82,3 +82,16 @@ test("WEB-52: the quick sheet keeps the day of reminders and expenses", async ()
   assert.equal(quickDetect("12.50 café", NOW).cents, 1250);
   assert.equal(quickDetect("1.200 alquiler", NOW).cents, 120000);
 });
+
+test("WEB-55: everyday conversation is not taken as a command", async () => {
+  const { findCommand } = await import("../core/find.js");
+  assert.equal(parse("hay que ver lo que llueve hoy", NOW).kind, "weather"); // a fair answer, not a task
+  for (const q of ["hay que joderse", "me siento genial porque aprobé", "estoy bien pero cansado", "qué tengo que hacer para sacarme el carnet", "¿qué opinas de gastar 200 euros en unas zapatillas?", "tengo que decirte que estoy contento", "ayer me gasté una pasta en la cena", "peso demasiado, ¿qué dieta me recomiendas?"]) assert.equal(parse(q, NOW).kind, "unknown", q);
+  assert.equal(findCommand("busca en internet vuelos baratos"), null);
+  assert.equal(findCommand("¿dónde está la farmacia más cercana?"), null);
+  assert.equal(findCommand("¿dónde apunté lo del alquiler?"), "alquiler"); // still works
+  assert.deepEqual(parse("qué tengo que hacer hoy", NOW), { kind: "agenda", day: "today" });
+  assert.deepEqual(parse("¿qué tengo que hacer?", NOW), { kind: "agenda", day: "today" });
+  assert.deepEqual(parse("hoy estoy bien", NOW), { kind: "mood", value: 3 });
+  assert.deepEqual(parse("me siento genial!", NOW), { kind: "mood", value: 4 });
+});

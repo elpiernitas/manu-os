@@ -10,6 +10,36 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
+## WEB-55 — la conversación normal no se toma por una orden
+
+Después de ampliar lo que MANU entiende sin IA (WEB-50 a WEB-52), se comprobó el riesgo contrario: 32 frases de conversación normal pasaron por todos los detectores (parse, búsqueda, presupuestos, correo, resumen y diario).
+
+### Falsos positivos encontrados
+
+- «hay que ver lo que llueve hoy» y «hay que joderse» se guardaban como **tareas**.
+- «¿dónde está la farmacia más cercana?» buscaba en los datos de Manu (podía enseñar un gasto de farmacia).
+- «busca en internet vuelos baratos» buscaba en los datos en vez de ir a la IA.
+- «qué tengo que hacer para sacarme el carnet» contestaba con la agenda de hoy.
+- «me siento genial porque aprobé» se guardaba como ánimo y cortaba la conversación.
+
+### Cambios
+
+- `web/core/assistant.js`:
+  - solo «tengo que …» crea una tarea; «hay que …» ya no;
+  - «qué tengo que hacer» va a la agenda solo si termina ahí o nombra un día;
+  - el ánimo solo cuenta si la frase termina en el estado («hoy estoy bien», «me siento genial!»).
+- `web/core/find.js`: no busca con «dónde está…» ni cuando la frase habla de internet, Google, la web, vuelos u hoteles. «¿Dónde apunté…?» sigue funcionando.
+- Versión 55.
+
+### Resultados
+
+- `npm test`: 167/167 PASS. La regresión usa todas las frases anteriores. El test de WEB-50 de «hay que regar las plantas» se ha actualizado: ahora es conversación.
+- Las 50 pruebas e2e en PASS.
+
+### Aceptado sin cambio
+
+- «borra lo último que te dije» y «archiva esta conversación» coinciden con la orden de correo, pero como no hay remitente con ese nombre y no hablan de correo, pasan a la IA (WEB-45).
+
 ## WEB-54 — deslizar entre ciudades en el tiempo
 
 Manu (2026-09-29, captura del tiempo de Gijón): «quiero que al deslizar al lateral me salga el de Oviedo».
