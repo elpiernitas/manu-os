@@ -90,3 +90,7 @@ En la revisión de ChatGPT del 2026-09-29, el defecto (posible colisión) era re
 
 Si un manejador delegado usa `e.target.closest("[data-x]")` y se pone `data-x` en `body` o en otro ancestro común, cualquier toque coincide con ese ancestro y dispara la acción equivocada. En WEB-20, `body[data-tab]` hacía que tocar cualquier cosa volviese a Hoy. El estado global lleva un nombre propio (`data-screen`). Prueba: recorrido de navegador de WEB-20 («weather page: whole screen is the sky»).
 
+### QAL-021 — Pasar todos los recorridos de navegador antes de fusionar, no solo los del cambio
+
+WEB-22 se fusionó tras pasar su recorrido nuevo y 5 regresiones, pero no el recorrido de Drive, que apunta un gasto desde Dinero escribiendo primero el concepto. Ese recorrido habría mostrado que la hoja nueva cambiaba sola a «Tarea» y el gasto no se guardaba. Se detectó en WEB-23 y se corrigió con una regresión en el recorrido de la hoja. Antes de fusionar hay que ejecutar todos los recorridos existentes.
+

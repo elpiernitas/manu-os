@@ -12,14 +12,16 @@ import { CITIES, proposeAlarm, shouldAskTomorrow, shortcutUrl, guessCity } from 
 import { isClientId, listEvents, createEvent, newEventBody, monthGrid, listCalendars, mergeDays } from "./core/gcal.js";
 import { detectRecurring, upcomingRecurring, spendingPattern, monthStats, monthlySeries } from "./core/insights.js";
 import { SCOPE, runServices, planTaskSync, listOpenTasks, insertTask, completeTask, contactBirthdays, mergePeople, saveBackup, loadBackup } from "./core/google.js";
+import { detectLink, linkInfo, PROVIDER_NAME } from "./core/links.js";
+import { putImage, getImage, clearImages } from "./core/imagestore.js";
 import { weatherEmoji, sceneFor, PARTICLES, MONEY_EMOJI } from "./core/scene.js";
-import { isGeminiKey, isSensitive, pickModel, listModels, buildActionPayload, askWithActions, issueUrl } from "./core/ai.js";
+import { buildImagePayload, buildLinkPayload, isGeminiKey, isSensitive, pickModel, listModels, buildActionPayload, askWithActions, issueUrl } from "./core/ai.js";
 import { encryptBackup, decryptBackup, passphraseProblem } from "./core/crypto.js";
 import { isSpotifyClientId, pkceValid, randomVerifier, challengeFor, authorizeUrl, exchangeCode, refreshTokens, listDevices, findSpeaker, transferTo, DEFAULT_SPEAKER } from "./core/spotify.js";
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "22";
+export const APP_VERSION = "23";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -44,7 +46,8 @@ let seriesPick = null; // month tapped in the income vs spending chart
 let moneyMonth = 0; // months back from the current one in Dinero
 let calView = null; // { y, m } month shown in Agenda
 let calSelected = null; // "YYYY-MM-DD"
-let overlay = null; // "weather"
+let overlay = null; // "weather" | "gemini" | "image"
+let viewImageId = null;
 const gcal = { tokens: {}, busy: false, error: null };
 let confirmDriveRestore = null;
 // Gemini key: never in the vault (so never in exports or backups). By default it
@@ -503,10 +506,12 @@ function nightCard() {
 }
 
 // ---------- Shared bits ----------
-const taskRow = (t) => `<div class="row"><button class="check" data-act="toggle" data-id="${esc(t.id)}" aria-pressed="${Boolean(t.done)}" aria-label="${t.done ? "Reabrir" : "Completar"}: ${esc(t.text)}">${I.check}</button><span class="grow ${t.done ? "done-text" : ""}">${esc(t.text)}</span></div>`;
+// Attachments of an item: its screenshot (tap to see it big) and its link.
+const attach = (x) => `${x.imageId ? `<button class="thumb" data-act="img-view" data-img-id="${esc(x.imageId)}" aria-label="Ver captura"><img data-img="${esc(x.imageId)}" alt=""></button>` : ""}${x.url ? `<a class="link small" href="${esc(x.url)}" target="_blank" rel="noopener">Abrir</a>` : ""}`;
+const taskRow = (t) => `<div class="row"><button class="check" data-act="toggle" data-id="${esc(t.id)}" aria-pressed="${Boolean(t.done)}" aria-label="${t.done ? "Reabrir" : "Completar"}: ${esc(t.text)}">${I.check}</button><span class="grow ${t.done ? "done-text" : ""}">${esc(t.text)}</span>${attach(t)}</div>`;
 const reminderAt = (r) => { const d = new Date(r.at); return `${d.toDateString() === today().toDateString() ? "Hoy" : d.toLocaleDateString("es-ES", { weekday: "short", day: "numeric" })} ${hhmm(d)}`; };
 const reminderIphoneUrl = (r) => { const d = new Date(r.at); return shortcutUrl(SHORTCUT_REMINDER, `${r.text} | ${dayKey(d)} ${hhmm(d)}`); };
-const reminderRow = (r) => `<div class="row"><button class="check" data-act="rem-done" data-id="${esc(r.id)}" aria-pressed="${Boolean(r.done)}" aria-label="Hecho: ${esc(r.text)}">${I.check}</button><div class="grow"><div class="${r.done ? "done-text" : ""}">${esc(r.text)}</div><div class="muted small">${esc(reminderAt(r))}</div></div><a class="link small" href="${esc(reminderIphoneUrl(r))}">Al iPhone</a></div>`;
+const reminderRow = (r) => `<div class="row"><button class="check" data-act="rem-done" data-id="${esc(r.id)}" aria-pressed="${Boolean(r.done)}" aria-label="Hecho: ${esc(r.text)}">${I.check}</button><div class="grow"><div class="${r.done ? "done-text" : ""}">${esc(r.text)}</div><div class="muted small">${esc(reminderAt(r))}</div></div>${attach(r)}<a class="link small" href="${esc(reminderIphoneUrl(r))}">Al iPhone</a></div>`;
 const sectionTitle = (t, extra = "") => `<div class="section-title"><h2>${t}</h2>${extra}</div>`;
 const addLink = (kind, label = "Añadir") => `<button class="link small" data-act="sheet" data-kind="${kind}">${label}</button>`;
 
@@ -555,7 +560,7 @@ const screens = {
       ${sectionTitle("Tareas", addLink("TASK"))}
       <section class="card">${open.length ? open.map(taskRow).join("") : '<p class="muted">Sin tareas pendientes.</p>'}${done.length ? `<details><summary>Hechas (${done.length})</summary>${done.map(taskRow).join("")}</details>` : ""}</section>
       ${sectionTitle("Ideas", addLink("IDEA"))}
-      <section class="card">${idea.length ? idea.map((i) => `<div class="row"><span class="grow">${esc(i.text)}</span><button class="link small" data-act="idea-to-task" data-id="${esc(i.id)}">Hacer tarea</button></div>`).join("") : '<p class="muted">Tus ideas quedan aquí, sin convertirse en proyectos sin tu permiso.</p>'}</section>`;
+      <section class="card">${idea.length ? idea.map((i) => `<div class="row"><span class="grow">${esc(i.text)}</span>${attach(i)}<button class="link small" data-act="idea-to-task" data-id="${esc(i.id)}">Hacer tarea</button></div>`).join("") : '<p class="muted">Tus ideas quedan aquí, sin convertirse en proyectos sin tu permiso.</p>'}</section>`;
   },
   manu() {
     const chips = refuge ? ["quiero entender por qué", "buscar una solución", "necesito desconectar"] : null;
@@ -567,7 +572,7 @@ const screens = {
     return `<div class="manu-head${empty ? " big" : ""}"><div class="orb${thinking ? " thinking" : ""}" id="orb" aria-hidden="true"><span>M</span></div><div><h1>MANU</h1><p class="subtitle">Tu asistente · ${aiReady() ? "IA disponible, siempre con tu confirmación" : '<button class="link small" data-act="gemini-guide">activar IA</button>'}</p></div></div>
       ${refuge ? `<div class="refuge-bar"><span>Refugio · no se guarda</span><button class="link" data-act="leave-refuge">Salir</button></div>` : ""}
       ${chips ? `<div class="suggest" aria-label="Sugerencias">${chips.map((s) => `<button data-say="${esc(s)}">${esc(s)}</button>`).join("")}</div>` : `<div class="quick-cards" aria-label="Sugerencias">${cards.map(([e, label, how, text]) => `<button class="qcard" ${how === "say" ? `data-say="${esc(text)}"` : `data-fill="${esc(text)}"`}><span class="qe" aria-hidden="true">${e}</span><span>${esc(label)}</span></button>`).join("")}</div>`}
-      <div class="chat" id="chat" aria-live="polite">${[...history, ...(refuge?.messages ?? [])].map((b) => `<div class="bubble ${b.from}${b.safety ? " safety" : ""}">${b.ai ? '<span class="ai-tag">IA</span>' : ""}${esc(b.text)}${b.proposal ? `${b.proposal.state ? `<details><summary class="muted small">Ver lo enviado</summary><pre class="payload">${esc(shownPayload(b.proposal))}</pre></details>` : `<pre class="payload">${esc(shownPayload(b.proposal))}</pre>`}${b.proposal.state ? `<p class="muted small">${b.proposal.state === "sent" ? (b.proposal.auto ? "Enviado a Gemini sin preguntar (lo activaste en Tú → IA)." : "Enviado a Gemini.") : "No enviado."}</p>` : `<div class="btns"><button class="btn" data-act="ai-send" data-id="${esc(b.proposal.id)}">Enviar a Gemini</button><button class="btn ghost" data-act="ai-cancel" data-id="${esc(b.proposal.id)}">No</button></div><div class="btns"><button class="link small" data-act="ask-elsewhere" data-app="chatgpt" data-id="${esc(b.proposal.id)}">Preguntar en ChatGPT</button><button class="link small" data-act="ask-elsewhere" data-app="claude" data-id="${esc(b.proposal.id)}">Preguntar en Claude</button></div>`}` : ""}${b.action ? `<div class="btns"><a class="btn" href="${esc(b.action.href)}">${esc(b.action.label)}</a></div>` : ""}${(b.calls ?? []).map((c, i) => callCard(b, c, i)).join("")}</div>`).join("")}</div>
+      <div class="chat" id="chat" aria-live="polite">${[...history, ...(refuge?.messages ?? [])].map((b) => `<div class="bubble ${b.from}${b.safety ? " safety" : ""}">${b.ai ? '<span class="ai-tag">IA</span>' : ""}${b.imageId ? `<img class="chat-img" data-img="${esc(b.imageId)}" alt="Captura">` : ""}${esc(b.text)}${b.url ? ` <a class="link small" href="${esc(b.url)}" target="_blank" rel="noopener">Abrir</a>` : ""}${b.proposal ? `${b.proposal.state ? `<details><summary class="muted small">Ver lo enviado</summary><pre class="payload">${esc(shownPayload(b.proposal))}</pre></details>` : `<pre class="payload">${esc(shownPayload(b.proposal))}</pre>`}${b.proposal.state ? `<p class="muted small">${b.proposal.state === "sent" ? (b.proposal.auto ? "Enviado a Gemini sin preguntar (lo activaste en Tú → IA)." : "Enviado a Gemini.") : "No enviado."}</p>` : `<div class="btns"><button class="btn" data-act="ai-send" data-id="${esc(b.proposal.id)}">Enviar a Gemini</button><button class="btn ghost" data-act="ai-cancel" data-id="${esc(b.proposal.id)}">No</button></div><div class="btns"><button class="link small" data-act="ask-elsewhere" data-app="chatgpt" data-id="${esc(b.proposal.id)}">Preguntar en ChatGPT</button><button class="link small" data-act="ask-elsewhere" data-app="claude" data-id="${esc(b.proposal.id)}">Preguntar en Claude</button></div>`}` : ""}${b.action ? `<div class="btns"><a class="btn" href="${esc(b.action.href)}">${esc(b.action.label)}</a></div>` : ""}${(b.calls ?? []).map((c, i) => callCard(b, c, i)).join("")}</div>`).join("")}</div>
       <form class="composer glass" id="composer"><label for="msg" class="sr">Mensaje para MANU</label><input id="msg" autocomplete="off" enterkeyhint="send" placeholder="${refuge ? "Cuéntame" : "Escribe a MANU"}"><button class="btn" type="submit">Enviar</button></form>`;
   },
   dinero() {
@@ -814,6 +819,22 @@ function detectHint(d) {
   if (d.kind === "IDEA") return "💡 Lo guardo como idea.";
   return "✅ Lo apunto como tarea.";
 }
+// Screenshot / link part of the sheet.
+function sharedBlock() {
+  const img = sheet.image, link = sheet.link;
+  const preview = img ? `<div class="qa-thumb"><img src="${esc(img)}" alt="Captura adjunta"><button type="button" data-act="qa-image-remove" aria-label="Quitar captura">✕</button></div>` : "";
+  const attachBtn = `<label class="qa-attach" for="qImage" role="button" tabindex="0">📎 ${img ? "Cambiar captura" : "Añadir captura"}</label><input id="qImage" type="file" accept="image/*" class="sr">`;
+  let ai = "";
+  if (link && !img && link.provider === "instagram") ai = '<p class="qa-note small">📸 Instagram no deja leer sus reels desde fuera. Haz una captura del reel con el texto visible y añádela con 📎.</p>';
+  else if (img || (link && (link.provider === "tiktok" || link.provider === "youtube"))) {
+    const what = img ? "la captura" : `el texto del vídeo de ${PROVIDER_NAME[link.provider]}`;
+    ai = aiReady()
+      ? `<div class="qa-ai"><button type="button" class="btn ghost block" data-act="qa-ai">✨ Que MANU lo lea y lo apunte</button><p class="muted small">Se envía ${what} a Google (Gemini) para sacar planes, fechas, precios o tareas; tú confirmas cada cosa. No lo uses con datos del banco, de salud o de otras personas.</p></div>`
+      : '<div class="qa-ai"><button type="button" class="btn ghost block" data-act="gemini-guide">✨ Activa la IA para que MANU lo lea</button></div>';
+  } else if (link) ai = `<p class="qa-note small">🔗 Enlace guardado con ${sheet.kind === "IDEA" ? "la idea" : "lo que añadas"}. MANU solo puede leer vídeos de TikTok y YouTube.</p>`;
+  return `<div class="qa-shared">${preview}<div class="qa-attach-row">${attachBtn}</div>${ai}</div>`;
+}
+
 function sheetHtml() {
   if (!sheet) return "";
   const k = sheet.kind;
@@ -831,6 +852,7 @@ function sheetHtml() {
     <div class="qa-head"><h2>${k === "EVENT" ? "Nuevo evento" : "Añadir"}</h2><button type="button" class="qa-close" data-act="sheet-close" aria-label="Cerrar">✕</button></div>
     <label for="qText" class="sr">Qué quieres añadir</label><textarea id="qText" rows="2" maxlength="400" placeholder="${k === "EVENT" ? "Título del evento" : "Escribe lo que sea…"}" enterkeyhint="done">${esc(sheet.text ?? "")}</textarea>
     ${k === "EVENT" ? "" : `<p class="qa-hint muted small" id="qaHint" aria-live="polite">${esc(detectHint(d))}</p>`}
+    ${k === "EVENT" ? "" : sharedBlock()}
     ${tiles}${extra}
     <button class="btn block qa-save" type="submit">${SAVE_LABEL[k]}</button></form></div>`;
 }
@@ -878,21 +900,38 @@ function animateEnter(kind) {
 
 // manual: the kind was chosen by Manu (a section's «Añadir»), so typing does not change it.
 function openSheet(kind, manual = false) {
-  sheet = { kind, manual, text: "", detected: null };
+  sheet = { kind, manual, text: "", detected: null, image: null, link: null };
   render();
 }
 
 // Typing in the sheet: guess the kind and prefill fields, without rebuilding
 // the sheet (and losing the keyboard) unless the kind changes.
+function rerenderSheet() {
+  const t = $("qText"); const pos = t?.selectionStart ?? null;
+  renderedSheetKind = undefined; render();
+  const n = $("qText"); if (n) { n.focus(); const p = pos ?? n.value.length; n.setSelectionRange(p, p); }
+}
+
 function onQuickInput(value) {
   if (!sheet) return;
   sheet.text = value;
   if (sheet.kind === "EVENT") return;
+  const link = detectLink(value);
+  if (Boolean(link) !== Boolean(sheet.link) || (link && sheet.link && link.url !== sheet.link.url)) {
+    sheet.link = link;
+    if (link && !sheet.manual && !sheet.image) sheet.kind = "IDEA"; // a shared video is usually «para luego»
+    rerenderSheet();
+    return;
+  }
   const d = quickDetect(value, today());
   sheet.detected = d;
-  if (!sheet.manual && value.trim() && d.kind !== sheet.kind) {
+  // Switch only to a kind MANU actually recognised (gasto, aviso, idea); fall back
+  // to «tarea» only if the current kind was itself a guess. Opening the sheet
+  // from Dinero and typing «gasolina» first keeps it a gasto.
+  if (!sheet.manual && value.trim() && d.kind !== sheet.kind && (d.kind !== "TASK" || sheet.guessed)) {
     const pos = $("qText")?.selectionStart ?? value.length;
     sheet.kind = d.kind;
+    sheet.guessed = d.kind !== "TASK";
     render();
     const t = $("qText"); if (t) { t.focus(); t.setSelectionRange(pos, pos); }
     $("quickAdd")?.querySelector(".qa-kind.on")?.classList.add("pop");
@@ -925,7 +964,7 @@ function render({ focus = false, enter = null } = {}) {
   if (tab === "tu" && (!sub || sub === "gcal") && isClientId(gClientId())) loadGis().catch(() => {});
   document.body.dataset.mode = modeState(today(), undefined, vault.settings.override).mode;
   renderTabs();
-  $("screen").innerHTML = overlay === "weather" ? weatherPage() : overlay === "gemini" ? geminiGuide() : (screens[tab] ?? screens.hoy)();
+  $("screen").innerHTML = overlay === "weather" ? weatherPage() : overlay === "gemini" ? geminiGuide() : overlay === "image" ? `<button class="link" data-act="overlay-close">${I.back} Volver</button><img class="viewer" data-img="${esc(viewImageId ?? "")}" alt="Captura">` : (screens[tab] ?? screens.hoy)();
   animateEnter(enter);
   const bars = $("screen").querySelectorAll(".bar > i[data-w]");
   if (enter && !reduceMotion()) { bars.forEach((el) => { el.style.width = "0%"; }); requestAnimationFrame(() => requestAnimationFrame(() => bars.forEach((el) => { el.style.width = `${el.dataset.w}%`; }))); }
@@ -933,11 +972,12 @@ function render({ focus = false, enter = null } = {}) {
   $("screen").querySelectorAll(".range > i").forEach((el) => { el.style.left = `${el.dataset.l}%`; el.style.width = `${el.dataset.w}%`; });
   $("screen").querySelectorAll(".week-bars i[data-h], .ie-bars i[data-h]").forEach((el) => { el.style.height = `${Math.max(Number(el.dataset.h) ? 2 : 0, Number(el.dataset.h))}%`; });
   $("screen").querySelectorAll("[data-c]").forEach((el) => { if (/^#[0-9a-f]{6}$/i.test(el.dataset.c)) el.style.setProperty("--ev", el.dataset.c); });
+  hydrateImages($("screen"));
   $("topTitle").textContent = sub ? { habitos: "Hábitos", salud: "Salud", comidas: "Comidas", personas: "Personas", tiempo: "Tiempo", avisos: "Avisos", datos: "Tus datos", gcal: "Google", ia: "IA", spotify: "Spotify", atajos: "Atajos" }[sub] : TABS.find(([id]) => id === tab)[1];
   $("fab").hidden = tab === "manu" || Boolean(sheet);
   const sheetKey = sheet ? sheet.kind : null;
   if (sheetKey !== renderedSheetKind || !sheet) {
-    const wasOpen = Boolean(renderedSheetKind);
+    const wasOpen = Boolean($("sheetBg"));
     $("sheetRoot").innerHTML = sheetHtml();
     renderedSheetKind = sheetKey;
     const bg = $("sheetBg");
@@ -1088,15 +1128,88 @@ function callCard(b, c, i) {
 const findCall = (el) => { const b = vault.chat.find((x) => x.at === el.dataset.at && x.calls); return b ? b.calls[Number(el.dataset.n)] : null; };
 
 // Runs one action Gemini proposed, only after Manu's tap. Everything stays local.
+const shared = (c) => ({ ...(c.imageId ? { imageId: c.imageId } : {}), ...(c.url ? { url: c.url } : {}) });
+
+// Images are loaded from IndexedDB after each render (kept in a small cache).
+const imageCache = new Map();
+function hydrateImages(root) {
+  root?.querySelectorAll("img[data-img]").forEach(async (img) => {
+    const id = img.dataset.img;
+    if (!id) return;
+    try {
+      if (!imageCache.has(id)) imageCache.set(id, await getImage(id));
+      const src = imageCache.get(id);
+      if (src && /^data:image\//.test(src)) img.src = src; else img.closest(".thumb")?.remove();
+    } catch {}
+  });
+}
+
+// Screenshot → small JPEG data URL (max 1280 px), read without blob: URLs (CSP).
+function compressImage(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("No he podido leer la imagen"));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error("Ese formato de imagen no se puede abrir aquí"));
+      img.onload = () => {
+        const scale = Math.min(1, 1280 / Math.max(img.width, img.height));
+        const c = document.createElement("canvas");
+        c.width = Math.round(img.width * scale); c.height = Math.round(img.height * scale);
+        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+        resolve(c.toDataURL("image/jpeg", 0.78));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+// «✨ Que MANU lo lea»: screenshot or TikTok/YouTube link → Gemini proposes
+// actions. Only on Manu's tap (the button says it goes to Google); never
+// with «Enviar sin preguntar».
+async function shareToAi() {
+  if (!sheet || !aiReady()) return;
+  const note = ($("qText")?.value ?? "").trim();
+  const link = sheet.link && !sheet.image ? sheet.link : null;
+  const image = sheet.image ?? null;
+  const at = new Date().toISOString();
+  let imageId = null;
+  if (image) { imageId = uid("img"); try { await putImage(imageId, image); imageCache.set(imageId, image); } catch { imageId = null; } }
+  sheet = null; tab = "manu"; sub = null; overlay = null;
+  vault.chat.push({ from: "me", text: image ? (note && !link ? note : "📷 Captura") : `🔗 ${PROVIDER_NAME[link.provider]}`, at, ...(imageId ? { imageId } : {}), ...(link ? { url: link.url } : {}) });
+  const answer = { from: "manu", text: "Pensando…", at: new Date(Date.now() + 1).toISOString(), ai: true };
+  vault.chat.push(answer);
+  persist(); render({ focus: true, enter: "tab" });
+  try {
+    let payload;
+    if (image) payload = buildImagePayload({ base64: image.split(",")[1], mime: "image/jpeg", note }, today());
+    else {
+      const info = await linkInfo(link);
+      if (!info) throw Object.assign(new Error("sin texto"), { code: "noinfo" });
+      payload = buildLinkPayload({ provider: PROVIDER_NAME[link.provider], url: link.url, title: info.title, author: info.author }, today());
+    }
+    const { text, calls } = await askWithActions({ key: aiStore.key, model: aiStore.model, payload, confirmed: true });
+    answer.text = text || (calls.length ? "Te propongo esto:" : "No veo nada que apuntar.");
+    if (calls.length) answer.calls = calls.map((c) => ({ ...c, state: null, ...(imageId ? { imageId } : {}), ...(link ? { url: link.url } : {}) }));
+  } catch (err) {
+    answer.ai = false;
+    answer.text = err.code === "noinfo" ? "Ese vídeo no trae texto que pueda leer. Haz una captura con el texto visible y añádela con 📎."
+      : err.code === "quota" ? "Hoy ya no queda IA gratuita. Sigo sin IA." : err.code === "key" ? "La clave de Gemini no funciona. Revísala en Tú → IA."
+      : err.code === "sensitive" ? "Eso parece privado: no lo envío." : `No he podido leerlo: ${err.message}`;
+  }
+  persist(); if (tab === "manu") render();
+}
+
 function runCall(c) {
   if (!c || c.state) return;
   c.state = "done";
   const at = new Date().toISOString();
   switch (c.name) {
-    case "anadir_tarea": vault.inbox.push({ ...capture({ id: uid("c"), text: c.texto, at }), status: "TASK" }); toast("Tarea añadida"); break;
-    case "anadir_idea": vault.inbox.push({ ...capture({ id: uid("c"), text: c.texto, at }), status: "IDEA" }); toast("Idea guardada"); break;
-    case "apuntar_gasto": vault.spending.push(newEntry({ id: uid("s"), cents: c.cents, merchant: c.concepto, at }, vault.settings.categoryRules ?? {})); toast("Gasto apuntado"); break;
-    case "crear_recordatorio": vault.reminders.push({ id: uid("r"), text: c.texto, at: c.at, done: false, notified: false }); toast("Recordatorio creado"); break;
+    case "anadir_tarea": vault.inbox.push({ ...capture({ id: uid("c"), text: c.texto, at }), status: "TASK", ...shared(c) }); toast("Tarea añadida"); break;
+    case "anadir_idea": vault.inbox.push({ ...capture({ id: uid("c"), text: c.texto, at }), status: "IDEA", ...shared(c) }); toast("Idea guardada"); break;
+    case "apuntar_gasto": vault.spending.push({ ...newEntry({ id: uid("s"), cents: c.cents, merchant: c.concepto, at }, vault.settings.categoryRules ?? {}), ...shared(c) }); toast("Gasto apuntado"); break;
+    case "crear_recordatorio": vault.reminders.push({ id: uid("r"), text: c.texto, at: c.at, done: false, notified: false, ...shared(c) }); toast("Recordatorio creado"); break;
     case "ir_a": case "importar_extracto": {
       persist();
       const [t, s2, ov] = c.name === "ir_a" ? SCREENS[c.pantalla] : ["dinero"];
@@ -1142,6 +1255,9 @@ document.addEventListener("click", async (e) => {
     case "toggle": updateItem(id, toggleDone); break;
     case "rem-done": vault.reminders = vault.reminders.map((r) => (r.id === id ? { ...r, done: !r.done } : r)); persist(); render(); break;
     case "sheet": openSheet(a.dataset.kind, true); break;
+    case "qa-image-remove": if (sheet) { sheet.image = null; rerenderSheet(); } break;
+    case "qa-ai": shareToAi(); break;
+    case "img-view": viewImageId = a.dataset.imgId; overlay = "image"; render({ focus: true, enter: "page" }); scrollTo(0, 0); break;
     case "sheet-kind": { if (!sheet) break; sheet.kind = a.dataset.kind; sheet.manual = true; sheet.text = $("qText")?.value ?? sheet.text; render(); const t = $("qText"); if (t) { t.focus(); t.setSelectionRange(t.value.length, t.value.length); } break; }
     case "sheet-close": closeSheet(); break;
     case "refuge": refuge = { state: initialRefuge(), messages: [{ from: "manu", text: "Estoy aquí. ¿Qué te vendría mejor ahora: entender por qué estás así, buscar una solución o cambiar de aire?" }] }; go("manu"); break;
@@ -1220,7 +1336,7 @@ document.addEventListener("click", async (e) => {
     case "export": exportBackup(); break;
     case "wipe": confirmWipe = true; render(); break;
     case "wipe-no": confirmWipe = false; render(); break;
-    case "wipe-yes": { let ss = null, ls = null; try { ss = sessionStorage; ls = localStorage; } catch {} wipeDeviceKeys([ls, ss]); gcal.tokens = {}; vault = emptyVault(); confirmWipe = false; persist(); render(); toast("Datos borrados de este dispositivo"); break; }
+    case "wipe-yes": { let ss = null, ls = null; try { ss = sessionStorage; ls = localStorage; } catch {} wipeDeviceKeys([ls, ss]); clearImages(); imageCache.clear(); gcal.tokens = {}; vault = emptyVault(); confirmWipe = false; persist(); render(); toast("Datos borrados de este dispositivo"); break; }
   }
 });
 
@@ -1316,18 +1432,24 @@ document.addEventListener("submit", async (e) => {
     render(); return;
   }
   if (f === "quickAdd") {
-    const raw = $("qText")?.value.trim() ?? "";
+    let raw = $("qText")?.value.trim() ?? "";
+    const link = sheet.link;
+    let imageId = null;
+    if (sheet.image) { imageId = uid("img"); try { await putImage(imageId, sheet.image); imageCache.set(imageId, sheet.image); } catch { imageId = null; toast("No he podido guardar la captura en este móvil"); } }
+    const extra = { ...(imageId ? { imageId } : {}), ...(link ? { url: link.url } : {}) };
+    if (link) raw = link.rest || raw.replace(link.url, "").trim() || `Vídeo de ${PROVIDER_NAME[link.provider]}`;
+    if (!raw && imageId) raw = "Captura";
     const at = new Date().toISOString();
     const k = sheet.kind;
     const d = quickDetect(raw, today());
     // Use the cleaned text MANU understood («sacar la basura», not the whole sentence).
     const text = (d.kind === k && d.text) || (k === "EXPENSE" && d.kind === "EXPENSE" ? d.merchant ?? "" : raw);
-    if (k === "TASK" && text) vault.inbox.push({ ...capture({ id: uid("c"), text: text.slice(0, 140), at }), status: "TASK" });
-    else if (k === "IDEA" && text) vault.inbox.push({ ...capture({ id: uid("c"), text: text.slice(0, 400), at }), status: "IDEA" });
+    if (k === "TASK" && text) vault.inbox.push({ ...capture({ id: uid("c"), text: text.slice(0, 140), at }), status: "TASK", ...extra });
+    else if (k === "IDEA" && text) vault.inbox.push({ ...capture({ id: uid("c"), text: text.slice(0, 400), at }), status: "IDEA", ...extra });
     else if (k === "EXPENSE") {
       const cents = toCents(($("qAmount")?.value ?? "").replace(/\s|€|\./g, ""));
       if (!cents) { toast("Pon el importe, por ejemplo 12,50"); $("qAmount")?.focus(); return; }
-      vault.spending.push(newEntry({ id: uid("s"), cents, merchant: text || null, at }, vault.settings.categoryRules ?? {}));
+      vault.spending.push({ ...newEntry({ id: uid("s"), cents, merchant: text || null, at }, vault.settings.categoryRules ?? {}), ...extra });
     } else if (k === "EVENT" && raw) {
       const minutes = Math.min(1440, Math.max(5, Number($("qMinutes").value) || 60));
       try {
@@ -1339,7 +1461,7 @@ document.addEventListener("submit", async (e) => {
     } else if (k === "REMINDER" && text) {
       const when = new Date($("qWhen").value);
       if (Number.isNaN(when.getTime())) { toast("Elige cuándo"); return; }
-      vault.reminders.push({ id: uid("r"), text: text.slice(0, 140), at: when.toISOString(), done: false, notified: false });
+      vault.reminders.push({ id: uid("r"), text: text.slice(0, 140), at: when.toISOString(), done: false, notified: false, ...extra });
     } else { toast("Escribe algo primero"); $("qText")?.focus(); return; }
     sheet = null; persist(); render();
     toast({ TASK: "Tarea añadida", IDEA: "Idea guardada", EXPENSE: "Gasto apuntado", REMINDER: "Recordatorio creado" }[k]);
@@ -1353,6 +1475,11 @@ document.addEventListener("input", (e) => {
 });
 
 document.addEventListener("change", async (e) => {
+  if (e.target.id === "qImage" && e.target.files?.[0] && sheet) {
+    try { sheet.image = await compressImage(e.target.files[0]); if (!sheet.manual && !(sheet.text ?? "").trim()) sheet.kind = "IDEA"; rerenderSheet(); }
+    catch (err) { toast(err.message); }
+    return;
+  }
   if (e.target.id === "workStart" && /^\d{2}:\d{2}$/.test(e.target.value)) { vault.settings.workStart = e.target.value; persist(); toast(`Entrada: ${e.target.value}`); return; }
   if (e.target.dataset.cat) {
     const r = learnCategory(vault.spending, vault.settings.categoryRules ?? {}, e.target.dataset.cat, e.target.value);

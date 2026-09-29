@@ -10,6 +10,31 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
+## WEB-23 — capturas y enlaces (TikTok, YouTube, reels)
+
+Manu (2026-09-29): quiere añadir capturas para guardarlas como notas y para que la IA las lea, y compartir vídeos de TikTok o reels para que MANU «saque la info y la meta donde debería».
+
+### Cambios
+
+- `web/core/links.js`: `detectLink` (tiktok, youtube, instagram o web), `oembedUrl`, `parseOembed` y `linkInfo`. Antes de usarlos se comprobó el CORS con curl: TikTok responde `*` y YouTube devuelve el origen; Instagram pide token.
+- `web/core/ai.js`: `buildImagePayload` (imagen en `inlineData` y la lista fija de funciones) y `buildLinkPayload` (texto del vídeo y funciones).
+- `web/core/imagestore.js`: las capturas se guardan en IndexedDB.
+- `web/app.js`:
+  - en el «+», el botón «📎 Añadir captura» reduce la imagen a JPEG de 1280 px y muestra una vista previa;
+  - con captura o con enlace de TikTok o YouTube aparece «✨ Que MANU lo lea y lo apunte», con el aviso de que va a Google. El resultado llega al chat como propuestas que confirmas con un toque, y lo creado lleva la captura o el enlace;
+  - con Instagram, MANU explica que hace falta una captura;
+  - sin IA, se guarda como nota con miniatura o «Abrir», y al tocar la miniatura se ve en grande;
+  - «Borrar todo» elimina las imágenes;
+  - versión 23.
+- `web/index.html`: `connect-src` añade `https://www.tiktok.com` y `https://www.youtube.com`.
+- Corrección de WEB-22: la hoja solo cambia de tipo sola si reconoce uno (gasto, aviso o idea), así que en Dinero escribir primero el concepto ya no la convierte en tarea (QAL-021).
+- Enmienda WEB-23 de ADR-0013 y threat model.
+
+### Resultados
+
+- `npm test`: 96/96 PASS (`web/tests/shared.test.js`).
+- Chromium con Gemini y TikTok simulados: 15 checks en PASS. Cubren la captura como nota con miniatura en IndexedDB y el visor; que no se envía nada sin IA ni antes del toque; que la imagen se envía una vez y el gasto se crea con la captura; que el texto de TikTok se lee y propone un aviso; Instagram; «Abrir»; que «Borrar todo» elimina las imágenes; y que no hay desplazamiento horizontal. También pasan todos los recorridos anteriores (de WEB-03 a WEB-22), incluido el de Drive, que destapó el fallo de WEB-22.
+
 ## WEB-22 — hoja «+» rediseñada
 
 Manu (2026-09-29), con captura de la hoja antigua: «no me gusta esto del +». Eligió rediseñar la hoja, no quitar el botón.

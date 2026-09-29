@@ -181,3 +181,19 @@ export async function askWithActions({ key, model, payload, confirmed }, fetchIm
   if (!text && !calls.length) throw new Error("Gemini no ha respondido");
   return { text, calls };
 }
+
+// Screenshots and shared links (WEB-23). Sent only when Manu taps the button
+// that says it goes to Google; never with «Enviar sin preguntar».
+const SHARED_SYSTEM = (now) => `${actionSystem(now)}
+Manu te comparte una captura de pantalla o un vídeo. Extrae lo útil (planes, sitios, fechas y horas, precios, recetas, recomendaciones, tareas) y propón acciones con las funciones: aviso si hay fecha y hora, gasto si es un pago que hizo Manu, tarea si hay algo que hacer, idea si es algo para guardar. Si no hay nada útil, dilo en una frase. No inventes datos que no aparezcan.`;
+
+export function buildImagePayload({ base64, mime, note = "" }, now = new Date()) {
+  if (!/^image\/(png|jpeg|webp|heic|heif)$/.test(mime)) throw new Error("Formato de imagen no admitido");
+  const parts = [{ inlineData: { mimeType: mime, data: base64 } }, { text: note ? `Captura de Manu. Nota: ${note}` : "Captura de Manu." }];
+  return { systemInstruction: { parts: [{ text: SHARED_SYSTEM(now) }] }, contents: [{ role: "user", parts }], tools: TOOLS, generationConfig: { maxOutputTokens: 600, temperature: 0.3 } };
+}
+
+export function buildLinkPayload({ provider, url, title, author }, now = new Date()) {
+  const text = `Vídeo de ${provider}${author ? ` de ${author}` : ""}.\nEnlace: ${url}\nTexto del vídeo: ${title}`;
+  return { systemInstruction: { parts: [{ text: SHARED_SYSTEM(now) }] }, contents: [{ role: "user", parts: [{ text }] }], tools: TOOLS, generationConfig: { maxOutputTokens: 600, temperature: 0.3 } };
+}

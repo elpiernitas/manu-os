@@ -52,6 +52,17 @@ La app web (ADR-0012) funciona sin IA, pero el chat solo entiende órdenes concr
 - **«Pegar y activar».** El botón lee el portapapeles solo al tocarlo, acepta solo el formato `AIza…`, prueba la clave y la guarda con «Recordar» activado, porque el botón lo dice. Es la misma opción de recordar ya aceptada en este ADR, elegida con un toque explícito. La clave sigue fuera del vault y de las copias, y «Borrar todos los datos» la elimina.
 - **Descartado: proteger la app con un código o un TOTP para meter claves en el código.** El código de la web es público, así que cualquier secreto incluido, incluido el de verificación, sería legible por cualquiera. Cifrar la clave con un PIN corto permitiría romperla por fuerza bruta sin conexión. Además, AGENTS.md prohíbe secretos en Git.
 
+## Enmienda (2026-09-29, WEB-23)
+
+- **Capturas y enlaces a Gemini, solo con un toque explícito.** Manu eligió que la IA pueda leer capturas y vídeos compartidos.
+  - Solo se envían al pulsar «✨ Que MANU lo lea y lo apunte», y el aviso junto al botón dice que va a Google y que no se use con datos del banco, de salud o de otras personas.
+  - Nunca se envían con «Enviar sin preguntar».
+  - Una imagen no se puede filtrar como el texto: la protección es la decisión de Manu en cada envío. El texto del vídeo pasa por el filtro de lo sensible.
+  - Gemini solo propone acciones con las funciones fijas, y cada una se confirma con un toque.
+- **Texto público de TikTok y YouTube.** Al pulsar ese botón con un enlace de TikTok o YouTube, MANU pide a su servicio oEmbed público el título o texto y el autor del vídeo. El servicio ve qué enlace consultas. Las dos direcciones se añadieron a `connect-src` en la CSP. Instagram exige un token de desarrollador y no se usa: para los reels se pide una captura.
+- **Las capturas se quedan en el móvil**, en IndexedDB, reducidas a JPEG de como máximo 1280 px. No van en las copias exportadas ni en la copia de Drive, y «Borrar todos los datos» las elimina.
+- NO_VERIFICADO: la lectura de imágenes con la clave real de Manu y en el iPhone (probado con Gemini simulado), y que el texto de TikTok traiga la información suficiente (muchos vídeos la dicen en voz y no en el texto).
+
 ## Historial
 
 - Ronda 1 de revisión (PR #13, 2026-09-28): la primera versión subía el vault en claro y automáticamente a Drive, enviaba a Gemini sin confirmación con un filtro de palabras presentado como garantía, y pedía los cuatro scopes de golpe. Corregido en esta versión del ADR.
