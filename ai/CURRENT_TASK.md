@@ -2,11 +2,11 @@
 
 Status: **REVIEW_PENDING**
 
-WEB-53 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
+WEB-54 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
 
 ## Tarea activa
 
-WEB-53 — seguridad (inyección de HTML) y textos largos que ensanchaban la página (`ai/HANDOFF.md`, «WEB-53»).
+WEB-54 — deslizar entre Gijón y Oviedo en el tiempo (`ai/HANDOFF.md`, «WEB-54»).
 
 ## Autorización
 
@@ -49,6 +49,7 @@ WEB-53 — seguridad (inyección de HTML) y textos largos que ensanchaban la pá
 
 ## Historial (cerrado)
 
+- **WEB-53** (seguridad y textos largos): CERRADA. Fusionada mediante el PR #60 (`c69c0d8`).
 - **WEB-52** (varios gastos y hoja rápida): CERRADA. Fusionada mediante el PR #59 (`1816ae5`).
 - **WEB-51** (fechas, miles, ingresos, salud y ánimo): CERRADA. Fusionada mediante el PR #58 (`7079ee9`).
 - **WEB-50** (frases sin IA): CERRADA. Fusionada mediante el PR #57 (`ba66180`).
