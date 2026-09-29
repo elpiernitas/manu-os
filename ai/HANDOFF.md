@@ -10,6 +10,32 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
+## WEB-22 — hoja «+» rediseñada
+
+Manu (2026-09-29), con captura de la hoja antigua: «no me gusta esto del +». Eligió rediseñar la hoja, no quitar el botón.
+
+### Cambios
+
+- `web/core/assistant.js`: `quickDetect` adivina el tipo a partir de un texto libre:
+  - gasto: «gasté 3,20 en café», «12,50 gasolina» o «cena 30€»;
+  - aviso, con su fecha: hoy si la hora aún no ha pasado y, si no, mañana;
+  - idea: «idea: …»;
+  - tarea, en cualquier otro caso.
+  Los números que no son dinero, como «2 kilos», siguen siendo tareas.
+- `web/app.js`:
+  - la hoja tiene título «Añadir» y botón ✕ (ya no hay «Cancelar»), un único campo grande, una línea que dice lo que MANU ha entendido, 4 fichas con emoji (✅ 💡 💸 🔔) y solo los campos necesarios, ya rellenados: importe grande en € o fecha y hora;
+  - el botón dice la acción («Apuntar gasto», «Crear aviso»…) e Intro guarda;
+  - el tipo cambia solo mientras escribes, sin perder el teclado ni el cursor;
+  - si eliges una ficha a mano, o abres la hoja desde el «Añadir» de una sección, se respeta tu elección;
+  - se guarda el texto limpio («sacar la basura», no la frase entera);
+  - versión 22.
+- `web/styles.css`: estilos `.qa-*`, con un rebote de la ficha al detectarla y «Reducir movimiento» respetado.
+
+### Resultados
+
+- `npm test`: 91/91 PASS (`web/tests/quick-add.test.js`).
+- Chromium: 13 checks en PASS. Durante las pruebas apareció un fallo real y se corrigió: al elegir una ficha a mano, el cursor saltaba al principio y lo escrito después quedaba delante. Regresiones en PASS.
+
 ## WEB-21 — estadísticas de dinero: ingresos, nómina y ahorro
 
 Petición de Manu (2026-09-29), con captura de Dinero: «no solo quiero tener lo gastado, quiero muchas más estadísticas, nómina, ingresado…».

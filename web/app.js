@@ -1,4 +1,4 @@
-import { parse, reply } from "./core/assistant.js";
+import { parse, reply, quickDetect } from "./core/assistant.js";
 import { CATEGORIES, CATEGORY_EMOJI, euros, newEntry, learnCategory, summary, toCents, rulesFromRows, applyRules } from "./core/money.js";
 import { MODE_TITLES, modeState } from "./core/modes.js";
 import { capture, confirm, markUnclassified, pending, tasks, ideas, toggleDone } from "./core/inbox.js";
@@ -19,7 +19,7 @@ import { isSpotifyClientId, pkceValid, randomVerifier, challengeFor, authorizeUr
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "21";
+export const APP_VERSION = "22";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -803,26 +803,36 @@ const subpages = {
   },
 };
 
-// ---------- Quick add sheet ----------
-const KINDS = [["TASK", "Tarea"], ["IDEA", "Idea"], ["EXPENSE", "Gasto"], ["REMINDER", "Aviso"]];
-const kindsFor = (k) => (k === "EVENT" ? [["EVENT", "Evento en Google"]] : KINDS);
+// ---------- Quick add sheet (WEB-22: one field, MANU guesses the kind) ----------
+const KINDS = [["TASK", "✅", "Tarea"], ["IDEA", "💡", "Idea"], ["EXPENSE", "💸", "Gasto"], ["REMINDER", "🔔", "Aviso"]];
+const SAVE_LABEL = { TASK: "Añadir tarea", IDEA: "Guardar idea", EXPENSE: "Apuntar gasto", REMINDER: "Crear aviso", EVENT: "Crear evento" };
+const localInput = (d) => `${dayKey(d)}T${hhmm(d)}`;
+function detectHint(d) {
+  if (!d || !sheet?.text) return "Escribe lo que sea: «llamar al taller», «12,50 gasolina», «recuérdame … a las 18», «idea: …».";
+  if (d.kind === "EXPENSE") return `💸 Parece un gasto de ${euros(d.cents)}${d.merchant ? ` en ${d.merchant}` : ""}.`;
+  if (d.kind === "REMINDER") return `🔔 Te aviso ${dayKey(d.at) === localDay() ? "hoy" : dayKey(d.at) === tomorrowKey() ? "mañana" : d.at.toLocaleDateString("es-ES")} a las ${hhmm(d.at)}.`;
+  if (d.kind === "IDEA") return "💡 Lo guardo como idea.";
+  return "✅ Lo apunto como tarea.";
+}
 function sheetHtml() {
   if (!sheet) return "";
   const k = sheet.kind;
-  const soon = new Date(Date.now() + 3600e3);
-  soon.setMinutes(0, 0, 0);
-  const local = `${dayKey(soon)}T${hhmm(soon)}`;
-  const fields = {
-    TASK: '<label for="qText" class="sr">Tarea</label><input id="qText" maxlength="140" placeholder="¿Qué tienes que hacer?" required>',
-    IDEA: '<label for="qText" class="sr">Idea</label><textarea id="qText" rows="3" maxlength="400" placeholder="Apunta la idea" required></textarea>',
-    EXPENSE: '<label for="qAmount" class="muted small">Importe (€)</label><input id="qAmount" inputmode="decimal" placeholder="12,50" required><label for="qText" class="muted small">Concepto</label><input id="qText" maxlength="80" placeholder="Café">',
-    EVENT: `<label for="qText" class="sr">Evento</label><input id="qText" maxlength="140" placeholder="Título del evento" required><label for="qWhen" class="muted small">Empieza</label><input id="qWhen" type="datetime-local" value="${local}" required><label for="qMinutes" class="muted small">Duración (minutos)</label><input id="qMinutes" inputmode="numeric" value="60">`,
-    REMINDER: `<label for="qText" class="sr">Recordatorio</label><input id="qText" maxlength="140" placeholder="¿Qué te recuerdo?" required><label for="qWhen" class="muted small">Cuándo</label><input id="qWhen" type="datetime-local" value="${local}" required>`,
-  }[k];
-  return `<div class="sheet-bg" id="sheetBg"><form class="sheet glass" id="quickAdd" role="dialog" aria-modal="true" aria-label="Añadir">
+  const d = sheet.detected ?? null;
+  const soon = new Date(Date.now() + 3600e3); soon.setMinutes(0, 0, 0);
+  const when = d?.kind === "REMINDER" && d.at ? d.at : soon;
+  const extra = {
+    EXPENSE: `<div class="qa-row"><label for="qAmount" class="muted small">Importe</label><div class="qa-amount"><input id="qAmount" inputmode="decimal" placeholder="0,00" value="${d?.kind === "EXPENSE" && d.cents ? esc(euros(d.cents).replace(/\s?€/, "")) : ""}" required><span>€</span></div></div>`,
+    REMINDER: `<div class="qa-row"><label for="qWhen" class="muted small">Cuándo</label><input id="qWhen" type="datetime-local" value="${localInput(when)}" required></div>`,
+    EVENT: `<div class="qa-row"><label for="qWhen" class="muted small">Empieza</label><input id="qWhen" type="datetime-local" value="${localInput(soon)}" required></div><div class="qa-row"><label for="qMinutes" class="muted small">Duración (min)</label><input id="qMinutes" inputmode="numeric" value="60"></div>`,
+  }[k] ?? "";
+  const tiles = k === "EVENT" ? "" : `<div class="qa-kinds" role="group" aria-label="Tipo">${KINDS.map(([id, e, label]) => `<button type="button" class="qa-kind${id === k ? " on" : ""}" data-kind="${id}" data-act="sheet-kind" aria-pressed="${id === k}"><span class="qa-e" aria-hidden="true">${e}</span><span>${label}</span></button>`).join("")}</div>`;
+  return `<div class="sheet-bg" id="sheetBg"><form class="sheet glass qa" id="quickAdd" role="dialog" aria-modal="true" aria-label="Añadir">
     <div class="grabber"></div>
-    <div class="segmented${k === "EVENT" ? " one" : ""}" role="group" aria-label="Tipo">${kindsFor(k).map(([id, label]) => `<button type="button" data-kind="${id}" data-act="sheet" aria-pressed="${id === k}">${label}</button>`).join("")}</div>
-    ${fields}<button class="btn block" type="submit">Guardar</button><button class="btn ghost block" type="button" data-act="sheet-close">Cancelar</button></form></div>`;
+    <div class="qa-head"><h2>${k === "EVENT" ? "Nuevo evento" : "Añadir"}</h2><button type="button" class="qa-close" data-act="sheet-close" aria-label="Cerrar">✕</button></div>
+    <label for="qText" class="sr">Qué quieres añadir</label><textarea id="qText" rows="2" maxlength="400" placeholder="${k === "EVENT" ? "Título del evento" : "Escribe lo que sea…"}" enterkeyhint="done">${esc(sheet.text ?? "")}</textarea>
+    ${k === "EVENT" ? "" : `<p class="qa-hint muted small" id="qaHint" aria-live="polite">${esc(detectHint(d))}</p>`}
+    ${tiles}${extra}
+    <button class="btn block qa-save" type="submit">${SAVE_LABEL[k]}</button></form></div>`;
 }
 
 // ---------- Render ----------
@@ -866,9 +876,31 @@ function animateEnter(kind) {
   }
 }
 
-function openSheet(kind) {
-  sheet = { kind };
+// manual: the kind was chosen by Manu (a section's «Añadir»), so typing does not change it.
+function openSheet(kind, manual = false) {
+  sheet = { kind, manual, text: "", detected: null };
   render();
+}
+
+// Typing in the sheet: guess the kind and prefill fields, without rebuilding
+// the sheet (and losing the keyboard) unless the kind changes.
+function onQuickInput(value) {
+  if (!sheet) return;
+  sheet.text = value;
+  if (sheet.kind === "EVENT") return;
+  const d = quickDetect(value, today());
+  sheet.detected = d;
+  if (!sheet.manual && value.trim() && d.kind !== sheet.kind) {
+    const pos = $("qText")?.selectionStart ?? value.length;
+    sheet.kind = d.kind;
+    render();
+    const t = $("qText"); if (t) { t.focus(); t.setSelectionRange(pos, pos); }
+    $("quickAdd")?.querySelector(".qa-kind.on")?.classList.add("pop");
+    return;
+  }
+  const hint = $("qaHint"); if (hint) hint.textContent = detectHint(d);
+  if (sheet.kind === "EXPENSE" && d.kind === "EXPENSE" && $("qAmount") && !$("qAmount").dataset.touched) $("qAmount").value = euros(d.cents).replace(/\s?€/, "");
+  if (sheet.kind === "REMINDER" && d.kind === "REMINDER" && $("qWhen") && !$("qWhen").dataset.touched) $("qWhen").value = localInput(d.at);
 }
 
 function closeSheet() {
@@ -911,7 +943,7 @@ function render({ focus = false, enter = null } = {}) {
     const bg = $("sheetBg");
     if (bg && !wasOpen && !reduceMotion()) { bg.dataset.state = "opening"; requestAnimationFrame(() => requestAnimationFrame(() => { bg.dataset.state = "open"; })); }
     else if (bg) bg.dataset.state = "open";
-    if (sheet) $("qText")?.focus();
+    if (sheet) { const t = $("qText"); if (t) { t.focus(); t.setSelectionRange(t.value.length, t.value.length); } }
   }
   if (tab === "manu") {
     const chat = $("chat");
@@ -1109,7 +1141,8 @@ document.addEventListener("click", async (e) => {
     case "forget": updateItem(id, markUnclassified); break;
     case "toggle": updateItem(id, toggleDone); break;
     case "rem-done": vault.reminders = vault.reminders.map((r) => (r.id === id ? { ...r, done: !r.done } : r)); persist(); render(); break;
-    case "sheet": openSheet(a.dataset.kind); break;
+    case "sheet": openSheet(a.dataset.kind, true); break;
+    case "sheet-kind": { if (!sheet) break; sheet.kind = a.dataset.kind; sheet.manual = true; sheet.text = $("qText")?.value ?? sheet.text; render(); const t = $("qText"); if (t) { t.focus(); t.setSelectionRange(t.value.length, t.value.length); } break; }
     case "sheet-close": closeSheet(); break;
     case "refuge": refuge = { state: initialRefuge(), messages: [{ from: "manu", text: "Estoy aquí. ¿Qué te vendría mejor ahora: entender por qué estás así, buscar una solución o cambiar de aire?" }] }; go("manu"); break;
     case "leave-refuge": refuge = null; render(); break;
@@ -1192,6 +1225,7 @@ document.addEventListener("click", async (e) => {
 });
 
 document.addEventListener("keydown", (e) => {
+  if (e.target.id === "qText" && e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); $("quickAdd")?.requestSubmit(); return; }
   if ((e.key === "Enter" || e.key === " ") && e.target.matches("label[for]") && e.target.getAttribute("role") === "button") { e.preventDefault(); $(e.target.getAttribute("for"))?.click(); }
   if (e.key === "Escape" && sheet) { sheet = null; render(); }
 });
@@ -1282,20 +1316,23 @@ document.addEventListener("submit", async (e) => {
     render(); return;
   }
   if (f === "quickAdd") {
-    const text = $("qText")?.value.trim() ?? "";
+    const raw = $("qText")?.value.trim() ?? "";
     const at = new Date().toISOString();
     const k = sheet.kind;
+    const d = quickDetect(raw, today());
+    // Use the cleaned text MANU understood («sacar la basura», not the whole sentence).
+    const text = (d.kind === k && d.text) || (k === "EXPENSE" && d.kind === "EXPENSE" ? d.merchant ?? "" : raw);
     if (k === "TASK" && text) vault.inbox.push({ ...capture({ id: uid("c"), text: text.slice(0, 140), at }), status: "TASK" });
     else if (k === "IDEA" && text) vault.inbox.push({ ...capture({ id: uid("c"), text: text.slice(0, 400), at }), status: "IDEA" });
     else if (k === "EXPENSE") {
-      const cents = toCents($("qAmount").value.replace(/\s|€/g, ""));
-      if (!cents) { toast("Pon un importe válido, por ejemplo 12,50"); return; }
+      const cents = toCents(($("qAmount")?.value ?? "").replace(/\s|€|\./g, ""));
+      if (!cents) { toast("Pon el importe, por ejemplo 12,50"); $("qAmount")?.focus(); return; }
       vault.spending.push(newEntry({ id: uid("s"), cents, merchant: text || null, at }, vault.settings.categoryRules ?? {}));
-    } else if (k === "EVENT" && text) {
+    } else if (k === "EVENT" && raw) {
       const minutes = Math.min(1440, Math.max(5, Number($("qMinutes").value) || 60));
       try {
         const token = await googleToken(SCOPE.calendar);
-        await createEvent(token, newEventBody({ title: text, start: $("qWhen").value, minutes }));
+        await createEvent(token, newEventBody({ title: raw, start: $("qWhen").value, minutes }));
         sheet = null; render(); toast("Evento creado en Google Calendar"); syncGoogle();
       } catch (err) { toast(err.message || "No se pudo crear el evento"); }
       return;
@@ -1303,13 +1340,15 @@ document.addEventListener("submit", async (e) => {
       const when = new Date($("qWhen").value);
       if (Number.isNaN(when.getTime())) { toast("Elige cuándo"); return; }
       vault.reminders.push({ id: uid("r"), text: text.slice(0, 140), at: when.toISOString(), done: false, notified: false });
-    } else return;
+    } else { toast("Escribe algo primero"); $("qText")?.focus(); return; }
     sheet = null; persist(); render();
     toast({ TASK: "Tarea añadida", IDEA: "Idea guardada", EXPENSE: "Gasto apuntado", REMINDER: "Recordatorio creado" }[k]);
   }
 });
 
 document.addEventListener("input", (e) => {
+  if (e.target.id === "qText") onQuickInput(e.target.value);
+  if (e.target.id === "qAmount" || e.target.id === "qWhen") e.target.dataset.touched = "1";
   if (e.target.id === "msg") $("orb")?.classList.toggle("listening", e.target.value.trim().length > 0);
 });
 
