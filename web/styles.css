@@ -676,3 +676,8 @@ body.kb .chat-down { bottom: auto; top: calc(var(--kb-bottom, 100dvh) - 124px); 
 .budget-row { align-items: center; gap: 10px; }
 .budget-form { display: grid; grid-template-columns: 1fr 96px auto; gap: 8px; margin-top: 10px; }
 .budget-form select, .budget-form input { min-height: 44px; min-width: 0; }
+
+/* ---------- WEB-48: buscar en todo ---------- */
+.find-row { width: 100%; text-align: left; background: none; border: 0; color: inherit; padding: 10px 0; gap: 10px; min-height: 44px; font: inherit; cursor: pointer; border-top: 1px solid rgba(255,255,255,.06); }
+.find-row:first-of-type { border-top: 0; }
+.find-row .grow { min-width: 0; overflow-wrap: anywhere; }
