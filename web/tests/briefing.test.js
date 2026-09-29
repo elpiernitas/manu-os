@@ -61,3 +61,8 @@ test("WEB-46: questions that ask for the summary", () => {
   for (const q of ["resumen del dia", "como va mi dia", "que tal voy", "como ha ido el dia"]) assert.ok(isBriefingQuestion(q), q);
   for (const q of ["gaste 3 en pan", "que hice ayer"]) assert.ok(!isBriefingQuestion(q), q);
 });
+
+test("WEB-47: budget alerts appear in the morning summary", () => {
+  const b = briefing({ now: new Date(2026, 8, 29, 9, 0), budgetAlerts: ["Comer y beber: te has pasado 20,00 € del presupuesto (200,00 €)."] });
+  assert.match(briefingText(b), /🎯 Comer y beber: te has pasado 20,00 €/);
+});

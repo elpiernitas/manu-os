@@ -669,3 +669,10 @@ body.kb .chat-down { bottom: auto; top: calc(var(--kb-bottom, 100dvh) - 124px); 
 .brief-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 10px; }
 .brief-list li { display: grid; grid-template-columns: 24px 1fr; gap: 10px; align-items: start; line-height: 1.35; }
 .brief-list li span:first-child { font-size: 18px; line-height: 1.2; }
+
+/* ---------- WEB-47: presupuestos ---------- */
+.bar.warn i { background: #f0a23b; }
+.bar.over i { background: #ff5a5f; }
+.budget-row { align-items: center; gap: 10px; }
+.budget-form { display: grid; grid-template-columns: 1fr 96px auto; gap: 8px; margin-top: 10px; }
+.budget-form select, .budget-form input { min-height: 44px; min-width: 0; }

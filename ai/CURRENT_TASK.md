@@ -2,11 +2,11 @@
 
 Status: **REVIEW_PENDING**
 
-WEB-46 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
+WEB-47 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
 
 ## Tarea activa
 
-WEB-46 — «Tu día de un vistazo» (resumen de mañana y de noche) y arreglos de la auditoría (`ai/HANDOFF.md`, «WEB-46»).
+WEB-47 — presupuestos por categoría en Dinero, en «Tu día» y en el chat (`ai/HANDOFF.md`, «WEB-47»).
 
 ## Autorización
 
@@ -49,6 +49,7 @@ WEB-46 — «Tu día de un vistazo» (resumen de mañana y de noche) y arreglos 
 
 ## Historial (cerrado)
 
+- **WEB-46** (resumen del día y auditoría): CERRADA. Fusionada mediante el PR #53 (`22479a3`).
 - **WEB-45** (chat, luz del día, Gmail y órdenes de correo): CERRADA. Fusionada mediante el PR #52 (`d7781f5`).
 - **WEB-44** (copia completa cifrada): CERRADA. Fusionada mediante el PR #51 (`ea9f790`).
 - **WEB-42/43** (aviso de la exportación de ChatGPT y buzón de Atajos): CERRADAS. Fusionadas mediante el PR #50 (`f268c32`).
