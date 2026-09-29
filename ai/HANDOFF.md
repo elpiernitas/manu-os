@@ -10,6 +10,31 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
+## WEB-31 — la barra sube en las páginas cortas (iPhone)
+
+Manu (2026-09-29, capturas): «en proyecto la barra sube». En Proyectos, la barra de pestañas y el «+» aparecen unos 46 pt más arriba que en Dinero, con una franja negra debajo.
+
+### Causa probable
+
+Proyectos es la única pantalla más corta que el móvil (en Chromium mide 664 de alto frente a una ventana de 664; Dinero mide 1666). En la app instalada con `black-translucent`, iOS coloca un documento corto como si la pantalla midiera una barra de estado menos (47 pt en un iPhone 14). La desviación de las capturas coincide con eso. Es una deducción a partir de las capturas; no se ha reproducido en Safari.
+
+### Cambios
+
+- `web/styles.css`:
+  - `html { min-height: calc(100% + env(safe-area-inset-top)) }`, con fondo `--bg`;
+  - `.app { min-height: 100dvh }`.
+  Así ninguna página es más corta que la pantalla, igual que las largas, que se ven bien.
+- Versión 31.
+
+### Resultados
+
+- `npm test`: 106/106 PASS. `node --check` pasa.
+- e2e3, e2e4 y e2e10–e2e30 en PASS, salvo las 3 expectativas antiguas de e2e18, que también fallan en `main`.
+
+### NO_VERIFICADO
+
+- En el iPhone real. Chromium no reproduce este comportamiento de iOS: allí `env(safe-area-inset-top)` vale 0.
+
 ## WEB-30 — zona inferior: chat, barra y pestañas
 
 Manu (2026-09-29, captura): «y las posiciones de abajo también».
