@@ -617,3 +617,6 @@ body[data-screen="weather"][data-wx="sun-cloud"] .ambient { background: linear-g
 body[data-screen="hoy"][data-wx="hot"] .ambient { background: linear-gradient(180deg, #7a4418 0%, #3f2412 38%, #0c0806 78%); }
 body[data-screen="hoy"][data-wx="sun-cloud"] .ambient { background: linear-gradient(180deg, #2f5078 0%, #1c3050 38%, #0a0d14 78%); }
 @media (prefers-reduced-motion: reduce) { .scene b { animation: none !important; } .scene .bolt, .scene .flash { display: none; } }
+
+/* ---------- WEB-37: nueva conversación ---------- */
+.chat-tools { display: flex; justify-content: flex-end; margin: 4px 0 6px; }

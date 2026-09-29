@@ -64,3 +64,22 @@ test("search: accents ignored, titles weigh more, snippet around the hit", () =>
   const s = stats(docs);
   assert.equal(s.count, 2); assert.equal(s.mine, 2);
 });
+
+test("WEB-37: a finished chat becomes an archive document; only chats with Manu's words", async () => {
+  const { chatToDoc, staleChat, search: s2 } = await import("../core/archive.js");
+  const chat = [
+    { from: "manu", text: "Hola, Manu.", at: "2026-09-29T10:00:00Z" },
+    { from: "me", text: "Quiero ir a Oporto en noviembre", at: "2026-09-29T10:01:00Z" },
+    { from: "manu", text: "Pensando…", at: "2026-09-29T10:01:01Z" },
+    { from: "manu", text: "¡Buena idea! Mira vuelos.", at: "2026-09-29T10:01:02Z" },
+  ];
+  const doc = chatToDoc(chat);
+  assert.equal(doc.source, "manu");
+  assert.equal(doc.title, "Quiero ir a Oporto en noviembre");
+  assert.deepEqual(doc.messages.map((m) => m.role), ["ai", "me", "ai"]);
+  assert.equal(chatToDoc([{ from: "manu", text: "Hola", at: "2026-09-29T10:00:00Z" }]), null);
+  assert.equal(s2([doc], "oporto")[0].doc.id, doc.id);
+  assert.equal(staleChat(chat, Date.parse("2026-09-29T10:20:00Z")), false);
+  assert.equal(staleChat(chat, Date.parse("2026-09-29T10:40:00Z")), true);
+  assert.equal(staleChat([], Date.now()), false);
+});

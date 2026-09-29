@@ -18,7 +18,7 @@ import { detectLink, linkInfo, PROVIDER_NAME } from "./core/links.js";
 import { allowedToSend, buildContext, buildConversationPayload, CONTEXT_CATEGORIES, BASIC_CONTEXT, FULL_CONTEXT, AUTO_SAFE } from "./core/converse.js";
 import { newProject, addSource, buildProjectPayload, citations, PRESETS } from "./core/projects.js";
 import { putImage, getImage, clearImages } from "./core/imagestore.js";
-import { readChatgptExport, search as archiveSearch, stats as archiveStats } from "./core/archive.js";
+import { readChatgptExport, search as archiveSearch, stats as archiveStats, chatToDoc, staleChat } from "./core/archive.js";
 import { putDocs, allDocs, clearArchive } from "./core/archivestore.js";
 import { findExcerpts, askPayload, profileDigest, profilePayload, memoryContext } from "./core/recall.js";
 import { weatherEmoji, sceneFor, PARTICLES, SHAPES, MONEY_EMOJI } from "./core/scene.js";
@@ -28,7 +28,7 @@ import { isSpotifyClientId, pkceValid, randomVerifier, challengeFor, authorizeUr
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "36";
+export const APP_VERSION = "37";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -689,6 +689,7 @@ const screens = {
       ${aiReady() && !aiMode().on && !refuge ? `<section class="card ai-offer"><b>💬 ¿Hablamos como con Gemini?</b><p class="muted small">MANU conversa contigo, sabe lo que elijas de tu vida y gestiona tus cosas. Lo que escribas irá a Google.</p><div class="btns"><button class="btn" data-act="ai-mode" data-v="full">Activar con todo</button><button class="btn ghost" data-act="ai-mode" data-v="basic">Solo lo básico</button></div><button class="link small" data-sub-go="ia">Elegir qué sabe</button></section>` : ""}
       ${refuge ? "" : mailCards()}
       ${chips ? `<div class="suggest" aria-label="Sugerencias">${chips.map((s) => `<button data-say="${esc(s)}">${esc(s)}</button>`).join("")}</div>` : `<div class="quick-cards" aria-label="Sugerencias">${cards.map(([e, label, how, text]) => `<button class="qcard" ${how === "say" ? `data-say="${esc(text)}"` : `data-fill="${esc(text)}"`}><span class="qe" aria-hidden="true">${e}</span><span>${esc(label)}</span></button>`).join("")}</div>`}
+      ${vault.chat.length && !refuge ? `<div class="chat-tools"><button class="link small" data-act="chat-new">＋ Nueva conversación</button></div>` : ""}
       <div class="chat" id="chat" aria-live="polite">${[...history, ...(refuge?.messages ?? [])].map((b) => `<div class="bubble ${b.from}${b.safety ? " safety" : ""}">${b.ai ? '<span class="ai-tag">IA</span>' : ""}${b.imageId ? `<img class="chat-img" data-img="${esc(b.imageId)}" alt="Captura">` : ""}${esc(b.text)}${b.url ? ` <a class="link small" href="${esc(b.url)}" target="_blank" rel="noopener">Abrir</a>` : ""}${b.proposal ? `${b.proposal.state ? "" : `<p class="small proposal-what">Se enviará a Google solo tu frase: <b>«${esc(b.proposal.message)}»</b>, con las instrucciones fijas de MANU. Nada de tus datos.</p>`}<details><summary class="muted small">${b.proposal.state ? "Ver lo enviado" : "Ver detalles técnicos"}</summary><pre class="payload">${esc(shownPayload(b.proposal))}</pre></details>${b.proposal.state ? `<p class="muted small">${b.proposal.state === "sent" ? (b.proposal.auto ? "Enviado a Gemini sin preguntar (lo activaste en Tú → IA)." : "Enviado a Gemini.") : "No enviado."}</p>` : `<div class="btns"><button class="btn" data-act="ai-send" data-id="${esc(b.proposal.id)}">Enviar a Gemini</button><button class="btn ghost" data-act="ai-cancel" data-id="${esc(b.proposal.id)}">No</button></div><div class="btns"><button class="link small" data-act="ask-elsewhere" data-app="chatgpt" data-id="${esc(b.proposal.id)}">Preguntar en ChatGPT</button><button class="link small" data-act="ask-elsewhere" data-app="claude" data-id="${esc(b.proposal.id)}">Preguntar en Claude</button></div>`}` : ""}${b.action ? `<div class="btns"><a class="btn" href="${esc(b.action.href)}">${esc(b.action.label)}</a></div>` : ""}${(b.calls ?? []).map((c, i) => callCard(b, c, i)).join("")}${b.mailUndo ? `<div class="btns"><button class="link small" data-act="mail-undo" data-at="${esc(b.at)}">Deshacer</button></div>` : ""}</div>`).join("")}</div>
       ${chatImage ? `<div class="chat-attach glass"><img src="${esc(chatImage)}" alt="Captura adjunta"><div class="grow small">${aiReady() ? "La captura se enviará a Google (Gemini) al pulsar «Enviar a Gemini». No uses capturas del banco o de salud si no quieres compartirlas." : '<button type="button" class="link small" data-act="gemini-guide">Activa la IA para que MANU lea la captura</button>'}</div><button type="button" class="qa-close" data-act="chat-image-remove" aria-label="Quitar captura">✕</button></div>` : ""}
       <form class="composer glass" id="composer">${refuge ? "" : '<label class="composer-attach" for="chatImage" role="button" tabindex="0" aria-label="Adjuntar captura">📎</label><input id="chatImage" type="file" accept="image/*" class="sr">'}<label for="msg" class="sr">Mensaje para MANU</label><input id="msg" autocomplete="off" enterkeyhint="send" placeholder="${refuge ? "Cuéntame" : chatImage ? "¿Qué quieres saber de la captura?" : "Escribe a MANU"}"><button class="btn" type="submit">${chatImage && aiReady() ? "Enviar a Gemini" : "Enviar"}</button></form>`;
@@ -754,7 +755,7 @@ const screens = {
         ${item("habitos", "repeat", "green", "Hábitos", vault.habits.length ? `${habitsDone} de ${vault.habits.length} hechos hoy` : "Crea tu primer hábito")}
         ${item("salud", "pulse", "red", "Salud", hs.sleep !== null || hs.steps !== null ? [hs.sleep !== null ? `${dec(hs.sleep)} h de sueño` : null, hs.steps !== null ? `${Math.round(hs.steps)} pasos` : null].filter(Boolean).join(" · ") + " (media semanal)" : "Sueño, pasos y peso")}
         ${item("comidas", "fork", "orange", "Comidas", `${vault.meals.filter((m) => m.day === t).length} apuntadas hoy`)}
-        ${item("archivo", "box", "teal", "Tu archivo", archive.stats?.count ? `${archive.stats.count} conversaciones de ChatGPT` : "Importa tu exportación de ChatGPT")}
+        ${item("archivo", "box", "teal", "Tu archivo", archive.stats?.count ? `${archive.stats.count} conversaciones guardadas` : "Tus conversaciones y tu exportación de ChatGPT")}
         ${item("personas", "people", "purple", "Personas", vault.people.length ? `${vault.people.length} personas` : "Cumpleaños y detalles")}
         <button class="item" data-act="refuge"><span class="ico teal">${I.leaf}</span><span class="grow"><span>Refugio</span><br><span class="muted small">Para cuando no estás bien</span></span><span class="chev">${I.chev}</span></button>
       </div>
@@ -794,7 +795,7 @@ const subpages = {
     return `${backBar("Tu archivo")}
       <p class="subtitle">Tu memoria digital: lo que importes se queda solo en este iPhone. No va a GitHub, ni a las copias, ni a ninguna IA salvo que tú lo pidas.</p>
       <section class="card"><h2>ChatGPT</h2>
-        ${s?.count ? `<p><b>${s.count}</b> conversaciones · ${s.mine} mensajes tuyos · de ${esc(d(s.from))} a ${esc(d(s.to))}</p>` : '<p class="muted">Cuando te llegue el correo de ChatGPT, descarga el .zip y elígelo aquí (sin descomprimir). También vale el archivo conversations.json.</p>'}
+        ${s?.count ? `<p><b>${s.count}</b> conversaciones${s.manu ? ` (${s.count - s.manu} de ChatGPT y ${s.manu} con MANU)` : ""} · ${s.mine} mensajes tuyos · de ${esc(d(s.from))} a ${esc(d(s.to))}</p>` : '<p class="muted">Cuando te llegue el correo de ChatGPT, descarga el .zip y elígelo aquí (sin descomprimir). También vale el archivo conversations.json.</p>'}
         <label class="btn ${s?.count ? "ghost" : ""} block" for="archiveFile" role="button" tabindex="0">${archive.busy ? "Importando…" : s?.count ? "Volver a importar" : "Elegir la exportación de ChatGPT"}</label><input id="archiveFile" type="file" accept=".zip,.json,application/zip,application/json" class="sr">
         <p class="muted small">En ChatGPT: Ajustes → Controles de datos → Exportar datos. Llega un correo con el enlace.</p></section>
       ${s?.count ? `<section class="card"><h2>Pregúntale a tu archivo</h2>${aiReady() ? `<form id="archiveAsk" class="composer-inline"><label for="archiveAskQ" class="sr">Pregunta</label><input id="archiveAskQ" placeholder="¿Qué me recomendaron para Lisboa?" autocomplete="off"><button class="btn" type="submit">${archive.asking ? "Pensando…" : "Preguntar"}</button></form><p class="muted small">MANU busca aquí en tu iPhone y solo envía a Gemini los trozos que tienen que ver. Crisis, Refugio y contraseñas nunca salen${sensitiveAllowed() ? "" : "; salud, dinero y ánimo tampoco (Tú → IA)"}.</p>` : '<p class="muted">Activa la IA (Tú → IA) para preguntarle. Buscar funciona sin IA.</p>'}
@@ -1644,10 +1645,23 @@ async function makeProfile() {
   archive.profiling = false; render();
 }
 async function archiveDocs() {
-  if (!archive.docs) { try { archive.docs = await allDocs(); } catch { archive.docs = []; } archive.stats = archiveStats(archive.docs); }
+  if (!archive.docs) { try { archive.docs = await allDocs(); } catch { archive.docs = []; } archive.stats = { ...archiveStats(archive.docs), manu: archive.docs.filter((x) => x.source === "manu").length }; }
   return archive.docs;
 }
 archiveDocs().then(() => { if (archive.stats?.count && tab === "tu") render(); });
+
+// WEB-37: each conversation starts empty; the previous one goes to «Tu
+// archivo» (only on this device), where MANU can recall it later.
+function startNewChat() {
+  const doc = chatToDoc(vault.chat);
+  vault.chat = [];
+  lastChatLength = 0;
+  persist(); render();
+  if (doc) putDocs([doc]).then(() => { archive.docs = null; return archiveDocs(); }).catch(() => {});
+}
+function newChatIfStale() { if (vault && staleChat(vault.chat) && !refuge) startNewChat(); }
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") newChatIfStale(); });
+setTimeout(newChatIfStale, 0);
 
 // «Pregúntale a mi archivo …», «según mi archivo …».
 function archiveAskCommand(text) {
@@ -1659,7 +1673,7 @@ const whoAmI = (text) => /^(?:que sabes de mi|quien soy|cual es mi perfil|como s
 // «¿Qué hablé con ChatGPT de Lisboa?», «busca en mi archivo lentejas».
 function archiveCommand(text) {
   const t = normalise(text);
-  const m = t.match(/(?:busca(?:me)? en (?:mi|el) archivo|que (?:hable|he hablado|le dije|le conte) (?:con|a) chatgpt (?:de|sobre)|busca en chatgpt|en mi archivo)\s+(.+)$/);
+  const m = t.match(/(?:busca(?:me)? en (?:mi|el) archivo|que (?:hable|he hablado|le dije|le conte) (?:con|a) chatgpt (?:de|sobre)|que (?:hablamos|te dije|te conte|hable contigo) (?:de|sobre)|busca en chatgpt|en mi archivo)\s+(.+)$/);
   return m ? m[1].trim() : null;
 }
 
@@ -1791,6 +1805,7 @@ document.addEventListener("click", async (e) => {
     case "ai-send": askAi(id); break;
     case "ai-do": runCall(findCall(a)); break;
     case "ai-undo": undoCall(findCall(a)); break;
+    case "chat-new": startNewChat(); toast("Conversación nueva. La anterior queda en Tu archivo."); break;
     case "profile-make": makeProfile(); break;
     case "profile-edit": archive.editProfile = true; render(); break;
     case "profile-cancel": archive.editProfile = false; render(); break;

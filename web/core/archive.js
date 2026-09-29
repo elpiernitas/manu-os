@@ -119,3 +119,24 @@ export function stats(docs) {
     to: times.length ? Math.max(...times) : null,
   };
 }
+
+// ---- MANU's own chats (WEB-37) ----
+// Each conversation with MANU is archived when a new one starts, so the chat
+// starts empty but MANU can still recall it («lo que hablamos de …»).
+export const NEW_CHAT_AFTER_MS = 30 * 60000;
+
+export function chatToDoc(chat) {
+  const messages = (chat ?? [])
+    .filter((m) => m?.text && m.text !== "Pensando…" && (m.from === "me" || m.from === "manu"))
+    .map((m) => ({ role: m.from === "me" ? "me" : "ai", text: String(m.text).slice(0, 20000), at: Date.parse(m.at) || null }));
+  if (!messages.some((m) => m.role === "me")) return null;
+  const first = messages.find((m) => m.role === "me");
+  const at = messages[0].at ?? Date.now();
+  return { id: `manu:${at}`, source: "manu", title: first.text.replace(/\s+/g, " ").slice(0, 80), at, messages };
+}
+
+// True when the last message is old enough to start a new conversation.
+export const staleChat = (chat, now = Date.now()) => {
+  const last = Date.parse(chat?.at?.(-1)?.at ?? "");
+  return Number.isFinite(last) && now - last > NEW_CHAT_AFTER_MS;
+};

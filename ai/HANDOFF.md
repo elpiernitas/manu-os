@@ -10,6 +10,41 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
+## WEB-37 — cada chat es una conversación nueva; la anterior va a «Tu archivo»
+
+Manu (2026-09-29, captura): «quiero que se vaya eliminando el historial, que cada chat sea una conversación nueva, a no ser que me refiera a algo hablado anteriormente».
+
+### Cambios
+
+- `web/core/archive.js`:
+  - `chatToDoc` convierte el chat en un documento del archivo (`source: "manu"`, sin «Pensando…», y solo si Manu escribió algo);
+  - `staleChat` detecta si hace más de 30 minutos que no se habla.
+- `web/app.js`:
+  - `startNewChat` guarda la conversación en «Tu archivo» (IndexedDB, solo en el dispositivo) y vacía el chat. Se ejecuta al volver a la app tras más de 30 minutos, al abrirla y con el nuevo botón «＋ Nueva conversación»;
+  - «¿qué hablamos de …?» y «¿qué te dije de …?» buscan también en las conversaciones con MANU;
+  - «Tu archivo» distingue las de ChatGPT de las de MANU;
+  - versión 37.
+- `web/core/recall.js`: los fragmentos y los recuerdos distinguen «MANU» de «ChatGPT». Así el modo conversación recuerda también lo hablado con MANU cuando el mensaje lo menciona (categoría «Recuerdos»).
+
+### Consecuencia de privacidad
+
+- Las conversaciones pasadas salen del vault. Ya no van en las copias cifradas ni en Drive: quedan solo en el dispositivo, como el resto de «Tu archivo».
+
+### Resultados
+
+- `npm test`: 122/122 PASS. `node --check` pasa.
+- e2e37 (reloj simulado): 10/10. Cubre:
+  - el botón solo aparece con mensajes;
+  - a los 20 minutos sigue la misma conversación y a más de 30 empieza vacía;
+  - el chat sale del vault y la idea apuntada se queda;
+  - «¿qué hablamos de Oporto?» encuentra la conversación anterior;
+  - el botón funciona, «Tu archivo» las muestra y todo sigue igual tras recargar.
+- e2e34 actualizado al nuevo texto. e2e3, e2e4 y e2e10–e2e36 en PASS, salvo las 3 expectativas antiguas de e2e18.
+
+### NO_VERIFICADO
+
+- En el iPhone real: el evento `visibilitychange` al volver a la app instalada.
+
 ## WEB-36 — seis escenas del tiempo, sin saltos, y el fondo animado recuperado
 
 Manu (2026-09-29, captura): «la animación cuando hay nublado se ralla». Pidió escenas para sol mucho, sol normal, sol con nubes, nubes, nubes con lluvia y nubes con lluvia y truenos.
