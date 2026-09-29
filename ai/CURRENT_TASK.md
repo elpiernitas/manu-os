@@ -2,11 +2,11 @@
 
 Status: **REVIEW_PENDING**
 
-WEB-16 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
+WEB-18 implementado. Se fusiona según la regla de fusión de `AGENTS.md`.
 
 ## Tarea activa
 
-WEB-16 — escenas vivas: tiempo, dinero, MANU, ánimo y agenda (`ai/HANDOFF.md`, «WEB-16»).
+WEB-18 — volver a poner la bola animada con la M en MANU, sin cara ni aspecto humano (`ai/HANDOFF.md`, «WEB-18»).
 
 ## Autorización
 
@@ -41,6 +41,8 @@ WEB-16 — escenas vivas: tiempo, dinero, MANU, ánimo y agenda (`ai/HANDOFF.md`
 
 ## Historial (cerrado)
 
+- **WEB-17** (quitar la bola con la M por un malentendido): CERRADA. Fusionada mediante el PR #25 (`18a9c7d`); WEB-18 revierte ese cambio.
+- **WEB-16** (escenas vivas): CERRADA. Fusionada mediante el PR #24 (`0caa79d`).
 - **WEB-15** (Spotify con un toque): CERRADA. Fusionada mediante el PR #23 (`c657d99`).
 - **WEB-14** (tutorial de Gemini): CERRADA. Fusionada mediante el PR #22 (`c8109ee`).
 - **WEB-13** (revisión de ChatGPT, calendario automático, gastos del Excel, puesta a punto): CERRADA. Fusionada mediante el PR #21 (`750589e`), con el «sí» de Manu.

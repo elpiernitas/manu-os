@@ -10,6 +10,39 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
+## WEB-18 — la bola con la M vuelve
+
+Manu aclara el 2026-09-29 que WEB-17 interpretó mal su petición: no quiere un avatar con cara ni aspecto humano, pero sí quiere la esfera animada con la M. Se revierte el commit `18a9c7d` del PR #25 y vuelven `.orb`, `.manu-head` y sus estados de respirar, escuchar mientras Manu escribe y pensar mientras responde la IA. No se crea ninguna figura humana. Versión 18 (`manuos-v18`).
+
+### Archivos y alcance
+
+- El revert recupera la esfera y sus animaciones en `web/app.js` y `web/styles.css`.
+- `web/app.js` pasa a versión 18 y `web/sw.js` a caché `manuos-v18`.
+- `ai/HANDOFF.md`, `ai/CURRENT_TASK.md` y `ai/PROJECT_STATE.md` registran WEB-18 y conservan WEB-17 y WEB-16 como historial.
+- No hay nuevas dependencias, peticiones de red, datos personales ni secretos.
+
+### Verificación
+
+- `cd web && npm test`: 81/81 PASS.
+- `node --check` en `web/app.js`, `web/sw.js` y `web/core/*.js`: PASS.
+- Comprobaciones locales equivalentes a `repository-contract`: PASS.
+
+### Riesgos y regresiones posibles
+
+- El cambio es visual y recupera código ya probado en WEB-16. `prefers-reduced-motion` sigue desactivando las animaciones de la esfera.
+
+### NO_VERIFICADO
+
+- El aspecto y las animaciones en el iPhone real.
+- Los workflows remotos, hasta publicar el PR.
+
+## WEB-17 — sin avatar en MANU
+
+Manu (2026-09-29): «yo con avatar no, qué vergüenza, esa parte elimínala». Se quitó la esfera con la M de la pantalla MANU (HTML, CSS y los eventos «escuchando» y «pensando») por un malentendido aclarado en WEB-18. Se mantuvieron las tarjetas rápidas con emoji y el resto de WEB-16. Versión 17.
+
+- `npm test`: 81/81 PASS.
+- Chromium: sin `.orb` y con 6 tarjetas; la tarjeta rellena la frase; regresiones en PASS.
+
 ## WEB-16 — escenas vivas
 
 Propuesta de ChatGPT que Manu pasó el 2026-09-29: una app oscura y elegante, pero con color, movimiento y humor que reaccionen a su vida. Se siguió su orden de prioridad.
