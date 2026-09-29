@@ -626,3 +626,29 @@ body[data-screen="hoy"][data-wx="sun-cloud"] .ambient { background: linear-gradi
 .bday select { min-height: 44px; }
 .check-row { display: flex; align-items: center; gap: 10px; min-height: 44px; }
 .check-row input { width: 22px; height: 22px; }
+
+/* ---------- WEB-40: la luz del día según el amanecer y el atardecer reales ---------- */
+/* «Sol mucho» de día ya no es naranja: azul intenso y cálido. */
+.sc-hot { background: linear-gradient(160deg, rgba(90,160,255,.5), rgba(255,200,90,.18) 55%, rgba(17,19,24,.92) 88%); }
+body[data-wx="hot"] { --ambient-1: rgba(70,150,255,.28); --ambient-2: rgba(255,200,90,.12); }
+body[data-screen="weather"][data-wx="hot"] .ambient { background: linear-gradient(180deg, #2f86e0 0%, #2266bd 45%, #123e78 100%); }
+body[data-screen="hoy"][data-wx="hot"] .ambient { background: linear-gradient(180deg, #245e9e 0%, #173963 38%, #080c14 78%); }
+/* Amanecer y atardecer: naranja, rojo y dorado (salvo con lluvia, tormenta, nieve o niebla). */
+body[data-sky="dawn"]:not([data-wx="rain"]):not([data-wx="storm"]):not([data-wx="snow"]):not([data-wx="fog"]),
+body[data-sky="dusk"]:not([data-wx="rain"]):not([data-wx="storm"]):not([data-wx="snow"]):not([data-wx="fog"]) { --ambient-1: rgba(255,140,60,.32); --ambient-2: rgba(230,70,90,.18); }
+body[data-screen="weather"][data-sky="dawn"]:not([data-wx="rain"]):not([data-wx="storm"]):not([data-wx="snow"]):not([data-wx="fog"]) .ambient { background: linear-gradient(180deg, #f2b35e 0%, #e0764a 38%, #7a3552 70%, #26183a 100%); }
+body[data-screen="weather"][data-sky="dusk"]:not([data-wx="rain"]):not([data-wx="storm"]):not([data-wx="snow"]):not([data-wx="fog"]) .ambient { background: linear-gradient(180deg, #e8964a 0%, #d0503f 36%, #6a2848 68%, #1c1230 100%); }
+body[data-screen="hoy"][data-sky="dawn"]:not([data-wx="rain"]):not([data-wx="storm"]):not([data-wx="snow"]):not([data-wx="fog"]) .ambient { background: linear-gradient(180deg, #8a5a2c 0%, #5e2c34 38%, #0c0a10 78%); }
+body[data-screen="hoy"][data-sky="dusk"]:not([data-wx="rain"]):not([data-wx="storm"]):not([data-wx="snow"]):not([data-wx="fog"]) .ambient { background: linear-gradient(180deg, #8a4526 0%, #5a2032 38%, #0c0810 78%); }
+.hero.scene-card.ph-dawn:not(.sc-rain):not(.sc-storm):not(.sc-snow):not(.sc-fog) { background: linear-gradient(160deg, rgba(255,190,90,.5), rgba(230,90,70,.28) 50%, rgba(17,19,24,.92) 88%); }
+.hero.scene-card.ph-dusk:not(.sc-rain):not(.sc-storm):not(.sc-snow):not(.sc-fog) { background: linear-gradient(160deg, rgba(255,150,60,.5), rgba(210,60,80,.3) 50%, rgba(17,19,24,.92) 88%); }
+/* Noche: siempre oscuro, aunque el código diga «nublado». */
+body[data-sky="night"] { --ambient-1: rgba(40,60,160,.22); --ambient-2: rgba(120,90,220,.10); }
+body[data-screen="weather"][data-sky="night"] .ambient { background: linear-gradient(180deg, #101c4a 0%, #0a1030 50%, #04060f 100%); }
+body[data-screen="hoy"][data-sky="night"] .ambient { background: linear-gradient(180deg, #0e1840 0%, #080d26 40%, #03040a 78%); }
+.hero.scene-card.ph-night { background: linear-gradient(170deg, rgba(20,30,80,.85), rgba(8,10,28,.95) 75%); }
+body[data-sky="night"] .scene .sun, body[data-sky="night"] .scene .rays, body[data-sky="night"] .scene .haze { display: none; }
+
+/* ---------- WEB-40: error de Gmail ---------- */
+.mail-error { border-color: rgba(255,180,80,.45); }
+.mail-error ol { margin: 6px 0 4px; padding-left: 20px; display: grid; gap: 4px; }

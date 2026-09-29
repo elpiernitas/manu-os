@@ -92,6 +92,8 @@ export function parseForecast(json) {
     now: { temp: round(c.temperature_2m), feels: round(c.apparent_temperature), humidity: c.relative_humidity_2m ?? null, wind: round(c.wind_speed_10m), ...iconFor(c.weather_code, c.is_day) },
     today: days[0],
     tomorrow: days[1] ?? null,
+    // WEB-40: the city's UTC offset, to know its local time for dawn and dusk.
+    offset: Number.isFinite(json.utc_offset_seconds) ? json.utc_offset_seconds : null,
     days,
     hours,
   };

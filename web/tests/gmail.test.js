@@ -85,3 +85,17 @@ test("Gemini can propose mail actions; the mail context only goes when marked", 
   assert.ok(!buildContext({ mail }, BASIC_CONTEXT, new Date()).includes("CORREO"));
   assert.ok(buildContext({ mail }, FULL_CONTEXT, new Date()).includes("Tienda <news@tienda.example> 9 (tiene baja)"));
 });
+
+test("WEB-40: Gmail errors say what Google said, not a generic message", async () => {
+  const { explainGmailError, fetchSnapshot: snap } = await import("../core/gmail.js");
+  const disabled = { error: { code: 403, status: "PERMISSION_DENIED", message: "Gmail API has not been used in project 123 before or it is disabled.", details: [{ "@type": "type.googleapis.com/google.rpc.ErrorInfo", reason: "SERVICE_DISABLED" }] } };
+  assert.equal(explainGmailError(403, disabled).code, "api-disabled");
+  assert.ok(explainGmailError(403, disabled).message.includes("has not been used"));
+  const scope = { error: { code: 403, status: "PERMISSION_DENIED", message: "Request had insufficient authentication scopes.", details: [{ reason: "ACCESS_TOKEN_SCOPE_INSUFFICIENT" }] } };
+  assert.equal(explainGmailError(403, scope).code, "scope");
+  assert.equal(explainGmailError(403, { error: { errors: [{ reason: "insufficientPermissions" }] } }).code, "scope");
+  assert.equal(explainGmailError(401, null).code, "auth");
+  assert.equal(explainGmailError(429, null).code, "rate");
+  assert.equal(explainGmailError(500, { error: { message: "Backend Error" } }).message, "Gmail respondió 500 (Google: Backend Error)");
+  await assert.rejects(snap("t", async () => ({ ok: false, status: 403, json: async () => disabled })), (e) => e.code === "api-disabled" && e.status === 403);
+});

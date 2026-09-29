@@ -21,14 +21,14 @@ import { putImage, getImage, clearImages } from "./core/imagestore.js";
 import { readChatgptExport, search as archiveSearch, stats as archiveStats, chatToDoc, staleChat } from "./core/archive.js";
 import { putDocs, allDocs, clearArchive } from "./core/archivestore.js";
 import { findExcerpts, askPayload, profileDigest, profilePayload, memoryContext } from "./core/recall.js";
-import { weatherEmoji, sceneFor, PARTICLES, SHAPES, MONEY_EMOJI } from "./core/scene.js";
+import { weatherEmoji, sceneFor, PARTICLES, SHAPES, MONEY_EMOJI, dayPhase, cityMinutes } from "./core/scene.js";
 import { buildImagePayload, buildLinkPayload, isGeminiKey, mayGo, setSensitiveOk, sensitiveAllowed, pickModel, listModels, buildActionPayload, askWithActions, issueUrl } from "./core/ai.js";
 import { encryptBackup, decryptBackup, passphraseProblem } from "./core/crypto.js";
 import { isSpotifyClientId, pkceValid, randomVerifier, challengeFor, authorizeUrl, exchangeCode, refreshTokens, listDevices, findSpeaker, transferTo, DEFAULT_SPEAKER } from "./core/spotify.js";
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "39";
+export const APP_VERSION = "40";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -58,7 +58,7 @@ let viewImageId = null;
 let chatImage = null; // screenshot attached in the MANU chat (not sent until «Enviar a Gemini»)
 let openProject = null; // id of the project being viewed
 let projSourceKind = "note";
-const gcal = { tokens: {}, busy: false, error: null };
+const gcal = { tokens: {}, busy: false, error: null, consentError: null };
 let confirmDriveRestore = null;
 // Gemini key: never in the vault (so never in exports or backups). By default it
 // lives only for this session; "Recordar" keeps it in this device's storage,
@@ -221,6 +221,8 @@ function syncAnimations(root) {
     el.style.animationDelay = `${(Number(base) - (t % period)).toFixed(3)}s`;
   });
 }
+// WEB-40: dawn/day/dusk/night from the city's real sunrise and sunset.
+const phaseOf = (f) => (f?.today ? dayPhase(cityMinutes(Date.now(), f.offset), f.today.sunrise, f.today.sunset) : null);
 function currentWeather() {
   const city = activeCity();
   return vault.weather && vault.weather.city?.name === city.name ? vault.weather : null;
@@ -242,7 +244,7 @@ function weatherCard() {
   const f = w.data;
   const age = Math.round((Date.now() - new Date(w.at).getTime()) / 60000);
   const scene = sceneFor(f.now.icon, f.today);
-  return `<section class="card hero scene-card sc-${scene}" aria-label="Tiempo en ${esc(city.name)}">
+  return `<section class="card hero scene-card sc-${scene}${phaseOf(f) ? ` ph-${phaseOf(f)}` : ""}" aria-label="Tiempo en ${esc(city.name)}">
     ${sceneLayer(scene)}
     <button class="hero-tap" data-act="weather-open" aria-label="Ver el tiempo completo"></button>
     <div class="row"><h2>${esc(city.name)}</h2><span class="muted small">${age < 2 ? "ahora" : `hace ${age} min`} ›</span></div>
@@ -812,7 +814,8 @@ const subpages = {
     const m = vault.mail;
     const when = m?.syncedAt ? new Date(m.syncedAt).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }) : null;
     return `${backBar("Correo")}
-      <div class="btns"><button class="btn ghost" data-act="gcal-sync">${gcal.busy ? "Actualizando…" : "Actualizar"}</button></div><p class="muted small">${when ? `Leído a las ${when} · últimos 30 días` : "Aún sin leer: toca «Actualizar»."}${gcal.error ? ` · ${esc(gcal.error)}` : ""}</p>
+      <div class="btns"><button class="btn ghost" data-act="gcal-sync">${gcal.busy ? "Actualizando…" : "Actualizar"}</button></div><p class="muted small">${when ? `Leído a las ${when} · últimos 30 días` : "Aún sin leer: toca «Actualizar»."}</p>
+      ${gmailErrorCard()}
       ${mailCards()}
       ${m ? `${sectionTitle("Importantes sin leer")}<section class="card">${m.important.length ? m.important.map((x) => `<a class="row" href="${esc(messageUrl(x.id))}" target="_blank" rel="noopener"><div class="grow"><div>${esc(x.name)}</div><div class="muted small">${esc(x.subject || "(sin asunto)")}</div></div><span class="chev">${I.chev}</span></a>`).join("") : '<p class="muted">Nada importante sin leer en los últimos 3 días. 🌿</p>'}</section>
       ${sectionTitle("Quién te escribe más")}<section class="card">${m.senders.length ? m.senders.slice(0, 15).map((x) => `<div class="stack mail-sender"><div class="row"><div class="grow"><div>${esc(x.name)}</div><div class="muted small">${esc(x.email)} · ${x.count} en 30 días${x.unread ? ` · ${x.unread} sin leer` : ""}</div></div></div><div class="btns">${x.unsub ? `<button class="btn small-btn" data-act="mail-do" data-kind="unsub" data-email="${esc(x.email)}">Baja</button>` : ""}<button class="btn ghost small-btn" data-act="mail-do" data-kind="archive" data-email="${esc(x.email)}">Archivar</button><button class="btn ghost small-btn" data-act="mail-do" data-kind="label" data-email="${esc(x.email)}">Etiquetar</button><button class="btn ghost small-btn" data-act="mail-do" data-kind="trash" data-email="${esc(x.email)}">Papelera</button></div></div>`).join("") : '<p class="muted">Sin newsletters ni avisos masivos.</p>'}</section>
@@ -1026,6 +1029,33 @@ function sheetHtml() {
 // ---------- Render ----------
 // ---------- Motion (QAL/animate rules: ease-out entrances, <300ms UI, reduced motion) ----------
 const reduceMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+// WEB-40: whether the chat should keep following its end.
+let chatPinned = true, autoScrollUntil = 0;
+const pageScroller = () => document.scrollingElement ?? document.documentElement;
+function chatAtEnd() {
+  const s = pageScroller();
+  const vh = window.visualViewport?.height ?? window.innerHeight;
+  return s.scrollHeight - (s.scrollTop + vh) < 160;
+}
+function scrollChatToEnd(smooth = false) {
+  autoScrollUntil = Date.now() + (smooth ? 700 : 150);
+  window.scrollTo({ top: pageScroller().scrollHeight, behavior: smooth && !reduceMotion() ? "smooth" : "auto" });
+}
+window.addEventListener("scroll", () => {
+  if (tab !== "manu" || document.body.classList.contains("kb") || Date.now() < autoScrollUntil) return;
+  chatPinned = chatAtEnd();
+}, { passive: true });
+// The chat keeps growing after a redraw (entry animation, «Pensando…» turning
+// into the answer). While Manu follows the conversation, stay at the end.
+let lastScreenHeight = 0;
+if (typeof ResizeObserver === "function") {
+  new ResizeObserver(() => {
+    const h = document.getElementById("screen")?.scrollHeight ?? 0;
+    const grew = h > lastScreenHeight;
+    lastScreenHeight = h;
+    if (grew && tab === "manu" && chatPinned && !document.body.classList.contains("kb")) scrollChatToEnd(false);
+  }).observe(document.getElementById("screen") ?? document.body);
+}
 let lastChatLength = 0;
 let renderedSheetKind = null;
 
@@ -1094,6 +1124,9 @@ function keyboardMode() {
   document.body.classList.toggle("kb", open);
   placeComposer();
   if (open && !was && tab === "manu") $("chat")?.lastElementChild?.scrollIntoView({ block: "end" });
+  // WEB-40: when the keyboard goes away, iOS leaves the page shifted; if Manu
+  // was following the conversation, bring back the end (twice: iOS animates).
+  if (!open && was && tab === "manu" && chatPinned) { setTimeout(() => scrollChatToEnd(false), 60); setTimeout(() => scrollChatToEnd(false), 360); }
 }
 // iOS keeps the layout viewport full height under the keyboard, so a sticky
 // composer ends up hidden behind it (or floating mid-screen). With the
@@ -1156,6 +1189,8 @@ function render({ focus = false, enter = null } = {}) {
   celebrateMoney = Boolean(enter) && tab === "dinero" && !overlay && !reduceMotion();
   const w = currentWeather();
   if (w?.data?.now) document.body.dataset.wx = sceneFor(w.data.now.icon, w.data.today); else delete document.body.dataset.wx;
+  const phase = w?.data ? phaseOf(w.data) : null;
+  if (phase) document.body.dataset.sky = phase; else delete document.body.dataset.sky;
   document.body.dataset.screen = overlay === "weather" ? "weather" : tab; // not data-tab: that attribute marks the tab buttons
   // Full-screen living background: the weather scene behind Hoy and the weather
   // page. Rebuilt only when it changes, so the animation never restarts on render.
@@ -1205,9 +1240,16 @@ function render({ focus = false, enter = null } = {}) {
   if (tab === "manu") {
     const chat = $("chat");
     const count = chat?.children.length ?? 0;
-    if (count > lastChatLength && lastChatLength > 0 && !reduceMotion()) [...chat.children].slice(lastChatLength - count).forEach((b) => b.classList.add("pop"));
+    const grew = count > lastChatLength && lastChatLength > 0;
+    if (grew && !reduceMotion()) [...chat.children].slice(lastChatLength - count).forEach((b) => b.classList.add("pop"));
+    const entering = lastChatLength === 0 || enter === "tab";
+    const mine = chat?.lastElementChild?.classList.contains("me");
     lastChatLength = count;
-    chat?.lastElementChild?.scrollIntoView({ block: "end", behavior: reduceMotion() ? "auto" : "smooth" });
+    // WEB-40: follow the end only when opening the chat, after Manu writes, or
+    // while he is already at the end; never while he reads older messages.
+    if (entering) { chatPinned = true; scrollChatToEnd(false); }
+    else if (grew && mine) { chatPinned = true; scrollChatToEnd(true); }
+    else if (chatPinned) scrollChatToEnd(grew);
   } else lastChatLength = 0;
   if (focus) $("screen").focus();
 }
@@ -1218,7 +1260,7 @@ function go(newTab) {
   overlay = null;
   sessionStorage.setItem("manuos.tab", tab);
   render({ focus: true, enter: "tab" });
-  scrollTo(0, 0);
+  if (tab !== "manu") scrollTo(0, 0); // the chat opens at its end (WEB-40)
   if (tab === "hoy") refreshWeather();
   syncOnOpen();
 }
@@ -1705,6 +1747,21 @@ document.addEventListener("input", (e) => {
 });
 
 // ---------- Gmail (WEB-33) ----------
+// WEB-40: when Gmail fails, the exact reason and what Manu has to do.
+const GMAIL_FIX = {
+  "api-disabled": ["Abre console.cloud.google.com/apis/library/gmail.googleapis.com", "Arriba, elige el proyecto de MANU (el mismo del Calendar)", "Pulsa «Habilitar» y espera un minuto", "Vuelve aquí y pulsa «Actualizar»"],
+  scope: ["Pulsa «Reconectar Gmail»", "En la ventana de Google, marca la casilla de Gmail («leer, redactar y enviar…»)", "Si no aparece, en Google Cloud → Google Auth Platform → Acceso a datos, añade el permiso …/auth/gmail.modify y vuelve a reconectar"],
+  "no-scope": ["Pulsa «Reconectar Gmail»", "En la ventana de Google, marca la casilla de Gmail", "Si no aparece, en Google Cloud → Google Auth Platform → Acceso a datos, añade el permiso …/auth/gmail.modify"],
+  denied: ["En Google Cloud → Google Auth Platform → Público: el estado debe ser «Prueba» y tu cuenta debe estar en «Usuarios de prueba»", "En «Acceso a datos», añade el permiso …/auth/gmail.modify", "Vuelve aquí y pulsa «Reconectar Gmail». Si Google avisa de «app no verificada», entra en «Configuración avanzada» → «Ir a MANU»"],
+  auth: ["Pulsa «Actualizar» otra vez"],
+  rate: ["Espera un minuto y pulsa «Actualizar»"],
+};
+function gmailErrorCard() {
+  const e = vault.settings.googleErrors?.gmail;
+  if (!e) return "";
+  const steps = GMAIL_FIX[e.code] ?? ["Pulsa «Reconectar Gmail»", "Si sigue fallando, mándale a Claude una captura de este mensaje"];
+  return `<section class="card mail-error"><h2>⚠️ Gmail no ha funcionado</h2><p class="small">${esc(e.message)}</p><ol class="small">${steps.map((s) => `<li>${esc(s)}</li>`).join("")}</ol><div class="btns"><button class="btn" data-act="mail-reconnect">Reconectar Gmail</button></div></section>`;
+}
 const mailSeen = () => vault.settings.mailSeen ?? [];
 function markMailSeen(key) { if (key) vault.settings.mailSeen = [...new Set([...mailSeen(), key])].slice(-300); }
 const senderName = (email) => vault.mail?.senders?.find((s) => s.email === email)?.name ?? email;
@@ -1757,8 +1814,22 @@ async function mailUndo(u) {
 
 // «¿De quién me llegan más correos?», «dame de baja de X», «archiva los de X».
 function mailCommand(text) {
-  if (!googleOn("gmail") || !vault.mail) return null;
   const t = normalise(text);
+  // Only questions about Manu's mail; «apunta idea: mandar un correo a…» is not one.
+  const aboutMail = /(correo|correos|mail|mails|email|emails|gmail)/.test(t)
+    && !/^(apunta|anota|recuerdame|recordatorio|gaste|he gastado|idea|pon una alarma)/.test(t)
+    && /(\?|^(que|cuales|quien|quienes|cuantos|tengo|hay|dame|desuscrib|archiva|a la papelera|borra|elimina|quitame)|me (han )?(llegado|llegaron|escribe|escriben)|nuevos|importantes|sin leer)/.test(t);
+  // WEB-40: never let a mail question fall through to an AI that knows nothing.
+  if (aboutMail && !googleOn("gmail")) return { text: "Gmail no está conectado. Conéctalo en Tú → Correo y te cuento qué te llega." };
+  if (aboutMail && !vault.mail) return { text: vault.settings.googleErrors?.gmail ? `Aún no he podido leer tu correo: ${vault.settings.googleErrors.gmail.message} Tienes los pasos en Tú → Correo.` : "Aún no he leído tu correo. Pulsa «Actualizar» en Tú → Correo." };
+  if (!googleOn("gmail") || !vault.mail) return null;
+  if (aboutMail && /(que|cuales|nuevos|ultimos|recientes|hoy|llegado|llegaron|tengo|hay|importantes|sin leer)/.test(t) && !/(quien|quienes|remitentes|mas|muchos|baja|archiv|papelera|borra|etiquet)/.test(t)) {
+    const m = vault.mail;
+    const imp = m.important.slice(0, 6);
+    const top = m.senders.slice(0, 3);
+    const when = m.syncedAt ? new Date(m.syncedAt).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }) : "?";
+    return { text: `${imp.length ? `Importantes sin leer: ${imp.map((x) => `${x.name} — «${x.subject || "sin asunto"}»`).join("; ")}.` : "No tienes correos importantes sin leer de los últimos 3 días."}${top.length ? ` Lo que más te llega: ${top.map((s) => `${s.name} (${s.count})`).join(", ")}.` : ""} (Leído a las ${when}; en Tú → Correo puedes actualizar.)` };
+  }
   if (/(correo|mail|email)/.test(t) && /(quien|quienes|cuales|remitentes|mas|muchos)/.test(t) && !/(baja|archiv|papelera|borra|etiquet)/.test(t)) {
     const top = vault.mail.senders.slice(0, 6);
     return { text: top.length ? `En los últimos 30 días, quien más te escribe: ${top.map((s) => `${s.name} (${s.count})`).join(", ")}. Dime «dame de baja de …», «archiva los de …» o «a la papelera los de …».` : "No veo newsletters ni avisos masivos en los últimos 30 días." };
@@ -1840,6 +1911,7 @@ document.addEventListener("click", async (e) => {
     case "profile-cancel": archive.editProfile = false; render(); break;
     case "profile-delete": if (window.confirm("¿Borrar tu perfil?")) { delete vault.profile; persist(); render(); toast("Perfil borrado"); } break;
     case "archive-clear": if (window.confirm("¿Borrar todo tu archivo de este iPhone? No se puede deshacer.")) { clearArchive().then(() => { archive.docs = null; archive.stats = null; archive.results = null; render(); toast("Archivo borrado"); }); } break;
+    case "mail-reconnect": delete gcal.tokens[SCOPE.gmail]; gcal.consentError = null; vault.settings.google = { ...(vault.settings.google ?? {}), gmail: true }; persist(); syncGoogle(); break;
     case "mail-connect": vault.settings.google = { ...(vault.settings.google ?? {}), gmail: true }; persist(); syncGoogle(); break;
     case "mail-seen": markMailSeen(a.dataset.k); persist(); render(); break;
     case "mail-do": {
@@ -2206,12 +2278,13 @@ async function googleConsent(scopes) {
       scope: missing.join(" "),
       include_granted_scopes: false,
       callback: (resp) => {
-        if (resp.error || !resp.access_token) { reject(new Error("Permiso no concedido")); return; }
+        if (resp.error || !resp.access_token) { gcal.consentError = { code: resp.error ?? "sin_token", description: resp.error_description ?? null }; reject(Object.assign(new Error(`Google no dio el permiso (${resp.error ?? "sin token"})`), { code: "consent" })); return; }
+        gcal.consentError = null;
         const granted = missing.filter((sc) => google.accounts.oauth2.hasGrantedAllScopes(resp, sc));
         for (const sc of granted) gcal.tokens[sc] = { token: resp.access_token, expires: Date.now() + (Number(resp.expires_in) || 3600) * 1000 };
         resolve(granted);
       },
-      error_callback: () => reject(new Error("Se cerró la ventana de Google")),
+      error_callback: (err) => { gcal.consentError = { code: err?.type ?? "popup_closed", description: null }; reject(Object.assign(new Error("Se cerró la ventana de Google"), { code: "consent" })); },
     });
     client.requestAccessToken({ prompt: "" });
   });
@@ -2224,11 +2297,16 @@ async function googleToken(scope) {
   return t.token;
 }
 
-// Never opens a window: used inside a sync, after googleConsent.
+// Never opens a window: used inside a sync, after googleConsent. When the
+// permission is missing it says why (WEB-40), instead of a generic «no».
 function cachedToken(scope) {
   const t = gcal.tokens[scope];
   if (t && Date.now() < t.expires - 60000) return Promise.resolve(t.token);
-  return Promise.reject(new Error("Permiso no concedido"));
+  const name = GOOGLE_FEATURES.find(([k]) => SCOPE[k] === scope)?.[1] ?? "este servicio";
+  const why = gcal.consentError
+    ? `Google no dio el permiso de ${name} (${gcal.consentError.code}${gcal.consentError.description ? `: ${gcal.consentError.description}` : ""})`
+    : `En la ventana de Google no se concedió el permiso de ${name}`;
+  return Promise.reject(Object.assign(new Error(why), { code: gcal.consentError?.code === "access_denied" ? "denied" : "no-scope" }));
 }
 
 async function withRetry(scope, fn) {
@@ -2290,8 +2368,11 @@ async function syncGoogle({ silent = false, quiet = false } = {}) {
   } else {
     try { await googleConsent(wanted); } catch { /* each service reports its own missing permission */ }
   }
-  const status = await runServices(services, enabled, cachedToken);
+  const errors = {};
+  const status = await runServices(services, enabled, cachedToken, errors);
   vault.settings.googleStatus = { ...(vault.settings.googleStatus ?? {}), ...status };
+  vault.settings.googleErrors = { ...(vault.settings.googleErrors ?? {}), ...errors };
+  for (const k of Object.keys(status)) if (!status[k].startsWith("error")) delete vault.settings.googleErrors[k];
   if (status.calendar?.startsWith("ok")) vault.settings.gcalSyncedAt = new Date().toISOString();
   const failed = Object.values(status).filter((v) => v.startsWith("error"));
   gcal.error = failed.length ? failed.map((v) => v.replace(/^error: /, "")).join(" · ") : null;
@@ -2299,7 +2380,9 @@ async function syncGoogle({ silent = false, quiet = false } = {}) {
   persist();
   if (silent) { if (!sheet && !document.activeElement?.matches("input, textarea")) render(); return; }
   render();
-  if (!quiet || failed.length) toast(failed.length ? "Google: algo no se ha sincronizado" : "Google sincronizado");
+  // WEB-40: say which service failed and Google's reason, never a generic message.
+  const failedNames = Object.keys(errors).map((k) => GOOGLE_FEATURES.find(([f]) => f === k)?.[1] ?? k);
+  if (!quiet || failed.length) toast(failed.length ? `No se ha sincronizado ${failedNames.join(" y ")}: ${Object.values(errors)[0].message}` : "Google sincronizado");
 }
 
 const validToken = (scope) => { const t = gcal.tokens[scope]; return Boolean(t && Date.now() < t.expires - 60000); };
