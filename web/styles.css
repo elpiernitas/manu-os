@@ -540,3 +540,9 @@ body.kb::after { top: auto; bottom: calc(100% - var(--kb-bottom, 100%)); height:
 .chat > * { scroll-margin-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px) + 100px); }
 /* The «M» is a little larger than the icons; keep every label on the same line. */
 .tab .dot { width: 26px; height: 26px; margin-block: -2px; font-size: 14px; }
+/* ---------- WEB-31: páginas cortas en la app instalada de iOS ---------- */
+/* With «black-translucent», iOS lays out a document shorter than the screen as
+   if it were one status bar shorter: the tab bar rises and a black band shows
+   below. Every page is at least the full screen tall, like the long ones. */
+html { min-height: calc(100% + env(safe-area-inset-top, 0px)); background: var(--bg); }
+.app { min-height: 100dvh; box-sizing: border-box; }
