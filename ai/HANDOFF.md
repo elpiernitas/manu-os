@@ -10,6 +10,32 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
+## WEB-24 — el calendario se actualiza al abrir Agenda u Hoy; la hoja cabe con el teclado
+
+Capturas de Manu (2026-09-29): «quiero que el calendar se actualice siempre», con la última sincronización a la 01:10. Además, con el teclado abierto, la hoja «+» perdía su parte de arriba (el título y la ✕).
+
+### Límites comprobados
+
+- Sin servidor, el permiso de Google dura aproximadamente una hora y en iOS solo se renueva dentro de un toque. La dirección iCal secreta de Google Calendar no sirve: su respuesta no lleva cabeceras CORS, comprobado con curl, así que la web no puede leerla.
+
+### Cambios
+
+- `web/app.js`:
+  - `syncOnOpen`: al tocar Agenda u Hoy, si han pasado más de 10 minutos, sincroniza en silencio si el permiso sigue vigente y, si ha caducado, lo renueva con ese mismo toque. Nunca se abre ninguna ventana de Google solo por abrir la app;
+  - el interruptor «Actualizar al abrir Agenda u Hoy» en Tú → Google está activado por defecto;
+  - `fitSheet` ajusta la hoja al área visible (`visualViewport`) cuando sale el teclado, y la cabecera de la hoja queda fija;
+  - versión 24.
+
+### Resultados
+
+- `npm test`: 96/96 PASS.
+- Chromium con GIS y Calendar simulados: 8 checks en PASS (al abrir la app no pasa nada; el toque en Agenda renueva y sincroniza con una ventana; no repite antes de 10 min; con el permiso vigente sincroniza sin ventana; cuando caduca, el toque lo renueva; el interruptor lo desactiva; con el área visible reducida se ven el título y la ✕).
+- Todos los recorridos anteriores en PASS. El de WEB-13 se actualizó al comportamiento nuevo: ahora entrar en Agenda ya sincroniza.
+
+### NO_VERIFICADO
+
+- En el iPhone: si la ventana de Google aparece un instante o pide elegir la cuenta al renovar el permiso.
+
 ## WEB-23 — capturas y enlaces (TikTok, YouTube, reels)
 
 Manu (2026-09-29): quiere añadir capturas para guardarlas como notas y para que la IA las lea, y compartir vídeos de TikTok o reels para que MANU «saque la info y la meta donde debería».
