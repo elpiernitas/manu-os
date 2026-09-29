@@ -2,11 +2,11 @@
 
 Status: **REVIEW_PENDING**
 
-WEB-42 y WEB-43 implementados por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
+WEB-44 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
 
 ## Tarea activa
 
-WEB-42 — aviso falso de la exportación de ChatGPT, y WEB-43 — buzón de Atajos (Apple Pay, Salud y ubicación) (`ai/HANDOFF.md`, «WEB-42» y «WEB-43»).
+WEB-44 — copia completa cifrada: vault, imágenes, Tu archivo y diario (`ai/HANDOFF.md`, «WEB-44»).
 
 ## Autorización
 
@@ -21,6 +21,7 @@ WEB-42 — aviso falso de la exportación de ChatGPT, y WEB-43 — buzón de Ata
 - 2026-09-29: Manu pide quitar el «+» y que Agenda no espere a verificar Google al abrir. Esto sustituye la conducta de WEB-24.
 - 2026-09-29: Manu decide «que lo sensible vaya a la IA me da igual». Se implementa con un interruptor en su dispositivo; secretos, crisis y Refugio siguen sin enviarse.
 - 2026-09-29: Manu pide hablar con MANU «como si fuera Gemini integrado, que lo sepa todo y lo maneje él». Se implementa como un modo que Manu activa, con las categorías sensibles solo si él las marca.
+- 2026-09-29: Manu acepta «todo»: la copia completa cifrada (WEB-44, con `backup-manager.js`) y después el borrador del chat, el tiempo y Gmail (WEB-45).
 - 2026-09-29: **cambio de gobernanza decidido por Manu.** El orquestador (ChatGPT/Codex) ya no revisa automáticamente, porque frenaba el avance. Claude Code fusiona los PR web cuando `npm test` y los dos workflows remotos están en verde y no hay conflictos. Cuando haga falta una revisión, Claude Code prepara un prompt, Manu se lo pasa a ChatGPT y le devuelve la respuesta; los defectos se corrigen en un PR nuevo con su regresión. Los PR #7, #8 y #9 siguen en borrador o pausa.
 
 ## Alcance autorizado
@@ -47,6 +48,7 @@ WEB-42 — aviso falso de la exportación de ChatGPT, y WEB-43 — buzón de Ata
 
 ## Historial (cerrado)
 
+- **WEB-42/43** (aviso de la exportación de ChatGPT y buzón de Atajos): CERRADAS. Fusionadas mediante el PR #50 (`f268c32`).
 - **WEB-41** (Tu diario): CERRADA. Fusionada mediante el PR #49 (`8aa480a`).
 - **WEB-40** (chat, luz del día y Gmail): CERRADA. Fusionada mediante el PR #48 (`4bc7841`).
 - **WEB-39** (Refugio limpio): CERRADA. Fusionada mediante el PR #47 (`4572d06`).

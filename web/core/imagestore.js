@@ -1,5 +1,5 @@
 // Screenshots attached to items live only on this device, in IndexedDB
-// (localStorage is too small). They are not in exports or Drive backups.
+// (localStorage is too small). Only the full copy (WEB-44) includes them.
 const DB = "manuos-images", STORE = "images";
 
 function open(idb = globalThis.indexedDB) {

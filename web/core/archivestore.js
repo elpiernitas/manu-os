@@ -1,5 +1,5 @@
 // «Tu archivo» lives only on this device, in IndexedDB (too big for
-// localStorage). Not in the vault, exports or Drive backups.
+// localStorage). Not in the vault; only the full copy (WEB-44) includes it.
 const DB = "manuos-archive", STORE = "docs";
 
 function open(idb = globalThis.indexedDB) {
