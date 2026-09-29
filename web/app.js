@@ -25,6 +25,7 @@ import { diaryDocs, dayLines, dayFromText, isDiaryQuestion, dayTitle } from "./c
 import { applyBuzon, buzonSummary } from "./core/buzon.js";
 import { briefing, briefingText, isBriefingQuestion } from "./core/briefing.js";
 import { budgetStatus, budgetLine, budgetCommand } from "./core/budget.js";
+import { findInVault, findCommand } from "./core/find.js";
 import { weatherEmoji, sceneFor, PARTICLES, SHAPES, MONEY_EMOJI, dayPhase, cityMinutes } from "./core/scene.js";
 import { buildImagePayload, buildLinkPayload, isGeminiKey, mayGo, setSensitiveOk, sensitiveAllowed, pickModel, listModels, buildActionPayload, askWithActions, issueUrl } from "./core/ai.js";
 import { encryptBackup, decryptBackup, passphraseProblem, isEnvelope } from "./core/crypto.js";
@@ -33,7 +34,7 @@ import { isSpotifyClientId, pkceValid, randomVerifier, challengeFor, authorizeUr
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "47";
+export const APP_VERSION = "48";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -237,6 +238,22 @@ function currentWeather() {
 let celebrateMoney = false; // short money shower, only when entering Dinero
 const moneyRain = () => `<div class="money-rain" aria-hidden="true">${Array.from({ length: 12 }, (_, i) => `<i>${MONEY_EMOJI[i % MONEY_EMOJI.length]}</i>`).join("")}</div>`;
 const catLabel = (c) => `${CATEGORY_EMOJI[c] ?? "📦"} ${CATEGORIES[c] ?? c}`;
+
+// ---------- Buscar en todo (WEB-48) ----------
+// Vault + «Tu archivo» and diary (if already loaded; they load at start).
+let findQ = "";
+function findEverywhere(q, limit = 30) {
+  const local = findInVault(vault, q, { limit });
+  const docs = archive.docs ?? [];
+  const arch = docs.length ? archiveSearch(docs, q, { limit: 8 }).map((r) => ({ kind: r.doc.source === "diario" ? "Diario" : "Archivo", icon: r.doc.source === "diario" ? "📔" : r.doc.source === "manu" ? "💬" : "🗂️", title: r.doc.title, detail: r.snippet, at: new Date(r.doc.at).toISOString(), go: { sub: "archivo" } })) : [];
+  return [...local, ...arch].slice(0, limit);
+}
+function findCard() {
+  const res = findQ ? findEverywhere(findQ) : [];
+  const goAttr = (g) => (g.project ? `data-act="find-go" data-project="${esc(g.project)}"` : g.sub ? `data-sub-go="${esc(g.sub)}"` : `data-act="find-go" data-tab="${esc(g.tab)}"`);
+  return `<section class="card find"><form id="findForm" class="composer-inline" role="search"><label for="findQ" class="sr">Buscar en todo</label><input id="findQ" type="search" placeholder="🔎 Buscar en todo (ideas, gastos, personas…)" value="${esc(findQ)}" autocomplete="off" enterkeyhint="search"><button class="btn" type="submit">Buscar</button></form>
+    ${findQ ? (res.length ? `<p class="muted small">${res.length === 30 ? "Los 30 más recientes" : `${res.length} resultado${res.length === 1 ? "" : "s"}`} para «${esc(findQ)}»</p>${res.map((x) => `<button class="row find-row" ${goAttr(x.go)}><span aria-hidden="true">${esc(x.icon)}</span><span class="grow"><span>${esc(x.title)}</span><br><span class="muted small">${esc(x.detail)}</span></span><span class="chev">${I.chev}</span></button>`).join("")}<button class="link small" data-act="find-clear">Borrar búsqueda</button>` : `<p class="muted small">No encuentro «${esc(findQ)}» en MANU. <button class="link small" data-act="find-clear">Borrar</button></p>`) : ""}</section>`;
+}
 
 // ---------- Presupuestos (WEB-47) ----------
 const budgetsNow = () => budgetStatus(vault.spending, vault.settings.budgets ?? {}, today());
@@ -808,6 +825,7 @@ const screens = {
     const hs = healthSummary(vault.health);
     const item = (key, icon, color, title, detail) => `<button class="item" data-sub="${key}"><span class="ico ${color}">${I[icon]}</span><span class="grow"><span>${title}</span><br><span class="muted small">${esc(detail)}</span></span><span class="chev">${I.chev}</span></button>`;
     return `<div class="row"><div class="avatar" aria-hidden="true">M</div><div class="grow"><h1>Manu</h1><p class="muted">${esc(longDate())}</p></div></div>
+      ${findCard()}
       ${setupCard()}
       ${sectionTitle("¿Cómo estás hoy?")}
       <section class="card"><div class="mood">${MOODS.map((m) => `<button data-act="mood" data-v="${m.value}" aria-pressed="${mood === m.value}" aria-label="${m.label}"><b class="mood-e" aria-hidden="true">${m.emoji}</b>${m.label}</button>`).join("")}</div>
@@ -1427,6 +1445,19 @@ function say(text) {
       persist(); render();
     });
     persist(); render(); return;
+  }
+  // WEB-48: «busca lisboa», «¿dónde apunté lo del alquiler?». Nothing found →
+  // the message goes on (to the AI if it is on), never a dead end.
+  const fq = findCommand(clean);
+  if (fq) {
+    const found = findEverywhere(fq, 8);
+    if (found.length) {
+      vault.chat.push({ from: "me", text: clean, at }, { from: "manu", at, text: `Sobre «${fq}» tengo:
+${found.map((x) => `${x.icon} ${x.title} — ${x.detail}`).join("\n")}
+
+También puedes buscar en Tú → 🔎.` });
+      persist(); render(); return;
+    }
   }
   // Mail (WEB-33): «¿de quién me llegan más correos?», «dame de baja de X».
   const mail = mailCommand(clean);
@@ -2141,6 +2172,8 @@ document.addEventListener("click", async (e) => {
     case "notify-on": await enableNotifications(); render(); break;
     case "notify-test": if (!(await testNotification())) toast("No se ha podido mostrar el aviso."); break;
     case "export": exportBackup(); break;
+    case "find-clear": findQ = ""; render(); break;
+    case "find-go": if (a.dataset.project) { openProject = a.dataset.project; go("proyectos"); } else go(a.dataset.tab); break;
     case "budget-del": { const b = { ...(vault.settings.budgets ?? {}) }; delete b[a.dataset.cat]; vault.settings.budgets = b; persist(); render(); break; }
     case "full-restore-yes": doFullRestore(); break;
     case "full-restore-no": full.pending = null; render(); break;
@@ -2285,6 +2318,10 @@ document.addEventListener("submit", async (e) => {
     persist(); render(); toast("Persona guardada");
     if (toCalendar) addBirthdayToCalendar(person.id);
     return;
+  }
+  if (f === "findForm") {
+    findQ = $("findQ").value.trim().slice(0, 100);
+    await archiveDocs(); render(); $("findQ")?.blur(); return;
   }
   if (f === "budgetForm") {
     const cat = $("budgetCat").value, cents = toCents($("budgetAmount").value.replace(/[€\s]/g, ""));

@@ -10,6 +10,39 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
+## WEB-48 — «Buscar en todo»
+
+Tercera mejora del análisis (idea de memos y karakeep, sin copiar código): encontrar algo sin saber dónde se guardó.
+
+### Cambios
+
+- `web/core/find.js` (nuevo, puro):
+  - `findInVault` busca en ideas, tareas, gastos, ingresos, recordatorios, personas (y sus notas), proyectos y sus fuentes, comidas y el chat del día;
+  - todas las palabras deben aparecer, al inicio de una palabra, sin tildes ni mayúsculas;
+  - muestra primero lo más reciente, con el sitio al que lleva cada resultado;
+  - `findCommand` reconoce «busca …», «encuentra …» y «¿dónde apunté lo de …?», pero no «busca en mi archivo…», que sigue siendo del archivo.
+- `web/app.js`:
+  - Tú tiene arriba una caja «🔎 Buscar en todo». Los resultados incluyen Tu archivo y el diario, y al tocarlos llevan a su sitio (pestaña, subpágina o el proyecto abierto). La búsqueda se conserva al moverse y se puede borrar;
+  - en el chat, si encuentra algo contesta con la lista. Si no encuentra nada, el mensaje sigue su curso (por ejemplo, a la IA). El Refugio responde antes, así que su botón «buscar una solución» no es una búsqueda;
+  - versión 48.
+- `web/sw.js`: `core/find.js` y caché v48.
+
+### Resultados
+
+- `npm test`: 153/153 PASS (`find.test.js` con 3 tests).
+- e2e48: 9/9. Cubre:
+  - los resultados de distintos tipos;
+  - que un resultado abra su proyecto o Personas;
+  - que la búsqueda se conserve y se pueda borrar;
+  - el caso sin resultados;
+  - el chat («¿dónde apunté lo del taller?»), incluido el caso sin resultados;
+  - el Refugio.
+- Toda la batería e2e en PASS.
+
+### NO_VERIFICADO
+
+- En el iPhone real, con los datos reales de Manu.
+
 ## WEB-47 — presupuestos por categoría
 
 Segunda mejora del análisis (inspirada en actualbudget/actual, sin copiar código): saber si vas bien de dinero sin mirar gráficos.
