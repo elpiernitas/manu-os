@@ -21,6 +21,7 @@ import { putImage, getImage, clearImages } from "./core/imagestore.js";
 import { readChatgptExport, search as archiveSearch, stats as archiveStats, chatToDoc, staleChat } from "./core/archive.js";
 import { putDocs, allDocs, clearArchive } from "./core/archivestore.js";
 import { findExcerpts, askPayload, profileDigest, profilePayload, memoryContext } from "./core/recall.js";
+import { diaryDocs, dayLines, dayFromText, isDiaryQuestion, dayTitle } from "./core/diary.js";
 import { weatherEmoji, sceneFor, PARTICLES, SHAPES, MONEY_EMOJI, dayPhase, cityMinutes } from "./core/scene.js";
 import { buildImagePayload, buildLinkPayload, isGeminiKey, mayGo, setSensitiveOk, sensitiveAllowed, pickModel, listModels, buildActionPayload, askWithActions, issueUrl } from "./core/ai.js";
 import { encryptBackup, decryptBackup, passphraseProblem } from "./core/crypto.js";
@@ -28,7 +29,7 @@ import { isSpotifyClientId, pkceValid, randomVerifier, challengeFor, authorizeUr
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "40";
+export const APP_VERSION = "41";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -798,11 +799,12 @@ const subpages = {
     const d = (t) => (t ? new Date(t).toLocaleDateString("es-ES", { month: "short", year: "numeric" }) : "?");
     return `${backBar("Tu archivo")}
       <p class="subtitle">Tu memoria digital: lo que importes se queda solo en este iPhone. No va a GitHub, ni a las copias, ni a ninguna IA salvo que tú lo pidas.</p>
+      <section class="card"><h2>📔 Tu diario</h2><p>${s?.diary ? `<b>${s.diary}</b> días con algo apuntado. MANU los rellena solo con tus gastos, tareas, ideas, recordatorios, agenda, ánimo, hábitos, comidas y salud.` : "MANU irá guardando aquí un resumen de cada día con lo que apuntes."}</p><p class="muted small">Pregúntale «¿qué hice ayer?», «¿cuánto gasté el martes?» o «¿qué pasó el 12?».</p></section>
       <section class="card"><h2>ChatGPT</h2>
         ${s?.count ? `<p><b>${s.count}</b> conversaciones${s.manu ? ` (${s.count - s.manu} de ChatGPT y ${s.manu} con MANU)` : ""} · ${s.mine} mensajes tuyos · de ${esc(d(s.from))} a ${esc(d(s.to))}</p>` : '<p class="muted">Cuando te llegue el correo de ChatGPT, descarga el .zip y elígelo aquí (sin descomprimir). También vale el archivo conversations.json.</p>'}
         <label class="btn ${s?.count ? "ghost" : ""} block" for="archiveFile" role="button" tabindex="0">${archive.busy ? "Importando…" : s?.count ? "Volver a importar" : "Elegir la exportación de ChatGPT"}</label><input id="archiveFile" type="file" accept=".zip,.json,application/zip,application/json" class="sr">
         <p class="muted small">En ChatGPT: Ajustes → Controles de datos → Exportar datos. Llega un correo con el enlace.</p></section>
-      ${s?.count ? `<section class="card"><h2>Pregúntale a tu archivo</h2>${aiReady() ? `<form id="archiveAsk" class="composer-inline"><label for="archiveAskQ" class="sr">Pregunta</label><input id="archiveAskQ" placeholder="¿Qué me recomendaron para Lisboa?" autocomplete="off"><button class="btn" type="submit">${archive.asking ? "Pensando…" : "Preguntar"}</button></form><p class="muted small">MANU busca aquí en tu iPhone y solo envía a Gemini los trozos que tienen que ver. Crisis, Refugio y contraseñas nunca salen${sensitiveAllowed() ? "" : "; salud, dinero y ánimo tampoco (Tú → IA)"}.</p>` : '<p class="muted">Activa la IA (Tú → IA) para preguntarle. Buscar funciona sin IA.</p>'}
+      ${s?.count || s?.diary ? `<section class="card"><h2>Pregúntale a tu archivo</h2>${aiReady() ? `<form id="archiveAsk" class="composer-inline"><label for="archiveAskQ" class="sr">Pregunta</label><input id="archiveAskQ" placeholder="¿Qué me recomendaron para Lisboa?" autocomplete="off"><button class="btn" type="submit">${archive.asking ? "Pensando…" : "Preguntar"}</button></form><p class="muted small">MANU busca aquí en tu iPhone y solo envía a Gemini los trozos que tienen que ver. Crisis, Refugio y contraseñas nunca salen${sensitiveAllowed() ? "" : "; salud, dinero y ánimo tampoco (Tú → IA)"}.</p>` : '<p class="muted">Activa la IA (Tú → IA) para preguntarle. Buscar funciona sin IA.</p>'}
         ${archive.answer ? `<div class="stack"><p class="muted small">«${esc(archive.answer.q)}»</p><div class="bubble manu"><span class="ai-tag">IA</span>${esc(archive.answer.text)}</div>${archive.answer.sources.length ? `<p class="muted small">Fuentes: ${archive.answer.sources.map((x) => `[${x.n}] ${esc(x.title)} (${esc(x.date)})`).join(" · ")}</p>` : ""}</div>` : ""}</section>
       <section class="card"><h2>Tu perfil</h2>${vault.profile?.text ? `${archive.editProfile ? `<form id="profileForm" class="stack"><label for="profileText" class="sr">Tu perfil</label><textarea id="profileText" rows="14">${esc(vault.profile.text)}</textarea><div class="btns"><button class="btn" type="submit">Guardar</button><button class="btn ghost" type="button" data-act="profile-cancel">Cancelar</button></div></form>` : `<div class="profile-text">${esc(vault.profile.text)}</div><p class="muted small">Hecho con ${vault.profile.basedOn} conversaciones · ${esc(new Date(vault.profile.at).toLocaleDateString("es-ES", { day: "numeric", month: "long" }))}. Corrige lo que no sea verdad: MANU usa este perfil al hablar contigo.</p><div class="btns"><button class="btn ghost" data-act="profile-edit">Corregir</button><button class="btn ghost" data-act="profile-make">${archive.profiling ? "Creando…" : "Rehacer"}</button><button class="link small danger-link" data-act="profile-delete">Borrar</button></div>`}` : `<p class="muted">Un retrato de quién eres a partir de tus conversaciones: gustos, rutinas, personas, lo que te preocupa y tus metas. Lo puedes corregir.</p>${aiReady() ? `<button class="btn block" data-act="profile-make">${archive.profiling ? "Creando tu perfil…" : "Crear mi perfil con Gemini"}</button><p class="muted small">Se envían a Gemini los títulos de tus conversaciones y la primera frase tuya de cada una (hasta unas 40.000 letras), sin crisis, Refugio ni contraseñas.</p>` : '<p class="muted small">Activa la IA en Tú → IA para crearlo.</p>'}`}</section>
       <section class="card"><h2>Buscar en tu archivo</h2><form id="archiveSearch" class="composer-inline"><label for="archiveQ" class="sr">Buscar</label><input id="archiveQ" value="${esc(archive.query)}" placeholder="Lisboa, lentejas, trabajo…" autocomplete="off"><button class="btn" type="submit">Buscar</button></form>
@@ -1301,6 +1303,11 @@ function say(text) {
     render();
     return;
   }
+  // WEB-41: «¿qué hice ayer?», «¿cuánto gasté el martes?» from the diary.
+  if (isDiaryQuestion(clean)) {
+    vault.chat.push({ from: "me", text: clean, at }, { from: "manu", text: diaryAnswer(clean), at });
+    persist(); render(); return;
+  }
   // Profile and questions to the archive (WEB-35).
   if (whoAmI(clean)) {
     vault.chat.push({ from: "me", text: clean, at }, { from: "manu", at, text: vault.profile?.text ? `Esto es lo que sé de ti (lo puedes corregir en Tú → Tu archivo):\n\n${vault.profile.text}` : "Aún no tengo tu perfil. Importa tu exportación de ChatGPT y pulsa «Crear mi perfil» en Tú → Tu archivo." });
@@ -1465,7 +1472,11 @@ async function converse(message) {
   const history = vault.chat.slice(0, -1).filter((b) => !b.proposal);
   let contextText = buildContext(lifeSnapshot(), mode.context, today());
   // WEB-35: what MANU remembers from Manu's archive, only if he shares it.
-  if (mode.context.archive) { const mem = memoryContext(await archiveDocs(), message, { permit: mayGo }); if (mem) contextText += `\n${mem}`; }
+  if (mode.context.archive) {
+    const mem = memoryContext(await archiveDocs(), message, { permit: mayGo }); if (mem) contextText += `\n${mem}`;
+    const d = dayFromText(message, today()); // WEB-41: «el martes…» → that day's diary
+    if (d) { const lines = dayLines(vault, d, { calendar: vault.calendar?.days ?? null }).filter(mayGo); if (lines.length) contextText += `\nDIARIO del ${dayTitle(d)}: ${lines.join(" ")}`; }
+  }
   const payload = buildConversationPayload({ message, history, contextText, context: sensitiveAllowed() ? FULL_CONTEXT : mode.context, now: today(), autoActions: mode.autoActions });
   const answer = { from: "manu", text: "Pensando…", at: new Date(Date.now() + 1).toISOString(), ai: true, sentContext: Object.keys(mode.context).filter((k) => mode.context[k]) };
   vault.chat.push(answer);
@@ -1692,7 +1703,7 @@ async function makeProfile() {
   archive.profiling = false; render();
 }
 async function archiveDocs() {
-  if (!archive.docs) { try { archive.docs = await allDocs(); } catch { archive.docs = []; } archive.stats = { ...archiveStats(archive.docs), manu: archive.docs.filter((x) => x.source === "manu").length }; }
+  if (!archive.docs) { try { archive.docs = await allDocs(); } catch { archive.docs = []; } archive.stats = { ...archiveStats(archive.docs.filter((x) => x.source !== "diario")), manu: archive.docs.filter((x) => x.source === "manu").length, diary: archive.docs.filter((x) => x.source === "diario").length }; }
   return archive.docs;
 }
 archiveDocs().then(() => { if (archive.stats?.count && tab === "tu") render(); });
@@ -1707,8 +1718,19 @@ function startNewChat() {
   if (doc) putDocs([doc]).then(() => { archive.docs = null; return archiveDocs(); }).catch(() => {});
 }
 function newChatIfStale() { if (vault && staleChat(vault.chat) && !refuge) startNewChat(); }
-document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") newChatIfStale(); });
-setTimeout(newChatIfStale, 0);
+// WEB-41: «Tu diario», one archive document per day, rebuilt from the vault
+// when MANU opens (same ids, so it only updates). Only on this device.
+async function refreshDiary() {
+  if (!vault) return;
+  try { await putDocs(diaryDocs(vault, { calendar: vault.calendar?.days ?? null })); archive.docs = null; await archiveDocs(); } catch { /* IndexedDB unavailable: the diary simply waits */ }
+}
+function diaryAnswer(text) {
+  const day = dayFromText(text, today());
+  const lines = day ? dayLines(vault, day, { calendar: vault.calendar?.days ?? null }) : [];
+  return lines.length ? `El ${dayTitle(day)}:\n${lines.map((l) => `• ${l}`).join("\n")}` : `El ${dayTitle(day)} no tengo nada apuntado.`;
+}
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") { newChatIfStale(); refreshDiary(); } });
+setTimeout(() => { newChatIfStale(); refreshDiary(); }, 0);
 
 // «Pregúntale a mi archivo …», «según mi archivo …».
 function archiveAskCommand(text) {

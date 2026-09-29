@@ -10,6 +10,42 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
+## WEB-41 — Tu diario: memoria día a día de lo que pasa por MANU
+
+Manu (2026-09-29) aceptó la «memoria de todo» (ADR-0016). Ya existían los 4 Atajos (alarma, recordatorio, agenda y «Apuntar en MANU») y el archivo de conversaciones (WEB-37). Faltaba recordar lo que hace cada día.
+
+### Cambios
+
+- `web/core/diary.js`:
+  - `dayLines` resume un día: gastos (con total), ingresos, tareas (y si están hechas), ideas, recordatorios, agenda, ánimo, hábitos, comidas y salud;
+  - `diaryDocs` crea un documento de archivo por día con algo apuntado (hasta 400 días y nunca en el futuro), con id `diario:AAAA-MM-DD`;
+  - `dayFromText` entiende «ayer», «anteayer», «hoy», «el lunes» (el último pasado), «el 12», «12 de agosto» y «3/10». Una fecha futura se toma del año anterior;
+  - `isDiaryQuestion`.
+- `web/app.js`:
+  - `refreshDiary` reconstruye el diario al abrir y al volver a MANU, en «Tu archivo» (IndexedDB, solo en el dispositivo). Los mismos ids solo se actualizan;
+  - el chat responde a «¿qué hice ayer?», «¿cuánto gasté el martes?» o «¿qué pasó el 12?» en local;
+  - en el modo conversación, con «Recuerdos» activo, un mensaje que menciona un día lleva el diario de ese día (filtrado con `mayGo`);
+  - «Tu archivo» muestra «📔 Tu diario»;
+  - versión 41.
+
+### Resultados
+
+- `npm test`: 129/129 PASS (`web/tests/diary.test.js`). `node --check` pasa.
+- e2e41 (una semana sintética): 8/8. Cubre:
+  - «¿qué hice ayer?», «¿cuánto gasté el martes?» y un día vacío;
+  - «gasté 3 en pan» sigue siendo un gasto;
+  - el diario sale en Tu archivo y se puede buscar, y no está en localStorage;
+  - el modo conversación recibe el diario del día mencionado.
+- e2e3, e2e4 y e2e10–e2e40 en PASS, salvo las 3 expectativas antiguas de e2e18.
+
+### Atajos de Apple Pay, Salud y ubicación (pendiente)
+
+Bloqueo técnico: el atajo «Apuntar en MANU» ya advierte que abrir una URL desde Atajos abre Safari, cuyo almacenamiento es distinto del de la app instalada. Los datos no llegarían a la MANU de la pantalla de inicio (NO_VERIFICADO en el iPhone de Manu). La alternativa propuesta es un «buzón»: los atajos añaden líneas a un archivo en iCloud Drive y MANU lo importa con un toque. Queda pendiente de que Manu la acepte.
+
+### Gmail
+
+Con Claude en su ordenador, Manu revisó Google Cloud el 2026-09-29. La API de Gmail estaba desactivada: ahora está habilitada. La app sigue en «Prueba», con su cuenta como usuario de prueba, y se ha añadido `gmail.modify` en «Acceso a datos». Falta «Reconectar Gmail» en el iPhone.
+
 ## WEB-40 — chat con teclado, luz del día real y errores reales de Gmail
 
 Manu (2026-09-29) pidió tres correcciones:
