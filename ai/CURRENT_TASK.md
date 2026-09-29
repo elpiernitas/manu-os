@@ -2,11 +2,11 @@
 
 Status: **REVIEW_PENDING**
 
-WEB-49 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
+WEB-50 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
 
 ## Tarea activa
 
-WEB-49 — rendimiento con un año de datos, sin conexión y pasos de Google con la Gmail API (`ai/HANDOFF.md`, «WEB-49»).
+WEB-50 — MANU entiende más frases sin IA: gastos, tareas, recordatorios, alarmas y preguntas de dinero (`ai/HANDOFF.md`, «WEB-50»).
 
 ## Autorización
 
@@ -49,6 +49,7 @@ WEB-49 — rendimiento con un año de datos, sin conexión y pasos de Google con
 
 ## Historial (cerrado)
 
+- **WEB-49** (rendimiento): CERRADA. Fusionada mediante el PR #56 (`20a4a7f`).
 - **WEB-48** (buscar en todo): CERRADA. Fusionada mediante el PR #55 (`c0974ff`).
 - **WEB-47** (presupuestos): CERRADA. Fusionada mediante el PR #54 (`a9fa039`).
 - **WEB-46** (resumen del día y auditoría): CERRADA. Fusionada mediante el PR #53 (`22479a3`).

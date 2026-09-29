@@ -23,7 +23,7 @@ import { putDocs, allDocs, clearArchive } from "./core/archivestore.js";
 import { findExcerpts, askPayload, profileDigest, profilePayload, memoryContext } from "./core/recall.js";
 import { diaryDocs, dayLines, dayFromText, isDiaryQuestion, dayTitle } from "./core/diary.js";
 import { applyBuzon, buzonSummary } from "./core/buzon.js";
-import { briefing, briefingText, isBriefingQuestion } from "./core/briefing.js";
+import { briefing, briefingText, isBriefingQuestion, monthPace } from "./core/briefing.js";
 import { budgetStatus, budgetLine, budgetCommand } from "./core/budget.js";
 import { findInVault, findCommand } from "./core/find.js";
 import { weatherEmoji, sceneFor, PARTICLES, SHAPES, MONEY_EMOJI, dayPhase, cityMinutes } from "./core/scene.js";
@@ -34,7 +34,7 @@ import { isSpotifyClientId, pkceValid, randomVerifier, challengeFor, authorizeUr
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "49";
+export const APP_VERSION = "50";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -1476,7 +1476,7 @@ También puedes buscar en Tú → 🔎.` });
   // the day, the weather, anything else) goes to Gemini with the chosen context.
   // Short commands («gasté 3 en café») stay instant and local; longer or
   // compound sentences go to Gemini, which can do several things at once.
-  const longCommand = ["expense", "reminder", "idea", "alarm"].includes(intent.kind) && clean.split(/\s+/).length > 8;
+  const longCommand = ["expense", "reminder", "idea", "alarm", "task"].includes(intent.kind) && clean.split(/\s+/).length > 8;
   if (aiMode().on && aiReady() && navigator.onLine && (["unknown", "greeting", "thanks", "agenda", "weather"].includes(intent.kind) || longCommand)) {
     const check = allowedToSend(clean, sensitiveAllowed() ? FULL_CONTEXT : aiMode().context);
     vault.chat.push({ from: "me", text: clean, at });
@@ -1490,13 +1490,17 @@ También puedes buscar en Tú → 🔎.` });
   let action = null;
   if (intent.kind === "expense") vault.spending.push(newEntry({ id: uid("s"), cents: intent.cents, merchant: intent.merchant, at }, vault.settings.categoryRules ?? {}));
   if (intent.kind === "idea") vault.inbox.push(capture({ id: uid("c"), text: intent.text, at }));
+  if (intent.kind === "task") vault.inbox.push({ ...capture({ id: uid("c"), text: intent.text.slice(0, 140), at }), status: "TASK" });
   if (intent.kind === "alarm") action = { label: `Poner en el iPhone · ${intent.time}`, href: shortcutUrl(SHORTCUT_ALARM, intent.time) };
   if (intent.kind === "reminder") {
-    const when = new Date(now);
-    if (intent.tomorrow) when.setDate(when.getDate() + 1);
-    const [h, m] = intent.time.split(":").map(Number);
-    when.setHours(h, m, 0, 0);
-    if (!intent.tomorrow && when < now) when.setDate(when.getDate() + 1);
+    let when = new Date(now);
+    if (intent.inMinutes) when = new Date(now.getTime() + intent.inMinutes * 60000); // WEB-50: «en 20 minutos»
+    else {
+      if (intent.tomorrow) when.setDate(when.getDate() + 1);
+      const [h, m] = intent.time.split(":").map(Number);
+      when.setHours(h, m, 0, 0);
+      if (!intent.tomorrow && when < now) when.setDate(when.getDate() + 1);
+    }
     const r = { id: uid("r"), text: intent.text, at: when.toISOString(), done: false, notified: false };
     vault.reminders.push(r);
     action = { label: "Añadir al iPhone", href: reminderIphoneUrl(r) };
@@ -1540,6 +1544,20 @@ async function activateGemini(key) {
 
 // Answers MANU gives from the app's own data (no AI): the day and the weather.
 function localAnswer(intent) {
+  if (intent.kind === "spendQuery") { // WEB-50
+    const [s, e] = monthRange();
+    const m = summary(vault.spending, s, e);
+    const pace = monthPace(vault.spending, today());
+    const vs = pace.diff === null ? "" : pace.diff === 0 ? " Igual que el mes pasado a estas alturas." : ` Un ${Math.abs(pace.diff)} % ${pace.diff < 0 ? "menos" : "más"} que el mes pasado a estas alturas.`;
+    if (intent.category) {
+      const v = m.byCategory[intent.category] ?? 0;
+      const b = budgetsNow().find((x) => x.cat === intent.category);
+      return `${catLabel(intent.category)}: ${euros(v)} este mes.${b ? ` ${budgetLine(b)}` : ""}`;
+    }
+    if (!m.total) return "Este mes aún no has apuntado gastos.";
+    const top = Object.entries(m.byCategory).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([c, v]) => `${CATEGORIES[c] ?? c} ${euros(v)}`).join(", ");
+    return `Llevas ${euros(m.total)} este mes.${vs} Lo que más: ${top}.`;
+  }
   if (intent.kind === "agenda") {
     const day = intent.day === "tomorrow" ? tomorrowKey() : localDay();
     const word = intent.day === "tomorrow" ? "Mañana" : "Hoy";
