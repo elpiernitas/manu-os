@@ -76,3 +76,16 @@ export class LocalStore {
     }
   }
 }
+
+// «Borrar todos los datos»: every MANU key on this device, including what
+// deliberately lives outside the vault (Gemini key, Spotify tokens, PKCE).
+export function wipeDeviceKeys(storages) {
+  let removed = 0;
+  for (const s of storages) {
+    if (!s) continue;
+    const keys = [];
+    for (let i = 0; i < s.length; i++) { const k = s.key(i); if (k?.startsWith("manuos.")) keys.push(k); }
+    for (const k of keys) { s.removeItem(k); removed++; }
+  }
+  return removed;
+}

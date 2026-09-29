@@ -149,6 +149,7 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
 .hero-tap { position: absolute; inset: 0; border: 0; background: none; cursor: pointer; border-radius: inherit; z-index: 0; }
 .hero > *:not(.hero-tap) { position: relative; z-index: 1; pointer-events: none; }
 .hero .btns, .hero .btns * { pointer-events: auto; }
+.hero .cal-head, .hero .cal-head * { pointer-events: auto; }
 .hours { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(48px, 1fr); gap: 4px; overflow-x: auto; scrollbar-width: none; }
 .hours > div { display: grid; justify-items: center; gap: 4px; padding: 4px 0; }
 .hours svg { width: 24px; height: 24px; color: var(--warm); }
@@ -251,3 +252,4 @@ details.card > summary { list-style: none; }
 .week-bars > div { display: grid; grid-template-rows: 1fr auto; justify-items: center; height: 100%; align-items: end; }
 .week-bars i { width: 70%; max-width: 26px; border-radius: 6px 6px 3px 3px; background: linear-gradient(180deg, var(--accent), var(--fill)); display: block; transition: height 500ms var(--ease-out); }
 @media (prefers-reduced-motion: reduce) { .cal-grid.slide { animation: none; } .week-bars i { transition: none; } }
+.small-btn { min-height: 36px; padding: 6px 14px; font-size: 15px; flex: none; }

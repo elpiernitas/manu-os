@@ -2,11 +2,11 @@
 
 Status: **REVIEW_PENDING**
 
-WEB-12 implementado por Claude Code; se fusiona cuando CI está en verde. La revisión del orquestador es bajo petición.
+WEB-13 implementado por Claude Code. Está listo, pero **no se fusiona** hasta que Manu lo confirme: un comentario suyo en el PR #21 (2026-09-29 00:43 UTC), posterior a la enmienda de `AGENTS.md`, pide no fusionar, y prevalece lo más restrictivo.
 
 ## Tarea activa
 
-WEB-12 — IA integrada que propone acciones en MANU (con confirmación), sugerencias de mejora como petición en GitHub y ajuste opcional «Enviar a Gemini sin preguntar» (`ai/HANDOFF.md`, «WEB-12»; enmienda WEB-12 de ADR-0013).
+WEB-13 — correcciones de los hallazgos 1–5 de la revisión de ChatGPT sobre los PR #15/#16, con regresiones (`ai/HANDOFF.md`, «WEB-13»).
 
 ## Autorización
 
@@ -14,6 +14,7 @@ WEB-12 — IA integrada que propone acciones en MANU (con confirmación), sugere
 - 2026-09-28: Manu autoriza Gemini y «todo» lo posible de Google, a coste 0 €.
 - 2026-09-28: Manu sube su extracto de Sabadell (.xls) para que la app lo lea. El archivo real no entra en el repositorio; solo se usan recuentos en local y un fixture inventado.
 - 2026-09-29: Manu pide una IA integrada a la que decirle cosas de la app y con la que subir sus gastos. El envío sin preguntar queda como ajuste que decide Manu, desactivado por defecto.
+- 2026-09-29: Manu ordena «cambia agents.md para que tú puedas decidir cuándo fusionar y cuándo no». `AGENTS.md` y `CLAUDE.md` recogen la regla de fusión, lo que resuelve el hallazgo 6 de la revisión de ChatGPT.
 - 2026-09-29: **cambio de gobernanza decidido por Manu.** El orquestador (ChatGPT/Codex) ya no revisa automáticamente, porque frenaba el avance. Claude Code fusiona los PR web cuando `npm test` y los dos workflows remotos están en verde y no hay conflictos. Cuando haga falta una revisión, Claude Code prepara un prompt, Manu se lo pasa a ChatGPT y le devuelve la respuesta; los defectos se corrigen en un PR nuevo con su regresión. Los PR #7, #8 y #9 siguen en borrador o pausa.
 
 ## Alcance autorizado
@@ -40,6 +41,7 @@ WEB-12 — IA integrada que propone acciones en MANU (con confirmación), sugere
 
 ## Historial (cerrado)
 
+- **WEB-12** (IA que propone acciones): CERRADA. Fusionada mediante el PR #20 (`9a5bf6f`).
 - **WEB-11** (todos los calendarios con color, WhatsApp): CERRADA. Fusionada mediante el PR #19 (`88b3df3`).
 - **WEB-10** (calendario de mes, cobros fijos, cuándo gastas): CERRADA. Fusionada mediante el PR #18 (`505c6bf`).
 - **WEB-09** (movimiento estilo iOS): CERRADA. Fusionada mediante el PR #17 (`8ca2bbb`).

@@ -1,7 +1,7 @@
 // Bank statement import (CSV exported from the bank's website/app).
 // Runs on the device; nothing is uploaded. Unknown formats are rejected with a reason.
 import { normalise } from "./text.js";
-import { newEntry } from "./money.js";
+import { newEntry, categoryId } from "./money.js";
 
 export function parseCsv(text) {
   const src = String(text ?? "").replace(/^﻿/, "");
@@ -78,7 +78,15 @@ export function parseDate(raw) {
 // Identity of a bank line. The running balance ("Saldo") tells apart two
 // identical purchases on the same day; without it, the nth repetition inside
 // the same file gets its own index. Re-importing the same file stays idempotent.
+// The id is the identity itself, not a hash: a 32-bit hash let two different
+// lines collide and one was dropped as a "duplicate".
 function fingerprint(at, cents, concept, balance, nth) {
+  return `bank:${at.slice(0, 10)}|${cents}|${normalise(concept)}|${balance ?? ""}|${nth}`;
+}
+
+// Ids written before WEB-13 (32-bit hash). Only used to recognise lines that
+// were already imported, and only if the saved entry really is the same line.
+export function legacyFingerprint(at, cents, concept, balance, nth) {
   const str = `${at.slice(0, 10)}|${cents}|${normalise(concept)}|${balance ?? ""}|${nth}`;
   let h = 5381;
   for (let i = 0; i < str.length; i++) h = ((h * 33) ^ str.charCodeAt(i)) >>> 0;
@@ -86,12 +94,13 @@ function fingerprint(at, cents, concept, balance, nth) {
 }
 
 // Returns { entries, skippedIncome, skippedInvalid, duplicates } or { error }.
-export function importStatement(text, existingIds = new Set(), learned = {}) {
-  return importStatementRows(parseCsv(text), existingIds, learned);
+export function importStatement(text, existingIds = new Set(), learned = {}, legacy = new Map()) {
+  return importStatementRows(parseCsv(text), existingIds, learned, legacy);
 }
 
 // Same import from already-parsed rows (e.g. an .xls read with SheetJS).
-export function importStatementRows(rawRows, existingIds = new Set(), learned = {}) {
+// `legacy`: Map of pre-WEB-13 id -> saved entry.
+export function importStatementRows(rawRows, existingIds = new Set(), learned = {}, legacy = new Map()) {
   const rows = (rawRows ?? []).map((r) => (r ?? []).map((c) => (typeof c === "string" ? c.trim() : c))).filter((r) => r.some((c) => c !== "" && c !== null && c !== undefined));
   const headerIndex = rows.findIndex((r) => findColumn(r, DATE_KEYS) >= 0 && findColumn(r, AMOUNT_KEYS) >= 0);
   if (headerIndex < 0) return { error: "No encuentro las columnas de fecha e importe. ¿Es el archivo de movimientos del banco?" };
@@ -111,9 +120,71 @@ export function importStatementRows(rawRows, existingIds = new Set(), learned = 
     const nth = occurrences.get(base) ?? 0;
     occurrences.set(base, nth + 1);
     const id = fingerprint(at, cents, concept ?? "", balance, nth);
-    if (seen.has(id)) { result.duplicates++; continue; }
+    const old = legacy.get(legacyFingerprint(at, cents, concept ?? "", balance, nth));
+    const sameLine = old && old.at?.slice(0, 10) === at.slice(0, 10) && old.cents === -cents && normalise(old.merchant ?? "") === normalise(concept ?? "");
+    if (seen.has(id) || sameLine) { result.duplicates++; continue; }
     seen.add(id);
     result.entries.push({ ...newEntry({ id, cents: -cents, merchant: concept, at }, learned), source: "BANK" });
   }
   return result;
+}
+
+// Same statement seen by two sources (the bank file and ChatGPT's classified
+// sheet): lines pair up by day and amount, counting repetitions, so neither
+// import double-counts the other.
+const dayCents = (e) => `${e.at.slice(0, 10)}|${e.cents}`;
+export function dropCrossSource(entries, existing, source) {
+  const pool = new Map();
+  for (const e of existing) if (e.source === source) pool.set(dayCents(e), (pool.get(dayCents(e)) ?? 0) + 1);
+  const kept = [];
+  let duplicates = 0;
+  for (const e of entries) {
+    const k = dayCents(e), n = pool.get(k) ?? 0;
+    if (n > 0) { pool.set(k, n - 1); duplicates++; } else kept.push(e);
+  }
+  return { entries: kept, duplicates };
+}
+
+// «Gastos clasificados» sheet of the ChatGPT Excel: expenses with the category
+// ChatGPT proposed. They are imported as rule-based proposals (ruled), never as
+// Manu's decisions; his own corrections (plain rules) still win.
+export function classifiedFromRows(rawRows, existing = [], learned = {}) {
+  const rows = (rawRows ?? []).map((r) => r ?? []);
+  const norm = (c) => normalise(String(c ?? ""));
+  const h = rows.findIndex((r) => r.some((c) => norm(c) === "fecha") && r.some((c) => norm(c).startsWith("gasto")) && r.some((c) => norm(c) === "categoria"));
+  if (h < 0) return null;
+  const header = rows[h].map(norm);
+  const col = (p) => header.findIndex(p);
+  const cDate = col((c) => c === "fecha"), cAmount = col((c) => c.startsWith("gasto")), cCat = col((c) => c === "categoria");
+  const cConcept = col((c) => c.startsWith("concepto")), cName = col((c) => c.startsWith("comercio")), cSub = col((c) => c.startsWith("subcategoria")), cReview = col((c) => c === "revisar");
+  const seen = new Set(existing.map((e) => e.id));
+  const occurrences = new Map();
+  const out = [];
+  let skipped = 0, duplicates = 0;
+  for (const r of rows.slice(h + 1)) {
+    if (!r.some((c) => c !== "" && c !== null && c !== undefined)) continue;
+    const at = parseDate(r[cDate]);
+    const raw = typeof r[cAmount] === "number" ? Math.round(r[cAmount] * 100) : amountToCents(r[cAmount]);
+    const cents = raw === null ? null : Math.abs(raw);
+    if (!at || !cents) { skipped++; continue; }
+    const concept = String((cConcept >= 0 && r[cConcept]) || (cName >= 0 && r[cName]) || "").trim().slice(0, 80) || null;
+    const base = `${at.slice(0, 10)}|${cents}|${normalise(concept ?? "")}`;
+    const nth = occurrences.get(base) ?? 0;
+    occurrences.set(base, nth + 1);
+    const id = `gpt:${base}|${nth}`;
+    if (seen.has(id)) { duplicates++; continue; }
+    seen.add(id);
+    const entry = { ...newEntry({ id, cents, merchant: concept, at }, learned), source: "CHATGPT" };
+    const manual = entry.category && !entry.inferred && !entry.ruled; // Manu's own rule
+    const category = categoryId(r[cCat]);
+    if (!manual && category) {
+      const ask = cReview >= 0 && norm(r[cReview]).startsWith("s");
+      delete entry.review; delete entry.sub;
+      Object.assign(entry, { category, inferred: ask, ruled: true }, ask ? { review: true } : {});
+      if (cSub >= 0 && r[cSub]) entry.sub = String(r[cSub]).slice(0, 60);
+    }
+    out.push(entry);
+  }
+  const cross = dropCrossSource(out, existing, "BANK");
+  return { entries: cross.entries, duplicates: duplicates + cross.duplicates, skipped };
 }

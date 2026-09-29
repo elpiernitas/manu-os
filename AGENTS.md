@@ -19,10 +19,10 @@ Si `ai/CURRENT_TASK.md` está marcado como `PAUSED`, `BLOCKED` o `NOT_AUTHORIZED
 
 - Nunca hagas cambios sustanciales directamente sobre la rama por defecto.
 - Crea una rama por tarea y mantén el alcance pequeño.
-- No hagas merge sin revisión externa.
-- Manu delegó en el orquestador técnico de ChatGPT/Codex la decisión final sobre cambios, revisiones y merges desde el 2026-09-28. El orquestador puede aceptar, corregir o rechazar aportaciones de Claude y fusionar un PR cuando la evidencia y los checks sean suficientes.
-- Esta delegación no autoriza costes, despliegues públicos, publicación de datos personales, conexión de servicios, ampliaciones sensibles de permisos ni decisiones materiales de producto; esos puntos siguen requiriendo autorización específica de Manu.
-- El orquestador no puede rebajar los gates, omitir una revisión externa ni presentar como verificado algo que no lo esté.
+- **Fusión (decisión de Manu, 2026-09-29).** Claude Code decide cuándo fusionar y cuándo no. Solo puede fusionar si `npm test` y los workflows remotos están en verde en el último commit, no hay conflictos y ha hecho una autorrevisión con evidencia. No fusiona si hay un defecto conocido sin corregir, un gate bloqueado o una decisión material de producto pendiente de Manu. En esos casos se detiene y pregunta.
+- La revisión externa (ChatGPT/Codex) es bajo petición: Claude Code prepara el prompt, Manu lo pasa y devuelve la respuesta, y los defectos demostrables se corrigen en un PR con su prueba de regresión. Esto sustituye a la delegación del 2026-09-28 en el orquestador.
+- La autorización para fusionar no cubre costes, publicación de datos personales, servicios nuevos, ampliaciones sensibles de permisos ni decisiones materiales de producto: siguen requiriendo autorización específica de Manu. Publicar la app web en GitHub Pages al fusionar en `main` ya está autorizado (ADR-0012).
+- Ningún agente puede rebajar los gates ni presentar como verificado algo que no lo esté.
 - No despliegues, conectes servicios ni actives facturación sin autorización explícita de Manu.
 - No añadas datos personales reales a código, fixtures, logs, issues o PRs.
 - No guardes secretos, API keys, tokens OAuth ni credenciales en Git.

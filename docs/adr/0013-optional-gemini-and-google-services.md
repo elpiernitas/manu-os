@@ -47,6 +47,11 @@ La app web (ADR-0012) funciona sin IA, pero el chat solo entiende órdenes concr
 - **«Enviar a Gemini sin preguntar».** Es un ajuste opcional, desactivado por defecto y que solo Manu puede activar en Tú → IA. Cuando está activo, el consentimiento por petición se sustituye por esa decisión explícita de Manu. El filtro de lo sensible sigue aplicándose antes de cualquier envío, que sigue llevando solo la frase, la instrucción fija con la fecha y hora y la lista de funciones. La burbuja indica que se envió sin preguntar y enseña lo enviado.
 - NO_VERIFICADO: la llamada de funciones con la clave real de Manu y en el iPhone (probado con Gemini simulado), y que iOS abra el selector de archivos desde la acción.
 
+## Enmienda (2026-09-29, WEB-13)
+
+- **«Pegar y activar».** El botón lee el portapapeles solo al tocarlo, acepta solo el formato `AIza…`, prueba la clave y la guarda con «Recordar» activado, porque el botón lo dice. Es la misma opción de recordar ya aceptada en este ADR, elegida con un toque explícito. La clave sigue fuera del vault y de las copias, y «Borrar todos los datos» la elimina.
+- **Descartado: proteger la app con un código o un TOTP para meter claves en el código.** El código de la web es público, así que cualquier secreto incluido, incluido el de verificación, sería legible por cualquiera. Cifrar la clave con un PIN corto permitiría romperla por fuerza bruta sin conexión. Además, AGENTS.md prohíbe secretos en Git.
+
 ## Historial
 
 - Ronda 1 de revisión (PR #13, 2026-09-28): la primera versión subía el vault en claro y automáticamente a Drive, enviaba a Gemini sin confirmación con un filtro de palabras presentado como garantía, y pedía los cuatro scopes de golpe. Corregido en esta versión del ADR.

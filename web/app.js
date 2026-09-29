@@ -3,22 +3,22 @@ import { CATEGORIES, euros, newEntry, learnCategory, summary, toCents, rulesFrom
 import { MODE_TITLES, modeState } from "./core/modes.js";
 import { capture, confirm, markUnclassified, pending, tasks, ideas, toggleDone } from "./core/inbox.js";
 import { initialRefuge, refugeReply } from "./core/refuge.js";
-import { LocalStore, emptyVault, validateVault } from "./core/storage.js";
+import { LocalStore, emptyVault, validateVault, wipeDeviceKeys } from "./core/storage.js";
 import { notificationStatus, isInstalled, enableNotifications, testNotification } from "./core/notify.js";
 import { launchParams, parseEvents, nextEvent, localDay } from "./core/intake.js";
 import { fetchForecast, searchCities, advice, WEATHER_TTL_MS } from "./core/weather.js";
-import { importStatement, importStatementRows } from "./core/bank.js";
+import { importStatement, importStatementRows, classifiedFromRows, dropCrossSource } from "./core/bank.js";
 import { CITIES, proposeAlarm, shouldAskTomorrow, shortcutUrl, guessCity } from "./core/night.js";
 import { isClientId, listEvents, createEvent, newEventBody, monthGrid, listCalendars, mergeDays } from "./core/gcal.js";
 import { detectRecurring, upcomingRecurring, spendingPattern } from "./core/insights.js";
 import { SCOPE, runServices, planTaskSync, listOpenTasks, insertTask, completeTask, contactBirthdays, mergePeople, saveBackup, loadBackup } from "./core/google.js";
 import { isSensitive, pickModel, listModels, buildActionPayload, askWithActions, issueUrl } from "./core/ai.js";
 import { encryptBackup, decryptBackup, passphraseProblem } from "./core/crypto.js";
-import { isSpotifyClientId, randomVerifier, challengeFor, authorizeUrl, exchangeCode, refreshTokens, listDevices, findSpeaker, transferTo, DEFAULT_SPEAKER } from "./core/spotify.js";
+import { isSpotifyClientId, pkceValid, randomVerifier, challengeFor, authorizeUrl, exchangeCode, refreshTokens, listDevices, findSpeaker, transferTo, DEFAULT_SPEAKER } from "./core/spotify.js";
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "12";
+export const APP_VERSION = "13";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -36,6 +36,7 @@ let sheet = null; // quick add: { kind }
 let confirmWipe = false;
 let cityResults = null;
 let moneyFilter = null; // "review"
+let moneyMonth = 0; // months back from the current one in Dinero
 let calView = null; // { y, m } month shown in Agenda
 let calSelected = null; // "YYYY-MM-DD"
 let overlay = null; // "weather"
@@ -134,6 +135,12 @@ const I = {
 
 const TABS = [["hoy", "Hoy"], ["agenda", "Agenda"], ["manu", "MANU"], ["dinero", "Dinero"], ["tu", "Tú"]];
 
+function latestMonthOffset() {
+  const last = vault.spending.reduce((m, x) => (x.at > m ? x.at : m), "");
+  if (!last) return 0;
+  const d = new Date(last), t = today();
+  return Math.max(0, (t.getFullYear() - d.getFullYear()) * 12 + t.getMonth() - d.getMonth());
+}
 function monthRange(d = today()) {
   return [new Date(d.getFullYear(), d.getMonth(), 1), new Date(d.getFullYear(), d.getMonth() + 1, 1)];
 }
@@ -301,7 +308,7 @@ async function musicToSpeaker() {
 async function finishSpotifyAuth(params) {
   let pkce = null;
   try { pkce = JSON.parse(localStorage.getItem("manuos.spotify.pkce") || "null"); localStorage.removeItem("manuos.spotify.pkce"); } catch {}
-  if (!pkce || pkce.state !== params.get("state") || Date.now() - pkce.at > 15 * 60000) { toast("No he podido conectar Spotify (sesión caducada). Inténtalo otra vez."); return; }
+  if (!pkceValid(pkce, params.get("state"))) { toast("No he podido conectar Spotify (sesión caducada). Inténtalo otra vez."); return; }
   try {
     spotifyStore.tokens = await exchangeCode({ clientId: vault.settings.spotifyClientId, code: params.get("code"), redirectUri: SITE, verifier: pkce.verifier });
     toast("Spotify conectado");
@@ -434,7 +441,7 @@ const screens = {
     const synced = vault.settings.gcalSyncedAt ? new Date(vault.settings.gcalSyncedAt).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }) : null;
     const gCal = isClientId(gClientId()) && googleOn("calendar");
     return `<h1>Agenda</h1><p class="subtitle">${esc(longDate())}</p>
-      ${g ? `<div class="btns"><button class="btn ghost" data-act="gcal-sync">${gcal.busy ? "Sincronizando…" : "Sincronizar con Google"}</button></div><p class="muted small">${synced ? `Última sincronización: ${synced}` : "Aún sin sincronizar."}${gcal.error ? ` · ${esc(gcal.error)}` : ""}</p>` : `<p class="muted small"><button class="link small" data-act="goto-gcal">Conectar Google (Calendar, Tasks, Contactos y Drive)</button></p>`}
+      ${g ? `<div class="btns"><button class="btn ghost" data-act="gcal-sync">${gcal.busy ? "Sincronizando…" : "Sincronizar con Google"}</button></div><p class="muted small">${synced ? `Última sincronización: ${synced}` : "Aún sin sincronizar."}${gcal.error ? ` · ${esc(gcal.error)}` : ""}${validToken(SCOPE.calendar) ? " · se actualiza sola cada 10 min" : ""}</p>` : `<p class="muted small"><button class="link small" data-act="goto-gcal">Conectar Google (Calendar, Tasks, Contactos y Drive)</button></p>`}
       ${calendarCard(gCal)}
       <details class="card"><summary class="muted small">Sin Google: pegar los eventos de hoy</summary><p class="muted small">Si tu calendario no es de Google, pega aquí tus eventos (o usa el atajo «MANU Agenda»).</p>${agendaToday() && vault.agenda.source !== "GOOGLE"
         ? (vault.agenda.events.length ? vault.agenda.events.map((ev) => `<div class="row"><span class="num chip">${esc(ev.time ? ev.time + (ev.end ? "–" + ev.end : "") : "Todo el día")}</span><span class="grow">${esc(ev.title)}</span></div>`).join("") : "") : ""}
@@ -456,27 +463,32 @@ const screens = {
       <form class="composer glass" id="composer"><label for="msg" class="sr">Mensaje para MANU</label><input id="msg" autocomplete="off" enterkeyhint="send" placeholder="${refuge ? "Cuéntame" : "Escribe a MANU"}"><button class="btn" type="submit">Enviar</button></form>`;
   },
   dinero() {
-    const [s, e] = monthRange();
+    const ref = today(); ref.setDate(1); ref.setMonth(ref.getMonth() - moneyMonth);
+    const [s, e] = monthRange(ref);
     const month = summary(vault.spending, s, e);
+    const monthName = ref.toLocaleDateString("es-ES", { month: "long", year: "numeric" });
+    const ri = vault.settings.lastRulesImport;
     const toReview = vault.spending.filter((x) => x.review).length;
     const entries = [...vault.spending].filter((x) => moneyFilter !== "review" || x.review).sort((a, b) => (a.at < b.at ? 1 : -1)).slice(0, moneyFilter === "review" ? 500 : 60);
     const rulesCount = Object.keys(vault.settings.categoryRules ?? {}).length;
     const cats = Object.entries(month.byCategory).sort((a, b) => b[1] - a[1]);
     const max = cats[0]?.[1] ?? 1;
     const imp = vault.settings.lastImport;
-    return `<h1>Dinero</h1><p class="subtitle">${esc(cap(today().toLocaleDateString("es-ES", { month: "long", year: "numeric" })))}</p>
+    return `<h1>Dinero</h1><p class="subtitle">${esc(cap(monthName))}</p>
       <div class="stack">
-      <section class="card hero"><h2>Gastado este mes</h2><div class="big-money" data-count-money="${month.total}">${euros(month.total)}</div>
+      <section class="card hero"><div class="row cal-head"><button class="link" data-act="money-prev" aria-label="Mes anterior">${I.back}</button><h2>${moneyMonth === 0 ? "Gastado este mes" : `Gastado en ${esc(monthName.replace(/ de \d{4}$/, ""))}`}</h2><button class="link" data-act="money-next" aria-label="Mes siguiente"${moneyMonth === 0 ? " disabled" : ""}>${I.chev}</button></div><div class="big-money" data-count-money="${month.total}">${euros(month.total)}</div>
         ${cats.map(([c, v]) => `<div class="stack"><div class="row"><span>${esc(CATEGORIES[c])}</span><span class="num">${euros(v)}</span></div><div class="bar"><i data-w="${Math.max(3, Math.round((v / max) * 100))}"></i></div></div>`).join("")}</section>
       <section class="card"><h2>${I.box} Importar del banco</h2>
         <p class="muted small">Descarga los movimientos de tu banco (Sabadell: Excel .xls; también vale CSV) y elígelo aquí. Se analiza en tu móvil y no se envía a nadie. Solo importo gastos y no duplico los que ya tengas. Si corriges la categoría de un comercio, la aprendo para todos sus movimientos.</p>
         <label class="btn ghost" for="bankFile" role="button" tabindex="0">Elegir archivo (Excel o CSV)</label><input id="bankFile" type="file" accept=".xls,.xlsx,.csv,text/csv,text/plain,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="sr">
         <label class="btn ghost" for="rulesFile" role="button" tabindex="0">Importar reglas (Excel de ChatGPT)</label><input id="rulesFile" type="file" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="sr">
         ${rulesCount ? `<p class="muted small">${rulesCount} reglas de categorías guardadas en este móvil.</p>` : ""}
+        ${ri ? `<p class="muted small">Excel de ChatGPT: ${ri.rules} reglas, ${ri.added} gastos nuevos${ri.duplicates ? `, ${ri.duplicates} ya estaban` : ""}${ri.review ? `, ${ri.review} por revisar` : ""}${ri.reclassified ? `, ${ri.reclassified} reclasificados` : ""}.</p>` : ""}
+        ${rulesCount && !vault.spending.length ? '<p class="small"><b>Las reglas solas no son gastos.</b> Importa el extracto del banco o vuelve a elegir el Excel de ChatGPT, que trae la hoja «Gastos clasificados», y verás aquí tus números.</p>' : ""}
         ${imp ? `<p class="muted small">Última importación: ${imp.added} gastos nuevos, ${imp.duplicates} repetidos, ${imp.income} ingresos ignorados${imp.invalid ? `, ${imp.invalid} filas no reconocidas` : ""}.</p>` : ""}</section>
       ${moneyInsights()}
       ${sectionTitle("Movimientos", `${toReview ? `<button class="link small" data-act="money-filter">${moneyFilter === "review" ? "Ver todos" : `Por revisar (${toReview})`}</button>` : ""}${addLink("EXPENSE")}`)}
-      <section class="card">${entries.length ? entries.map((x) => `<div class="row"><div class="grow"><div>${esc(x.merchant ?? "Sin concepto")}</div><div class="muted small">${new Date(x.at).toLocaleDateString("es-ES", { day: "numeric", month: "short" })}${x.sub ? ` · ${esc(x.sub)}` : ""}${x.source === "BANK" ? " · banco" : ""}${x.review ? ' · <b class="review">revisar</b>' : x.inferred ? " · categoría propuesta" : ""}</div></div>
+      <section class="card">${entries.length ? entries.map((x) => `<div class="row"><div class="grow"><div>${esc(x.merchant ?? "Sin concepto")}</div><div class="muted small">${new Date(x.at).toLocaleDateString("es-ES", { day: "numeric", month: "short" })}${x.sub ? ` · ${esc(x.sub)}` : ""}${x.source === "BANK" ? " · banco" : ""}${x.review ? ' · <b class="review">revisar</b>' : x.inferred ? " · categoría propuesta" : x.ruled ? " · según tus reglas" : ""}</div></div>
           <div class="stack"><span class="num">${euros(x.cents)}</span><label class="sr" for="cat-${esc(x.id)}">Categoría</label><select id="cat-${esc(x.id)}" data-cat="${esc(x.id)}">${Object.entries(CATEGORIES).map(([k, t]) => `<option value="${k}"${k === x.category ? " selected" : ""}>${esc(t)}</option>`).join("")}</select></div></div>`).join("")
         : '<p class="muted">Sin gastos. Toca «+», escribe a MANU «gasté 12,50 en café» o importa el CSV del banco.</p>'}</section>
       </div>`;
@@ -490,6 +502,7 @@ const screens = {
     const hs = healthSummary(vault.health);
     const item = (key, icon, color, title, detail) => `<button class="item" data-sub="${key}"><span class="ico ${color}">${I[icon]}</span><span class="grow"><span>${title}</span><br><span class="muted small">${esc(detail)}</span></span><span class="chev">${I.chev}</span></button>`;
     return `<div class="row"><div class="avatar" aria-hidden="true">M</div><div class="grow"><h1>Manu</h1><p class="muted">${esc(longDate())}</p></div></div>
+      ${setupCard()}
       ${sectionTitle("¿Cómo estás hoy?")}
       <section class="card"><div class="mood">${MOODS.map((m) => `<button data-act="mood" data-v="${m.value}" aria-pressed="${mood === m.value}"><b>${m.value}</b>${m.label}</button>`).join("")}</div>
         <div class="row"><span class="muted small">Últimos 7 días</span><span class="dots">${week.map((v) => `<i data-v="${v}" title="${v ? MOODS[v - 1].label : "Sin dato"}"></i>`).join("")}</span></div>
@@ -515,6 +528,17 @@ const screens = {
       <p class="muted small">MANU OS web · versión ${APP_VERSION} · datos solo en este dispositivo</p>`;
   },
 };
+
+// «Puesta a punto»: what is still missing, each with one button.
+function setupCard() {
+  const steps = [];
+  if (!["calendar", "tasks", "contacts", "drive"].some(googleOn)) steps.push(["Google", "Calendar, Tasks y Contactos con un toque", '<button class="btn small-btn" data-act="google-connect-all">Conectar</button>']);
+  if (!aiReady()) steps.push(["IA (Gemini)", "Crear la clave y pegarla: 2 toques", '<button class="btn small-btn" data-sub-go="ia">Activar</button>']);
+  if (notificationStatus() === "default") steps.push(["Avisos", "Para que MANU te avise", '<button class="btn small-btn" data-act="notify-on">Activar</button>']);
+  if (shortcutsPending()) steps.push(["Atajos del iPhone", `${shortcutsPending()} por crear (alarmas y recordatorios que suenan siempre)`, '<button class="btn small-btn" data-sub-go="atajos">Ver</button>']);
+  if (!steps.length) return "";
+  return `${sectionTitle("Puesta a punto")}<section class="card">${steps.map(([t, d, b]) => `<div class="row"><div class="grow"><div>${t}</div><div class="muted small">${esc(d)}</div></div>${b}</div>`).join("")}</section>`;
+}
 
 const backBar = (title) => `<button class="link" data-act="back">${I.back} Tú</button><h1>${title}</h1>`;
 
@@ -634,6 +658,8 @@ const subpages = {
   ia() {
     const key = aiStore.key;
     return `${backBar("IA (Gemini)")}
+      ${aiReady() ? "" : `<section class="card"><h2>Actívala en 2 toques</h2><ol class="muted small"><li>Crea tu clave gratis con tu Gmail («Create API key»). No pide tarjeta; si te pide activar facturación, no lo hagas. Cópiala.</li><li>Vuelve aquí y pulsa «Pegar y activar». MANU la prueba y la recuerda en este móvil.</li></ol>
+        <div class="btns"><a class="btn ghost" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">1. Crear mi clave</a><button class="btn" data-act="ai-paste">2. Pegar y activar</button></div></section>`}
       <section class="card"><h2>Estado</h2><p>${aiReady() ? `Activada con <b>${esc(aiStore.model)}</b>.` : key ? "Clave guardada. Pulsa «Probar clave»." : "Sin clave: MANU funciona sin IA."}</p>
         <form id="aiForm" class="stack"><label for="aiKey" class="muted small">Clave de API de Gemini. Nunca va en las copias. Por defecto solo dura mientras MANU está abierta.</label><input id="aiKey" type="password" value="${esc(key)}" autocomplete="off" spellcheck="false" placeholder="AIza…"><div class="btns"><button class="btn" type="submit">Guardar y probar clave</button>${key ? '<button class="btn danger" type="button" data-act="ai-forget">Borrar clave</button>' : ""}</div></form>
         <div class="row"><div class="grow"><div>Recordar la clave en este móvil</div><div class="muted small">Más cómodo, pero cualquier código que corra en esta web podría leerla (ADR-0013).</div></div><button class="check" data-act="ai-remember" aria-pressed="${aiStore.remember}" aria-label="Recordar clave">${I.check}</button></div>
@@ -747,6 +773,7 @@ function closeSheet() {
 }
 
 function render({ focus = false, enter = null } = {}) {
+  if (tab === "tu" && (!sub || sub === "gcal") && isClientId(gClientId())) loadGis().catch(() => {});
   document.body.dataset.mode = modeState(today(), undefined, vault.settings.override).mode;
   renderTabs();
   $("screen").innerHTML = overlay === "weather" ? weatherPage() : (screens[tab] ?? screens.hoy)();
@@ -849,6 +876,18 @@ function shownPayload(p) {
   const { tools, ...rest } = proposalPayload(p);
   return `${JSON.stringify(rest, null, 1)}\n+ lista fija de ${tools[0].functionDeclarations.length} acciones que puede proponer`;
 }
+
+async function activateGemini(key) {
+  aiStore.key = key;
+  try {
+    const model = pickModel(await listModels(key));
+    if (!model) { toast("Tu clave no tiene modelos de texto disponibles"); return false; }
+    aiStore.model = model; vault.settings.aiEnabled = true; persist(); render(); toast(`IA lista: ${model}`);
+    return true;
+  } catch (err) { aiStore.model = ""; render(); toast(err.message); return false; }
+}
+
+const GEMINI_KEY_RE = /^AIza[0-9A-Za-z_-]{30,60}$/;
 
 async function askAi(proposalId, { auto = false } = {}) {
   const bubble = vault.chat.find((b) => b.proposal?.id === proposalId);
@@ -979,11 +1018,21 @@ document.addEventListener("click", async (e) => {
     }
     case "cal-day": calSelected = a.dataset.day; { const d = new Date(`${calSelected}T12:00:00`); if (calView && (d.getMonth() !== calView.m)) calView = { y: d.getFullYear(), m: d.getMonth() }; } render(); break;
     case "cal-today": calView = null; calSelected = null; render(); break;
+    case "money-prev": moneyMonth++; render(); break;
+    case "money-next": moneyMonth = Math.max(0, moneyMonth - 1); render(); break;
     case "money-filter": moneyFilter = moneyFilter === "review" ? null : "review"; render(); break;
     case "spotify-connect": startSpotifyAuth(); break;
     case "spotify-forget": spotifyStore.tokens = null; render(); toast("Spotify desconectado de este móvil"); break;
     case "ask-elsewhere": { const b = vault.chat.find((x) => x.proposal?.id === id); if (b) { try { await navigator.clipboard.writeText(b.proposal.message); } catch {} window.open(askElsewhereUrl(a.dataset.app, b.proposal.message), "_blank", "noopener"); } break; }
     case "ai-cancel": { const b = vault.chat.find((x) => x.proposal?.id === id); if (b) { b.proposal.state = "cancelled"; persist(); render(); } break; }
+    case "ai-paste": {
+      let text = "";
+      try { text = (await navigator.clipboard.readText()).trim(); } catch { toast("No puedo leer el portapapeles: pega la clave en el campo de abajo."); break; }
+      if (!GEMINI_KEY_RE.test(text)) { toast("No veo una clave de Gemini copiada (empieza por «AIza»)."); break; }
+      aiStore.remember = true; // the button says it: remembered on this phone (ADR-0013)
+      await activateGemini(text);
+      break;
+    }
     case "ai-remember": { const k = aiStore.key; aiStore.remember = !aiStore.remember; aiStore.key = k; render(); break; }
     case "ai-forget": aiStore.key = ""; aiStore.model = ""; render(); toast("Clave borrada de este móvil"); break;
     case "ai-toggle": vault.settings.aiEnabled = vault.settings.aiEnabled === false; persist(); render(); break;
@@ -1011,7 +1060,7 @@ document.addEventListener("click", async (e) => {
     case "export": exportBackup(); break;
     case "wipe": confirmWipe = true; render(); break;
     case "wipe-no": confirmWipe = false; render(); break;
-    case "wipe-yes": vault = emptyVault(); confirmWipe = false; persist(); render(); toast("Datos borrados de este dispositivo"); break;
+    case "wipe-yes": { let ss = null, ls = null; try { ss = sessionStorage; ls = localStorage; } catch {} wipeDeviceKeys([ls, ss]); gcal.tokens = {}; vault = emptyVault(); confirmWipe = false; persist(); render(); toast("Datos borrados de este dispositivo"); break; }
   }
 });
 
@@ -1073,12 +1122,7 @@ document.addEventListener("submit", async (e) => {
   if (f === "aiForm") {
     const key = $("aiKey").value.trim();
     if (!key) { aiStore.key = ""; aiStore.model = ""; render(); return; }
-    aiStore.key = key;
-    try {
-      const model = pickModel(await listModels(key));
-      if (!model) { toast("Tu clave no tiene modelos de texto disponibles"); return; }
-      aiStore.model = model; vault.settings.aiEnabled = true; persist(); render(); toast(`IA lista: ${model}`);
-    } catch (err) { aiStore.model = ""; render(); toast(err.message); }
+    await activateGemini(key);
     return;
   }
   if (f === "addHabit") { const n = $("habitName").value.trim(); if (n) { vault.habits.push({ id: uid("h"), name: n.slice(0, 60), done: [] }); persist(); render(); } return; }
@@ -1143,11 +1187,15 @@ document.addEventListener("change", async (e) => {
       const XLSX = await loadSheetJs();
       const wb = XLSX.read(new Uint8Array(await e.target.files[0].arrayBuffer()), { type: "array" });
       let result = { error: "No encuentro reglas en ese Excel." };
+      let classified = null;
       for (const name of wb.SheetNames) {
-        const r = rulesFromRows(XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: true, defval: "" }));
-        if (!r.error) { result = r; break; }
+        const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: true, defval: "" });
+        const r = rulesFromRows(rows);
+        if (!r.error && result.error) result = r;
+        classified ??= classifiedFromRows(rows, vault.spending, vault.settings.categoryRules ?? {});
       }
-      if (result.error) { toast(result.error); return; }
+      if (result.error && !classified?.entries.length) { toast(result.error); return; }
+      if (result.error) result = { rules: {} };
       // Manu's own corrections (plain ids) always win over imported rules.
       const current = vault.settings.categoryRules ?? {};
       const merged = { ...result.rules };
@@ -1155,13 +1203,20 @@ document.addEventListener("change", async (e) => {
       vault.settings.categoryRules = merged;
       const applied = applyRules(vault.spending, merged);
       vault.spending = applied.entries;
-      persist(); render(); toast(`${Object.keys(result.rules).length} reglas importadas · ${applied.changed} gastos reclasificados`);
+      const added = classified?.entries ?? [];
+      vault.spending.push(...added);
+      vault.settings.lastRulesImport = { at: new Date().toISOString(), rules: Object.keys(result.rules).length, reclassified: applied.changed, added: added.length, duplicates: classified?.duplicates ?? 0, review: added.filter((x) => x.review).length };
+      // Show the month with the most recent movement, so the numbers are visible at once.
+      moneyMonth = latestMonthOffset();
+      persist(); render(); scrollTo(0, 0);
+      toast(`${Object.keys(result.rules).length} reglas · ${added.length} gastos importados`);
     } catch { toast("No he podido leer ese Excel."); }
     return;
   }
   if (e.target.id === "bankFile" && e.target.files?.[0]) {
     const file = e.target.files[0];
     const ids = new Set(vault.spending.map((x) => x.id));
+    const legacy = new Map(vault.spending.filter((x) => /^bank-[0-9a-z]+$/.test(x.id)).map((x) => [x.id, x]));
     const rules = vault.settings.categoryRules ?? {};
     let r;
     try {
@@ -1169,13 +1224,16 @@ document.addEventListener("change", async (e) => {
         toast("Leyendo el Excel…");
         const XLSX = await loadSheetJs();
         const wb = XLSX.read(new Uint8Array(await file.arrayBuffer()), { type: "array" });
-        r = importStatementRows(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: "" }), ids, rules);
+        r = importStatementRows(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: "" }), ids, rules, legacy);
       } else {
-        r = importStatement(await file.text(), ids, rules);
+        r = importStatement(await file.text(), ids, rules, legacy);
       }
     } catch { toast("No he podido leer ese archivo."); return; }
     if (r.error) { toast(r.error); return; }
+    const cross = dropCrossSource(r.entries, vault.spending, "CHATGPT");
+    r.entries = cross.entries; r.duplicates += cross.duplicates;
     vault.spending.push(...r.entries);
+    moneyMonth = latestMonthOffset();
     vault.settings.lastImport = { at: new Date().toISOString(), added: r.entries.length, duplicates: r.duplicates, income: r.skippedIncome, invalid: r.skippedInvalid };
     persist(); render(); toast(`${r.entries.length} gastos importados`); return;
   }
@@ -1189,16 +1247,20 @@ document.addEventListener("change", async (e) => {
 });
 
 // ---------- Google Calendar (Google Identity Services token model) ----------
+// Loaded once and ahead of the tap (Tú, Google), so the consent window opens
+// inside Manu's gesture: iOS blocks it after a network wait (QAL-015).
+let gisLoading = null;
 function loadGis() {
   if (globalThis.google?.accounts?.oauth2) return Promise.resolve();
-  return new Promise((resolve, reject) => {
+  gisLoading ??= new Promise((resolve, reject) => {
     const el = document.createElement("script");
     el.src = "https://accounts.google.com/gsi/client";
     el.async = true;
     el.onload = () => resolve();
-    el.onerror = () => reject(new Error("No se pudo cargar el acceso de Google. ¿Tienes conexión?"));
+    el.onerror = () => { gisLoading = null; el.remove(); reject(new Error("No se pudo cargar el acceso de Google. ¿Tienes conexión?")); };
     document.head.appendChild(el);
   });
+  return gisLoading;
 }
 
 // One token per scope. Scopes of the features Manu enabled are requested
@@ -1245,9 +1307,11 @@ async function withRetry(scope, fn) {
   catch (err) { if (err.code !== "auth") throw err; delete gcal.tokens[scope]; return fn(await googleToken(scope)); }
 }
 
-async function syncGoogle() {
+// silent: automatic refresh. Never opens a Google window (iOS would block it
+// and it would interrupt Manu); it only uses tokens still valid in memory.
+async function syncGoogle({ silent = false } = {}) {
   if (gcal.busy) return;
-  gcal.busy = true; gcal.error = null; render();
+  gcal.busy = true; gcal.lastRun = Date.now(); if (!silent) { gcal.error = null; render(); }
   const services = [
     { key: "calendar", scope: SCOPE.calendar, run: async () => {
       const now = new Date();
@@ -1284,15 +1348,33 @@ async function syncGoogle() {
   const enabled = Object.fromEntries(["calendar", "tasks", "contacts"].map((k) => [k, googleOn(k)]));
   const wanted = Object.keys(enabled).filter((k) => enabled[k]).map((k) => SCOPE[k]);
   if (enabled.calendar) wanted.push(SCOPE.calendarList); // to show all of Manu's calendars
-  try { await googleConsent(wanted); } catch { /* each service reports its own missing permission */ }
+  if (silent) {
+    // Only the services whose permission is still valid; the rest wait for a tap.
+    for (const k of Object.keys(enabled)) if (enabled[k] && !validToken(SCOPE[k])) enabled[k] = false;
+    if (!Object.values(enabled).some(Boolean)) { gcal.busy = false; return; }
+  } else {
+    try { await googleConsent(wanted); } catch { /* each service reports its own missing permission */ }
+  }
   const status = await runServices(services, enabled, cachedToken);
   vault.settings.googleStatus = { ...(vault.settings.googleStatus ?? {}), ...status };
   if (status.calendar?.startsWith("ok")) vault.settings.gcalSyncedAt = new Date().toISOString();
   const failed = Object.values(status).filter((v) => v.startsWith("error"));
   gcal.error = failed.length ? failed.map((v) => v.replace(/^error: /, "")).join(" · ") : null;
   gcal.busy = false;
-  persist(); render();
+  persist();
+  if (silent) { if (!sheet && !document.activeElement?.matches("input, textarea")) render(); return; }
+  render();
   toast(failed.length ? "Google: algo no se ha sincronizado" : "Google sincronizado");
+}
+
+const validToken = (scope) => { const t = gcal.tokens[scope]; return Boolean(t && Date.now() < t.expires - 60000); };
+const AUTO_SYNC_MS = 10 * 60000;
+function autoSyncGoogle() {
+  if (document.visibilityState !== "visible" || !navigator.onLine || gcal.busy) return;
+  if (!["calendar", "tasks", "contacts"].some((k) => googleOn(k) && validToken(SCOPE[k]))) return;
+  const last = Math.max(Date.parse(vault.settings.gcalSyncedAt ?? "") || 0, gcal.lastRun ?? 0);
+  if (Date.now() - last < AUTO_SYNC_MS) return;
+  syncGoogle({ silent: true }).catch(() => { gcal.busy = false; });
 }
 
 // SheetJS (vendor/, Apache-2.0) is loaded only when an Excel file is imported.
@@ -1368,4 +1450,6 @@ refreshWeather();
 if (isClientId(gClientId()) && GOOGLE_FEATURES.some(([k]) => googleOn(k))) loadGis().catch(() => {});
 checkReminders();
 setInterval(checkReminders, 30000);
+setInterval(autoSyncGoogle, 60000);
+document.addEventListener("visibilitychange", autoSyncGoogle);
 setInterval(() => { if (tab === "hoy" && !sheet && !document.activeElement?.matches("input, textarea")) render(); }, 60000);
