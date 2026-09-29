@@ -102,3 +102,11 @@ WEB-22 se fusionó tras pasar su recorrido nuevo y 5 regresiones, pero no el rec
 ### QAL-023 — Al relajar un filtro de privacidad, separar antes lo que nunca debe salir
 
 En WEB-28, al dejar que el ánimo fuera a la IA, «morir» y «refugio» estaban dentro del grupo «ánimo» y se habrían relajado con él. Además, «quiero morir» no activaba la ayuda de crisis. Antes de ampliar lo que se envía, hay que sacar a una categoría que nunca se permite lo que debe quedarse en el móvil (crisis y secretos), y probar frases reales de crisis contra el detector.
+
+### QAL-024 — Probar el teclado de iOS con un viewport visual simulado, no solo con un viewport pequeño
+
+WEB-26 dio por bueno el composer con el teclado abierto, pero en el iPhone quedaba tapado. En iOS, el teclado encoge solo `visualViewport`; `innerHeight` y el layout viewport no cambian, y `sticky` y `fixed` se anclan al layout viewport. Un recorrido de navegador que solo reduce la ventana no reproduce el fallo. Hay que simular `visualViewport` (altura y `offsetTop`) y comprobar la posición real del elemento frente al borde del teclado.
+
+### QAL-025 — Cada módulo nuevo debe entrar en la caché de instalación del service worker
+
+Cinco módulos añadidos entre WEB-22 y WEB-27 no estaban en `SHELL`, así que sin conexión la app podía no arrancar. Lo comprueba `web/tests/sw-shell.test.js`.

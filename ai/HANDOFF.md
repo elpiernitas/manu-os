@@ -10,6 +10,35 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
+## WEB-29 — chat con el teclado del iPhone y caché sin conexión
+
+Manu (2026-09-29, con capturas): «el chat se buguea un poco». Con el teclado abierto, la barra de escribir quedaba tapada por el teclado o flotando a media pantalla.
+
+### Causa
+
+En iOS, el teclado encoge solo el viewport visual; el layout viewport sigue a pantalla completa. Un composer `position: sticky; bottom` se ancla al layout viewport, así que quedaba detrás del teclado. Si el chat era corto, se quedaba en su sitio del flujo, a media pantalla.
+
+### Cambios
+
+- `web/app.js`:
+  - `placeComposer` fija la variable `--kb-bottom` al borde inferior del viewport visual (`offsetTop + height`). Se recalcula al redimensionar y al desplazar el viewport visual;
+  - al abrirse el teclado, el chat baja al último mensaje;
+  - versión 29.
+- `web/styles.css`: con `body.kb`, el composer y la captura adjunta pasan a `position: fixed` justo encima del teclado. El chat reserva sitio (`padding-bottom` y `scroll-margin-bottom`) para que el último mensaje no quede debajo.
+- `web/sw.js`: faltaban 5 módulos en la caché de instalación (`converse`, `imagestore`, `links`, `projects` y `scene`). Sin ellos, la app podía no arrancar sin conexión justo tras actualizarse. `web/tests/sw-shell.test.js` impide que vuelva a pasar.
+
+### Resultados
+
+- `npm test`: 106/106 PASS. `node --check` pasa.
+- Chromium con un viewport visual simulado como el de iOS (e2e29, 8 checks):
+  - con el código anterior, el composer quedaba en y=656 bajo un teclado que empieza en y=430 (FAIL reproducido);
+  - con el arreglo queda justo encima (bottom 420), sigue al viewport visual cuando se desplaza, mantiene el foco al enviar y vuelve a su sitio al cerrar el teclado.
+- e2e3, e2e4 y e2e10–e2e28 en PASS. e2e18 mantiene las 3 expectativas antiguas que también fallan en `main`.
+
+### NO_VERIFICADO
+
+- En el iPhone real. La simulación reproduce el modelo de viewports de iOS, pero no es Safari.
+
 ## WEB-28 — «Permitir datos sensibles» en la IA
 
 Manu (2026-09-29): «que lo sensible vaya a la IA me da igual».

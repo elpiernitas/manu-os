@@ -2,11 +2,11 @@
 
 Status: **REVIEW_PENDING**
 
-WEB-28 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
+WEB-29 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
 
 ## Tarea activa
 
-WEB-28 — «Permitir datos sensibles» en la IA, por decisión de Manu; secretos, crisis y Refugio nunca (`ai/HANDOFF.md`, «WEB-28»; enmienda WEB-28 de ADR-0013).
+WEB-29 — chat con el teclado del iPhone y caché sin conexión completa (`ai/HANDOFF.md`, «WEB-29»).
 
 ## Autorización
 
@@ -44,6 +44,7 @@ WEB-28 — «Permitir datos sensibles» en la IA, por decisión de Manu; secreto
 
 ## Historial (cerrado)
 
+- **WEB-28** (datos sensibles permitidos por Manu): CERRADA. Fusionada mediante el PR #36 (`f1cd738`).
 - **WEB-27** (modo conversación): CERRADA. Fusionada mediante el PR #35 (`fbc1f60`).
 - **WEB-26** (chat y teclado): CERRADA. Fusionada mediante el PR #34 (`1a02cd9`).
 - **WEB-25** (proyectos y capturas en el chat): CERRADA. Fusionada mediante el PR #33 (`a6a7a01`).

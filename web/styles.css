@@ -524,7 +524,9 @@ body[data-screen="hoy"][data-wx="fog"] .ambient { background: linear-gradient(18
 .chat-attach { position: sticky; bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px) + 78px); z-index: 2; }
 /* ---------- WEB-26: con el teclado abierto ---------- */
 body.kb .tabbar, body.kb #fab { opacity: 0; pointer-events: none; transform: translateY(20px); transition: opacity 150ms ease, transform 150ms ease; }
-body.kb .composer { bottom: 8px; }
-body.kb .chat-attach { bottom: 70px; }
+body.kb .composer { position: fixed; left: max(12px, calc(50% - 248px)); right: max(12px, calc(50% - 248px)); top: calc(var(--kb-bottom, 100dvh) - 68px); bottom: auto; margin: 0; z-index: 40; }
+body.kb .chat-attach { position: fixed; left: max(12px, calc(50% - 248px)); right: max(12px, calc(50% - 248px)); top: calc(var(--kb-bottom, 100dvh) - 146px); bottom: auto; margin: 0; z-index: 40; }
+body.kb .chat { padding-bottom: 84px; }
+body.kb .chat > * { scroll-margin-bottom: 84px; }
 .proposal-what { margin: 8px 0 4px; }
 .ai-call.done { border-color: rgba(61,220,151,.35); } .ai-offer { gap: 6px; margin-bottom: 8px; }
