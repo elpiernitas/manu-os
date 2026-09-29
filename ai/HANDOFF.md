@@ -10,6 +10,43 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
+## WEB-38 — Personas: autocompletar contactos y cumpleaños en Google Calendar
+
+Manu (2026-09-29, captura): quiere que en Personas se autocomplete el nombre con Google Contactos, que se rellenen los campos y que el cumpleaños se marque solo en el calendario.
+
+### Cambios
+
+- `web/core/google.js`: la lectura de Contactos pide también `phoneNumbers`; `contactsFrom` da todos los contactos (nombre, cumpleaños y móvil) ordenados.
+- `web/core/gcal.js`: `birthdayEventBody` crea un evento de día completo, anual (`RRULE:FREQ=YEARLY`), desde la próxima fecha. El 29 de febrero empieza en el siguiente año bisiesto.
+- `web/app.js`:
+  - `vault.contacts` guarda la lista para autocompletar (con «Traer los nombres de Google Contactos» si aún no está);
+  - el nombre con `datalist`: al elegir un contacto se rellenan el cumpleaños y el móvil si están vacíos;
+  - el cumpleaños se elige con día y mes (sin año);
+  - «Ponerlo en Google Calendar (cada año)», marcado por defecto. Se desmarca con una nota si el contacto ya tiene cumpleaños en Google, para no duplicarlo con el calendario «Cumpleaños» de Google;
+  - «🎂 Al calendario» para personas ya guardadas;
+  - los cumpleaños de Personas salen en Agenda aunque no haya Google;
+  - «Cumple mañana» en lugar de «en 1 días»;
+  - versión 38.
+
+### Privacidad
+
+- Nombres, cumpleaños y móviles de los contactos se guardan en el vault del dispositivo y en su copia cifrada. Nunca en el repositorio ni en Gemini, salvo la categoría «Personas» marcada.
+
+### Resultados
+
+- `npm test`: 124/124 PASS (tests nuevos en `gcal.test.js` y `google.test.js`). `node --check` pasa.
+- e2e38 (Contactos y Calendar simulados): 11/11. Cubre:
+  - día y mes, contactos traídos y los que tienen cumpleaños aparecen solos;
+  - al elegir un contacto se rellena el móvil;
+  - el evento es anual y de día completo, y la persona queda enlazada al contacto y al evento;
+  - el contacto con cumpleaños en Google se desmarca con nota;
+  - Agenda muestra el cumpleaños de mañana.
+- e2e3 actualizado (selects y botón de guardar). e2e3, e2e4 y e2e10–e2e37 en PASS, salvo las 3 expectativas antiguas de e2e18.
+
+### NO_VERIFICADO
+
+- Con los contactos y el calendario reales de Manu. Que el calendario «Cumpleaños» de Google muestre los de sus contactos depende de su configuración de Google.
+
 ## WEB-37 — cada chat es una conversación nueva; la anterior va a «Tu archivo»
 
 Manu (2026-09-29, captura): «quiero que se vaya eliminando el historial, que cada chat sea una conversación nueva, a no ser que me refiera a algo hablado anteriormente».
