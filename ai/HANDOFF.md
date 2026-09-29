@@ -10,6 +10,34 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
+## WEB-30 — zona inferior: chat, barra y pestañas
+
+Manu (2026-09-29, captura): «y las posiciones de abajo también».
+
+La captura muestra tres problemas:
+- el contenido del chat se leía entre la barra de escribir y la de pestañas;
+- el último mensaje podía quedar debajo de las barras;
+- la etiqueta «MANU» estaba 3 px más baja que las demás.
+
+### Cambios
+
+- `web/styles.css`:
+  - un degradado fijo (`body::after`) bajo las barras flotantes. Es más alto en el chat y, con el teclado abierto, se coloca justo encima del teclado;
+  - el composer y la captura adjunta quedan por encima del degradado;
+  - `scroll-margin-bottom` en los mensajes, para que el último siempre quede por encima de las barras;
+  - la «M» de la pestaña pasa a 26 px con margen negativo, así que todas las etiquetas quedan en la misma línea.
+- Versión 30.
+
+### Resultados
+
+- `npm test`: 106/106 PASS. `node --check` pasa.
+- e2e30 (iPhone 14, 4 checks): etiquetas alineadas (antes 630 frente a 627), último mensaje por encima del composer, composer por encima de la barra sin solaparse y degradado presente.
+- e2e3, e2e4 y e2e10–e2e29 en PASS, salvo las 3 expectativas antiguas de e2e18, que también fallan en `main`.
+
+### NO_VERIFICADO
+
+- En el iPhone real.
+
 ## WEB-29 — chat con el teclado del iPhone y caché sin conexión
 
 Manu (2026-09-29, con capturas): «el chat se buguea un poco». Con el teclado abierto, la barra de escribir quedaba tapada por el teclado o flotando a media pantalla.

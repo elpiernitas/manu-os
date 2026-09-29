@@ -2,11 +2,11 @@
 
 Status: **REVIEW_PENDING**
 
-WEB-29 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
+WEB-30 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
 
 ## Tarea activa
 
-WEB-29 — chat con el teclado del iPhone y caché sin conexión completa (`ai/HANDOFF.md`, «WEB-29»).
+WEB-30 — zona inferior del chat, la barra de escribir y las pestañas (`ai/HANDOFF.md`, «WEB-30»).
 
 ## Autorización
 
@@ -44,6 +44,7 @@ WEB-29 — chat con el teclado del iPhone y caché sin conexión completa (`ai/H
 
 ## Historial (cerrado)
 
+- **WEB-29** (chat con teclado y caché sin conexión): CERRADA. Fusionada mediante el PR #37 (`ffbcf52`).
 - **WEB-28** (datos sensibles permitidos por Manu): CERRADA. Fusionada mediante el PR #36 (`f1cd738`).
 - **WEB-27** (modo conversación): CERRADA. Fusionada mediante el PR #35 (`fbc1f60`).
 - **WEB-26** (chat y teclado): CERRADA. Fusionada mediante el PR #34 (`1a02cd9`).

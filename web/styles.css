@@ -530,3 +530,13 @@ body.kb .chat { padding-bottom: 84px; }
 body.kb .chat > * { scroll-margin-bottom: 84px; }
 .proposal-what { margin: 8px 0 4px; }
 .ai-call.done { border-color: rgba(61,220,151,.35); } .ai-offer { gap: 6px; margin-bottom: 8px; }
+/* ---------- WEB-30: zona inferior limpia ---------- */
+/* A fade under the floating bars so the scrolling content never reads through them. */
+body::after { content: ""; position: fixed; left: 0; right: 0; bottom: 0; z-index: 7; pointer-events: none; height: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px) + 56px); background: linear-gradient(to bottom, rgba(5,6,8,0), var(--bg) 55%); }
+body[data-screen="manu"]::after { height: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px) + 112px); background: linear-gradient(to bottom, rgba(5,6,8,0), var(--bg) 38%); }
+body.kb::after { top: auto; bottom: calc(100% - var(--kb-bottom, 100%)); height: 96px; background: linear-gradient(to bottom, rgba(5,6,8,0), var(--bg) 45%); }
+.composer, .chat-attach { z-index: 8; }
+/* The newest message is always scrolled clear of the composer and the tab bar. */
+.chat > * { scroll-margin-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px) + 100px); }
+/* The «M» is a little larger than the icons; keep every label on the same line. */
+.tab .dot { width: 26px; height: 26px; margin-block: -2px; font-size: 14px; }
