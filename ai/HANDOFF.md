@@ -10,6 +10,24 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
+## WEB-39 — el Refugio empieza limpio
+
+Manu (2026-09-29, captura): «en refugio aparece el historial; técnicamente tendría que ser como un chat de prueba que no se guarda ni tiene registro».
+
+### Causa y cambio
+
+- El chat pintaba el historial normal seguido de los mensajes del Refugio. Ahora, con el Refugio abierto, solo se ven sus mensajes (`web/app.js`). El Refugio ya vivía solo en memoria: no se guarda en el vault, no va a «Tu archivo» ni a Gemini.
+- Versión 39.
+
+### Resultados
+
+- `npm test`: 124/124 PASS. `node --check` pasa.
+- e2e39: 4/4. Cubre:
+  - el Refugio empieza sin el chat anterior;
+  - sus mensajes se ven, pero no se guardan en el vault;
+  - al salir vuelve el chat normal sin rastro del Refugio.
+- e2e3, e2e4 y e2e10–e2e38 en PASS, salvo las 3 expectativas antiguas de e2e18.
+
 ## WEB-38 — Personas: autocompletar contactos y cumpleaños en Google Calendar
 
 Manu (2026-09-29, captura): quiere que en Personas se autocomplete el nombre con Google Contactos, que se rellenen los campos y que el cumpleaños se marque solo en el calendario.
