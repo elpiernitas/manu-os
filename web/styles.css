@@ -253,3 +253,8 @@ details.card > summary { list-style: none; }
 .week-bars i { width: 70%; max-width: 26px; border-radius: 6px 6px 3px 3px; background: linear-gradient(180deg, var(--accent), var(--fill)); display: block; transition: height 500ms var(--ease-out); }
 @media (prefers-reduced-motion: reduce) { .cal-grid.slide { animation: none; } .week-bars i { transition: none; } }
 .small-btn { min-height: 36px; padding: 6px 14px; font-size: 15px; flex: none; }
+.guide-step .step-n { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--fill); color: #fff; font-weight: 700; flex: none; }
+.guide-step .step-n svg { width: 16px; height: 16px; }
+.guide-step.done { opacity: .6; }
+.guide-step h2 { margin: 0; }
+.guide-step.done .step-n { background: var(--ok); color: #050608; }

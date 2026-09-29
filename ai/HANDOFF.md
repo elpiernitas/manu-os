@@ -10,6 +10,32 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
+## WEB-14 — tutorial paso a paso para activar Gemini
+
+Petición de Manu (2026-09-29): al pulsar «Activar» de Gemini quiere un tutorial paso a paso, con enlace a «Create API key» y con «Pegar y activar» en el mismo sitio, y que después desaparezca de su vista.
+
+### Cambios
+
+- `web/app.js`: la vista `gemini` (`geminiGuide`) se abre desde «Puesta a punto» y desde Tú → IA. Tiene 4 pasos:
+  1. abrir `aistudio.google.com/apikey` (el paso se marca como hecho al pulsarlo);
+  2. crear la clave, sin activar la facturación;
+  3. copiarla;
+  4. «Pegar y activar», con un campo manual de respaldo.
+- Al activar la clave, el tutorial se cierra, vuelve a Tú, y la fila de «Puesta a punto» y la tarjeta de IA desaparecen. Versión 14 (`manuos-v14`).
+
+### Resultados
+
+- `npm test`: 79/79 PASS.
+- Chromium headless con AI Studio y Gemini simulados:
+  - 4 pasos; el enlace abre `https://aistudio.google.com/apikey` en una ventana nueva;
+  - el paso 1 queda marcado; una clave manual inválida se rechaza;
+  - al pegar una válida se cierra y vuelve a Tú sin la fila de IA, y la página de IA ya no muestra el tutorial;
+  - regresiones en PASS.
+
+### NO_VERIFICADO
+
+- En el iPhone: cómo se ve AI Studio desde la app instalada y que funcione «Pegar» con el portapapeles de iOS. Los nombres exactos de los botones de AI Studio pueden cambiar, por eso el tutorial menciona las dos variantes.
+
 ## WEB-13 — correcciones de la revisión de ChatGPT (PR #15/#16)
 
 Revisión pedida por Manu y devuelta el 2026-09-29 sobre `4b19d3e` y `dfb0c56`.
