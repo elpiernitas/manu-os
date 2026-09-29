@@ -94,3 +94,7 @@ Si un manejador delegado usa `e.target.closest("[data-x]")` y se pone `data-x` e
 
 WEB-22 se fusionó tras pasar su recorrido nuevo y 5 regresiones, pero no el recorrido de Drive, que apunta un gasto desde Dinero escribiendo primero el concepto. Ese recorrido habría mostrado que la hoja nueva cambiaba sola a «Tarea» y el gasto no se guardaba. Se detectó en WEB-23 y se corrigió con una regresión en el recorrido de la hoja. Antes de fusionar hay que ejecutar todos los recorridos existentes.
 
+### QAL-022 — Ejecutar en local las mismas comprobaciones que CI antes del navegador
+
+`npm test` no importa `web/app.js`, así que un error de sintaxis en una plantilla solo aparece al cargar la página. El CI ya ejecuta `node --check` sobre `app.js`, `sw.js` y `core/*.js`. En WEB-26, un recorrido de navegador falló por esa causa antes de publicar. Antes de los recorridos, hay que ejecutar en local el mismo bucle de `node --check`.
+

@@ -25,3 +25,11 @@ test("numbers that are not money stay as tasks", () => {
   assert.equal(quickDetect("comprar 2 kilos de patatas", now).kind, "TASK");
   assert.equal(quickDetect("revisar el informe 3", now).kind, "TASK");
 });
+
+import { parse, reply } from "../core/assistant.js";
+test("greetings and thanks are handled locally", () => {
+  for (const t of ["hola", "Hola!", "buenas", "buenos días", "¿qué tal?", "hola manu"]) assert.equal(parse(t).kind, "greeting", t);
+  for (const t of ["gracias", "muchas gracias!", "vale"]) assert.equal(parse(t).kind, "thanks", t);
+  assert.equal(parse("hola, apunta idea: x").kind === "greeting", false);
+  assert.ok(reply({ kind: "greeting" }).startsWith("¡"));
+});

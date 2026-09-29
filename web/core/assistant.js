@@ -61,6 +61,10 @@ export function parse(input) {
   if (text.includes("manana") && (text.includes("que tengo") || text.includes("agenda"))) return { kind: "agenda", day: "tomorrow" };
   if (text.includes("que tengo") || text.includes("agenda") || text.includes("mi dia")) return { kind: "agenda", day: "today" };
   if (text.includes("refugio")) return { kind: "refuge" };
+  // Greetings and thanks are answered by MANU itself, never sent to the AI.
+  const bare = text.replace(/^[¿¡\s]+/, "");
+  if (/^(hola|holi|buenas|buenos dias|buenas tardes|buenas noches|hey|ey|que tal|como estas|que pasa)\b[\s!?.,]*(manu)?[\s!?.,]*$/.test(bare)) return { kind: "greeting" };
+  if (/^(gracias|muchas gracias|genial|perfecto|vale|ok|okey)\b[\s!?.,]*(manu)?[\s!?.,]*$/.test(bare)) return { kind: "thanks" };
   return { kind: "unknown" };
 }
 
@@ -99,6 +103,10 @@ export function reply(intent, variant = 0) {
       return `Apuntado: «${intent.text}» ${intent.tomorrow ? "mañana" : "hoy"} a las ${intent.time}. Te aviso si tienes MANU abierta; para que suene siempre, añádelo al iPhone.`;
     case "refuge":
       return "Abro el Refugio. Aquí no hay prisa.";
+    case "greeting":
+      return ["¡Hola, Manu! ¿Qué apunto? Un gasto, una tarea, un recordatorio… o pregúntame qué tienes hoy.", "¡Buenas! Aquí estoy. Dime qué necesitas."][v];
+    case "thanks":
+      return ["¡A mandar!", "Nada, para eso estoy."][v];
     default:
       return [
         "No te he entendido del todo. Puedo guardar una idea, apuntar un gasto o enseñarte tu agenda.",
