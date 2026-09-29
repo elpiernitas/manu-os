@@ -10,6 +10,29 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
+## WEB-15 — Spotify conectado con un toque
+
+Manu creó con Claude en Chrome la app «MANU OS» en Spotify for Developers (2026-09-29): modo Development, redirección a la web publicada, solo Web API y un usuario, el propio Manu. El secreto no se copió.
+
+### Cambios
+
+- `web/app.js`:
+  - `DEFAULT_SPOTIFY_CLIENT_ID` y `spClientId()`;
+  - la página de Spotify tiene un solo botón «Conectar Spotify», con el altavoz y un Client ID alternativo en «Ajustes avanzados»;
+  - Spotify aparece en «Puesta a punto»;
+  - versión 15 (`manuos-v15`).
+- Enmienda WEB-15 de ADR-0014.
+
+### Resultados
+
+- `npm test`: 79/79 PASS.
+- Chromium: Spotify en «Puesta a punto»; la página ya no pide el Client ID; «Conectar» va a `accounts.spotify.com/authorize` con el Client ID de Manu, PKCE S256, los scopes de reproducción y sin secreto. Regresiones en PASS.
+
+### NO_VERIFICADO
+
+- El intercambio real de tokens y cambiar al altavoz «baño» con la cuenta de Manu en modo Development.
+- En iOS, que la vuelta de Spotify llegue a la app instalada.
+
 ## WEB-14 — tutorial paso a paso para activar Gemini
 
 Petición de Manu (2026-09-29): al pulsar «Activar» de Gemini quiere un tutorial paso a paso, con enlace a «Create API key» y con «Pegar y activar» en el mismo sitio, y que después desaparezca de su vista.

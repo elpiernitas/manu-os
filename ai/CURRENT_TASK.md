@@ -2,11 +2,11 @@
 
 Status: **REVIEW_PENDING**
 
-WEB-14 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
+WEB-15 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
 
 ## Tarea activa
 
-WEB-14 — tutorial paso a paso para activar Gemini (`ai/HANDOFF.md`, «WEB-14»).
+WEB-15 — Spotify conectado con un toque usando la app «MANU OS» de Manu (`ai/HANDOFF.md`, «WEB-15»; enmienda WEB-15 de ADR-0014).
 
 ## Autorización
 
@@ -41,6 +41,7 @@ WEB-14 — tutorial paso a paso para activar Gemini (`ai/HANDOFF.md`, «WEB-14»
 
 ## Historial (cerrado)
 
+- **WEB-14** (tutorial de Gemini): CERRADA. Fusionada mediante el PR #22 (`c8109ee`).
 - **WEB-13** (revisión de ChatGPT, calendario automático, gastos del Excel, puesta a punto): CERRADA. Fusionada mediante el PR #21 (`750589e`), con el «sí» de Manu.
 - **WEB-12** (IA que propone acciones): CERRADA. Fusionada mediante el PR #20 (`9a5bf6f`).
 - **WEB-11** (todos los calendarios con color, WhatsApp): CERRADA. Fusionada mediante el PR #19 (`88b3df3`).

@@ -18,13 +18,16 @@ import { isSpotifyClientId, pkceValid, randomVerifier, challengeFor, authorizeUr
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "14";
+export const APP_VERSION = "15";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
 // Public OAuth client of Manu's Google Cloud project "MANU OS" (not a secret:
 // it only works from the authorised origin https://elpiernitas.github.io).
 const DEFAULT_GOOGLE_CLIENT_ID = "531306255339-r6gmmrvd0otte4ee4rr9rivb25le09ko.apps.googleusercontent.com";
+// Client ID of Manu's Spotify app «MANU OS» (Development mode). Public by design
+// with PKCE: there is no client secret in the app (ADR-0014).
+const DEFAULT_SPOTIFY_CLIENT_ID = "f5a3acb0124f45179c0d1d0b54e66f3b";
 
 const store = new LocalStore(globalThis.localStorage ?? { getItem: () => null, setItem: () => { throw new Error("no storage"); } });
 const loaded = store.load();
@@ -67,7 +70,8 @@ const spotifyStore = {
   get tokens() { try { return JSON.parse(localStorage.getItem("manuos.spotify.tokens") || "null"); } catch { return null; } },
   set tokens(v) { try { v ? localStorage.setItem("manuos.spotify.tokens", JSON.stringify(v)) : localStorage.removeItem("manuos.spotify.tokens"); } catch {} },
 };
-const spotifyReady = () => isSpotifyClientId(vault.settings.spotifyClientId);
+const spClientId = () => vault.settings.spotifyClientId || DEFAULT_SPOTIFY_CLIENT_ID;
+const spotifyReady = () => isSpotifyClientId(spClientId());
 const aiReady = () => Boolean(aiStore.key && aiStore.model && vault.settings.aiEnabled !== false);
 let variant = vault.chat.length;
 const weather = { loading: false, error: null };
@@ -284,7 +288,7 @@ async function spotifyToken() {
   if (!t) return null;
   if (Date.now() > t.expires - 60000) {
     if (!t.refresh) return null;
-    t = await refreshTokens({ clientId: vault.settings.spotifyClientId, refresh: t.refresh });
+    t = await refreshTokens({ clientId: spClientId(), refresh: t.refresh });
     spotifyStore.tokens = t;
   }
   return t.access;
@@ -294,7 +298,7 @@ async function startSpotifyAuth() {
   const verifier = randomVerifier();
   const state = randomVerifier(24);
   try { localStorage.setItem("manuos.spotify.pkce", JSON.stringify({ verifier, state, at: Date.now() })); } catch {}
-  location.assign(authorizeUrl({ clientId: vault.settings.spotifyClientId, redirectUri: SITE, challenge: await challengeFor(verifier), state }));
+  location.assign(authorizeUrl({ clientId: spClientId(), redirectUri: SITE, challenge: await challengeFor(verifier), state }));
 }
 
 function openSpotifyApp() {
@@ -323,7 +327,7 @@ async function finishSpotifyAuth(params) {
   try { pkce = JSON.parse(localStorage.getItem("manuos.spotify.pkce") || "null"); localStorage.removeItem("manuos.spotify.pkce"); } catch {}
   if (!pkceValid(pkce, params.get("state"))) { toast("No he podido conectar Spotify (sesión caducada). Inténtalo otra vez."); return; }
   try {
-    spotifyStore.tokens = await exchangeCode({ clientId: vault.settings.spotifyClientId, code: params.get("code"), redirectUri: SITE, verifier: pkce.verifier });
+    spotifyStore.tokens = await exchangeCode({ clientId: spClientId(), code: params.get("code"), redirectUri: SITE, verifier: pkce.verifier });
     toast("Spotify conectado");
   } catch { toast("Spotify no ha dado permiso"); }
 }
@@ -532,7 +536,7 @@ const screens = {
       <div class="list">
         ${item("tiempo", "pin", "blue", "Tiempo y ciudades", `Casa: ${(vault.settings.homeCity ?? CITIES.GIJON).name}`)}
         ${item("gcal", "google", "blue", "Google", isClientId(gClientId()) ? "Calendar, Tasks, Contactos y Drive" : "Conectar tus servicios de Google")}
-        ${item("spotify", "leaf", "green", "Spotify", spotifyReady() ? (spotifyStore.tokens ? `Conectado · altavoz «${vault.settings.spotifySpeaker || DEFAULT_SPEAKER}»` : "Configurado, sin conectar") : "Música en tu altavoz")}
+        ${item("spotify", "leaf", "green", "Spotify", spotifyStore.tokens ? `Conectado · altavoz «${vault.settings.spotifySpeaker || DEFAULT_SPEAKER}»` : "Sin conectar: un toque")}
         ${item("ia", "bolt", "purple", "IA (Gemini)", aiReady() ? `Activada · ${aiStore.model}` : "Chat con IA opcional")}
         ${item("atajos", "bolt", "orange", "Atajos del iPhone", shortcutsPending() ? `${shortcutsPending()} pendientes de crear` : "Todos creados")}
         ${item("avisos", "bell", "red", "Avisos", "Notificaciones de MANU")}
@@ -548,6 +552,7 @@ function setupCard() {
   if (!["calendar", "tasks", "contacts", "drive"].some(googleOn)) steps.push(["Google", "Calendar, Tasks y Contactos con un toque", '<button class="btn small-btn" data-act="google-connect-all">Conectar</button>']);
   if (!aiReady()) steps.push(["IA (Gemini)", "Crear la clave y pegarla: 2 toques", '<button class="btn small-btn" data-act="gemini-guide">Activar</button>']);
   if (notificationStatus() === "default") steps.push(["Avisos", "Para que MANU te avise", '<button class="btn small-btn" data-act="notify-on">Activar</button>']);
+  if (!spotifyStore.tokens) steps.push(["Spotify", `Música en tu altavoz «${vault.settings.spotifySpeaker || DEFAULT_SPEAKER}»: un toque`, '<button class="btn small-btn" data-act="spotify-connect">Conectar</button>']);
   if (shortcutsPending()) steps.push(["Atajos del iPhone", `${shortcutsPending()} por crear (alarmas y recordatorios que suenan siempre)`, '<button class="btn small-btn" data-sub-go="atajos">Ver</button>']);
   if (!steps.length) return "";
   return `${sectionTitle("Puesta a punto")}<section class="card">${steps.map(([t, d, b]) => `<div class="row"><div class="grow"><div>${t}</div><div class="muted small">${esc(d)}</div></div>${b}</div>`).join("")}</section>`;
@@ -656,17 +661,14 @@ const subpages = {
   spotify() {
     const id = vault.settings.spotifyClientId ?? "";
     return `${backBar("Spotify")}
-      <section class="card"><h2>Estado</h2><p>${spotifyReady() ? (spotifyStore.tokens ? "Conectado." : "Configurado. Conéctalo para elegir el altavoz.") : "Sin configurar: «Música» solo abre Spotify."}</p>
+      <section class="card"><h2>Estado</h2><p>${spotifyStore.tokens ? `Conectado · altavoz «${esc(vault.settings.spotifySpeaker || DEFAULT_SPEAKER)}».` : "Tu app «MANU OS» de Spotify ya está creada. Solo falta conectarla: se abre Spotify, aceptas y vuelves a MANU."}</p>
+        <div class="btns"><button class="btn${spotifyStore.tokens ? " ghost" : " block"}" type="button" data-act="spotify-connect">${spotifyStore.tokens ? "Reconectar" : "Conectar Spotify"}</button>${spotifyStore.tokens ? '<button class="btn danger" type="button" data-act="spotify-forget">Desconectar</button>' : ""}</div>
+        <p class="muted small">MANU solo pide ver y cambiar el altavoz de reproducción, nunca reproduce por su cuenta. Cambiar de altavoz desde fuera de Spotify suele requerir Premium.</p></section>
+      <details class="card"><summary>Ajustes avanzados</summary>
         <form id="spotifyForm" class="stack">
-          <label for="spId" class="muted small">Client ID de tu app de Spotify for Developers (32 caracteres). No es una contraseña.</label><input id="spId" value="${esc(id)}" autocomplete="off" spellcheck="false">
           <label for="spSpeaker" class="muted small">Nombre del altavoz</label><input id="spSpeaker" value="${esc(vault.settings.spotifySpeaker || DEFAULT_SPEAKER)}" maxlength="40">
-          <div class="btns"><button class="btn ghost" type="submit">Guardar</button>${spotifyReady() ? `<button class="btn" type="button" data-act="spotify-connect">${spotifyStore.tokens ? "Reconectar" : "Conectar"}</button>` : ""}${spotifyStore.tokens ? '<button class="btn danger" type="button" data-act="spotify-forget">Desconectar</button>' : ""}</div></form></section>
-      <section class="card"><h2>Cómo crear la app (una vez, desde el ordenador)</h2><ol class="muted small">
-        <li>Entra en <b>developer.spotify.com/dashboard</b> con tu cuenta de Spotify y crea una app «MANU OS».</li>
-        <li>En «Redirect URIs» añade exactamente <code>${esc(SITE)}</code>.</li>
-        <li>Marca «Web API». No hace falta el «Client secret»: no lo copies.</li>
-        <li>Copia el <b>Client ID</b> aquí y pulsa «Conectar».</li></ol>
-        <p class="muted small">MANU solo pide ver y cambiar el altavoz de reproducción. Cambiar de altavoz desde fuera de Spotify suele requerir Premium.</p></section>`;
+          <label for="spId" class="muted small">Client ID de otra app de Spotify (vacío = la tuya, «MANU OS»)</label><input id="spId" value="${esc(id)}" autocomplete="off" spellcheck="false" placeholder="${DEFAULT_SPOTIFY_CLIENT_ID}">
+          <button class="btn ghost" type="submit">Guardar</button></form></details>`;
   },
   ia() {
     const key = aiStore.key;
@@ -1108,9 +1110,10 @@ document.addEventListener("submit", async (e) => {
   if (f === "spotifyForm") {
     const id = $("spId").value.trim();
     if (id && !isSpotifyClientId(id)) { toast("Ese no parece un Client ID de Spotify"); return; }
-    vault.settings.spotifyClientId = id || null;
+    const next = id && id !== DEFAULT_SPOTIFY_CLIENT_ID ? id : null;
+    if (next !== (vault.settings.spotifyClientId ?? null)) spotifyStore.tokens = null; // tokens belong to the app that issued them
+    vault.settings.spotifyClientId = next;
     vault.settings.spotifySpeaker = $("spSpeaker").value.trim().slice(0, 40) || DEFAULT_SPEAKER;
-    if (!id) spotifyStore.tokens = null;
     persist(); render(); toast("Spotify guardado"); return;
   }
   if (f === "driveForm") {
