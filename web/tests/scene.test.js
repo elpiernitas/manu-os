@@ -39,11 +39,19 @@ test("WEB-40: dawn and dusk only around the real sunrise and sunset", async () =
   // Oviedo, late September: sunrise 08:15, sunset 20:10
   assert.equal(dayPhase(at(8, 0), "08:15", "20:10"), "dawn");
   assert.equal(dayPhase(at(8, 50), "08:15", "20:10"), "dawn");
-  assert.equal(dayPhase(at(9, 0), "08:15", "20:10"), "day");
+  assert.equal(dayPhase(at(9, 0), "08:15", "20:10"), "dawn"); // WEB-45: 45 min after sunrise
+  assert.equal(dayPhase(at(9, 1), "08:15", "20:10"), "day");
+  assert.equal(dayPhase(at(7, 30), "08:15", "20:10"), "dawn");
+  assert.equal(dayPhase(at(7, 29), "08:15", "20:10"), "night");
+  assert.equal(dayPhase(at(19, 24), "08:15", "20:10"), "day");
+  assert.equal(dayPhase(at(19, 25), "08:15", "20:10"), "dusk");
+  assert.equal(dayPhase(at(20, 55), "08:15", "20:10"), "dusk");
+  assert.equal(dayPhase(at(20, 56), "08:15", "20:10"), "night");
   assert.equal(dayPhase(at(16, 51), "08:15", "20:10"), "day"); // afternoon is not sunset
   assert.equal(dayPhase(at(19, 35), "08:15", "20:10"), "dusk");
   assert.equal(dayPhase(at(20, 45), "08:15", "20:10"), "dusk");
   assert.equal(dayPhase(at(21, 0), "08:15", "20:10"), "night");
+  assert.equal((await import("../core/scene.js")).TWILIGHT.before, 45);
   assert.equal(dayPhase(at(3, 0), "08:15", "20:10"), "night");
   assert.equal(dayPhase(at(12, 0), null, "20:10"), null);
   // The city's time, not the phone's: 18:00 UTC is 20:00 in Madrid (UTC+2)

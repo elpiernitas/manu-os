@@ -12,7 +12,7 @@ import { importStatement, importStatementRows, classifiedFromRows, dropCrossSour
 import { CITIES, proposeAlarm, shouldAskTomorrow, shortcutUrl, guessCity } from "./core/night.js";
 import { birthdayEventBody, isClientId, listEvents, createEvent, newEventBody, monthGrid, listCalendars, mergeDays } from "./core/gcal.js";
 import { detectRecurring, upcomingRecurring, spendingPattern, monthStats, monthlySeries } from "./core/insights.js";
-import { fetchSnapshot, summarize as mailSummary, mailSuggestions, findSender, idsFrom, archive as mailArchive, unarchive as mailUnarchive, trash as mailTrash, untrash as mailUntrash, ensureLabel, addLabel, removeLabel, messageUrl } from "./core/gmail.js";
+import { fetchSnapshot, summarize as mailSummary, mailSuggestions, findSender, mailOrder, idsFrom, archive as mailArchive, unarchive as mailUnarchive, trash as mailTrash, untrash as mailUntrash, ensureLabel, addLabel, removeLabel, messageUrl } from "./core/gmail.js";
 import { SCOPE, runServices, planTaskSync, listOpenTasks, insertTask, completeTask, contactBirthdays, mergePeople, saveBackup, loadBackup } from "./core/google.js";
 import { detectLink, linkInfo, PROVIDER_NAME } from "./core/links.js";
 import { allowedToSend, buildContext, buildConversationPayload, CONTEXT_CATEGORIES, BASIC_CONTEXT, FULL_CONTEXT, AUTO_SAFE } from "./core/converse.js";
@@ -31,7 +31,7 @@ import { isSpotifyClientId, pkceValid, randomVerifier, challengeFor, authorizeUr
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "44";
+export const APP_VERSION = "45";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -1068,10 +1068,25 @@ function chatAtEnd() {
 function scrollChatToEnd(smooth = false) {
   autoScrollUntil = Date.now() + (smooth ? 700 : 150);
   window.scrollTo({ top: pageScroller().scrollHeight, behavior: smooth && !reduceMotion() ? "smooth" : "auto" });
+  chatUnseen = false; updateChatDown();
 }
+// WEB-45: while Manu reads older messages, a small «↓» takes him back to the
+// end; it gets a dot when something new arrived meanwhile.
+let chatUnseen = false;
+function updateChatDown() {
+  const b = document.getElementById("chatDown");
+  if (!b) return;
+  const show = tab === "manu" && !sheet && !chatPinned && !chatAtEnd();
+  if (!show && chatAtEnd()) chatUnseen = false;
+  b.hidden = !show;
+  b.classList.toggle("unseen", show && chatUnseen);
+  b.setAttribute("aria-label", chatUnseen ? "Hay mensajes nuevos: bajar al último" : "Bajar al último mensaje");
+}
+document.getElementById("chatDown")?.addEventListener("click", () => { chatPinned = true; scrollChatToEnd(true); });
 window.addEventListener("scroll", () => {
   if (tab !== "manu" || document.body.classList.contains("kb") || Date.now() < autoScrollUntil) return;
   chatPinned = chatAtEnd();
+  updateChatDown();
 }, { passive: true });
 // The chat keeps growing after a redraw (entry animation, «Pensando…» turning
 // into the answer). While Manu follows the conversation, stay at the end.
@@ -1082,6 +1097,7 @@ if (typeof ResizeObserver === "function") {
     const grew = h > lastScreenHeight;
     lastScreenHeight = h;
     if (grew && tab === "manu" && chatPinned && !document.body.classList.contains("kb")) scrollChatToEnd(false);
+    else if (grew && tab === "manu" && !chatPinned) { chatUnseen = true; updateChatDown(); }
   }).observe(document.getElementById("screen") ?? document.body);
 }
 let lastChatLength = 0;
@@ -1278,7 +1294,9 @@ function render({ focus = false, enter = null } = {}) {
     if (entering) { chatPinned = true; scrollChatToEnd(false); }
     else if (grew && mine) { chatPinned = true; scrollChatToEnd(true); }
     else if (chatPinned) scrollChatToEnd(grew);
-  } else lastChatLength = 0;
+    else if (grew) chatUnseen = true;
+    updateChatDown();
+  } else { lastChatLength = 0; updateChatDown(); }
   // WEB-44: redraws must not wipe the backup phrase Manu is typing (never saved).
   if (sub !== "datos") { full.pass = ""; full.plain = false; }
   else { if ($("fullPass")) $("fullPass").value = full.pass; if ($("fullPlain")) $("fullPlain").checked = full.plain; }
@@ -1826,18 +1844,28 @@ document.addEventListener("input", (e) => {
 // ---------- Gmail (WEB-33) ----------
 // WEB-40: when Gmail fails, the exact reason and what Manu has to do.
 const GMAIL_FIX = {
-  "api-disabled": ["Abre console.cloud.google.com/apis/library/gmail.googleapis.com", "Arriba, elige el proyecto de MANU (el mismo del Calendar)", "Pulsa «Habilitar» y espera un minuto", "Vuelve aquí y pulsa «Actualizar»"],
-  scope: ["Pulsa «Reconectar Gmail»", "En la ventana de Google, marca la casilla de Gmail («leer, redactar y enviar…»)", "Si no aparece, en Google Cloud → Google Auth Platform → Acceso a datos, añade el permiso …/auth/gmail.modify y vuelve a reconectar"],
-  "no-scope": ["Pulsa «Reconectar Gmail»", "En la ventana de Google, marca la casilla de Gmail", "Si no aparece, en Google Cloud → Google Auth Platform → Acceso a datos, añade el permiso …/auth/gmail.modify"],
-  denied: ["En Google Cloud → Google Auth Platform → Público: el estado debe ser «Prueba» y tu cuenta debe estar en «Usuarios de prueba»", "En «Acceso a datos», añade el permiso …/auth/gmail.modify", "Vuelve aquí y pulsa «Reconectar Gmail». Si Google avisa de «app no verificada», entra en «Configuración avanzada» → «Ir a MANU»"],
-  auth: ["Pulsa «Actualizar» otra vez"],
-  rate: ["Espera un minuto y pulsa «Actualizar»"],
+  "api-disabled": ["Abre console.cloud.google.com/apis/library/gmail.googleapis.com", "Arriba, elige el proyecto de MANU (el mismo del Calendar)", "Pulsa «Habilitar» y espera un minuto", "Vuelve aquí y pulsa «Ya está, reintentar»"],
+  scope: ["Pulsa «Volver a autorizar»", "En la ventana de Google, marca la casilla de Gmail («leer, redactar y enviar…»)", "Si no aparece, en Google Cloud → Google Auth Platform → Acceso a datos, añade el permiso …/auth/gmail.modify y vuelve a autorizar"],
+  "no-scope": ["Pulsa «Volver a autorizar»", "En la ventana de Google, marca la casilla de Gmail", "Si no aparece, en Google Cloud → Google Auth Platform → Acceso a datos, añade el permiso …/auth/gmail.modify"],
+  denied: ["En Google Cloud → Google Auth Platform → Público: el estado debe ser «Prueba» y tu cuenta debe estar en «Usuarios de prueba»", "En «Acceso a datos», añade el permiso …/auth/gmail.modify", "Vuelve aquí y pulsa «Volver a autorizar». Si Google avisa de «app no verificada», entra en «Configuración avanzada» → «Ir a MANU»"],
+  auth: ["Pulsa «Volver a autorizar»", "En la ventana de Google, elige tu cuenta y acepta"],
+  rate: ["Espera un minuto y pulsa «Reintentar»"],
+  network: ["Comprueba que tienes internet (wifi o datos)", "Pulsa «Reintentar»"],
+};
+// WEB-45: the concrete action for each error.
+const GMAIL_ACTION = {
+  "api-disabled": '<a class="btn" href="https://console.cloud.google.com/apis/library/gmail.googleapis.com" target="_blank" rel="noopener">Activar la API de Gmail</a><button class="btn ghost" data-act="mail-connect">Ya está, reintentar</button>',
+  network: '<button class="btn" data-act="mail-connect">Reintentar</button>',
+  rate: '<button class="btn" data-act="mail-connect">Reintentar</button>',
 };
 function gmailErrorCard() {
   const e = vault.settings.googleErrors?.gmail;
   if (!e) return "";
-  const steps = GMAIL_FIX[e.code] ?? ["Pulsa «Reconectar Gmail»", "Si sigue fallando, mándale a Claude una captura de este mensaje"];
-  return `<section class="card mail-error"><h2>⚠️ Gmail no ha funcionado</h2><p class="small">${esc(e.message)}</p><ol class="small">${steps.map((s) => `<li>${esc(s)}</li>`).join("")}</ol><div class="btns"><button class="btn" data-act="mail-reconnect">Reconectar Gmail</button></div></section>`;
+  const steps = GMAIL_FIX[e.code] ?? ["Pulsa «Volver a autorizar»", "Si sigue fallando, mándale a Claude una captura de este mensaje"];
+  const action = GMAIL_ACTION[e.code] ?? '<button class="btn" data-act="mail-reconnect">Volver a autorizar</button>';
+  const d = e.detail;
+  const tech = [`código ${e.code}`, e.status !== null && e.status !== undefined ? `HTTP ${e.status}` : null, d?.reasons?.length ? d.reasons.join(", ") : null, d?.google ?? d?.cause ?? null, e.at ? new Date(e.at).toLocaleString("es-ES") : null].filter(Boolean).join(" · ");
+  return `<section class="card mail-error"><h2>⚠️ Gmail no ha funcionado</h2><p class="small">${esc(e.message)}</p><ol class="small">${steps.map((s) => `<li>${esc(s)}</li>`).join("")}</ol><div class="btns">${action}</div><details class="small muted"><summary>Detalle técnico</summary><p>${esc(tech)}</p></details></section>`;
 }
 const mailSeen = () => vault.settings.mailSeen ?? [];
 function markMailSeen(key) { if (key) vault.settings.mailSeen = [...new Set([...mailSeen(), key])].slice(-300); }
@@ -1911,12 +1939,12 @@ function mailCommand(text) {
     const top = vault.mail.senders.slice(0, 6);
     return { text: top.length ? `En los últimos 30 días, quien más te escribe: ${top.map((s) => `${s.name} (${s.count})`).join(", ")}. Dime «dame de baja de …», «archiva los de …» o «a la papelera los de …».` : "No veo newsletters ni avisos masivos en los últimos 30 días." };
   }
-  const m = t.match(/(?:dame de baja|darme de baja|desuscrib\w*|quitame|archiva\w*|a la papelera|borra\w*|elimina\w*)(?: los correos| los)?(?: de| a)? (.+)$/);
-  if (!m) return null;
-  const who = m[1].replace(/^(los de |de )/, "").trim();
-  const s = findSender(vault.mail, who);
-  if (!s) return { text: `No encuentro a «${who}» entre quienes más te escriben. Toca «Actualizar» en Tú → Correo si es reciente.` };
-  const name = /(baja|desuscrib|quitame)/.test(t) ? "correo_baja" : /archiv/.test(t) ? "correo_archivar" : "correo_papelera";
+  const order = mailOrder(t);
+  if (!order) return null;
+  const s = findSender(vault.mail, order.who);
+  // A sender that is not in the mail and no word about mail: not a mail order.
+  if (!s) return order.aboutMail ? { text: `No encuentro a «${order.who}» entre quienes más te escriben. Toca «Actualizar» en Tú → Correo si es reciente.` } : null;
+  const name = { unsub: "correo_baja", archive: "correo_archivar", trash: "correo_papelera" }[order.kind];
   return { text: "¿Lo hago?", calls: [{ name, remitente: s.email, state: null }] };
 }
 
@@ -2492,6 +2520,9 @@ async function syncGoogle({ silent = false, quiet = false } = {}) {
   }
   const errors = {};
   const status = await runServices(services, enabled, cachedToken, errors);
+  // WEB-45: a 401 means the saved token no longer works: forget it, so the next
+  // tap asks Google again instead of repeating the same failure for an hour.
+  for (const e of Object.values(errors)) if (e.code === "auth" && e.scope) delete gcal.tokens[e.scope];
   vault.settings.googleStatus = { ...(vault.settings.googleStatus ?? {}), ...status };
   vault.settings.googleErrors = { ...(vault.settings.googleErrors ?? {}), ...errors };
   for (const k of Object.keys(status)) if (!status[k].startsWith("error")) delete vault.settings.googleErrors[k];

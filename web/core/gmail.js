@@ -14,19 +14,25 @@ export function explainGmailError(status, body) {
   const reasons = [...(e.details ?? []).map((d) => d?.reason), ...(e.errors ?? []).map((x) => x?.reason), e.status].filter(Boolean);
   const has = (...r) => r.some((x) => reasons.includes(x));
   const google = e.message ? ` (Google: ${String(e.message).replace(/\s+/g, " ").slice(0, 180)})` : "";
-  if (status === 401) return { code: "auth", message: "La sesión de Google ha caducado. Pulsa «Actualizar» otra vez." };
-  if (has("SERVICE_DISABLED", "accessNotConfigured")) return { code: "api-disabled", message: `La API de Gmail no está activada en tu proyecto de Google Cloud${google}` };
-  if (has("ACCESS_TOKEN_SCOPE_INSUFFICIENT", "insufficientPermissions")) return { code: "scope", message: `El permiso que dio Google no incluye Gmail${google}` };
-  if (status === 429 || has("rateLimitExceeded", "userRateLimitExceeded", "RATE_LIMIT_EXCEEDED")) return { code: "rate", message: "Gmail pide esperar un poco (demasiadas peticiones seguidas)." };
-  return { code: "http", message: `Gmail respondió ${status}${google}` };
+  const detail = { status, reasons: reasons.slice(0, 5), google: e.message ? String(e.message).slice(0, 300) : null }; // WEB-45: kept for diagnosis
+  if (status === 401) return { code: "auth", message: "La sesión de Google ha caducado. Pulsa «Actualizar» otra vez.", detail };
+  if (has("SERVICE_DISABLED", "accessNotConfigured")) return { code: "api-disabled", message: `La API de Gmail no está activada en tu proyecto de Google Cloud${google}`, detail };
+  if (has("ACCESS_TOKEN_SCOPE_INSUFFICIENT", "insufficientPermissions")) return { code: "scope", message: `El permiso que dio Google no incluye Gmail${google}`, detail };
+  if (status === 429 || has("rateLimitExceeded", "userRateLimitExceeded", "RATE_LIMIT_EXCEEDED")) return { code: "rate", message: "Gmail pide esperar un poco (demasiadas peticiones seguidas).", detail };
+  return { code: "http", message: `Gmail respondió ${status}${google}`, detail };
 }
 
+// WEB-45: no answer at all (offline, DNS, blocked request) is not a Google error.
+export const NETWORK_ERROR = { code: "network", message: "No he podido conectar con Gmail. Comprueba tu conexión e inténtalo otra vez." };
+
 async function call(token, url, init = {}, fetchImpl = fetch) {
-  const res = await fetchImpl(url, { ...init, headers: { Authorization: `Bearer ${token}`, ...(init.headers ?? {}) } });
+  let res;
+  try { res = await fetchImpl(url, { ...init, headers: { Authorization: `Bearer ${token}`, ...(init.headers ?? {}) } }); }
+  catch (err) { throw Object.assign(new Error(NETWORK_ERROR.message), { code: NETWORK_ERROR.code, status: 0, detail: { status: 0, reasons: [], google: null, cause: String(err?.message ?? err).slice(0, 200) } }); }
   if (!res.ok) {
     const body = await Promise.resolve().then(() => res.json()).catch(() => null); // some errors come without a body
     const x = explainGmailError(res.status, body);
-    throw Object.assign(new Error(x.message), { code: x.code, status: res.status });
+    throw Object.assign(new Error(x.message), { code: x.code, status: res.status, detail: x.detail });
   }
   return res.status === 204 ? null : res.json().catch(() => null);
 }
@@ -136,7 +142,7 @@ export async function fetchSnapshot(token, fetchImpl = fetch, { max = LIMITS.mes
   const out = [];
   for (let i = 0; i < wanted.length; i += 8) {
     const batch = await Promise.all(wanted.slice(i, i + 8).map((id) =>
-      call(token, `${API}/messages/${encodeURIComponent(id)}?format=metadata&${headers}`, {}, fetchImpl).catch((err) => { if (err.code === "auth") throw err; return null; })));
+      call(token, `${API}/messages/${encodeURIComponent(id)}?format=metadata&${headers}`, {}, fetchImpl).catch((err) => { if (err.code === "auth" || err.code === "network") throw err; return null; })));
     out.push(...batch.filter(Boolean).map(slim));
   }
   return out;
@@ -174,6 +180,20 @@ export async function ensureLabel(token, name, fetchImpl = fetch) {
   if (found) return found.id;
   const created = await call(token, `${API}/labels`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: clean, labelListVisibility: "labelShow", messageListVisibility: "show" }) }, fetchImpl);
   return created.id;
+}
+
+// WEB-45: «dame de baja de revolut», «archiva los de amazon», «a la papelera los
+// correos de x». The order must START the sentence as a whole word: before,
+// «…me emborrache, sabes? puedes decirme más opciones» matched «borra».
+// `text` is already normalised (lower case, no accents).
+const MAIL_ORDER = /^(?:por favor,? )?(dame de baja|darme de baja|desuscribeme|desuscribirme|quitame|archiva(?:me|los)?|mandalos a la papelera|manda a la papelera|a la papelera|borra(?:me|los)?|elimina(?:me|los)?)(?= |$)(?: todos)?(?: los correos| los emails| los mails| los mensajes| los)?(?: de| a)? (.+)$/;
+export function mailOrder(text) {
+  const m = String(text ?? "").trim().match(MAIL_ORDER);
+  if (!m) return null;
+  const who = m[2].replace(/^(los de |de )/, "").replace(/[?.!¿¡]+$/, "").trim();
+  if (!who) return null;
+  const kind = /(baja|desuscrib|quitame)/.test(m[1]) ? "unsub" : /archiv/.test(m[1]) ? "archive" : "trash";
+  return { kind, who, aboutMail: /(correo|correos|mail|mails|email|emails|gmail|mensajes|newsletter)/.test(text) };
 }
 
 // Opens the message in Gmail (web or app).

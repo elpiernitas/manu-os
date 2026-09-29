@@ -652,3 +652,11 @@ body[data-sky="night"] .scene .sun, body[data-sky="night"] .scene .rays, body[da
 /* ---------- WEB-40: error de Gmail ---------- */
 .mail-error { border-color: rgba(255,180,80,.45); }
 .mail-error ol { margin: 6px 0 4px; padding-left: 20px; display: grid; gap: 4px; }
+
+/* ---------- WEB-45: «bajar» en el chat ---------- */
+.chat-down { position: fixed; left: 50%; bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px) + 92px); width: 40px; height: 40px; margin-left: -20px; border-radius: 50%; border: 1px solid rgba(255,255,255,.14); color: var(--text); font-size: 18px; line-height: 1; z-index: 30; cursor: pointer; box-shadow: 0 6px 18px rgba(0,0,0,.35); animation: chatDownIn .18s ease-out; }
+.chat-down[hidden] { display: none; }
+.chat-down.unseen::after { content: ""; position: absolute; top: 2px; right: 2px; width: 10px; height: 10px; border-radius: 50%; background: var(--blue, #246BFD); box-shadow: 0 0 0 2px var(--bg); }
+body.kb .chat-down { bottom: auto; top: calc(var(--kb-bottom, 100dvh) - 124px); z-index: 41; }
+@keyframes chatDownIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .chat-down { animation: none; } }

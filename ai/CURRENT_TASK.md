@@ -2,11 +2,11 @@
 
 Status: **REVIEW_PENDING**
 
-WEB-44 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
+WEB-45 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
 
 ## Tarea activa
 
-WEB-44 — copia completa cifrada: vault, imágenes, Tu archivo y diario (`ai/HANDOFF.md`, «WEB-44»).
+WEB-45 — chat («↓»), luz del día a ±45 min, errores de Gmail con acción concreta y la orden de correo que cazaba cualquier frase (`ai/HANDOFF.md`, «WEB-45»).
 
 ## Autorización
 
@@ -48,6 +48,7 @@ WEB-44 — copia completa cifrada: vault, imágenes, Tu archivo y diario (`ai/HA
 
 ## Historial (cerrado)
 
+- **WEB-44** (copia completa cifrada): CERRADA. Fusionada mediante el PR #51 (`ea9f790`).
 - **WEB-42/43** (aviso de la exportación de ChatGPT y buzón de Atajos): CERRADAS. Fusionadas mediante el PR #50 (`f268c32`).
 - **WEB-41** (Tu diario): CERRADA. Fusionada mediante el PR #49 (`8aa480a`).
 - **WEB-40** (chat, luz del día y Gmail): CERRADA. Fusionada mediante el PR #48 (`4bc7841`).

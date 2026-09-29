@@ -39,7 +39,7 @@ export const MONEY_EMOJI = ["💶", "💸", "🪙"];
 // ---- Light of the day (WEB-40) ----
 // «dawn»/«dusk» only around the real sunrise and sunset of the chosen city;
 // «day» and «night» the rest of the time. Minutes are the city's local time.
-export const TWILIGHT = { before: 40, after: 40 };
+export const TWILIGHT = { before: 45, after: 45 }; // WEB-45: ±45 min
 const mins = (hhmm) => { const m = /^(\d{2}):(\d{2})$/.exec(String(hhmm ?? "")); return m ? Number(m[1]) * 60 + Number(m[2]) : null; };
 
 // Local minutes of the day in the city, from its UTC offset (seconds).

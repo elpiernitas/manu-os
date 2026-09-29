@@ -138,3 +138,7 @@ En WEB-42, un detector por palabras («export», «data») tomó el aviso «Your
 ### QAL-032 — `String.fromCharCode(...bytes)` no escala
 
 En WEB-44, el base64 de `crypto.js` usaba `...` sobre todo el array, y con 3 MB lanzaba «Maximum call stack size exceeded». Cualquier conversión de bytes a texto se hace por trozos (0x8000), y el test debe usar un tamaño realista (varios MB), no unos pocos bytes.
+
+### QAL-033 — Un verbo buscado en cualquier parte de la frase caza palabras ajenas
+
+En WEB-45, `borra\w*` sin ancla coincidía con «emborrache», y una pregunta cualquiera se convertía en «borra los correos de …». Las órdenes que actúan sobre datos deben anclarse al inicio y a palabra completa. Si el objeto no se encuentra y la frase no menciona el dominio (correo), no se responde como orden. El test de regresión usa la frase real.
