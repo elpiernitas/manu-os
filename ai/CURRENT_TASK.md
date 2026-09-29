@@ -2,11 +2,11 @@
 
 Status: **REVIEW_PENDING**
 
-WEB-20 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
+WEB-21 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
 
 ## Tarea activa
 
-WEB-20 — fondos vivos en todas las pantallas (`ai/HANDOFF.md`, «WEB-20»).
+WEB-21 — estadísticas de dinero: ingresos, nómina y ahorro (`ai/HANDOFF.md`, «WEB-21»).
 
 ## Autorización
 
@@ -41,6 +41,7 @@ WEB-20 — fondos vivos en todas las pantallas (`ai/HANDOFF.md`, «WEB-20»).
 
 ## Historial (cerrado)
 
+- **WEB-20** (fondos vivos): CERRADA. Fusionada mediante el PR #28 (`26ce9b1`).
 - **WEB-19** (claves «AQ.» de Gemini): CERRADA. Fusionada mediante el PR #27 (`8e57b3c`).
 - **WEB-18** (la bola con la M vuelve): CERRADA. Fusionada mediante el PR #26 (`5bad2b9`), hecha por ChatGPT/Codex.
 - **WEB-17** (quitar la bola con la M por un malentendido): CERRADA. Fusionada mediante el PR #25 (`18a9c7d`); WEB-18 revierte ese cambio.

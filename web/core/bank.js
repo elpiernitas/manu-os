@@ -93,7 +93,8 @@ export function legacyFingerprint(at, cents, concept, balance, nth) {
   return `bank-${h.toString(36)}`;
 }
 
-// Returns { entries, skippedIncome, skippedInvalid, duplicates } or { error }.
+// Returns { entries, income, balance, skippedInvalid, duplicates, incomeDuplicates } or { error }.
+// Income lines (positive amounts) are kept apart from expenses (WEB-21).
 export function importStatement(text, existingIds = new Set(), learned = {}, legacy = new Map()) {
   return importStatementRows(parseCsv(text), existingIds, learned, legacy);
 }
@@ -107,23 +108,25 @@ export function importStatementRows(rawRows, existingIds = new Set(), learned = 
   const header = rows[headerIndex].map((c) => String(c ?? ""));
   const cDate = findColumn(header, DATE_KEYS), cAmount = findColumn(header, AMOUNT_KEYS), cConcept = findColumn(header, CONCEPT_KEYS), cBalance = findColumn(header, BALANCE_KEYS);
   const occurrences = new Map();
-  const result = { entries: [], skippedIncome: 0, skippedInvalid: 0, duplicates: 0 };
+  const result = { entries: [], income: [], incomeDuplicates: 0, balance: null, skippedIncome: 0, skippedInvalid: 0, duplicates: 0 };
   const seen = new Set(existingIds);
   for (const r of rows.slice(headerIndex + 1)) {
     const at = parseDate(r[cDate]);
     const cents = amountToCents(r[cAmount]);
     if (!at || cents === null || cents === 0) { result.skippedInvalid++; continue; }
-    if (cents > 0) { result.skippedIncome++; continue; }
     const concept = String(cConcept >= 0 ? r[cConcept] ?? "" : "").slice(0, 80) || null;
     const balance = cBalance >= 0 ? amountToCents(r[cBalance]) : null;
+    // Latest running balance in the file («Saldo»): the account balance on that day.
+    if (balance !== null && (!result.balance || at > result.balance.at)) result.balance = { cents: balance, at };
     const base = `${at.slice(0, 10)}|${cents}|${normalise(concept ?? "")}|${balance ?? ""}`;
     const nth = occurrences.get(base) ?? 0;
     occurrences.set(base, nth + 1);
     const id = fingerprint(at, cents, concept ?? "", balance, nth);
     const old = legacy.get(legacyFingerprint(at, cents, concept ?? "", balance, nth));
     const sameLine = old && old.at?.slice(0, 10) === at.slice(0, 10) && old.cents === -cents && normalise(old.merchant ?? "") === normalise(concept ?? "");
-    if (seen.has(id) || sameLine) { result.duplicates++; continue; }
+    if (seen.has(id) || sameLine) { if (cents > 0) result.incomeDuplicates++; else result.duplicates++; continue; }
     seen.add(id);
+    if (cents > 0) { result.income.push({ id, cents, concept, at, source: "BANK", kind: incomeKind(concept) }); continue; }
     result.entries.push({ ...newEntry({ id, cents: -cents, merchant: concept, at }, learned), source: "BANK" });
   }
   return result;
@@ -187,4 +190,17 @@ export function classifiedFromRows(rawRows, existing = [], learned = {}) {
   }
   const cross = dropCrossSource(out, existing, "BANK");
   return { entries: cross.entries, duplicates: duplicates + cross.duplicates, skipped };
+}
+
+// What kind of income a bank line is, from its concept. Payroll without a
+// keyword is recognised later by repetition (insights.js › markPayroll).
+export function incomeKind(concept) {
+  const t = ` ${normalise(concept ?? "").replace(/[^a-z0-9ñ]+/g, " ")} `;
+  if (/ (nomina|nominas|salario|haberes|payroll) /.test(t)) return "PAYROLL";
+  // Banks write «ABONO BIZUM» for a Bizum received: Bizum first, and «abono»
+  // alone (any credit) is not a refund.
+  if (/ bizum /.test(t)) return "BIZUM";
+  if (/ (devolucion|reembolso) /.test(t)) return "REFUND";
+  if (/ (transferencia|transf|traspaso) /.test(t)) return "TRANSFER";
+  return "OTHER";
 }

@@ -62,11 +62,11 @@ test("bank amounts and dates in Spanish formats", () => {
   assert.ok(parseDate("2026-09-28"));
 });
 
-test("statement import: expenses only, dedup, categorised, rejects unknown files", () => {
+test("statement import: expenses and income apart, dedup, categorised, rejects unknown files", () => {
   const csv = "Movimientos de la cuenta\nFecha;Concepto;Importe\n28/09/2026;COMPRA MERCADONA;-34,50\n28/09/2026;NOMINA;1500,00\n27/09/2026;Pago Spotify;-11,99\nbasura;;\n";
   const r = importStatement(csv);
   assert.equal(r.entries.length, 2);
-  assert.equal(r.skippedIncome, 1);
+  assert.deepEqual(r.income.map((i) => [i.concept, i.cents, i.kind]), [["NOMINA", 150000, "PAYROLL"]]);
   assert.equal(r.duplicates, 0);
   assert.equal(r.skippedInvalid, 1);
   const merc = r.entries.find((e) => e.merchant === "COMPRA MERCADONA");

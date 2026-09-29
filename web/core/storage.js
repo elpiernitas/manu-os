@@ -2,10 +2,10 @@
 // Everything stays on the device; nothing is sent anywhere.
 export const SCHEMA_VERSION = 1;
 
-const OPTIONAL_LISTS = ["reminders", "habits", "people", "meals", "health", "moods"];
+const OPTIONAL_LISTS = ["reminders", "habits", "people", "meals", "health", "moods", "income"];
 
 export function emptyVault() {
-  return { schema: SCHEMA_VERSION, inbox: [], spending: [], chat: [], settings: {}, reminders: [], habits: [], people: [], meals: [], health: [], moods: [] };
+  return { schema: SCHEMA_VERSION, inbox: [], spending: [], chat: [], settings: {}, income: [], reminders: [], habits: [], people: [], meals: [], health: [], moods: [] };
 }
 
 // Validates a vault read from storage or from a backup file.
@@ -20,7 +20,7 @@ export function validateVault(data) {
     if (data[key] !== undefined && !Array.isArray(data[key])) return { ok: false, reason: `La sección «${key}» no es válida.` };
   }
   const ids = new Set();
-  const withIds = [...data.inbox, ...data.spending, ...["reminders", "habits", "people", "meals"].flatMap((k) => data[k] ?? [])];
+  const withIds = [...data.inbox, ...data.spending, ...["reminders", "habits", "people", "meals", "income"].flatMap((k) => data[k] ?? [])];
   for (const item of withIds) {
     if (!item || typeof item.id !== "string") return { ok: false, reason: "Hay un elemento sin identificador." };
     if (ids.has(item.id)) return { ok: false, reason: `Identificador repetido: ${item.id}.` };
@@ -36,6 +36,9 @@ export function validateVault(data) {
   }
   for (const entry of data.spending) {
     if (!Number.isInteger(entry.cents) || entry.cents <= 0) return { ok: false, reason: "Hay un gasto con un importe no válido." };
+  }
+  for (const entry of data.income ?? []) {
+    if (!Number.isInteger(entry.cents) || entry.cents <= 0 || typeof entry.at !== "string") return { ok: false, reason: "Hay un ingreso con un importe no válido." };
   }
   const vault = { ...emptyVault(), ...data, settings: data.settings ?? {} };
   for (const key of OPTIONAL_LISTS) vault[key] = data[key] ?? [];
