@@ -22,7 +22,7 @@ import { isSpotifyClientId, pkceValid, randomVerifier, challengeFor, authorizeUr
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "25";
+export const APP_VERSION = "26";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -663,7 +663,7 @@ const screens = {
     return `<div class="manu-head${empty ? " big" : ""}"><div class="orb${thinking ? " thinking" : ""}" id="orb" aria-hidden="true"><span>M</span></div><div><h1>MANU</h1><p class="subtitle">Tu asistente · ${aiReady() ? "IA disponible, siempre con tu confirmación" : '<button class="link small" data-act="gemini-guide">activar IA</button>'}</p></div></div>
       ${refuge ? `<div class="refuge-bar"><span>Refugio · no se guarda</span><button class="link" data-act="leave-refuge">Salir</button></div>` : ""}
       ${chips ? `<div class="suggest" aria-label="Sugerencias">${chips.map((s) => `<button data-say="${esc(s)}">${esc(s)}</button>`).join("")}</div>` : `<div class="quick-cards" aria-label="Sugerencias">${cards.map(([e, label, how, text]) => `<button class="qcard" ${how === "say" ? `data-say="${esc(text)}"` : `data-fill="${esc(text)}"`}><span class="qe" aria-hidden="true">${e}</span><span>${esc(label)}</span></button>`).join("")}</div>`}
-      <div class="chat" id="chat" aria-live="polite">${[...history, ...(refuge?.messages ?? [])].map((b) => `<div class="bubble ${b.from}${b.safety ? " safety" : ""}">${b.ai ? '<span class="ai-tag">IA</span>' : ""}${b.imageId ? `<img class="chat-img" data-img="${esc(b.imageId)}" alt="Captura">` : ""}${esc(b.text)}${b.url ? ` <a class="link small" href="${esc(b.url)}" target="_blank" rel="noopener">Abrir</a>` : ""}${b.proposal ? `${b.proposal.state ? `<details><summary class="muted small">Ver lo enviado</summary><pre class="payload">${esc(shownPayload(b.proposal))}</pre></details>` : `<pre class="payload">${esc(shownPayload(b.proposal))}</pre>`}${b.proposal.state ? `<p class="muted small">${b.proposal.state === "sent" ? (b.proposal.auto ? "Enviado a Gemini sin preguntar (lo activaste en Tú → IA)." : "Enviado a Gemini.") : "No enviado."}</p>` : `<div class="btns"><button class="btn" data-act="ai-send" data-id="${esc(b.proposal.id)}">Enviar a Gemini</button><button class="btn ghost" data-act="ai-cancel" data-id="${esc(b.proposal.id)}">No</button></div><div class="btns"><button class="link small" data-act="ask-elsewhere" data-app="chatgpt" data-id="${esc(b.proposal.id)}">Preguntar en ChatGPT</button><button class="link small" data-act="ask-elsewhere" data-app="claude" data-id="${esc(b.proposal.id)}">Preguntar en Claude</button></div>`}` : ""}${b.action ? `<div class="btns"><a class="btn" href="${esc(b.action.href)}">${esc(b.action.label)}</a></div>` : ""}${(b.calls ?? []).map((c, i) => callCard(b, c, i)).join("")}</div>`).join("")}</div>
+      <div class="chat" id="chat" aria-live="polite">${[...history, ...(refuge?.messages ?? [])].map((b) => `<div class="bubble ${b.from}${b.safety ? " safety" : ""}">${b.ai ? '<span class="ai-tag">IA</span>' : ""}${b.imageId ? `<img class="chat-img" data-img="${esc(b.imageId)}" alt="Captura">` : ""}${esc(b.text)}${b.url ? ` <a class="link small" href="${esc(b.url)}" target="_blank" rel="noopener">Abrir</a>` : ""}${b.proposal ? `${b.proposal.state ? "" : `<p class="small proposal-what">Se enviará a Google solo tu frase: <b>«${esc(b.proposal.message)}»</b>, con las instrucciones fijas de MANU. Nada de tus datos.</p>`}<details><summary class="muted small">${b.proposal.state ? "Ver lo enviado" : "Ver detalles técnicos"}</summary><pre class="payload">${esc(shownPayload(b.proposal))}</pre></details>${b.proposal.state ? `<p class="muted small">${b.proposal.state === "sent" ? (b.proposal.auto ? "Enviado a Gemini sin preguntar (lo activaste en Tú → IA)." : "Enviado a Gemini.") : "No enviado."}</p>` : `<div class="btns"><button class="btn" data-act="ai-send" data-id="${esc(b.proposal.id)}">Enviar a Gemini</button><button class="btn ghost" data-act="ai-cancel" data-id="${esc(b.proposal.id)}">No</button></div><div class="btns"><button class="link small" data-act="ask-elsewhere" data-app="chatgpt" data-id="${esc(b.proposal.id)}">Preguntar en ChatGPT</button><button class="link small" data-act="ask-elsewhere" data-app="claude" data-id="${esc(b.proposal.id)}">Preguntar en Claude</button></div>`}` : ""}${b.action ? `<div class="btns"><a class="btn" href="${esc(b.action.href)}">${esc(b.action.label)}</a></div>` : ""}${(b.calls ?? []).map((c, i) => callCard(b, c, i)).join("")}</div>`).join("")}</div>
       ${chatImage ? `<div class="chat-attach glass"><img src="${esc(chatImage)}" alt="Captura adjunta"><div class="grow small">${aiReady() ? "La captura se enviará a Google (Gemini) al pulsar «Enviar a Gemini». No uses capturas del banco o de salud si no quieres compartirlas." : '<button type="button" class="link small" data-act="gemini-guide">Activa la IA para que MANU lea la captura</button>'}</div><button type="button" class="qa-close" data-act="chat-image-remove" aria-label="Quitar captura">✕</button></div>` : ""}
       <form class="composer glass" id="composer">${refuge ? "" : '<label class="composer-attach" for="chatImage" role="button" tabindex="0" aria-label="Adjuntar captura">📎</label><input id="chatImage" type="file" accept="image/*" class="sr">'}<label for="msg" class="sr">Mensaje para MANU</label><input id="msg" autocomplete="off" enterkeyhint="send" placeholder="${refuge ? "Cuéntame" : chatImage ? "¿Qué quieres saber de la captura?" : "Escribe a MANU"}"><button class="btn" type="submit">${chatImage && aiReady() ? "Enviar a Gemini" : "Enviar"}</button></form>`;
   },
@@ -1019,6 +1019,18 @@ function fitSheet() {
   bg.style.bottom = "auto";
 }
 window.visualViewport?.addEventListener("resize", fitSheet);
+// Keyboard open (visible area much smaller than the window): hide the tab bar
+// and «+» so the chat composer sits right above the keyboard.
+let fullHeight = window.visualViewport?.height ?? window.innerHeight; // baseline without keyboard
+window.addEventListener("orientationchange", () => { fullHeight = 0; setTimeout(() => { fullHeight = window.visualViewport?.height ?? window.innerHeight; }, 400); });
+function keyboardMode() {
+  const vv = window.visualViewport;
+  if (vv) fullHeight = Math.max(fullHeight, vv.height, document.activeElement?.matches("input, textarea") ? 0 : window.innerHeight);
+  const open = Boolean(vv) && vv.height < fullHeight * 0.78 && document.activeElement?.matches("input, textarea");
+  document.body.classList.toggle("kb", open);
+}
+window.visualViewport?.addEventListener("resize", keyboardMode);
+document.addEventListener("focusout", () => setTimeout(keyboardMode, 50));
 window.visualViewport?.addEventListener("scroll", fitSheet);
 
 function rerenderSheet() {
@@ -1181,13 +1193,13 @@ function say(text) {
     }
     const proposal = { id: uid("q"), message: clean, at };
     if (vault.settings.aiAutoSend === true) {
-      vault.chat.push({ from: "me", text: clean, at }, { from: "manu", text: "Se lo pregunto a Gemini. Se envía exactamente esto:", at, proposal: { ...proposal, auto: true } });
+      vault.chat.push({ from: "me", text: clean, at }, { from: "manu", text: "Se lo pregunto a Gemini.", at, proposal: { ...proposal, auto: true } });
       askAi(proposal.id, { auto: true }); return;
     }
-    vault.chat.push({ from: "me", text: clean, at }, { from: "manu", text: "No lo entiendo sin IA. ¿Se lo pregunto a Gemini? Se enviaría exactamente esto:", at, proposal });
+    vault.chat.push({ from: "me", text: clean, at }, { from: "manu", text: "Eso no lo sé hacer yo solo. ¿Se lo pregunto a Gemini?", at, proposal });
     persist(); render(); return;
   }
-  vault.chat.push({ from: "me", text: clean, at }, { from: "manu", text: reply(intent, variant++), at, ...(action ? { action } : {}) });
+  vault.chat.push({ from: "me", text: clean, at }, { from: "manu", text: localAnswer(intent) ?? reply(intent, variant++), at, ...(action ? { action } : {}) });
   persist();
   render();
 }
@@ -1209,6 +1221,26 @@ async function activateGemini(key) {
   } catch (err) { aiStore.model = ""; render(); toast(err.message); return false; }
 }
 
+
+// Answers MANU gives from the app's own data (no AI): the day and the weather.
+function localAnswer(intent) {
+  if (intent.kind === "agenda") {
+    const day = intent.day === "tomorrow" ? tomorrowKey() : localDay();
+    const word = intent.day === "tomorrow" ? "Mañana" : "Hoy";
+    const evs = eventsFor(day);
+    const rems = vault.reminders.filter((r) => !r.done && dayKey(new Date(r.at)) === day);
+    if (!evs.length && !rems.length) return vault.calendar || googleOn("calendar") ? `${word} no tienes nada en el calendario ni recordatorios. 🌿` : `${word} no tienes recordatorios. Conecta Google en Tú para ver también tu calendario.`;
+    const list = [...evs.map((e) => `${e.time ?? "todo el día"} ${e.title}`), ...rems.map((r) => `🔔 ${hhmm(new Date(r.at))} ${r.text}`)];
+    return `${word}: ${list.slice(0, 6).join(" · ")}${list.length > 6 ? ` y ${list.length - 6} más` : ""}.`;
+  }
+  if (intent.kind === "weather") {
+    const w = currentWeather();
+    if (!w?.data?.now) return "Ahora no tengo el tiempo cargado. Abre Hoy con conexión y te lo digo.";
+    const f = w.data;
+    return `${w.city.name}: ${f.now.text.toLowerCase()}, ${f.now.temp}° (${f.today.min}°–${f.today.max}°). ${advice(f)}`;
+  }
+  return null;
+}
 
 async function askAi(proposalId, { auto = false } = {}) {
   const bubble = vault.chat.find((b) => b.proposal?.id === proposalId);

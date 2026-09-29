@@ -2,11 +2,11 @@
 
 Status: **REVIEW_PENDING**
 
-WEB-25 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
+WEB-26 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
 
 ## Tarea activa
 
-WEB-25 — proyectos tipo NotebookLM y capturas en el chat (`ai/HANDOFF.md`, «WEB-25»; enmienda WEB-25 de ADR-0013).
+WEB-26 — chat más claro (saludos, agenda y tiempo sin IA, propuesta legible) y teclado (`ai/HANDOFF.md`, «WEB-26»).
 
 ## Autorización
 
@@ -42,6 +42,7 @@ WEB-25 — proyectos tipo NotebookLM y capturas en el chat (`ai/HANDOFF.md`, «W
 
 ## Historial (cerrado)
 
+- **WEB-25** (proyectos y capturas en el chat): CERRADA. Fusionada mediante el PR #33 (`a6a7a01`).
 - **WEB-24** (calendario al abrir): CERRADA. Fusionada mediante el PR #32 (`817802b`).
 - **WEB-23** (capturas y enlaces): CERRADA. Fusionada mediante el PR #31 (`6b95cf1`).
 - **WEB-22** (hoja «+»): CERRADA. Fusionada mediante el PR #30 (`a86c01a`); su fallo en Dinero se corrigió en WEB-23.

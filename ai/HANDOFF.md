@@ -10,6 +10,27 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
+## WEB-26 — chat más claro y teclado
+
+Capturas de Manu (2026-09-29, aún con una versión antigua en caché):
+- «hola» acababa en una propuesta de Gemini que mostraba un JSON técnico;
+- con el teclado abierto, la barra de pestañas y el «+» flotaban sobre el chat.
+Las capturas confirman además que su clave de Gemini ya funciona, porque aparece «Enviar a Gemini».
+
+### Cambios
+
+- `web/core/assistant.js`: los saludos («hola», «buenas», «¿qué tal?»…) y los agradecimientos los responde MANU sin IA.
+- `web/app.js`:
+  - `localAnswer` responde «qué tengo hoy/mañana» con los eventos y recordatorios reales, y «qué tiempo hace» con el tiempo cargado. Las respuestas antiguas decían, en falso, que no podía leerlos;
+  - la propuesta de Gemini se explica en palabras normales («Se enviará a Google solo tu frase: «…»») y el JSON queda en «Ver detalles técnicos»;
+  - `keyboardMode`: con el teclado abierto se ocultan la barra y el «+», y el campo de escribir baja justo encima del teclado;
+  - versión 26.
+
+### Resultados
+
+- `npm test`: 100/100 PASS. `node --check` pasa en todos los archivos.
+- Chromium: 6 checks en PASS; todos los recorridos anteriores en PASS.
+
 ## WEB-25 — proyectos tipo NotebookLM y capturas en el chat
 
 Manu (2026-09-29): «quiero que a la IA (Gemini) MANU pueda adjuntarle capturas de pantalla para que las lea, y quiero otro icono de proyectos como si fuera Google NotebookLM».
