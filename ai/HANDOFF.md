@@ -10,6 +10,37 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
+## WEB-54 — deslizar entre ciudades en el tiempo
+
+Manu (2026-09-29, captura del tiempo de Gijón): «quiero que al deslizar al lateral me salga el de Oviedo».
+
+### Cambios (`web/app.js`, `web/styles.css`)
+
+- En la pantalla del tiempo:
+  - deslizar a la izquierda o a la derecha cambia de ciudad, como en la app Tiempo del iPhone. Pasa por Gijón, Oviedo y la ciudad de casa si es otra;
+  - solo cuenta un gesto claramente horizontal (más de 60 px y en menos de 0,8 s). Deslizar sobre la tira de horas sigue desplazándola;
+  - los puntos arriba indican la ciudad y se pueden tocar. En el ordenador valen las flechas ← →;
+  - la entrada lateral se anima según la dirección, salvo con movimiento reducido.
+- `vault.weatherCities` guarda el último tiempo de cada ciudad, así que el cambio es instantáneo y funciona sin conexión si ya se vio. Si esa copia tiene más de 30 minutos, se actualiza.
+- La ciudad elegida pasa a ser la del día (`cityOverride`), igual que los botones de Hoy.
+- Versión 54.
+
+### Resultados
+
+- e2e54 (gestos táctiles reales por CDP en iPhone 14): 9/9. Cubre:
+  - los dos puntos;
+  - Gijón → Oviedo con su propio tiempo y vuelta sin pedir nada a la red;
+  - que un arrastre corto no cambie de ciudad;
+  - que la tira de horas no cambie de ciudad;
+  - que Hoy muestre la ciudad elegida;
+  - las flechas y los puntos;
+  - el uso sin conexión.
+- Las 50 pruebas e2e y `npm test` (166) en PASS.
+
+### NO_VERIFICADO
+
+- La sensibilidad del gesto en el iPhone real.
+
 ## WEB-53 — seguridad frente a inyección de HTML y textos largos
 
 ### Seguridad (XSS)

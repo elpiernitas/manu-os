@@ -691,3 +691,14 @@ body.kb .chat-down { bottom: auto; top: calc(var(--kb-bottom, 100dvh) - 124px); 
 .brief-list li { grid-template-columns: 24px minmax(0, 1fr); }
 .proj-grid > *, .proj-head > *, .row > .grow, .stack > * { min-width: 0; }
 .proj-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+/* ---------- WEB-54: deslizar entre ciudades en el tiempo ---------- */
+.city-dots { display: flex; justify-content: center; gap: 2px; margin: 4px 0 -4px; }
+.city-dots button { width: 28px; height: 28px; border: 0; background: none; padding: 0; cursor: pointer; display: grid; place-items: center; }
+.city-dots button::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: rgba(255,255,255,.35); transition: background-color .2s var(--ease-out), transform .2s var(--ease-out); }
+.city-dots button[aria-selected="true"]::before { background: #fff; transform: scale(1.15); }
+.weather-head.slide-next, .weather-city.slide-next { animation: cityInNext .28s var(--ease-out); }
+.weather-head.slide-prev, .weather-city.slide-prev { animation: cityInPrev .28s var(--ease-out); }
+@keyframes cityInNext { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: none; } }
+@keyframes cityInPrev { from { opacity: 0; transform: translateX(-28px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .weather-head.slide-next, .weather-head.slide-prev, .weather-city.slide-next, .weather-city.slide-prev { animation: none; } }

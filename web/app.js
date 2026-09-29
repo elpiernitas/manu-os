@@ -34,7 +34,7 @@ import { isSpotifyClientId, pkceValid, randomVerifier, challengeFor, authorizeUr
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "53";
+export const APP_VERSION = "54";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -204,6 +204,8 @@ async function refreshWeather(force = false) {
   try {
     const data = await fetchForecast(city);
     vault.weather = { city, at: new Date().toISOString(), data };
+    // WEB-54: one copy per city, so swiping between them is instant (and offline).
+    vault.weatherCities = { ...Object.fromEntries(Object.entries(vault.weatherCities ?? {}).filter(([k]) => weatherCityList().some((c) => c.name === k))), [city.name]: vault.weather };
     persist();
   } catch {
     weather.error = "No he podido traer el tiempo ahora.";
@@ -212,6 +214,43 @@ async function refreshWeather(force = false) {
     if (tab === "hoy" && !sheet && !document.activeElement?.matches("input, textarea")) render();
   }
 }
+
+// ---------- Tiempo: deslizar entre ciudades (WEB-54) ----------
+function weatherCityList() {
+  const home = vault.settings.homeCity;
+  return [CITIES.GIJON, CITIES.OVIEDO, ...(home && ![CITIES.GIJON.name, CITIES.OVIEDO.name].includes(home.name) ? [home] : [])];
+}
+let weatherSlide = null; // "next" | "prev": direction of the last swipe, for the entrance
+function showCity(c, dir = null) {
+  vault.settings.cityOverride = { day: localDay(), city: c };
+  const cached = vault.weatherCities?.[c.name];
+  if (cached) vault.weather = cached;
+  weatherSlide = dir;
+  persist(); render(); refreshWeather(!cached || Date.now() - Date.parse(cached.at) > WEATHER_TTL_MS);
+}
+function swipeCity(step) {
+  const list = weatherCityList();
+  const i = Math.max(0, list.findIndex((c) => c.name === activeCity().name));
+  const next = list[(i + step + list.length) % list.length];
+  if (next.name !== activeCity().name) showCity(next, step > 0 ? "next" : "prev");
+}
+const cityDots = () => { const list = weatherCityList(), cur = activeCity().name; return `<div class="city-dots" role="tablist" aria-label="Ciudades">${list.map((c) => `<button role="tab" data-act="city" data-city="${esc(c.name)}" aria-selected="${c.name === cur}" aria-label="${esc(c.name)}"></button>`).join("")}</div>`; };
+let swipeStart = null;
+document.addEventListener("touchstart", (e) => {
+  if (overlay !== "weather" || e.touches.length !== 1 || e.target.closest(".hours, input, select, textarea")) { swipeStart = null; return; }
+  swipeStart = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now() };
+}, { passive: true });
+document.addEventListener("touchend", (e) => {
+  if (!swipeStart || overlay !== "weather") return;
+  const t = e.changedTouches[0], dx = t.clientX - swipeStart.x, dy = t.clientY - swipeStart.y;
+  const quick = Date.now() - swipeStart.t < 800;
+  swipeStart = null;
+  if (quick && Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) swipeCity(dx < 0 ? 1 : -1);
+}, { passive: true });
+document.addEventListener("keydown", (e) => {
+  if (overlay !== "weather" || e.target.matches("input, textarea, select")) return;
+  if (e.key === "ArrowRight") swipeCity(1); else if (e.key === "ArrowLeft") swipeCity(-1);
+});
 
 const wxE = (icon, cls = "") => `<span class="wx-emoji${cls ? ` ${cls}` : ""}" aria-hidden="true">${weatherEmoji(icon)}</span>`;
 const sceneLayer = (scene) => `<div class="scene scene-${scene}" aria-hidden="true">${(SHAPES[scene] ?? []).map((c) => `<b class="${c}"></b>`).join("")}${"<i></i>".repeat(PARTICLES[scene] ?? 0)}</div>`;
@@ -326,12 +365,13 @@ function geminiGuide() {
 function weatherPage() {
   const city = activeCity();
   const w = vault.weather && vault.weather.city?.name === city.name ? vault.weather : null;
-  if (!w || !w.data.hours) return `<button class="link" data-act="overlay-close">${I.back} Hoy</button><h1>${esc(city.name)}</h1><p class="muted">${weather.loading ? "Cargando…" : "Sin datos todavía."}</p>`;
+  const slide = weatherSlide ? ` slide-${weatherSlide}` : ""; weatherSlide = null;
+  if (!w || !w.data.hours) return `<button class="link" data-act="overlay-close">${I.back} Hoy</button>${cityDots()}<h1 class="weather-city${slide}">${esc(city.name)}</h1><p class="muted">${weather.loading ? "Cargando…" : navigator.onLine ? "Sin datos todavía." : "Sin conexión: aún no tengo el tiempo de esta ciudad."}</p>`;
   const f = w.data;
   const lo = Math.min(...f.days.map((d) => d.min)), hi = Math.max(...f.days.map((d) => d.max));
   const span = Math.max(1, hi - lo);
-  return `<button class="link" data-act="overlay-close">${I.back} Hoy</button>
-    <div class="weather-head"><p class="muted">${esc(city.name)}</p>${wxE(f.now.icon, "xl")}<div class="temp xl"><span data-count="${f.now.temp}">${f.now.temp}</span>°</div><p>${esc(f.now.text)}</p><p class="muted">Máx. ${f.today.max}° · Mín. ${f.today.min}°</p></div>
+  return `<button class="link" data-act="overlay-close">${I.back} Hoy</button>${cityDots()}
+    <div class="weather-head${slide}"><p class="muted">${esc(city.name)}</p>${wxE(f.now.icon, "xl")}<div class="temp xl"><span data-count="${f.now.temp}">${f.now.temp}</span>°</div><p>${esc(f.now.text)}</p><p class="muted">Máx. ${f.today.max}° · Mín. ${f.today.min}°</p></div>
     <section class="card"><p class="small">${esc(advice(f))}</p><div class="hours scroll">${f.hours.map((h) => `<div><span class="muted small">${esc(h.time)}</span>${wxE(h.icon)}${h.rain >= 20 ? `<span class="rain small">${h.rain}%</span>` : ""}<b>${h.temp}°</b></div>`).join("")}</div></section>
     ${sectionTitle("Próximos 7 días")}
     <section class="card">${f.days.map((d) => `<div class="row day"><span class="wd">${esc(d.weekday)}</span><span class="dicon">${wxE(d.icon)}${d.rain >= 20 ? `<span class="rain small">${d.rain}%</span>` : ""}</span><span class="num muted">${d.min}°</span><span class="range"><i data-l="${Math.round(((d.min - lo) / span) * 100)}" data-w="${Math.max(6, Math.round(((d.max - d.min) / span) * 100))}"></i></span><span class="num">${d.max}°</span></div>`).join("")}</section>
@@ -2198,7 +2238,7 @@ document.addEventListener("click", async (e) => {
     case "meal-fav": addMeal(a.dataset.text); break;
     case "city": {
       const c = [CITIES.GIJON, CITIES.OVIEDO, vault.settings.homeCity].find((x) => x && x.name === a.dataset.city);
-      if (c) { vault.settings.cityOverride = { day: localDay(), city: c }; persist(); render(); refreshWeather(true); }
+      if (c && c.name !== activeCity().name) { const list = weatherCityList(); showCity(c, list.findIndex((x) => x.name === c.name) > list.findIndex((x) => x.name === activeCity().name) ? "next" : "prev"); }
       break;
     }
     case "home-city": { const c = cityResults?.[Number(a.dataset.i)]; if (c) { vault.settings.homeCity = c; vault.settings.cityOverride = null; cityResults = null; persist(); render(); refreshWeather(true); toast(`Casa: ${c.name}`); } break; }
