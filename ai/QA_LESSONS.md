@@ -134,3 +134,7 @@ En WEB-40, el simulador de teclado fijaba `height = innerHeight` antes de aplica
 ### QAL-031 — Un correo de «ha empezado» no es el resultado
 
 En WEB-42, un detector por palabras («export», «data») tomó el aviso «Your data export has started» como la exportación ya lista. Si un servicio manda varios correos del mismo proceso (solicitado, en preparación, listo), el detector debe excluir los estados intermedios, y el test debe cubrir el correo intermedio real además del final.
+
+### QAL-032 — `String.fromCharCode(...bytes)` no escala
+
+En WEB-44, el base64 de `crypto.js` usaba `...` sobre todo el array, y con 3 MB lanzaba «Maximum call stack size exceeded». Cualquier conversión de bytes a texto se hace por trozos (0x8000), y el test debe usar un tamaño realista (varios MB), no unos pocos bytes.

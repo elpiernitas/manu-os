@@ -15,7 +15,13 @@ const subtle = () => {
   if (!s) throw new Error("Este navegador no permite cifrar");
   return s;
 };
-const b64 = (bytes) => btoa(String.fromCharCode(...new Uint8Array(bytes)));
+// WEB-44: in chunks; spreading a multi-megabyte array overflows the call stack.
+const b64 = (bytes) => {
+  const u = new Uint8Array(bytes);
+  let bin = "";
+  for (let i = 0; i < u.length; i += 0x8000) bin += String.fromCharCode(...u.subarray(i, i + 0x8000));
+  return btoa(bin);
+};
 const unb64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
 
 async function deriveKey(passphrase, salt, iterations) {

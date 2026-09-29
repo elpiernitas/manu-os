@@ -10,6 +10,67 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
+## WEB-44 — copia completa cifrada
+
+Manu (2026-09-29) aceptó la copia completa. Antes, «Descargar copia» y la copia de Drive guardaban solo el vault. Las capturas, «Tu archivo» (ChatGPT y chats antiguos) y el diario viven en IndexedDB y se perdían al borrar los datos de Safari o al cambiar de iPhone.
+
+### Cambios
+
+- `web/core/backup-manager.js` (nuevo):
+  - copia las claves `manuos.*` de localStorage, excepto los secretos (clave de Gemini, tokens y PKCE de Spotify, cualquier clave con aspecto de secreto) y las copias `.damaged`. Nunca lee claves de otras páginas del mismo origen (`elpiernitas.github.io`);
+  - copia todas las bases `manuos-*` de IndexedDB, con sus índices y los Blob;
+  - el formato lleva una huella SHA-256 del contenido;
+  - la lectura va por lotes de 200 y cede el hilo entre lotes;
+  - la restauración:
+    - lo valida todo antes de escribir, también con `validateVault`;
+    - hace una instantánea previa;
+    - escribe una transacción por base;
+    - escribe localStorage al final;
+    - si algo falla, deshace cada paso.
+- `web/core/crypto.js`: `b64` por trozos. Con `...` sobre varios MB desbordaba la pila: reproducido con 3 MB y corregido.
+- `web/app.js`:
+  - Tú → Tus datos:
+    - tiene «💾 Copia completa», cifrada por defecto con una frase que solo vive en memoria mientras estás en la página;
+    - «Sin cifrar» pide marcar una casilla;
+    - «Guardar en Drive» sube la copia si no supera 5 MB y, si la supera, avisa;
+    - «Restaurar una copia» reconoce la copia básica antigua, la completa y cualquiera de las dos cifrada, y muestra qué trae antes de pedir confirmación;
+  - «Cifrar y subir» (en Google) sube la misma copia completa, así Drive no guarda nunca una parcial. «Descargar y restaurar» reconoce las copias completas;
+  - Hoy muestra «💾 Hace N días que no haces copia» a los 7 días, o si aún no hay ninguna y ya hay datos. «Luego» lo pospone 3 días;
+  - mientras se restaura, `persist()` no escribe y al final la app se recarga;
+  - versión 44.
+- `web/sw.js`: `core/backup-manager.js` en SHELL y caché v44. Los comentarios de `imagestore.js` y `archivestore.js` se han actualizado.
+
+### Resultados
+
+- `npm test`: 138/138 PASS (`web/tests/backup-manager.test.js`, 4 tests nuevos). Cubren:
+  - la ausencia de secretos;
+  - los archivos alterados, cortados, antiguos y ajenos;
+  - la validación del contenido;
+  - una copia cifrada de más de 3 MB y una frase incorrecta.
+- `backup-manager` en Chromium con pantalla de iPhone 14, fuera de la app, 17/17:
+  - 300 imágenes, 1200 documentos y un Blob: 17,6 MB, exportados en 0,6 s y restaurados en 0,4 s, con la mayor pausa de la interfaz en 38 ms;
+  - la marcha atrás cuando falla la escritura del vault.
+- e2e44b en la app (iPhone 14), 19/19. Cubre:
+  - el aviso de Hoy y «Luego»;
+  - la frase corta;
+  - la descarga cifrada sin datos legibles ni clave de Gemini, y la copia sin cifrar completa;
+  - la subida cifrada a Drive (simulada);
+  - borrar todo;
+  - la frase incorrecta y el archivo alterado;
+  - la confirmación con recuentos;
+  - la restauración de vault, imágenes y archivo, sin tocar la clave de Gemini;
+  - la copia básica antigua;
+  - la restauración completa desde Drive.
+- e2e3, e2e4 y e2e10–e2e43 en PASS. e2e4 se ha adaptado al nuevo flujo de Drive. Excepciones: las 3 expectativas antiguas de e2e18 y «qué tengo hoy» de e2e26. Esta última depende de la hora (usa «a las 18») y falla igual en `main` pasadas las 18:00.
+
+### NO_VERIFICADO
+
+- En el iPhone real:
+  - la descarga desde la app instalada (usa el mismo método que la copia básica);
+  - la memoria con copias de cientos de MB;
+  - el tiempo de PBKDF2 (600 000 iteraciones).
+- Drive con copias de más de 5 MB: por ahora no se suben; subirlas pediría una subida reanudable.
+
 ## WEB-43 — buzón de Atajos: Apple Pay, Salud y ubicación
 
 Manu (2026-09-29) aceptó el «buzón» si no hay otra manera. No la hay sin un servidor: una web no puede leer Cartera, Salud ni la ubicación en segundo plano. Además, una URL abierta desde Atajos va a Safari, cuyo almacenamiento es distinto del de la app instalada.

@@ -25,12 +25,13 @@ import { diaryDocs, dayLines, dayFromText, isDiaryQuestion, dayTitle } from "./c
 import { applyBuzon, buzonSummary } from "./core/buzon.js";
 import { weatherEmoji, sceneFor, PARTICLES, SHAPES, MONEY_EMOJI, dayPhase, cityMinutes } from "./core/scene.js";
 import { buildImagePayload, buildLinkPayload, isGeminiKey, mayGo, setSensitiveOk, sensitiveAllowed, pickModel, listModels, buildActionPayload, askWithActions, issueUrl } from "./core/ai.js";
-import { encryptBackup, decryptBackup, passphraseProblem } from "./core/crypto.js";
+import { encryptBackup, decryptBackup, passphraseProblem, isEnvelope } from "./core/crypto.js";
+import { exportFullBackup, downloadBlob, readBackupFile, restoreFullBackup, FORMAT as FULL_FORMAT } from "./core/backup-manager.js";
 import { isSpotifyClientId, pkceValid, randomVerifier, challengeFor, authorizeUrl, exchangeCode, refreshTokens, listDevices, findSpeaker, transferTo, DEFAULT_SPEAKER } from "./core/spotify.js";
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "43";
+export const APP_VERSION = "44";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -100,7 +101,9 @@ const today = () => new Date();
 const tomorrowKey = () => { const d = today(); d.setDate(d.getDate() + 1); return dayKey(d); };
 const hhmm = (d) => `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 
+let restoring = false; // WEB-44: while a full copy is restored, nothing in memory may overwrite it
 function persist() {
+  if (restoring) return;
   if (vault.chat.length > 200) vault.chat = vault.chat.slice(-200);
   if (!store.save(vault)) toast("No he podido guardar en este dispositivo.");
 }
@@ -668,6 +671,7 @@ const screens = {
       <div class="stack">
       ${nightCard()}
       ${weatherCard()}
+      ${backupNudge()}
       ${mailCards()}
       ${googleOn("gmail") && vault.mail?.important?.length ? `<section class="card"><h2>${I.mail} ${vault.mail.important.length} correo${vault.mail.important.length === 1 ? "" : "s"} importante${vault.mail.important.length === 1 ? "" : "s"}</h2>${vault.mail.important.slice(0, 3).map((x) => `<a class="row" href="${esc(messageUrl(x.id))}" target="_blank" rel="noopener"><div class="grow"><div>${esc(x.name)}</div><div class="muted small">${esc(x.subject || "(sin asunto)")}</div></div></a>`).join("")}<button class="link small" data-sub-go="correo">Ver todo el correo</button></section>` : ""}
       ${next || agendaToday() ? `<section class="card"><h2>Próximo</h2>${next ? `<div class="row"><span class="chip num">${esc(next.time)}</span><span class="grow">${esc(next.title)}</span></div>` : '<p class="muted">No te queda nada más hoy.</p>'}</section>` : ""}
@@ -918,7 +922,7 @@ const subpages = {
         <div class="row"><div class="grow"><div>Actualizar al abrir Agenda u Hoy</div><div class="muted small">Si han pasado más de 10 minutos. Cuando el permiso de Google ha caducado (cada hora, aprox.), puede abrirse un momento su ventana.</div></div><button class="check" data-act="gauto" aria-pressed="${vault.settings.googleAutoOpen !== false}" aria-label="Actualizar al abrir">${I.check}</button></div>
         ${GOOGLE_FEATURES.map(([k, label, desc]) => `<div class="row"><div class="grow"><div>${label}</div><div class="muted small">${esc(desc)}${st[k] && st[k] !== "off" ? ` · ${esc(st[k].replace(/^ok: /, "").replace(/^error: /, "⚠︎ "))}` : ""}</div></div><button class="check" data-act="gfeature" data-k="${k}" aria-pressed="${googleOn(k)}" aria-label="${label}">${I.check}</button></div>`).join("")}
         ${["calendar", "tasks", "contacts", "gmail"].some(googleOn) ? `<button class="btn" data-act="gcal-sync">${gcal.busy ? "Sincronizando…" : "Sincronizar ahora"}</button>` : ""}</section>` : ""}
-      ${ok && googleOn("drive") ? `<section class="card"><h2>Copia cifrada en Drive</h2>
+      ${ok && googleOn("drive") ? `<section class="card"><h2>Copia completa cifrada en Drive</h2>
         <p class="muted small">Se cifra en tu móvil (AES-256-GCM) con una frase que eliges tú y que nunca se guarda ni se sube. Sin la frase, nadie puede leerla, tampoco Google ni MANU. Si la olvidas, la copia no se puede recuperar. La copia solo se sube cuando pulsas el botón.</p>
         <form id="driveForm" class="stack"><label for="drivePass" class="muted small">Frase de la copia (mínimo 10 caracteres)</label><input id="drivePass" type="password" autocomplete="new-password" minlength="10">
           <div class="btns"><button class="btn ghost" type="submit" data-drive="save">Cifrar y subir</button><button class="btn ghost" type="submit" data-drive="restore">Descargar y restaurar</button></div></form>
@@ -994,8 +998,9 @@ const subpages = {
   },
   datos() {
     return `${backBar("Tus datos")}
-      <section class="card"><p class="muted">Todo se guarda solo en este dispositivo. Si borras los datos de Safari, se pierden: descarga una copia de vez en cuando.</p>
-        <div class="btns"><button class="btn ghost" data-act="export">Descargar copia</button><label class="btn ghost" for="import" role="button" tabindex="0">Restaurar copia</label><input id="import" type="file" accept="application/json,.json" class="sr"></div>
+      ${fullBackupCard()}
+      <section class="card"><p class="muted small">Solo lo básico (sin imágenes, archivo ni diario), sin cifrar:</p>
+        <div class="btns"><button class="btn ghost" data-act="export">Descargar copia básica</button></div>
         ${confirmWipe ? '<p>¿Seguro? Se borra todo lo guardado en este dispositivo.</p><div class="btns"><button class="btn danger" data-act="wipe-yes">Sí, borrar todo</button><button class="btn ghost" data-act="wipe-no">Cancelar</button></div>' : '<button class="link" data-act="wipe">Borrar todos los datos…</button>'}</section>`;
   },
 };
@@ -1274,6 +1279,9 @@ function render({ focus = false, enter = null } = {}) {
     else if (grew && mine) { chatPinned = true; scrollChatToEnd(true); }
     else if (chatPinned) scrollChatToEnd(grew);
   } else lastChatLength = 0;
+  // WEB-44: redraws must not wipe the backup phrase Manu is typing (never saved).
+  if (sub !== "datos") { full.pass = ""; full.plain = false; }
+  else { if ($("fullPass")) $("fullPass").value = full.pass; if ($("fullPlain")) $("fullPlain").checked = full.plain; }
   if (focus) $("screen").focus();
 }
 
@@ -1805,6 +1813,7 @@ async function addBirthdayToCalendar(id) {
 }
 // Choosing a contact fills in what Google knows (birthday, phone) if still empty.
 document.addEventListener("input", (e) => {
+  if (e.target.id === "fullPass") { full.pass = e.target.value; return; }
   if (e.target.id !== "pName") return;
   const c = vault.contacts?.find((x) => x.name.toLowerCase() === e.target.value.trim().toLowerCase());
   if (!c) return;
@@ -2055,6 +2064,9 @@ document.addEventListener("click", async (e) => {
     case "notify-on": await enableNotifications(); render(); break;
     case "notify-test": if (!(await testNotification())) toast("No se ha podido mostrar el aviso."); break;
     case "export": exportBackup(); break;
+    case "full-restore-yes": doFullRestore(); break;
+    case "full-restore-no": full.pending = null; render(); break;
+    case "backup-later": vault.settings.backupSnooze = new Date(Date.now() + 3 * 86400000).toISOString(); persist(); render(); break;
     case "wipe": confirmWipe = true; render(); break;
     case "wipe-no": confirmWipe = false; render(); break;
     case "wipe-yes": { let ss = null, ls = null; try { ss = sessionStorage; ls = localStorage; } catch {} wipeDeviceKeys([ls, ss]); clearImages(); clearArchive(); archive.docs = null; archive.stats = null; imageCache.clear(); gcal.tokens = {}; vault = emptyVault(); confirmWipe = false; persist(); render(); toast("Datos borrados de este dispositivo"); break; }
@@ -2116,6 +2128,28 @@ document.addEventListener("submit", async (e) => {
     vault.settings.spotifySpeaker = $("spSpeaker").value.trim().slice(0, 40) || DEFAULT_SPEAKER;
     persist(); render(); toast("Spotify guardado"); return;
   }
+  if (f === "fullForm") {
+    if (full.busy) return;
+    const pass = $("fullPass").value, plain = $("fullPlain").checked;
+    const where = e.submitter?.dataset.full ?? "download";
+    if (where === "drive" && plain) { toast("A Drive solo se suben copias cifradas."); return; }
+    if (!plain) { const problem = passphraseProblem(pass); if (problem) { toast(problem); return; } }
+    full.busy = where === "drive" ? "drive" : "export"; render();
+    try {
+      const b = await makeFullBackup(pass, plain);
+      const mb = (b.bytes / 1048576).toFixed(1);
+      if (where === "drive") {
+        if (b.bytes > DRIVE_MAX) { toast(`La copia pesa ${mb} MB y Drive por ahora solo admite hasta 5 MB desde MANU. Descárgala y guárdala en Archivos o iCloud.`); return; }
+        await withRetry(SCOPE.drive, (tk) => saveBackup(tk, b.envelope));
+      } else downloadBlob(b.blob, b.filename);
+      vault.settings.lastFullBackup = { at: new Date().toISOString(), where: where === "drive" ? "drive" : "download", mb, encrypted: !plain };
+      delete vault.settings.backupSnooze;
+      persist();
+      toast(where === "drive" ? `Copia completa cifrada en tu Drive (${mb} MB)` : `Copia completa lista (${mb} MB). Guárdala en Archivos o iCloud.`);
+    } catch (err) { toast(`No he podido hacer la copia: ${err.message}`); }
+    finally { full.busy = null; render(); }
+    return;
+  }
   if (f === "driveForm") {
     const pass = $("drivePass").value;
     const problem = passphraseProblem(pass);
@@ -2123,14 +2157,23 @@ document.addEventListener("submit", async (e) => {
     const action = e.submitter?.dataset.drive ?? "save";
     try {
       if (action === "save") {
-        const envelope = await encryptBackup(vault, pass);
-        await withRetry(SCOPE.drive, (tk) => saveBackup(tk, envelope));
+        // WEB-44: the same full copy as in Tus datos, so Drive never keeps a partial one.
+        const b = await makeFullBackup(pass, false);
+        if (b.bytes > DRIVE_MAX) { toast(`La copia pesa ${(b.bytes / 1048576).toFixed(1)} MB y Drive por ahora solo admite hasta 5 MB desde MANU. Descárgala en Tú → Tus datos.`); return; }
+        await withRetry(SCOPE.drive, (tk) => saveBackup(tk, b.envelope));
+        vault.settings.lastFullBackup = { at: new Date().toISOString(), where: "drive", mb: (b.bytes / 1048576).toFixed(1), encrypted: true };
         vault.settings.googleStatus = { ...(vault.settings.googleStatus ?? {}), drive: `ok: copia cifrada ${new Date().toLocaleString("es-ES", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}` };
         persist(); render(); toast("Copia cifrada guardada en tu Drive");
       } else {
         const b = await withRetry(SCOPE.drive, (tk) => loadBackup(tk));
         if (!b) { toast("No hay copia en Drive todavía"); return; }
-        confirmDriveRestore = { file: b.file, data: await decryptBackup(b.data, pass) };
+        const data = await decryptBackup(b.data, pass);
+        if (typeof data === "string") { // WEB-44: a full copy
+          const checked = await readBackupFile(new Blob([data]), { validateVault });
+          if (!checked.ok) { toast(checked.reason); return; }
+          full.pending = checked; tab = "tu"; sub = "datos"; render(); scrollTo(0, 0); return;
+        }
+        confirmDriveRestore = { file: b.file, data };
         render();
       }
     } catch (err) { toast(err.message || "No se pudo completar la copia"); }
@@ -2314,11 +2357,14 @@ document.addEventListener("change", async (e) => {
     vault.settings.lastImport = { at: new Date().toISOString(), added: r.entries.length, duplicates: r.duplicates, incomeAdded: (r.income ?? []).length, incomeDuplicates: r.incomeDuplicates ?? 0, invalid: r.skippedInvalid };
     persist(); render(); toast(`${r.entries.length} gastos y ${(r.income ?? []).length} ingresos importados`); return;
   }
+  if (e.target.id === "fullPlain") { full.plain = e.target.checked; return; }
   if (e.target.id === "import" && e.target.files?.[0]) {
+    const file = e.target.files[0]; e.target.value = "";
     try {
-      const result = validateVault(JSON.parse(await e.target.files[0].text()));
-      if (!result.ok) { toast(result.reason); return; }
-      vault = result.vault; persist(); render(); toast("Copia restaurada");
+      // WEB-44: validate everything first; nothing is written until Manu confirms.
+      const checked = await checkAnyBackup(await file.text(), $("fullPass")?.value ?? "");
+      if (!checked.ok) { toast(checked.reason); return; }
+      full.pending = checked; render(); scrollTo(0, 0);
     } catch { toast("Ese archivo no es una copia de MANU OS."); }
   }
 });
@@ -2481,6 +2527,82 @@ function loadSheetJs() {
     el.onerror = () => reject(new Error("SheetJS"));
     document.head.appendChild(el);
   });
+}
+
+// ---------- Copia completa (WEB-44) ----------
+// Vault + images + «Tu archivo» + diary in one file, encrypted by default.
+// Secrets (Gemini key, Spotify tokens) never go in it (core/backup-manager.js).
+const full = { busy: null, pending: null, pass: "", plain: false }; // pass: memory only, while on Tus datos
+const DRIVE_MAX = 5 * 1024 * 1024; // Drive simple/multipart uploads are for files up to 5 MB
+const daysSince = (iso) => (iso ? Math.floor((Date.now() - Date.parse(iso)) / 86400000) : null);
+function fullBackupCard() {
+  const last = vault.settings.lastFullBackup;
+  const p = full.pending;
+  if (p) {
+    const c = p.counts?.databases ?? {};
+    const n = (db, st) => c[db]?.[st] ?? 0;
+    return `<section class="card"><h2>💾 ¿Restaurar esta copia?</h2>
+      <p class="small">${p.kind === "vault" ? "Copia básica (solo el vault)." : `Copia completa${p.createdAt ? ` del ${esc(new Date(p.createdAt).toLocaleString("es-ES", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }))}` : ""}: ${n("manuos-images", "images")} imágenes, ${n("manuos-archive", "docs")} documentos de tu archivo y diario.`}</p>
+      <p class="muted small">Reemplaza lo que hay ahora en este iPhone. Tu clave de Gemini y Spotify no se tocan. Si algo falla, todo se queda como estaba.</p>
+      <div class="btns"><button class="btn danger" data-act="full-restore-yes">${full.busy === "restore" ? "Restaurando…" : "Sí, restaurar"}</button><button class="btn ghost" data-act="full-restore-no">Cancelar</button></div></section>`;
+  }
+  return `<section class="card"><h2>💾 Copia completa</h2>
+    <p class="muted small">Si borras los datos de Safari o cambias de iPhone, se pierde todo lo que no esté en una copia. Esta guarda tus datos, capturas, «Tu archivo» y el diario. La clave de Gemini y los tokens de Spotify nunca van dentro.</p>
+    <p class="small">${last ? `Última copia: hace ${daysSince(last.at) === 0 ? "menos de un día" : `${daysSince(last.at)} ${daysSince(last.at) === 1 ? "día" : "días"}`} (${esc(last.where === "drive" ? "en tu Drive" : "descargada")}, ${esc(last.mb)} MB).` : "Aún no has hecho ninguna copia completa."}</p>
+    <form id="fullForm" class="stack" autocomplete="off">
+      <label for="fullPass" class="muted small">Frase para cifrarla (mín. 10 caracteres; sin ella no se puede abrir, apúntala en un sitio seguro)</label>
+      <input id="fullPass" type="password" maxlength="200" autocomplete="new-password">
+      <label class="check-row"><input type="checkbox" id="fullPlain"> Sin cifrar (no recomendado: quien tenga el archivo lo lee todo)</label>
+      <div class="btns"><button class="btn" type="submit" data-full="download">${full.busy === "export" ? "Preparando…" : "Descargar copia completa"}</button>${googleOn("drive") ? `<button class="btn ghost" type="submit" data-full="drive">${full.busy === "drive" ? "Subiendo…" : "Guardar en Drive"}</button>` : ""}</div>
+    </form>
+    <div class="btns"><label class="btn ghost" for="import" role="button" tabindex="0">Restaurar una copia</label><input id="import" type="file" accept="application/json,.json" class="sr"></div>
+    <p class="muted small">Para restaurar una copia cifrada, escribe primero su frase arriba.</p></section>`;
+}
+// Encrypted file: the same AES-GCM envelope as the Drive copy (crypto.js),
+// whose plaintext is the full-backup text.
+async function makeFullBackup(pass, plain) {
+  const exp = await exportFullBackup({ appVersion: APP_VERSION });
+  if (plain) return { blob: exp.blob, filename: exp.filename, bytes: exp.bytes };
+  const envelope = await encryptBackup(await exp.blob.text(), pass);
+  const blob = new Blob([JSON.stringify(envelope)], { type: "application/json" });
+  return { blob, envelope, filename: exp.filename.replace(".json", "-cifrada.json"), bytes: blob.size };
+}
+// Any copy MANU ever made: basic vault, full, or either one encrypted.
+async function checkAnyBackup(text, pass) {
+  let data;
+  try { data = JSON.parse(text); } catch { return { ok: false, reason: "Ese archivo no es una copia de MANU OS." }; }
+  if (isEnvelope(data)) {
+    if (passphraseProblem(pass)) return { ok: false, reason: "Es una copia cifrada: escribe su frase en «Frase para cifrarla» y vuelve a elegir el archivo." };
+    try { data = await decryptBackup(data, pass); } catch (err) { return { ok: false, reason: err.message }; }
+    if (typeof data === "string") return readBackupFile(new Blob([data]), { validateVault });
+  }
+  if (data?.format === FULL_FORMAT) return readBackupFile(new Blob([text]), { validateVault });
+  const v = validateVault(data);
+  return v.ok ? { ok: true, kind: "vault", vault: v.vault } : { ok: false, reason: v.reason };
+}
+async function doFullRestore() {
+  const p = full.pending;
+  if (!p || full.busy) return;
+  if (p.kind === "vault") { vault = p.vault; full.pending = null; persist(); render(); toast("Copia restaurada"); return; }
+  full.busy = "restore"; render();
+  try {
+    restoring = true;
+    await restoreFullBackup(p);
+    toast("Copia restaurada. Reiniciando MANU…");
+    setTimeout(() => location.reload(), 600);
+  } catch (err) {
+    restoring = false; full.busy = null; full.pending = null; render();
+    toast(err.message);
+  }
+}
+// Hoy: a quiet nudge after 7 days without a full copy (only once there is something to lose).
+function backupNudge() {
+  const s = vault.settings;
+  if (s.backupSnooze && Date.parse(s.backupSnooze) > Date.now()) return "";
+  const lastAt = s.lastFullBackup?.at;
+  const items = vault.inbox.length + vault.spending.length + (vault.people?.length ?? 0) + (vault.projects?.length ?? 0);
+  if (lastAt ? daysSince(lastAt) < 7 : items < 5) return "";
+  return `<section class="card ai-offer"><b>💾 ${lastAt ? `Hace ${daysSince(lastAt)} días que no haces copia` : "Aún no tienes ninguna copia"}</b><p class="muted small">Si se borran los datos de Safari, se pierde todo. Tarda un momento.</p><div class="btns"><button class="btn" data-sub-go="datos">Hacer copia</button><button class="btn ghost" data-act="backup-later">Luego</button></div></section>`;
 }
 
 function exportBackup() {
