@@ -2,11 +2,11 @@
 
 Status: **REVIEW_PENDING**
 
-WEB-17 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
+WEB-18 implementado. Se fusiona según la regla de fusión de `AGENTS.md`.
 
 ## Tarea activa
 
-WEB-17 — quitar el avatar de MANU a petición de Manu (`ai/HANDOFF.md`, «WEB-17»).
+WEB-18 — volver a poner la bola animada con la M en MANU, sin cara ni aspecto humano (`ai/HANDOFF.md`, «WEB-18»).
 
 ## Autorización
 
@@ -41,6 +41,7 @@ WEB-17 — quitar el avatar de MANU a petición de Manu (`ai/HANDOFF.md`, «WEB-
 
 ## Historial (cerrado)
 
+- **WEB-17** (quitar la bola con la M por un malentendido): CERRADA. Fusionada mediante el PR #25 (`18a9c7d`); WEB-18 revierte ese cambio.
 - **WEB-16** (escenas vivas): CERRADA. Fusionada mediante el PR #24 (`0caa79d`).
 - **WEB-15** (Spotify con un toque): CERRADA. Fusionada mediante el PR #23 (`c657d99`).
 - **WEB-14** (tutorial de Gemini): CERRADA. Fusionada mediante el PR #22 (`c8109ee`).

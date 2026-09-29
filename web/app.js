@@ -19,7 +19,7 @@ import { isSpotifyClientId, pkceValid, randomVerifier, challengeFor, authorizeUr
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "17";
+export const APP_VERSION = "18";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -518,8 +518,10 @@ const screens = {
     const chips = refuge ? ["quiero entender por qué", "buscar una solución", "necesito desconectar"] : null;
     // Short cards: «fill» starts the sentence for Manu; «say» sends it directly.
     const cards = [["💸", "Apuntar gasto", "fill", "gasté "], ["⏰", "Crear alarma", "fill", "pon una alarma a las "], ["🔔", "Recordatorio", "fill", "recuérdame "], ["💡", "Guardar idea", "fill", "apunta idea: "], ["🗓️", "¿Qué tengo hoy?", "say", "qué tengo hoy"], ["🌿", "Refugio", "say", "refugio"]];
+    const thinking = vault.chat.at(-1)?.text === "Pensando…";
+    const empty = !vault.chat.length && !refuge;
     const history = vault.chat.length ? vault.chat : [{ from: "manu", text: "Hola, Manu. Puedo apuntar gastos, ideas y tareas, crear recordatorios y alarmas, y acompañarte en el Refugio. Aún funciono sin IA: habla claro y corto." }];
-    return `<h1>MANU</h1><p class="subtitle">Tu asistente · ${aiReady() ? "IA disponible, siempre con tu confirmación" : '<button class="link small" data-act="gemini-guide">activar IA</button>'}</p>
+    return `<div class="manu-head${empty ? " big" : ""}"><div class="orb${thinking ? " thinking" : ""}" id="orb" aria-hidden="true"><span>M</span></div><div><h1>MANU</h1><p class="subtitle">Tu asistente · ${aiReady() ? "IA disponible, siempre con tu confirmación" : '<button class="link small" data-act="gemini-guide">activar IA</button>'}</p></div></div>
       ${refuge ? `<div class="refuge-bar"><span>Refugio · no se guarda</span><button class="link" data-act="leave-refuge">Salir</button></div>` : ""}
       ${chips ? `<div class="suggest" aria-label="Sugerencias">${chips.map((s) => `<button data-say="${esc(s)}">${esc(s)}</button>`).join("")}</div>` : `<div class="quick-cards" aria-label="Sugerencias">${cards.map(([e, label, how, text]) => `<button class="qcard" ${how === "say" ? `data-say="${esc(text)}"` : `data-fill="${esc(text)}"`}><span class="qe" aria-hidden="true">${e}</span><span>${esc(label)}</span></button>`).join("")}</div>`}
       <div class="chat" id="chat" aria-live="polite">${[...history, ...(refuge?.messages ?? [])].map((b) => `<div class="bubble ${b.from}${b.safety ? " safety" : ""}">${b.ai ? '<span class="ai-tag">IA</span>' : ""}${esc(b.text)}${b.proposal ? `${b.proposal.state ? `<details><summary class="muted small">Ver lo enviado</summary><pre class="payload">${esc(shownPayload(b.proposal))}</pre></details>` : `<pre class="payload">${esc(shownPayload(b.proposal))}</pre>`}${b.proposal.state ? `<p class="muted small">${b.proposal.state === "sent" ? (b.proposal.auto ? "Enviado a Gemini sin preguntar (lo activaste en Tú → IA)." : "Enviado a Gemini.") : "No enviado."}</p>` : `<div class="btns"><button class="btn" data-act="ai-send" data-id="${esc(b.proposal.id)}">Enviar a Gemini</button><button class="btn ghost" data-act="ai-cancel" data-id="${esc(b.proposal.id)}">No</button></div><div class="btns"><button class="link small" data-act="ask-elsewhere" data-app="chatgpt" data-id="${esc(b.proposal.id)}">Preguntar en ChatGPT</button><button class="link small" data-act="ask-elsewhere" data-app="claude" data-id="${esc(b.proposal.id)}">Preguntar en Claude</button></div>`}` : ""}${b.action ? `<div class="btns"><a class="btn" href="${esc(b.action.href)}">${esc(b.action.label)}</a></div>` : ""}${(b.calls ?? []).map((c, i) => callCard(b, c, i)).join("")}</div>`).join("")}</div>
@@ -1045,7 +1047,7 @@ document.addEventListener("click", async (e) => {
   const s = e.target.closest("[data-say]");
   if (s) { say(s.dataset.say); return; }
   const fill = e.target.closest("[data-fill]");
-  if (fill) { const m = $("msg"); if (m) { m.value = fill.dataset.fill; m.focus(); m.setSelectionRange(m.value.length, m.value.length); } return; }
+  if (fill) { const m = $("msg"); if (m) { m.value = fill.dataset.fill; m.focus(); m.setSelectionRange(m.value.length, m.value.length); $("orb")?.classList.add("listening"); } return; }
   if (e.target.id === "fab" || e.target.closest("#fab")) { openSheet(tab === "dinero" ? "EXPENSE" : "TASK"); return; }
   if (e.target.id === "sheetBg") { closeSheet(); return; }
   const a = e.target.closest("[data-act]");
@@ -1255,6 +1257,10 @@ document.addEventListener("submit", async (e) => {
     sheet = null; persist(); render();
     toast({ TASK: "Tarea añadida", IDEA: "Idea guardada", EXPENSE: "Gasto apuntado", REMINDER: "Recordatorio creado" }[k]);
   }
+});
+
+document.addEventListener("input", (e) => {
+  if (e.target.id === "msg") $("orb")?.classList.toggle("listening", e.target.value.trim().length > 0);
 });
 
 document.addEventListener("change", async (e) => {
