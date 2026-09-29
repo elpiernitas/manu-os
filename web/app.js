@@ -13,13 +13,13 @@ import { isClientId, listEvents, createEvent, newEventBody, monthGrid, listCalen
 import { detectRecurring, upcomingRecurring, spendingPattern } from "./core/insights.js";
 import { SCOPE, runServices, planTaskSync, listOpenTasks, insertTask, completeTask, contactBirthdays, mergePeople, saveBackup, loadBackup } from "./core/google.js";
 import { weatherEmoji, sceneFor, PARTICLES, MONEY_EMOJI } from "./core/scene.js";
-import { isSensitive, pickModel, listModels, buildActionPayload, askWithActions, issueUrl } from "./core/ai.js";
+import { isGeminiKey, isSensitive, pickModel, listModels, buildActionPayload, askWithActions, issueUrl } from "./core/ai.js";
 import { encryptBackup, decryptBackup, passphraseProblem } from "./core/crypto.js";
 import { isSpotifyClientId, pkceValid, randomVerifier, challengeFor, authorizeUrl, exchangeCode, refreshTokens, listDevices, findSpeaker, transferTo, DEFAULT_SPEAKER } from "./core/spotify.js";
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "18";
+export const APP_VERSION = "19";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -230,8 +230,8 @@ function geminiGuide() {
     <div class="stack">
     ${step(0, "Abre Google AI Studio", "Se abre la página de claves de Google. Si te lo pide, entra con tu Gmail y acepta las condiciones.", '<a class="btn block" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" data-act="guide-step" data-n="1">Abrir la página de claves</a>')}
     ${step(1, "Crea la clave", "Pulsa <b>«Create API key»</b> (puede aparecer como «Crear clave de API»). Si te pregunta por un proyecto, elige el que te proponga o uno nuevo. <b>No actives la facturación</b>: la clave gratuita no la necesita.")}
-    ${step(2, "Cópiala", "Aparece una clave larga que empieza por <b>AIza</b>. Pulsa el icono de copiar que tiene al lado.")}
-    ${step(3, "Vuelve aquí y pégala", "MANU la lee del portapapeles, la prueba y la recuerda en este móvil. No va a Google Drive, ni a las copias, ni al repositorio.", '<button class="btn block" data-act="ai-paste">Pegar y activar</button><form id="guideForm" class="stack"><label for="guideKey" class="muted small">¿No funciona el botón? Pégala aquí a mano:</label><input id="guideKey" type="password" autocomplete="off" spellcheck="false" placeholder="AIza…"><button class="btn ghost" type="submit">Activar con esta clave</button></form>')}
+    ${step(2, "Cópiala", "En «Clave de API» aparece una clave larga que empieza por <b>AQ.</b> (las antiguas empiezan por <b>AIza</b>). Pulsa el icono de copiar que tiene al lado; no copies el nombre ni el número del proyecto.")}
+    ${step(3, "Vuelve aquí y pégala", "MANU la lee del portapapeles, la prueba y la recuerda en este móvil. No va a Google Drive, ni a las copias, ni al repositorio.", '<button class="btn block" data-act="ai-paste">Pegar y activar</button><form id="guideForm" class="stack"><label for="guideKey" class="muted small">¿No funciona el botón? Pégala aquí a mano:</label><input id="guideKey" type="password" autocomplete="off" spellcheck="false" placeholder="AQ.… o AIza…"><button class="btn ghost" type="submit">Activar con esta clave</button></form>')}
     </div>`;
 }
 
@@ -723,7 +723,7 @@ const subpages = {
     return `${backBar("IA (Gemini)")}
       ${aiReady() ? "" : `<section class="card"><h2>Actívala paso a paso</h2><p class="muted small">Te guío: crear la clave gratis, copiarla y pegarla aquí.</p><button class="btn block" data-act="gemini-guide">Empezar</button></section>`}
       <section class="card"><h2>Estado</h2><p>${aiReady() ? `Activada con <b>${esc(aiStore.model)}</b>.` : key ? "Clave guardada. Pulsa «Probar clave»." : "Sin clave: MANU funciona sin IA."}</p>
-        <form id="aiForm" class="stack"><label for="aiKey" class="muted small">Clave de API de Gemini. Nunca va en las copias. Por defecto solo dura mientras MANU está abierta.</label><input id="aiKey" type="password" value="${esc(key)}" autocomplete="off" spellcheck="false" placeholder="AIza…"><div class="btns"><button class="btn" type="submit">Guardar y probar clave</button>${key ? '<button class="btn danger" type="button" data-act="ai-forget">Borrar clave</button>' : ""}</div></form>
+        <form id="aiForm" class="stack"><label for="aiKey" class="muted small">Clave de API de Gemini. Nunca va en las copias. Por defecto solo dura mientras MANU está abierta.</label><input id="aiKey" type="password" value="${esc(key)}" autocomplete="off" spellcheck="false" placeholder="AQ.… o AIza…"><div class="btns"><button class="btn" type="submit">Guardar y probar clave</button>${key ? '<button class="btn danger" type="button" data-act="ai-forget">Borrar clave</button>' : ""}</div></form>
         <div class="row"><div class="grow"><div>Recordar la clave en este móvil</div><div class="muted small">Más cómodo, pero cualquier código que corra en esta web podría leerla (ADR-0013).</div></div><button class="check" data-act="ai-remember" aria-pressed="${aiStore.remember}" aria-label="Recordar clave">${I.check}</button></div>
         ${key ? `<div class="row"><span>Ofrecer la IA en el chat</span><button class="check" data-act="ai-toggle" aria-pressed="${vault.settings.aiEnabled !== false}" aria-label="Usar IA">${I.check}</button></div>
         <div class="row"><div class="grow"><div>Enviar a Gemini sin preguntar</div><div class="muted small">Desactivado por defecto. Si lo activas, lo que MANU no entienda irá directo a Gemini. Lo que parezca privado (salud, dinero, ánimo, teléfonos…) seguirá sin enviarse nunca.</div></div><button class="check" data-act="ai-auto" aria-pressed="${vault.settings.aiAutoSend === true}" aria-label="Enviar sin preguntar">${I.check}</button></div>` : ""}</section>
@@ -956,7 +956,6 @@ async function activateGemini(key) {
   } catch (err) { aiStore.model = ""; render(); toast(err.message); return false; }
 }
 
-const GEMINI_KEY_RE = /^AIza[0-9A-Za-z_-]{30,60}$/;
 
 async function askAi(proposalId, { auto = false } = {}) {
   const bubble = vault.chat.find((b) => b.proposal?.id === proposalId);
@@ -1100,8 +1099,8 @@ document.addEventListener("click", async (e) => {
     case "ai-cancel": { const b = vault.chat.find((x) => x.proposal?.id === id); if (b) { b.proposal.state = "cancelled"; persist(); render(); } break; }
     case "ai-paste": {
       let text = "";
-      try { text = (await navigator.clipboard.readText()).trim(); } catch { toast("No puedo leer el portapapeles: pega la clave en el campo de abajo."); break; }
-      if (!GEMINI_KEY_RE.test(text)) { toast("No veo una clave de Gemini copiada (empieza por «AIza»)."); break; }
+      try { text = (await navigator.clipboard.readText()).trim(); } catch { toast("No he podido leer lo copiado. Si el iPhone muestra «Pegar», tócalo; si no, pega la clave en el campo de abajo."); break; }
+      if (!isGeminiKey(text)) { toast("No veo una clave de Gemini copiada (empieza por «AQ.» o «AIza»). Pulsa el icono de copiar junto a «Clave de API»."); break; }
       aiStore.remember = true; // the button says it: remembered on this phone (ADR-0013)
       if (await activateGemini(text) && overlay === "gemini") { overlay = null; tab = "tu"; sub = null; render({ focus: true, enter: "tab" }); scrollTo(0, 0); toast("IA activada. Ya puedes hablar con MANU."); }
       break;
@@ -1199,7 +1198,7 @@ document.addEventListener("submit", async (e) => {
   }
   if (f === "guideForm") {
     const key = $("guideKey").value.trim();
-    if (!GEMINI_KEY_RE.test(key)) { toast("Eso no parece una clave de Gemini (empieza por «AIza»)."); return; }
+    if (!isGeminiKey(key)) { toast("Eso no parece una clave de Gemini (empieza por «AQ.» o «AIza»)."); return; }
     aiStore.remember = true;
     if (await activateGemini(key)) { overlay = null; tab = "tu"; sub = null; render({ focus: true, enter: "tab" }); scrollTo(0, 0); toast("IA activada. Ya puedes hablar con MANU."); }
     return;
