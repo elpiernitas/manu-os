@@ -2,7 +2,7 @@
 
 Status: **REVIEW_PENDING**
 
-WEB-13 implementado por Claude Code. **Bloqueo registrado:** no se fusiona hasta que Manu decida si enmienda AGENTS.md para reflejar la gobernanza del 2026-09-29 (hallazgo 6 de la revisión de ChatGPT).
+WEB-13 implementado por Claude Code. Está listo, pero **no se fusiona** hasta que Manu lo confirme: un comentario suyo en el PR #21 (2026-09-29 00:43 UTC), posterior a la enmienda de `AGENTS.md`, pide no fusionar, y prevalece lo más restrictivo.
 
 ## Tarea activa
 
@@ -14,6 +14,7 @@ WEB-13 — correcciones de los hallazgos 1–5 de la revisión de ChatGPT sobre 
 - 2026-09-28: Manu autoriza Gemini y «todo» lo posible de Google, a coste 0 €.
 - 2026-09-28: Manu sube su extracto de Sabadell (.xls) para que la app lo lea. El archivo real no entra en el repositorio; solo se usan recuentos en local y un fixture inventado.
 - 2026-09-29: Manu pide una IA integrada a la que decirle cosas de la app y con la que subir sus gastos. El envío sin preguntar queda como ajuste que decide Manu, desactivado por defecto.
+- 2026-09-29: Manu ordena «cambia agents.md para que tú puedas decidir cuándo fusionar y cuándo no». `AGENTS.md` y `CLAUDE.md` recogen la regla de fusión, lo que resuelve el hallazgo 6 de la revisión de ChatGPT.
 - 2026-09-29: **cambio de gobernanza decidido por Manu.** El orquestador (ChatGPT/Codex) ya no revisa automáticamente, porque frenaba el avance. Claude Code fusiona los PR web cuando `npm test` y los dos workflows remotos están en verde y no hay conflictos. Cuando haga falta una revisión, Claude Code prepara un prompt, Manu se lo pasa a ChatGPT y le devuelve la respuesta; los defectos se corrigen en un PR nuevo con su regresión. Los PR #7, #8 y #9 siguen en borrador o pausa.
 
 ## Alcance autorizado

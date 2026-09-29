@@ -252,3 +252,4 @@ details.card > summary { list-style: none; }
 .week-bars > div { display: grid; grid-template-rows: 1fr auto; justify-items: center; height: 100%; align-items: end; }
 .week-bars i { width: 70%; max-width: 26px; border-radius: 6px 6px 3px 3px; background: linear-gradient(180deg, var(--accent), var(--fill)); display: block; transition: height 500ms var(--ease-out); }
 @media (prefers-reduced-motion: reduce) { .cal-grid.slide { animation: none; } .week-bars i { transition: none; } }
+.small-btn { min-height: 36px; padding: 6px 14px; font-size: 15px; flex: none; }

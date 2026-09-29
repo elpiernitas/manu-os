@@ -502,6 +502,7 @@ const screens = {
     const hs = healthSummary(vault.health);
     const item = (key, icon, color, title, detail) => `<button class="item" data-sub="${key}"><span class="ico ${color}">${I[icon]}</span><span class="grow"><span>${title}</span><br><span class="muted small">${esc(detail)}</span></span><span class="chev">${I.chev}</span></button>`;
     return `<div class="row"><div class="avatar" aria-hidden="true">M</div><div class="grow"><h1>Manu</h1><p class="muted">${esc(longDate())}</p></div></div>
+      ${setupCard()}
       ${sectionTitle("¿Cómo estás hoy?")}
       <section class="card"><div class="mood">${MOODS.map((m) => `<button data-act="mood" data-v="${m.value}" aria-pressed="${mood === m.value}"><b>${m.value}</b>${m.label}</button>`).join("")}</div>
         <div class="row"><span class="muted small">Últimos 7 días</span><span class="dots">${week.map((v) => `<i data-v="${v}" title="${v ? MOODS[v - 1].label : "Sin dato"}"></i>`).join("")}</span></div>
@@ -527,6 +528,17 @@ const screens = {
       <p class="muted small">MANU OS web · versión ${APP_VERSION} · datos solo en este dispositivo</p>`;
   },
 };
+
+// «Puesta a punto»: what is still missing, each with one button.
+function setupCard() {
+  const steps = [];
+  if (!["calendar", "tasks", "contacts", "drive"].some(googleOn)) steps.push(["Google", "Calendar, Tasks y Contactos con un toque", '<button class="btn small-btn" data-act="google-connect-all">Conectar</button>']);
+  if (!aiReady()) steps.push(["IA (Gemini)", "Crear la clave y pegarla: 2 toques", '<button class="btn small-btn" data-sub-go="ia">Activar</button>']);
+  if (notificationStatus() === "default") steps.push(["Avisos", "Para que MANU te avise", '<button class="btn small-btn" data-act="notify-on">Activar</button>']);
+  if (shortcutsPending()) steps.push(["Atajos del iPhone", `${shortcutsPending()} por crear (alarmas y recordatorios que suenan siempre)`, '<button class="btn small-btn" data-sub-go="atajos">Ver</button>']);
+  if (!steps.length) return "";
+  return `${sectionTitle("Puesta a punto")}<section class="card">${steps.map(([t, d, b]) => `<div class="row"><div class="grow"><div>${t}</div><div class="muted small">${esc(d)}</div></div>${b}</div>`).join("")}</section>`;
+}
 
 const backBar = (title) => `<button class="link" data-act="back">${I.back} Tú</button><h1>${title}</h1>`;
 
@@ -646,6 +658,8 @@ const subpages = {
   ia() {
     const key = aiStore.key;
     return `${backBar("IA (Gemini)")}
+      ${aiReady() ? "" : `<section class="card"><h2>Actívala en 2 toques</h2><ol class="muted small"><li>Crea tu clave gratis con tu Gmail («Create API key»). No pide tarjeta; si te pide activar facturación, no lo hagas. Cópiala.</li><li>Vuelve aquí y pulsa «Pegar y activar». MANU la prueba y la recuerda en este móvil.</li></ol>
+        <div class="btns"><a class="btn ghost" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">1. Crear mi clave</a><button class="btn" data-act="ai-paste">2. Pegar y activar</button></div></section>`}
       <section class="card"><h2>Estado</h2><p>${aiReady() ? `Activada con <b>${esc(aiStore.model)}</b>.` : key ? "Clave guardada. Pulsa «Probar clave»." : "Sin clave: MANU funciona sin IA."}</p>
         <form id="aiForm" class="stack"><label for="aiKey" class="muted small">Clave de API de Gemini. Nunca va en las copias. Por defecto solo dura mientras MANU está abierta.</label><input id="aiKey" type="password" value="${esc(key)}" autocomplete="off" spellcheck="false" placeholder="AIza…"><div class="btns"><button class="btn" type="submit">Guardar y probar clave</button>${key ? '<button class="btn danger" type="button" data-act="ai-forget">Borrar clave</button>' : ""}</div></form>
         <div class="row"><div class="grow"><div>Recordar la clave en este móvil</div><div class="muted small">Más cómodo, pero cualquier código que corra en esta web podría leerla (ADR-0013).</div></div><button class="check" data-act="ai-remember" aria-pressed="${aiStore.remember}" aria-label="Recordar clave">${I.check}</button></div>
@@ -759,6 +773,7 @@ function closeSheet() {
 }
 
 function render({ focus = false, enter = null } = {}) {
+  if (tab === "tu" && (!sub || sub === "gcal") && isClientId(gClientId())) loadGis().catch(() => {});
   document.body.dataset.mode = modeState(today(), undefined, vault.settings.override).mode;
   renderTabs();
   $("screen").innerHTML = overlay === "weather" ? weatherPage() : (screens[tab] ?? screens.hoy)();
@@ -861,6 +876,18 @@ function shownPayload(p) {
   const { tools, ...rest } = proposalPayload(p);
   return `${JSON.stringify(rest, null, 1)}\n+ lista fija de ${tools[0].functionDeclarations.length} acciones que puede proponer`;
 }
+
+async function activateGemini(key) {
+  aiStore.key = key;
+  try {
+    const model = pickModel(await listModels(key));
+    if (!model) { toast("Tu clave no tiene modelos de texto disponibles"); return false; }
+    aiStore.model = model; vault.settings.aiEnabled = true; persist(); render(); toast(`IA lista: ${model}`);
+    return true;
+  } catch (err) { aiStore.model = ""; render(); toast(err.message); return false; }
+}
+
+const GEMINI_KEY_RE = /^AIza[0-9A-Za-z_-]{30,60}$/;
 
 async function askAi(proposalId, { auto = false } = {}) {
   const bubble = vault.chat.find((b) => b.proposal?.id === proposalId);
@@ -998,6 +1025,14 @@ document.addEventListener("click", async (e) => {
     case "spotify-forget": spotifyStore.tokens = null; render(); toast("Spotify desconectado de este móvil"); break;
     case "ask-elsewhere": { const b = vault.chat.find((x) => x.proposal?.id === id); if (b) { try { await navigator.clipboard.writeText(b.proposal.message); } catch {} window.open(askElsewhereUrl(a.dataset.app, b.proposal.message), "_blank", "noopener"); } break; }
     case "ai-cancel": { const b = vault.chat.find((x) => x.proposal?.id === id); if (b) { b.proposal.state = "cancelled"; persist(); render(); } break; }
+    case "ai-paste": {
+      let text = "";
+      try { text = (await navigator.clipboard.readText()).trim(); } catch { toast("No puedo leer el portapapeles: pega la clave en el campo de abajo."); break; }
+      if (!GEMINI_KEY_RE.test(text)) { toast("No veo una clave de Gemini copiada (empieza por «AIza»)."); break; }
+      aiStore.remember = true; // the button says it: remembered on this phone (ADR-0013)
+      await activateGemini(text);
+      break;
+    }
     case "ai-remember": { const k = aiStore.key; aiStore.remember = !aiStore.remember; aiStore.key = k; render(); break; }
     case "ai-forget": aiStore.key = ""; aiStore.model = ""; render(); toast("Clave borrada de este móvil"); break;
     case "ai-toggle": vault.settings.aiEnabled = vault.settings.aiEnabled === false; persist(); render(); break;
@@ -1087,12 +1122,7 @@ document.addEventListener("submit", async (e) => {
   if (f === "aiForm") {
     const key = $("aiKey").value.trim();
     if (!key) { aiStore.key = ""; aiStore.model = ""; render(); return; }
-    aiStore.key = key;
-    try {
-      const model = pickModel(await listModels(key));
-      if (!model) { toast("Tu clave no tiene modelos de texto disponibles"); return; }
-      aiStore.model = model; vault.settings.aiEnabled = true; persist(); render(); toast(`IA lista: ${model}`);
-    } catch (err) { aiStore.model = ""; render(); toast(err.message); }
+    await activateGemini(key);
     return;
   }
   if (f === "addHabit") { const n = $("habitName").value.trim(); if (n) { vault.habits.push({ id: uid("h"), name: n.slice(0, 60), done: [] }); persist(); render(); } return; }
@@ -1217,16 +1247,20 @@ document.addEventListener("change", async (e) => {
 });
 
 // ---------- Google Calendar (Google Identity Services token model) ----------
+// Loaded once and ahead of the tap (Tú, Google), so the consent window opens
+// inside Manu's gesture: iOS blocks it after a network wait (QAL-015).
+let gisLoading = null;
 function loadGis() {
   if (globalThis.google?.accounts?.oauth2) return Promise.resolve();
-  return new Promise((resolve, reject) => {
+  gisLoading ??= new Promise((resolve, reject) => {
     const el = document.createElement("script");
     el.src = "https://accounts.google.com/gsi/client";
     el.async = true;
     el.onload = () => resolve();
-    el.onerror = () => reject(new Error("No se pudo cargar el acceso de Google. ¿Tienes conexión?"));
+    el.onerror = () => { gisLoading = null; el.remove(); reject(new Error("No se pudo cargar el acceso de Google. ¿Tienes conexión?")); };
     document.head.appendChild(el);
   });
+  return gisLoading;
 }
 
 // One token per scope. Scopes of the features Manu enabled are requested

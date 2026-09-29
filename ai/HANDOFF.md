@@ -21,7 +21,7 @@ Revisión pedida por Manu y devuelta el 2026-09-29 sobre `4b19d3e` y `dfb0c56`.
 3. Las entradas categorizadas por una regla importada llevan `ruled: true` y siguen aceptando versiones nuevas de la regla. Solo la corrección de Manu es definitiva (`isConfirmed`). En Dinero se muestran como «según tus reglas».
 4. Id bancario sin hash (`bank:fecha|importe|concepto|saldo|n`). Los ids antiguos (`bank-…`) solo cuentan como duplicado si el gasto guardado coincide en día, importe y concepto.
 5. `pkceValid`: el estado tiene que coincidir, y la hora tiene que ser un número finito, no futura y de 15 minutos como máximo.
-6. **No corregido en código, bloqueo registrado:** HANDOFF autoriza fusionar con CI en verde, mientras que AGENTS.md exige revisión externa antes de fusionar. Es la decisión de gobernanza de Manu del 2026-09-29, pero AGENTS.md no se ha cambiado. Hasta que Manu decida si se enmienda, prevalece lo más restrictivo (CLAUDE.md) y este PR no se fusiona.
+6. **Gobernanza:** Manu decidió el 2026-09-29 («cambia agents.md para que tú puedas decidir cuándo fusionar y cuándo no») y `AGENTS.md` y `CLAUDE.md` ya recogen la regla de fusión. HANDOFF y AGENTS.md dejan de contradecirse.
 
 7. **Sincronización automática de Google** (petición de Manu con captura de la Agenda, 2026-09-29). Mientras MANU está abierta y el permiso sigue vigente (unos 60 min tras tocar «Sincronizar»), se resincroniza sola cada 10 minutos y al volver a la app, sin abrir nunca una ventana de Google. Cuando el permiso caduca, espera al siguiente toque. Los tokens siguen solo en memoria (ADR-0013). Sincronizar en segundo plano o con la app cerrada no es posible sin un servidor que guarde un token de refresco.
 
@@ -30,6 +30,13 @@ Revisión pedida por Manu y devuelta el 2026-09-29 sobre `4b19d3e` y `dfb0c56`.
    - `dropCrossSource` empareja por día e importe, contando repeticiones, para que el extracto del banco y la hoja no se dupliquen, en cualquier orden.
    - Dinero tiene flechas de mes, salta al último mes con movimientos después de importar y muestra un resumen de la importación. Si solo hay reglas, avisa de que las reglas solas no son gastos.
 
+9. **Configurar con pocos toques** (petición de Manu: «que solo tuviera que pulsar unos pocos botones»).
+   - Tú muestra «Puesta a punto» con lo que falta, cada cosa con su botón: Google, IA, Avisos y Atajos.
+   - «Conectar» de Google es un solo toque. El script de Google se precarga una vez al abrir Tú o Google, para que la ventana se abra dentro del toque (QAL-015).
+   - IA: «1. Crear mi clave» abre `aistudio.google.com/apikey` y «2. Pegar y activar» lee el portapapeles, comprueba el formato `AIza…`, prueba la clave y la **recuerda en este móvil**, como dice el botón (enmienda WEB-13 de ADR-0013). Sigue fuera del vault y de las copias.
+   - Una app protegida con código o Google Authenticator **no** permitiría meter claves en el código: el código de la web es público y el secreto de verificación también estaría en él. Se descartó.
+10. **Gobernanza:** `AGENTS.md` y `CLAUDE.md` recogen la regla de fusión decidida por Manu. Después, el 2026-09-29 a las 00:43 UTC, un comentario de Manu en el PR #21 pidió no fusionar. Prevalece lo más restrictivo: este PR queda listo y **no se fusiona** hasta que Manu lo confirme.
+
 ### Resultados
 
 - `npm test`: 79/79 PASS (6 tests nuevos en `web/tests/review-web06-08.test.js`).
@@ -37,6 +44,7 @@ Revisión pedida por Manu y devuelta el 2026-09-29 sobre `4b19d3e` y `dfb0c56`.
   - con el Excel de ChatGPT primero, 368 gastos (138 por revisar, 0 en «Otros»); al importar después el .xls de Sabadell, 0 nuevos y 368 repetidos;
   - en el orden inverso, 368 del banco y luego 0 nuevos del Excel;
   - reimportar no añade nada.
+- Navegador: «Puesta a punto», pegar una clave inválida (rechazada) y una válida (activada y recordada, fuera del vault), y conectar Google con 1 script cargado y 1 ventana.
 - Navegador con un Excel inventado: resumen, salto a septiembre, agosto con 75,20 €, reimportación sin duplicados.
 - Chromium con reloj simulado: sin ventana ni sincronización al abrir sin permiso; la sincronización manual abre 1 ventana; nada antes de 10 min; a los 11 min trae el evento cambiado sin ventana nueva; al caducar se detiene sin abrir ventanas.
 - El ejemplo de colisión de la revisión **no colisiona** en `4b19d3e` ni en `dfb0c56`: se obtienen 2 entradas y 0 duplicados. Se buscó por fuerza bruta una colisión real, que con el importador antiguo da 1 entrada y 1 «duplicado», y es la que usa el test (QAL-019).

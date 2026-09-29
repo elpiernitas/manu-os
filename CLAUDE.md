@@ -14,4 +14,4 @@ Claude Code debe leer y cumplir `AGENTS.md` antes de actuar. Si existe conflicto
 
 ## Límites
 
-No hagas merge. No conectes servicios, publiques, despliegues, uses datos personales reales, añadas secretos, generes costes ni amplíes permisos. Detente ante una decisión material de producto o un gate bloqueado.
+Fusiona solo según la regla de fusión de `AGENTS.md` (decisión de Manu del 2026-09-29). No conectes servicios, publiques, despliegues, uses datos personales reales, añadas secretos, generes costes ni amplíes permisos. Detente ante una decisión material de producto o un gate bloqueado.
