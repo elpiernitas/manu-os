@@ -63,6 +63,12 @@ La app web (ADR-0012) funciona sin IA, pero el chat solo entiende órdenes concr
 - **Las capturas se quedan en el móvil**, en IndexedDB, reducidas a JPEG de como máximo 1280 px. No van en las copias exportadas ni en la copia de Drive, y «Borrar todos los datos» las elimina.
 - NO_VERIFICADO: la lectura de imágenes con la clave real de Manu y en el iPhone (probado con Gemini simulado), y que el texto de TikTok traiga la información suficiente (muchos vídeos la dicen en voz y no en el texto).
 
+## Enmienda (2026-09-29, WEB-25)
+
+- **Capturas en el chat de MANU.** El 📎 del chat adjunta una captura. El botón pasa a decir «Enviar a Gemini» y el aviso de que va a Google queda visible, así que ese toque es el consentimiento explícito. Nunca se envía con «Enviar sin preguntar».
+- **Proyectos (tipo NotebookLM).** Cada proyecto tiene fuentes: notas, enlaces (con el texto de TikTok o YouTube) y capturas guardadas en IndexedDB. Al pulsar «Preguntar» o un botón de resumen, se envían a Gemini la pregunta, las fuentes de texto numeradas y hasta 4 capturas, y la respuesta cita las fuentes. Las fuentes de texto que parecen sensibles no se envían, y la respuesta dice cuáles se quedaron fuera. Una pregunta sensible no se envía. Las capturas no se pueden filtrar: el aviso lo dice.
+- Los proyectos están en el vault (`projects`) y entran en las copias. Sus capturas no, porque están en IndexedDB.
+
 ## Historial
 
 - Ronda 1 de revisión (PR #13, 2026-09-28): la primera versión subía el vault en claro y automáticamente a Drive, enviaba a Gemini sin confirmación con un filtro de palabras presentado como garantía, y pedía los cuatro scopes de golpe. Corregido en esta versión del ADR.

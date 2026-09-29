@@ -10,6 +10,36 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
+## WEB-25 — proyectos tipo NotebookLM y capturas en el chat
+
+Manu (2026-09-29): «quiero que a la IA (Gemini) MANU pueda adjuntarle capturas de pantalla para que las lea, y quiero otro icono de proyectos como si fuera Google NotebookLM».
+
+### Cambios
+
+- `web/core/projects.js`:
+  - `newProject` y `addSource`, con límites: 40 fuentes y 20.000 caracteres por nota;
+  - `buildProjectPayload`: fuentes numeradas [n], hasta 4 capturas en línea y un tope total; las fuentes sensibles se excluyen, una pregunta sensible se bloquea y no se envían las funciones de acción;
+  - `citations` extrae las [n] de la respuesta; `PRESETS` son Resumen, Puntos clave y Preguntas de repaso.
+- `web/app.js`:
+  - sexta pestaña «Proyectos» con su icono de cuaderno;
+  - la lista es una cuadrícula de proyectos con emoji; la página de cada proyecto permite preguntar (con botones rápidos), ver las respuestas con las citas como fichas y avisa de las fuentes excluidas;
+  - se pueden añadir fuentes de tipo nota, enlace (con el texto de TikTok o YouTube) y captura, y quitarlas o borrar el proyecto;
+  - el chat de MANU tiene un 📎: vista previa, aviso y botón «Enviar a Gemini». Reutiliza `shareToAi`, que ahora acepta `{ note, link, image }`;
+  - versión 25.
+- `web/core/storage.js`: `projects` es una lista opcional validada.
+- `web/styles.css`: 6 columnas en la barra de pestañas (etiquetas de 9,5 px) y los estilos de proyectos y del adjunto del chat.
+- Enmienda WEB-25 de ADR-0013 y threat model.
+
+### Resultados
+
+- `npm test`: 99/99 PASS (`web/tests/projects.test.js`).
+- Chromium con Gemini y TikTok simulados: 15 checks en PASS. Cubren las 6 pestañas sin que se corten las etiquetas; crear un proyecto y añadir 4 fuentes (entre ellas el texto de TikTok y una captura); que sin IA no se envía nada; una sola petición con las fuentes numeradas y la imagen; que la fuente con teléfono no se envía y se avisa; las fichas de cita; el botón «Resumen»; la captura en el chat; que el adjunto se limpia; la persistencia; y que no hay desplazamiento horizontal.
+- Todos los recorridos anteriores en PASS.
+
+### NO_VERIFICADO
+
+- Con la clave real de Gemini y en el iPhone. La calidad de las respuestas depende de Gemini.
+
 ## WEB-24 — el calendario se actualiza al abrir Agenda u Hoy; la hoja cabe con el teclado
 
 Capturas de Manu (2026-09-29): «quiero que el calendar se actualice siempre», con la última sincronización a la 01:10. Además, con el teclado abierto, la hoja «+» perdía su parte de arriba (el título y la ✕).
