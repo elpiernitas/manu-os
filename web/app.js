@@ -24,7 +24,7 @@ import { isSpotifyClientId, pkceValid, randomVerifier, challengeFor, authorizeUr
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "31";
+export const APP_VERSION = "32";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -642,7 +642,7 @@ const screens = {
     const synced = vault.settings.gcalSyncedAt ? new Date(vault.settings.gcalSyncedAt).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }) : null;
     const gCal = isClientId(gClientId()) && googleOn("calendar");
     return `<h1>Agenda</h1><p class="subtitle">${esc(longDate())}</p>
-      ${g ? `<div class="btns"><button class="btn ghost" data-act="gcal-sync">${gcal.busy ? "Sincronizando…" : "Sincronizar con Google"}</button></div><p class="muted small">${synced ? `Última sincronización: ${synced}` : "Aún sin sincronizar."}${gcal.error ? ` · ${esc(gcal.error)}` : ""}${vault.settings.googleAutoOpen !== false ? " · se actualiza al abrir Agenda u Hoy" : ""}</p>` : `<p class="muted small"><button class="link small" data-act="goto-gcal">Conectar Google (Calendar, Tasks, Contactos y Drive)</button></p>`}
+      ${g ? `<div class="btns"><button class="btn ghost" data-act="gcal-sync">${gcal.busy ? "Actualizando…" : "Actualizar"}</button></div><p class="muted small">${synced ? `Última sincronización: ${synced}` : "Aún sin sincronizar."}${gcal.error ? ` · ${esc(gcal.error)}` : ""}${validToken(SCOPE.calendar) ? " · se actualiza sola mientras Google siga conectado" : " · toca «Actualizar» para traer cambios"}</p>` : `<p class="muted small"><button class="link small" data-act="goto-gcal">Conectar Google (Calendar, Tasks, Contactos y Drive)</button></p>`}
       ${upcomingCard()}
       ${calendarCard(gCal)}
       <details class="card"><summary class="muted small">Sin Google: pegar los eventos de hoy</summary><p class="muted small">Si tu calendario no es de Google, pega aquí tus eventos (o usa el atajo «MANU Agenda»).</p>${agendaToday() && vault.agenda.source !== "GOOGLE"
@@ -1119,7 +1119,6 @@ function render({ focus = false, enter = null } = {}) {
   $("screen").querySelectorAll("[data-c]").forEach((el) => { if (/^#[0-9a-f]{6}$/i.test(el.dataset.c)) el.style.setProperty("--ev", el.dataset.c); });
   hydrateImages($("screen"));
   $("topTitle").textContent = sub ? { habitos: "Hábitos", salud: "Salud", comidas: "Comidas", personas: "Personas", tiempo: "Tiempo", avisos: "Avisos", datos: "Tus datos", gcal: "Google", ia: "IA", spotify: "Spotify", atajos: "Atajos" }[sub] : TABS.find(([id]) => id === tab)[1];
-  $("fab").hidden = tab === "manu" || Boolean(sheet);
   const sheetKey = sheet ? sheet.kind : null;
   if (sheetKey !== renderedSheetKind || !sheet) {
     const wasOpen = Boolean($("sheetBg"));
@@ -1152,10 +1151,10 @@ function go(newTab) {
   syncOnOpen();
 }
 
-// «Que el calendario se actualice siempre» (WEB-24). Without a server the
-// Google permission lasts about an hour and can only be renewed inside a tap
-// (iOS). So the tap that opens Agenda or Hoy also renews it and syncs when the
-// data is older than 10 minutes. While the permission is valid it syncs silently.
+// Opening Agenda or Hoy shows what is saved at once (WEB-32: Manu did not want
+// to wait for Google's check every time). While the Google permission (about
+// an hour, no server) is valid it syncs silently in the background; once it
+// has expired, «Actualizar» renews it with one tap.
 const OPEN_SYNC_MS = 10 * 60000;
 function syncOnOpen() {
   if (!["agenda", "hoy"].includes(tab) || !navigator.onLine || gcal.busy) return;
@@ -1163,7 +1162,6 @@ function syncOnOpen() {
   const last = Math.max(Date.parse(vault.settings.gcalSyncedAt ?? "") || 0, gcal.lastRun ?? 0);
   if (Date.now() - last < OPEN_SYNC_MS) return;
   if (validToken(SCOPE.calendar)) syncGoogle({ silent: true }).catch(() => { gcal.busy = false; });
-  else if (globalThis.google?.accounts?.oauth2) syncGoogle({ quiet: true }).catch(() => { gcal.busy = false; }); // needs this tap
 }
 
 // ---------- Chat ----------
@@ -1514,7 +1512,6 @@ document.addEventListener("click", async (e) => {
   if (s) { say(s.dataset.say); return; }
   const fill = e.target.closest("[data-fill]");
   if (fill) { const m = $("msg"); if (m) { m.value = fill.dataset.fill; m.focus(); m.setSelectionRange(m.value.length, m.value.length); $("orb")?.classList.add("listening"); } return; }
-  if (e.target.id === "fab" || e.target.closest("#fab")) { openSheet(tab === "dinero" ? "EXPENSE" : "TASK"); return; }
   if (e.target.id === "sheetBg") { closeSheet(); return; }
   const a = e.target.closest("[data-act]");
   if (!a) return;

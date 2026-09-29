@@ -546,3 +546,5 @@ body.kb::after { top: auto; bottom: calc(100% - var(--kb-bottom, 100%)); height:
    below. Every page is at least the full screen tall, like the long ones. */
 html { min-height: calc(100% + env(safe-area-inset-top, 0px)); background: var(--bg); }
 .app { min-height: 100dvh; box-sizing: border-box; }
+/* ---------- WEB-32: sin «+»; la barra ocupa todo el ancho ---------- */
+.tabbar { left: max(12px, calc(50% - 260px)); right: max(12px, calc(50% - 260px)); width: auto; }
