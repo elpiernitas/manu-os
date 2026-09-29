@@ -10,6 +10,71 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
+## WEB-45 — «↓» en el chat, luz a ±45 min, errores de Gmail accionables y órdenes de correo
+
+Manu pidió, con prioridad sobre el resto de su propuesta «WEB-19», lo que WEB-40 aún no cubría. Gmail mantiene el acceso total (`gmail.modify`), por decisión suya del 2026-09-29. Durante la tarea envió una captura: «…me venís 4/5 me emborrache sabes? puedes decirme más opciones» recibió «No encuentro a «sabes? puedes decirme mas opciones» entre quienes más te escriben».
+
+### Causas
+
+- **Correo:** la orden de correo buscaba `borra\w*` en cualquier parte de la frase, y «em**borra**che» coincidía.
+- **Chat:** al leer mensajes antiguos no había forma rápida de volver al final ni de saber que había llegado algo nuevo.
+- **Gmail:**
+  - un fallo de red se trataba como un error de Google;
+  - la tarjeta ofrecía siempre «Reconectar», también cuando lo que faltaba era activar la API;
+  - no se guardaba el detalle técnico;
+  - tras un 401 se seguía usando el mismo token.
+
+### Cambios
+
+- `web/core/gmail.js`:
+  - `mailOrder`: la orden (baja, archivar, papelera, borrar, eliminar) debe empezar la frase y ser una palabra entera;
+  - `NETWORK_ERROR` (código `network`);
+  - `detail` con estado, motivos de Google y mensaje, sin token ni contenido del correo;
+  - la instantánea se detiene ante un fallo de red.
+- `web/core/google.js`: `runServices` guarda `scope`, `status`, `detail` y `at`.
+- `web/core/scene.js`: `TWILIGHT` pasa de ±40 a ±45 min.
+- `web/app.js`:
+  - `mailCommand` usa `mailOrder`. Si no encuentra al remitente y la frase no habla de correo, la frase pasa a la IA;
+  - botón «↓» fijo sobre la caja de escribir: solo en MANU y cuando no estás al final, con un punto azul si llegó algo mientras leías; respeta el teclado;
+  - tarjeta de Gmail con la acción según el error:
+    - API desactivada: «Activar la API de Gmail» (enlace a Google Cloud) y «Ya está, reintentar»;
+    - red o límite: «Reintentar»;
+    - resto: «Volver a autorizar»;
+    - «Detalle técnico» plegable;
+  - tras un 401 se olvida el token de ese permiso, para que el siguiente toque pida otro a Google;
+  - versión 45.
+- `web/index.html` (`#chatDown`), `web/styles.css` y `web/sw.js` (v45).
+
+### Resultados
+
+- `npm test`: 140/140 PASS. Novedades:
+  - `mailOrder` con la frase exacta de Manu y órdenes reales;
+  - respuestas simuladas de Gmail: éxito, token caducado, 401 sin cuerpo, API desactivada, permiso insuficiente, otros 403 y red. Un servicio que falla no rompe los demás, y el token nunca aparece en los errores;
+  - límites de ±45 min.
+- e2e45a (chat en iPhone 14, teclado simulado): 15/15. Cubre:
+  - enviar y cerrar el teclado, que baja al final;
+  - una respuesta tardía mientras lees, que no mueve la página;
+  - el botón «↓» (aparece, se marca con punto y baja al pulsarlo);
+  - una respuesta larga, que sigue visible;
+  - el botón no sale en otras pestañas;
+  - con el teclado, el botón no queda bajo la caja;
+  - sin hueco al cerrar el teclado.
+- e2e45b (Gmail simulado): 15/15. Cubre:
+  - API desactivada con enlace y reintento, detalle técnico sin token;
+  - Calendar sigue funcionando;
+  - sin red: «Comprueba tu conexión» y «Reintentar»;
+  - la frase del bar no se toma como orden, y «archiva los de tienda» sí.
+- e2e45c (cielo): 12/12. Cubre:
+  - 07:29 noche y 07:31 amanecer; 09:00 amanecer y 09:02 día; 19:23 día y 19:25 atardecer; 20:55 atardecer y 20:57 noche;
+  - con nubes o lluvia a mediodía no hay naranja;
+  - con movimiento reducido no hay animaciones (de 17 a 0).
+- Resto de e2e en PASS, salvo e2e18 (3 expectativas antiguas) y «qué tengo hoy» de e2e26 (depende de la hora, igual en `main`).
+
+### NO_VERIFICADO
+
+- En el iPhone real: el teclado con «↓», las fases de luz y Gmail con la cuenta real de Manu.
+- La respuesta de la IA no llega por partes (sin streaming). «Mantener visible la respuesta» se cumple porque se sigue el final mientras el contenido crece.
+
 ## WEB-44 — copia completa cifrada
 
 Manu (2026-09-29) aceptó la copia completa. Antes, «Descargar copia» y la copia de Drive guardaban solo el vault. Las capturas, «Tu archivo» (ChatGPT y chats antiguos) y el diario viven en IndexedDB y se perdían al borrar los datos de Safari o al cambiar de iPhone.

@@ -24,7 +24,8 @@ export async function runServices(services, enabled, tokenFor, errors = {}) {
       status[svc.key] = `ok: ${await svc.run(token)}`;
     } catch (err) {
       status[svc.key] = `error: ${err?.message ?? "fallo"}`;
-      errors[svc.key] = { code: err?.code ?? "error", message: err?.message ?? "fallo" };
+      // WEB-45: the technical detail stays for diagnosis (no tokens, no mail content).
+      errors[svc.key] = { code: err?.code ?? "error", message: err?.message ?? "fallo", scope: svc.scope, status: err?.status ?? null, detail: err?.detail ?? null, at: new Date().toISOString() };
     }
   }
   return status;
