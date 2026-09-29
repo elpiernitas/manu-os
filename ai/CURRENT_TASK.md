@@ -2,11 +2,11 @@
 
 Status: **REVIEW_PENDING**
 
-WEB-50 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
+WEB-51 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
 
 ## Tarea activa
 
-WEB-50 — MANU entiende más frases sin IA: gastos, tareas, recordatorios, alarmas y preguntas de dinero (`ai/HANDOFF.md`, «WEB-50»).
+WEB-51 — fechas y horas en lo que dice Manu, miles, ingresos, salud y ánimo desde el chat (`ai/HANDOFF.md`, «WEB-51»).
 
 ## Autorización
 
@@ -49,6 +49,7 @@ WEB-50 — MANU entiende más frases sin IA: gastos, tareas, recordatorios, alar
 
 ## Historial (cerrado)
 
+- **WEB-50** (frases sin IA): CERRADA. Fusionada mediante el PR #57 (`ba66180`).
 - **WEB-49** (rendimiento): CERRADA. Fusionada mediante el PR #56 (`20a4a7f`).
 - **WEB-48** (buscar en todo): CERRADA. Fusionada mediante el PR #55 (`c0974ff`).
 - **WEB-47** (presupuestos): CERRADA. Fusionada mediante el PR #54 (`a9fa039`).

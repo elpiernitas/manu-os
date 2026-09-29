@@ -142,3 +142,7 @@ En WEB-44, el base64 de `crypto.js` usaba `...` sobre todo el array, y con 3 MB 
 ### QAL-033 — Un verbo buscado en cualquier parte de la frase caza palabras ajenas
 
 En WEB-45, `borra\w*` sin ancla coincidía con «emborrache», y una pregunta cualquiera se convertía en «borra los correos de …». Las órdenes que actúan sobre datos deben anclarse al inicio y a palabra completa. Si el objeto no se encuentra y la frase no menciona el dominio (correo), no se responde como orden. El test de regresión usa la frase real.
+
+### QAL-034 — Texto en español: `\b` con tildes y el punto de los miles
+
+En WEB-51, `/cobr[eé]\b/` nunca coincidía con «cobré 200», porque para JavaScript «é» no es carácter de palabra y no hay límite entre «é» y el espacio. Además, «1.200» se leía como 1,20 €. En texto en español hay que usar `(?=\s|$)` en vez de `\b` tras letras con tilde (o normalizar antes). Los importes se interpretan con los miles españoles (`\d{1,3}(\.\d{3})+`) antes que como decimales. Cada caso lleva un test con la frase real.
