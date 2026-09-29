@@ -10,13 +10,6 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
-## WEB-17 — sin avatar en MANU
-
-Manu (2026-09-29): «yo con avatar no, qué vergüenza, esa parte elimínala». Se quita la esfera con la M de la pantalla MANU (HTML, CSS y los eventos «escuchando» y «pensando»). Se mantienen las tarjetas rápidas con emoji y el resto de WEB-16. Versión 17.
-
-- `npm test`: 81/81 PASS.
-- Chromium: sin `.orb` y con 6 tarjetas; la tarjeta rellena la frase; regresiones en PASS.
-
 ## WEB-16 — escenas vivas
 
 Propuesta de ChatGPT que Manu pasó el 2026-09-29: una app oscura y elegante, pero con color, movimiento y humor que reaccionen a su vida. Se siguió su orden de prioridad.
@@ -32,7 +25,8 @@ Propuesta de ChatGPT que Manu pasó el 2026-09-29: una app oscura y elegante, pe
   - al entrar, una lluvia breve de 💶 💸 🪙 (unos 3 s, sin repetirse);
   - el total sube desde 0 y las barras se llenan;
   - las categorías llevan emoji en las barras, los movimientos y el selector.
-- **MANU:** (la esfera se retiró en WEB-17)
+- **MANU:**
+  - una esfera con la M que respira; va más rápido mientras escribes y gira mientras la IA piensa;
   - 6 tarjetas con emoji que empiezan la frase o la envían.
 - **Ánimo:** 😣 😕 🙂 🤩, con un rebote al elegir y un tono de fondo (`body[data-mood]`).
 - **Agenda:** «Lo próximo» (48 h de eventos y recordatorios en línea temporal) antes del mes. El mes se compacta cuando no tiene eventos.

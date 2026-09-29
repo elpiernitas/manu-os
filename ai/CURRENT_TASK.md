@@ -2,11 +2,11 @@
 
 Status: **REVIEW_PENDING**
 
-WEB-17 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
+WEB-16 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
 
 ## Tarea activa
 
-WEB-17 — quitar el avatar de MANU a petición de Manu (`ai/HANDOFF.md`, «WEB-17»).
+WEB-16 — escenas vivas: tiempo, dinero, MANU, ánimo y agenda (`ai/HANDOFF.md`, «WEB-16»).
 
 ## Autorización
 
@@ -41,7 +41,6 @@ WEB-17 — quitar el avatar de MANU a petición de Manu (`ai/HANDOFF.md`, «WEB-
 
 ## Historial (cerrado)
 
-- **WEB-16** (escenas vivas): CERRADA. Fusionada mediante el PR #24 (`0caa79d`).
 - **WEB-15** (Spotify con un toque): CERRADA. Fusionada mediante el PR #23 (`c657d99`).
 - **WEB-14** (tutorial de Gemini): CERRADA. Fusionada mediante el PR #22 (`c8109ee`).
 - **WEB-13** (revisión de ChatGPT, calendario automático, gastos del Excel, puesta a punto): CERRADA. Fusionada mediante el PR #21 (`750589e`), con el «sí» de Manu.
