@@ -13,6 +13,7 @@ import { isClientId, listEvents, createEvent, newEventBody, monthGrid, listCalen
 import { detectRecurring, upcomingRecurring, spendingPattern, monthStats, monthlySeries } from "./core/insights.js";
 import { SCOPE, runServices, planTaskSync, listOpenTasks, insertTask, completeTask, contactBirthdays, mergePeople, saveBackup, loadBackup } from "./core/google.js";
 import { detectLink, linkInfo, PROVIDER_NAME } from "./core/links.js";
+import { newProject, addSource, buildProjectPayload, citations, PRESETS } from "./core/projects.js";
 import { putImage, getImage, clearImages } from "./core/imagestore.js";
 import { weatherEmoji, sceneFor, PARTICLES, MONEY_EMOJI } from "./core/scene.js";
 import { buildImagePayload, buildLinkPayload, isGeminiKey, isSensitive, pickModel, listModels, buildActionPayload, askWithActions, issueUrl } from "./core/ai.js";
@@ -21,7 +22,7 @@ import { isSpotifyClientId, pkceValid, randomVerifier, challengeFor, authorizeUr
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "24";
+export const APP_VERSION = "25";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -48,6 +49,9 @@ let calView = null; // { y, m } month shown in Agenda
 let calSelected = null; // "YYYY-MM-DD"
 let overlay = null; // "weather" | "gemini" | "image"
 let viewImageId = null;
+let chatImage = null; // screenshot attached in the MANU chat (not sent until «Enviar a Gemini»)
+let openProject = null; // id of the project being viewed
+let projSourceKind = "note";
 const gcal = { tokens: {}, busy: false, error: null };
 let confirmDriveRestore = null;
 // Gemini key: never in the vault (so never in exports or backups). By default it
@@ -111,6 +115,7 @@ const I = {
   agenda: svg('<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/>'),
   dinero: svg('<rect x="2" y="6" width="20" height="13" rx="3"/><circle cx="12" cy="12.5" r="2.5"/>'),
   tu: svg('<circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/>'),
+  proyectos: svg('<path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11M9 8h6"/>'),
   plus: svg('<path d="M12 5v14M5 12h14"/>'),
   check: svg('<path d="M5 12.5l4.5 4.5L19 7.5"/>', 'stroke-width="3"'),
   chev: svg('<path d="M9 6l6 6-6 6"/>'),
@@ -142,7 +147,7 @@ const I = {
   alarm: svg('<circle cx="12" cy="13" r="7"/><path d="M12 9v4l2.5 2M4 4l3 2.5M20 4l-3 2.5"/>'),
 };
 
-const TABS = [["hoy", "Hoy"], ["agenda", "Agenda"], ["manu", "MANU"], ["dinero", "Dinero"], ["tu", "Tú"]];
+const TABS = [["hoy", "Hoy"], ["agenda", "Agenda"], ["manu", "MANU"], ["dinero", "Dinero"], ["proyectos", "Proyectos"], ["tu", "Tú"]];
 
 function latestMonthOffset() {
   const last = vault.spending.reduce((m, x) => (x.at > m ? x.at : m), "");
@@ -347,6 +352,92 @@ async function finishSpotifyAuth(params) {
     spotifyStore.tokens = await exchangeCode({ clientId: spClientId(), code: params.get("code"), redirectUri: SITE, verifier: pkce.verifier });
     toast("Spotify conectado");
   } catch { toast("Spotify no ha dado permiso"); }
+}
+
+// ---------- Projects (WEB-25, like NotebookLM) ----------
+const currentProject = () => (vault.projects ?? []).find((x) => x.id === openProject) ?? null;
+function updateProject(id, fn) {
+  vault.projects = (vault.projects ?? []).map((p) => (p.id === id ? fn(p) : p));
+  persist(); render();
+}
+const SOURCE_ICON = { note: "📝", link: "🔗", image: "🖼️" };
+function projectPage(p) {
+  const kinds = [["note", "📝 Nota"], ["link", "🔗 Enlace"], ["image", "🖼️ Captura"]];
+  const form = {
+    note: '<label for="projText" class="sr">Texto</label><textarea id="projText" rows="4" maxlength="20000" placeholder="Pega un texto, apuntes, una receta…" required></textarea><label for="projTitle" class="sr">Título</label><input id="projTitle" maxlength="80" placeholder="Título (opcional)"><button class="btn block" type="submit">Añadir nota</button>',
+    link: '<label for="projUrl" class="sr">Enlace</label><input id="projUrl" inputmode="url" placeholder="https://www.tiktok.com/… o YouTube" required><label for="projText" class="sr">Notas</label><textarea id="projText" rows="2" maxlength="4000" placeholder="Qué te interesa de este enlace (opcional)"></textarea><p class="muted small">De TikTok y YouTube se guarda el texto del vídeo (se consulta a ese servicio al añadirlo). De otras webs, solo el enlace y tus notas.</p><button class="btn block" type="submit">Añadir enlace</button>',
+    image: '<label class="btn ghost block" for="projImage" role="button" tabindex="0">📎 Elegir captura o foto</label><input id="projImage" type="file" accept="image/*" class="sr"><p class="muted small">Se guarda en tu móvil. Solo se envía a Gemini cuando pulsas «Preguntar».</p>',
+  }[projSourceKind];
+  const ai = aiReady();
+  return `<button class="link" data-act="proj-back">${I.back} Proyectos</button>
+    <div class="proj-head"><span class="proj-e big" aria-hidden="true">${esc(p.emoji)}</span><div><h1>${esc(p.name)}</h1><p class="subtitle">${p.sources.length} fuente${p.sources.length === 1 ? "" : "s"}</p></div></div>
+    <div class="stack">
+    <section class="card"><h2>Pregunta al proyecto</h2>
+      ${ai ? `<div class="suggest">${[["resumen", "📄 Resumen"], ["claves", "🔑 Puntos clave"], ["preguntas", "❓ Preguntas de repaso"]].map(([k, l]) => `<button type="button" data-act="proj-preset" data-p="${k}" data-label="${esc(l)}"${p.sources.length ? "" : " disabled"}>${l}</button>`).join("")}</div>
+      <form id="projAsk" class="composer-inline"><label for="projQ" class="sr">Pregunta</label><input id="projQ" maxlength="2000" placeholder="¿Qué quieres saber?"${p.sources.length ? "" : " disabled"}><button class="btn" type="submit"${p.sources.length ? "" : " disabled"}>Preguntar</button></form>
+      <p class="muted small">Al pulsar «Preguntar» o un botón de arriba se envían a Google (Gemini) las fuentes del proyecto: textos y hasta 4 capturas. Las que parecen privadas (teléfonos, IBAN, salud…) no se envían.</p>` : '<button class="btn ghost block" data-act="gemini-guide">✨ Activa la IA para preguntar a tus fuentes</button>'}
+      ${(p.chat ?? []).length ? `<div class="proj-chat">${p.chat.map((m) => `<div class="bubble ${m.from}">${m.from === "manu" && m.ai ? '<span class="ai-tag">IA</span>' : ""}${esc(m.text)}${m.cites?.length ? `<div class="cites">${m.cites.map((n) => { const src = p.sources[n - 1]; return src ? `<button class="chip" data-act="proj-src-view" data-id="${esc(src.id)}" data-n="${n}">[${n}] ${esc(src.title.slice(0, 28))}</button>` : ""; }).join("")}</div>` : ""}${m.excluded?.length ? `<p class="muted small">No envié las fuentes ${m.excluded.map((n) => `[${n}]`).join(", ")} por parecer privadas.</p>` : ""}</div>`).join("")}</div>` : ""}
+    </section>
+    ${sectionTitle(`Fuentes (${p.sources.length})`)}
+    <section class="card">${p.sources.length ? p.sources.map((src, i) => `<div class="row"><span class="src-n">${i + 1}</span><span aria-hidden="true">${SOURCE_ICON[src.kind]}</span>${src.imageId ? `<button class="thumb" data-act="img-view" data-img-id="${esc(src.imageId)}" aria-label="Ver captura"><img data-img="${esc(src.imageId)}" alt=""></button>` : ""}<div class="grow"><div>${esc(src.title)}</div>${src.text && src.kind !== "note" ? `<div class="muted small">${esc(src.text.slice(0, 90))}${src.text.length > 90 ? "…" : ""}</div>` : src.kind === "note" ? `<div class="muted small">${src.text.length} caracteres</div>` : ""}</div>${src.url ? `<a class="link small" href="${esc(src.url)}" target="_blank" rel="noopener">Abrir</a>` : ""}<button class="link small" data-act="proj-del-source" data-id="${esc(src.id)}" aria-label="Quitar fuente">✕</button></div>`).join("") : '<p class="muted">Añade notas, capturas o vídeos. Luego pregunta y MANU te contesta solo con eso.</p>'}</section>
+    <section class="card"><h2>Añadir fuente</h2>
+      <div class="segmented three" role="group" aria-label="Tipo de fuente">${kinds.map(([k, l]) => `<button type="button" data-act="proj-kind" data-kind="${k}" aria-pressed="${k === projSourceKind}">${l}</button>`).join("")}</div>
+      <form id="projSource" class="stack">${form}</form>
+    </section>
+    <button class="link small danger-link" data-act="proj-delete">Borrar este proyecto</button>
+    </div>`;
+}
+
+async function addProjectSource() {
+  const p = currentProject(); if (!p) return;
+  const at = new Date().toISOString();
+  try {
+    if (projSourceKind === "note") {
+      updateProject(p.id, (x) => addSource(x, { id: uid("src"), kind: "note", title: $("projTitle").value, text: $("projText").value, at }));
+      toast("Nota añadida");
+    } else if (projSourceKind === "link") {
+      const link = detectLink($("projUrl").value);
+      if (!link) { toast("Pega un enlace que empiece por https://"); return; }
+      const notes = $("projText").value.trim();
+      let info = null;
+      if (link.provider === "tiktok" || link.provider === "youtube") { toast(`Leyendo el vídeo de ${PROVIDER_NAME[link.provider]}…`); try { info = await linkInfo(link); } catch { info = null; } }
+      const text = [info?.title, notes].filter(Boolean).join("\n\n");
+      updateProject(p.id, (x) => addSource(x, { id: uid("src"), kind: "link", url: link.url, title: info ? `${PROVIDER_NAME[link.provider]}${info.author ? ` · ${info.author}` : ""}` : link.url.replace(/^https?:\/\//, "").slice(0, 60), text, at }));
+      toast(info ? "Enlace añadido con el texto del vídeo" : link.provider === "instagram" ? "Instagram no deja leer el reel: añade una captura" : "Enlace añadido");
+    }
+  } catch (err) { toast(err.message); }
+}
+
+async function addProjectImage(file) {
+  const p = currentProject(); if (!p) return;
+  try {
+    const dataUrl = await compressImage(file);
+    const imageId = uid("img");
+    await putImage(imageId, dataUrl); imageCache.set(imageId, dataUrl);
+    updateProject(p.id, (x) => addSource(x, { id: uid("src"), kind: "image", imageId, title: `Captura ${new Date().toLocaleDateString("es-ES", { day: "numeric", month: "short" })}` }));
+    toast("Captura añadida");
+  } catch (err) { toast(err.message); }
+}
+
+// Ask the notebook. Only on Manu's tap on «Preguntar a Gemini» or a preset.
+async function askProject(question, label = null) {
+  const p = currentProject(); if (!p || !aiReady() || !p.sources.length) return;
+  const images = {};
+  for (const src of p.sources.filter((x) => x.kind === "image")) { try { images[src.imageId] = imageCache.get(src.imageId) ?? await getImage(src.imageId); } catch {} }
+  let built;
+  try { built = buildProjectPayload({ project: p, question, images }); }
+  catch (err) { toast(err.code === "sensitive" ? "Esa pregunta parece privada: no la envío." : err.message); return; }
+  const me = { from: "me", text: label ?? question, at: new Date().toISOString() };
+  const answer = { from: "manu", text: "Pensando…", at: new Date(Date.now() + 1).toISOString(), ai: true, excluded: built.excluded };
+  updateProject(p.id, (x) => ({ ...x, chat: [...(x.chat ?? []), me, answer].slice(-40) }));
+  let text;
+  try {
+    const r = await askWithActions({ key: aiStore.key, model: aiStore.model, payload: built.payload, confirmed: true });
+    text = r.text ?? "No he encontrado respuesta en las fuentes.";
+  } catch (err) {
+    text = err.code === "quota" ? "Hoy ya no queda IA gratuita." : err.code === "key" ? "La clave de Gemini no funciona. Revísala en Tú → IA." : err.code === "sensitive" ? "Algo parece privado: no lo envío." : `No he podido preguntar: ${err.message}`;
+  }
+  updateProject(p.id, (x) => ({ ...x, chat: (x.chat ?? []).map((m) => (m.at === answer.at ? { ...m, text, cites: citations(text, x.sources.length) } : m)) }));
 }
 
 // ---------- Money statistics (WEB-21) ----------
@@ -573,7 +664,8 @@ const screens = {
       ${refuge ? `<div class="refuge-bar"><span>Refugio · no se guarda</span><button class="link" data-act="leave-refuge">Salir</button></div>` : ""}
       ${chips ? `<div class="suggest" aria-label="Sugerencias">${chips.map((s) => `<button data-say="${esc(s)}">${esc(s)}</button>`).join("")}</div>` : `<div class="quick-cards" aria-label="Sugerencias">${cards.map(([e, label, how, text]) => `<button class="qcard" ${how === "say" ? `data-say="${esc(text)}"` : `data-fill="${esc(text)}"`}><span class="qe" aria-hidden="true">${e}</span><span>${esc(label)}</span></button>`).join("")}</div>`}
       <div class="chat" id="chat" aria-live="polite">${[...history, ...(refuge?.messages ?? [])].map((b) => `<div class="bubble ${b.from}${b.safety ? " safety" : ""}">${b.ai ? '<span class="ai-tag">IA</span>' : ""}${b.imageId ? `<img class="chat-img" data-img="${esc(b.imageId)}" alt="Captura">` : ""}${esc(b.text)}${b.url ? ` <a class="link small" href="${esc(b.url)}" target="_blank" rel="noopener">Abrir</a>` : ""}${b.proposal ? `${b.proposal.state ? `<details><summary class="muted small">Ver lo enviado</summary><pre class="payload">${esc(shownPayload(b.proposal))}</pre></details>` : `<pre class="payload">${esc(shownPayload(b.proposal))}</pre>`}${b.proposal.state ? `<p class="muted small">${b.proposal.state === "sent" ? (b.proposal.auto ? "Enviado a Gemini sin preguntar (lo activaste en Tú → IA)." : "Enviado a Gemini.") : "No enviado."}</p>` : `<div class="btns"><button class="btn" data-act="ai-send" data-id="${esc(b.proposal.id)}">Enviar a Gemini</button><button class="btn ghost" data-act="ai-cancel" data-id="${esc(b.proposal.id)}">No</button></div><div class="btns"><button class="link small" data-act="ask-elsewhere" data-app="chatgpt" data-id="${esc(b.proposal.id)}">Preguntar en ChatGPT</button><button class="link small" data-act="ask-elsewhere" data-app="claude" data-id="${esc(b.proposal.id)}">Preguntar en Claude</button></div>`}` : ""}${b.action ? `<div class="btns"><a class="btn" href="${esc(b.action.href)}">${esc(b.action.label)}</a></div>` : ""}${(b.calls ?? []).map((c, i) => callCard(b, c, i)).join("")}</div>`).join("")}</div>
-      <form class="composer glass" id="composer"><label for="msg" class="sr">Mensaje para MANU</label><input id="msg" autocomplete="off" enterkeyhint="send" placeholder="${refuge ? "Cuéntame" : "Escribe a MANU"}"><button class="btn" type="submit">Enviar</button></form>`;
+      ${chatImage ? `<div class="chat-attach glass"><img src="${esc(chatImage)}" alt="Captura adjunta"><div class="grow small">${aiReady() ? "La captura se enviará a Google (Gemini) al pulsar «Enviar a Gemini». No uses capturas del banco o de salud si no quieres compartirlas." : '<button type="button" class="link small" data-act="gemini-guide">Activa la IA para que MANU lea la captura</button>'}</div><button type="button" class="qa-close" data-act="chat-image-remove" aria-label="Quitar captura">✕</button></div>` : ""}
+      <form class="composer glass" id="composer">${refuge ? "" : '<label class="composer-attach" for="chatImage" role="button" tabindex="0" aria-label="Adjuntar captura">📎</label><input id="chatImage" type="file" accept="image/*" class="sr">'}<label for="msg" class="sr">Mensaje para MANU</label><input id="msg" autocomplete="off" enterkeyhint="send" placeholder="${refuge ? "Cuéntame" : chatImage ? "¿Qué quieres saber de la captura?" : "Escribe a MANU"}"><button class="btn" type="submit">${chatImage && aiReady() ? "Enviar a Gemini" : "Enviar"}</button></form>`;
   },
   dinero() {
     const ref = today(); ref.setDate(1); ref.setMonth(ref.getMonth() - moneyMonth);
@@ -605,6 +697,16 @@ const screens = {
       <section class="card">${entries.length ? entries.map((x) => `<div class="row"><span class="cat-emoji" aria-hidden="true">${CATEGORY_EMOJI[x.category] ?? "📦"}</span><div class="grow"><div>${esc(x.merchant ?? "Sin concepto")}</div><div class="muted small">${new Date(x.at).toLocaleDateString("es-ES", { day: "numeric", month: "short" })}${x.sub ? ` · ${esc(x.sub)}` : ""}${x.source === "BANK" ? " · banco" : ""}${x.review ? ' · <b class="review">revisar</b>' : x.inferred ? " · categoría propuesta" : x.ruled ? " · según tus reglas" : ""}</div></div>
           <div class="stack"><span class="num">${euros(x.cents)}</span><label class="sr" for="cat-${esc(x.id)}">Categoría</label><select id="cat-${esc(x.id)}" data-cat="${esc(x.id)}">${Object.keys(CATEGORIES).map((k) => `<option value="${k}"${k === x.category ? " selected" : ""}>${esc(catLabel(k))}</option>`).join("")}</select></div></div>`).join("")
         : '<p class="muted">Sin gastos. Toca «+», escribe a MANU «gasté 12,50 en café» o importa el CSV del banco.</p>'}</section>
+      </div>`;
+  },
+  proyectos() {
+    const list = vault.projects ?? [];
+    const p = openProject ? list.find((x) => x.id === openProject) : null;
+    if (p) return projectPage(p);
+    return `<h1>Proyectos</h1><p class="subtitle">Cuadernos con tus fuentes: MANU responde solo con lo que metas en cada uno.</p>
+      <div class="stack">
+      ${list.length ? `<div class="proj-grid">${list.map((x) => `<button class="proj-card" data-act="proj-open" data-id="${esc(x.id)}"><span class="proj-e" aria-hidden="true">${esc(x.emoji)}</span><b>${esc(x.name)}</b><span class="muted small">${x.sources.length} fuente${x.sources.length === 1 ? "" : "s"}</span></button>`).join("")}</div>` : '<section class="card"><p class="muted">Aún no tienes proyectos. Crea uno para un viaje, un estudio, una reforma, recetas… y mete notas, capturas y vídeos.</p></section>'}
+      <section class="card"><h2>Nuevo proyecto</h2><form id="projForm" class="proj-new"><label for="projEmoji" class="sr">Emoji</label><input id="projEmoji" maxlength="4" value="📁" aria-label="Emoji"><label for="projName" class="sr">Nombre</label><input id="projName" maxlength="60" placeholder="Viaje a Lisboa" required><button class="btn" type="submit">Crear</button></form></section>
       </div>`;
   },
   tu() {
@@ -1197,11 +1299,11 @@ function compressImage(file) {
 // «✨ Que MANU lo lea»: screenshot or TikTok/YouTube link → Gemini proposes
 // actions. Only on Manu's tap (the button says it goes to Google); never
 // with «Enviar sin preguntar».
-async function shareToAi() {
-  if (!sheet || !aiReady()) return;
-  const note = ($("qText")?.value ?? "").trim();
-  const link = sheet.link && !sheet.image ? sheet.link : null;
-  const image = sheet.image ?? null;
+async function shareToAi(from = null) {
+  if (!aiReady()) return;
+  const src = from ?? (sheet ? { note: ($("qText")?.value ?? "").trim(), link: sheet.link && !sheet.image ? sheet.link : null, image: sheet.image ?? null } : null);
+  if (!src) return;
+  const { note, link, image } = src;
   const at = new Date().toISOString();
   let imageId = null;
   if (image) { imageId = uid("img"); try { await putImage(imageId, image); imageCache.set(imageId, image); } catch { imageId = null; } }
@@ -1284,6 +1386,14 @@ document.addEventListener("click", async (e) => {
     case "toggle": updateItem(id, toggleDone); break;
     case "rem-done": vault.reminders = vault.reminders.map((r) => (r.id === id ? { ...r, done: !r.done } : r)); persist(); render(); break;
     case "sheet": openSheet(a.dataset.kind, true); break;
+    case "chat-image-remove": chatImage = null; render(); break;
+    case "proj-open": openProject = a.dataset.id; projSourceKind = "note"; render({ focus: true, enter: "page" }); scrollTo(0, 0); break;
+    case "proj-back": openProject = null; render({ focus: true, enter: "tab" }); scrollTo(0, 0); break;
+    case "proj-kind": projSourceKind = a.dataset.kind; render(); break;
+    case "proj-del-source": updateProject(openProject, (p) => ({ ...p, sources: p.sources.filter((x) => x.id !== a.dataset.id) })); break;
+    case "proj-delete": if (a.dataset.confirm === "1") { vault.projects = (vault.projects ?? []).filter((p) => p.id !== openProject); openProject = null; persist(); render(); toast("Proyecto borrado"); } else { a.dataset.confirm = "1"; a.textContent = "Pulsa otra vez para borrarlo"; } break;
+    case "proj-preset": askProject(PRESETS[a.dataset.p], a.dataset.label); break;
+    case "proj-src-view": { const src = currentProject()?.sources.find((x) => x.id === a.dataset.id); if (src) toast(`[${a.dataset.n}] ${src.title}`); break; }
     case "qa-image-remove": if (sheet) { sheet.image = null; rerenderSheet(); } break;
     case "qa-ai": shareToAi(); break;
     case "img-view": viewImageId = a.dataset.imgId; overlay = "image"; render({ focus: true, enter: "page" }); scrollTo(0, 0); break;
@@ -1389,7 +1499,22 @@ const num = (v) => { const n = Number(String(v).replace(",", ".")); return v !==
 document.addEventListener("submit", async (e) => {
   e.preventDefault();
   const f = e.target.id;
-  if (f === "composer") { const input = $("msg"); const v = input.value; input.value = ""; say(v); $("msg")?.focus(); return; }
+  if (f === "projForm") {
+    try {
+      const p = newProject({ id: uid("p"), name: $("projName").value, emoji: $("projEmoji").value || "📁" });
+      vault.projects = [...(vault.projects ?? []), p]; openProject = p.id; persist(); render({ focus: true, enter: "page" }); scrollTo(0, 0);
+    } catch (err) { toast(err.message); }
+    return;
+  }
+  if (f === "projSource") { await addProjectSource(); return; }
+  if (f === "projAsk") { const q = $("projQ").value.trim(); if (q) { $("projQ").value = ""; askProject(q); } return; }
+  if (f === "composer") {
+    const input = $("msg"); const v = input.value; input.value = "";
+    // A screenshot goes to Gemini only with this explicit «Enviar a Gemini».
+    if (chatImage && aiReady()) { const image = chatImage; chatImage = null; shareToAi({ note: v.trim(), link: null, image }); return; }
+    if (chatImage) { toast("Activa la IA para que MANU lea la captura"); return; }
+    say(v); $("msg")?.focus(); return;
+  }
   if (f === "pasteEvents") { const events = parseEvents($("eventsText").value); vault.agenda = { day: localDay(), events, importedAt: new Date().toISOString() }; persist(); render(); toast(events.length ? `Agenda de hoy: ${events.length} evento${events.length === 1 ? "" : "s"}` : "No he reconocido ningún evento"); return; }
   if (f === "gcalForm") {
     const id = $("gcalId").value.trim();
@@ -1505,6 +1630,11 @@ document.addEventListener("input", (e) => {
 });
 
 document.addEventListener("change", async (e) => {
+  if (e.target.id === "chatImage" && e.target.files?.[0]) {
+    try { chatImage = await compressImage(e.target.files[0]); render(); $("msg")?.focus(); } catch (err) { toast(err.message); }
+    return;
+  }
+  if (e.target.id === "projImage" && e.target.files?.[0]) { await addProjectImage(e.target.files[0]); return; }
   if (e.target.id === "qImage" && e.target.files?.[0] && sheet) {
     try { sheet.image = await compressImage(e.target.files[0]); if (!sheet.manual && !(sheet.text ?? "").trim()) sheet.kind = "IDEA"; rerenderSheet(); }
     catch (err) { toast(err.message); }

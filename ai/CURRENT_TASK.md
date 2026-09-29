@@ -2,11 +2,11 @@
 
 Status: **REVIEW_PENDING**
 
-WEB-24 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
+WEB-25 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
 
 ## Tarea activa
 
-WEB-24 — calendario al abrir Agenda u Hoy y hoja «+» con el teclado (`ai/HANDOFF.md`, «WEB-24»).
+WEB-25 — proyectos tipo NotebookLM y capturas en el chat (`ai/HANDOFF.md`, «WEB-25»; enmienda WEB-25 de ADR-0013).
 
 ## Autorización
 
@@ -42,6 +42,7 @@ WEB-24 — calendario al abrir Agenda u Hoy y hoja «+» con el teclado (`ai/HAN
 
 ## Historial (cerrado)
 
+- **WEB-24** (calendario al abrir): CERRADA. Fusionada mediante el PR #32 (`817802b`).
 - **WEB-23** (capturas y enlaces): CERRADA. Fusionada mediante el PR #31 (`6b95cf1`).
 - **WEB-22** (hoja «+»): CERRADA. Fusionada mediante el PR #30 (`a86c01a`); su fallo en Dinero se corrigió en WEB-23.
 - **WEB-21** (estadísticas de dinero): CERRADA. Fusionada mediante el PR #29 (`f375782`).

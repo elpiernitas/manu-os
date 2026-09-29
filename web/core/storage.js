@@ -2,10 +2,10 @@
 // Everything stays on the device; nothing is sent anywhere.
 export const SCHEMA_VERSION = 1;
 
-const OPTIONAL_LISTS = ["reminders", "habits", "people", "meals", "health", "moods", "income"];
+const OPTIONAL_LISTS = ["reminders", "habits", "people", "meals", "health", "moods", "income", "projects"];
 
 export function emptyVault() {
-  return { schema: SCHEMA_VERSION, inbox: [], spending: [], chat: [], settings: {}, income: [], reminders: [], habits: [], people: [], meals: [], health: [], moods: [] };
+  return { schema: SCHEMA_VERSION, inbox: [], spending: [], chat: [], settings: {}, income: [], projects: [], reminders: [], habits: [], people: [], meals: [], health: [], moods: [] };
 }
 
 // Validates a vault read from storage or from a backup file.
@@ -20,7 +20,7 @@ export function validateVault(data) {
     if (data[key] !== undefined && !Array.isArray(data[key])) return { ok: false, reason: `La sección «${key}» no es válida.` };
   }
   const ids = new Set();
-  const withIds = [...data.inbox, ...data.spending, ...["reminders", "habits", "people", "meals", "income"].flatMap((k) => data[k] ?? [])];
+  const withIds = [...data.inbox, ...data.spending, ...["reminders", "habits", "people", "meals", "income", "projects"].flatMap((k) => data[k] ?? [])];
   for (const item of withIds) {
     if (!item || typeof item.id !== "string") return { ok: false, reason: "Hay un elemento sin identificador." };
     if (ids.has(item.id)) return { ok: false, reason: `Identificador repetido: ${item.id}.` };
