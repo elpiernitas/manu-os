@@ -69,6 +69,15 @@ La app web (ADR-0012) funciona sin IA, pero el chat solo entiende órdenes concr
 - **Proyectos (tipo NotebookLM).** Cada proyecto tiene fuentes: notas, enlaces (con el texto de TikTok o YouTube) y capturas guardadas en IndexedDB. Al pulsar «Preguntar» o un botón de resumen, se envían a Gemini la pregunta, las fuentes de texto numeradas y hasta 4 capturas, y la respuesta cita las fuentes. Las fuentes de texto que parecen sensibles no se envían, y la respuesta dice cuáles se quedaron fuera. Una pregunta sensible no se envía. Las capturas no se pueden filtrar: el aviso lo dice.
 - Los proyectos están en el vault (`projects`) y entran en las copias. Sus capturas no, porque están en IndexedDB.
 
+## Enmienda (2026-09-29, WEB-27): modo conversación
+
+Manu pidió «hablar con MANU como si fuera Gemini integrado dentro, que lo sepa todo y que maneje él las cosas». Es una decisión material de privacidad, así que es Manu quien la toma en la app y no se aplica sola:
+- **Activación explícita.** Está desactivado por defecto. Se activa en el chat o en Tú → IA con «Activar con todo» o «Solo lo básico». Mientras está activo, **cada mensaje** que MANU no resuelve sola (saludos, preguntas, el día, el tiempo, frases largas) va a Gemini, con los últimos 10 turnos y el contexto elegido. El texto lo dice antes de activarlo.
+- **Contexto por categorías.** Agenda y recordatorios, tareas e ideas, tiempo y hábitos forman el nivel básico. Dinero, salud, ánimo y personas son sensibles: solo se envían si Manu los marca, que es la «decisión específica» que exige AGENTS.md. Un mensaje o un turno del historial que toque una categoría no permitida no se envía, y MANU explica por qué.
+- **Nunca se envían** contraseñas, tarjetas, IBAN, teléfonos, correos, claves de API ni el Refugio. `sensitiveKinds` las marca como «secret», y esa categoría no se puede permitir.
+- **Acciones sin preguntar**, desactivado por defecto: crear tareas, ideas y recordatorios y completar tareas, siempre con «Deshacer». Los gastos, las sugerencias de mejora y la importación siguen pidiendo el toque de Manu.
+- Las órdenes cortas («gasté 3 en café») las sigue resolviendo MANU en local, al instante. La crisis y el Refugio nunca pasan por la IA.
+
 ## Historial
 
 - Ronda 1 de revisión (PR #13, 2026-09-28): la primera versión subía el vault en claro y automáticamente a Drive, enviaba a Gemini sin confirmación con un filtro de palabras presentado como garantía, y pedía los cuatro scopes de golpe. Corregido en esta versión del ADR.

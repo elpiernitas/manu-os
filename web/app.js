@@ -1,3 +1,4 @@
+import { normalise } from "./core/text.js";
 import { parse, reply, quickDetect } from "./core/assistant.js";
 import { CATEGORIES, CATEGORY_EMOJI, euros, newEntry, learnCategory, summary, toCents, rulesFromRows, applyRules } from "./core/money.js";
 import { MODE_TITLES, modeState } from "./core/modes.js";
@@ -13,6 +14,7 @@ import { isClientId, listEvents, createEvent, newEventBody, monthGrid, listCalen
 import { detectRecurring, upcomingRecurring, spendingPattern, monthStats, monthlySeries } from "./core/insights.js";
 import { SCOPE, runServices, planTaskSync, listOpenTasks, insertTask, completeTask, contactBirthdays, mergePeople, saveBackup, loadBackup } from "./core/google.js";
 import { detectLink, linkInfo, PROVIDER_NAME } from "./core/links.js";
+import { allowedToSend, buildContext, buildConversationPayload, CONTEXT_CATEGORIES, BASIC_CONTEXT, FULL_CONTEXT, AUTO_SAFE } from "./core/converse.js";
 import { newProject, addSource, buildProjectPayload, citations, PRESETS } from "./core/projects.js";
 import { putImage, getImage, clearImages } from "./core/imagestore.js";
 import { weatherEmoji, sceneFor, PARTICLES, MONEY_EMOJI } from "./core/scene.js";
@@ -22,7 +24,7 @@ import { isSpotifyClientId, pkceValid, randomVerifier, challengeFor, authorizeUr
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "26";
+export const APP_VERSION = "27";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -660,8 +662,9 @@ const screens = {
     const thinking = vault.chat.at(-1)?.text === "Pensando…";
     const empty = !vault.chat.length && !refuge;
     const history = vault.chat.length ? vault.chat : [{ from: "manu", text: "Hola, Manu. Puedo apuntar gastos, ideas y tareas, crear recordatorios y alarmas, y acompañarte en el Refugio. Aún funciono sin IA: habla claro y corto." }];
-    return `<div class="manu-head${empty ? " big" : ""}"><div class="orb${thinking ? " thinking" : ""}" id="orb" aria-hidden="true"><span>M</span></div><div><h1>MANU</h1><p class="subtitle">Tu asistente · ${aiReady() ? "IA disponible, siempre con tu confirmación" : '<button class="link small" data-act="gemini-guide">activar IA</button>'}</p></div></div>
+    return `<div class="manu-head${empty ? " big" : ""}"><div class="orb${thinking ? " thinking" : ""}" id="orb" aria-hidden="true"><span>M</span></div><div><h1>MANU</h1><p class="subtitle">${aiReady() && aiMode().on ? "Gemini integrado · conversación" : `Tu asistente · ${aiReady() ? "IA disponible, siempre con tu confirmación" : '<button class="link small" data-act="gemini-guide">activar IA</button>'}`}</p></div></div>
       ${refuge ? `<div class="refuge-bar"><span>Refugio · no se guarda</span><button class="link" data-act="leave-refuge">Salir</button></div>` : ""}
+      ${aiReady() && !aiMode().on && !refuge ? `<section class="card ai-offer"><b>💬 ¿Hablamos como con Gemini?</b><p class="muted small">MANU conversa contigo, sabe lo que elijas de tu vida y gestiona tus cosas. Lo que escribas irá a Google.</p><div class="btns"><button class="btn" data-act="ai-mode" data-v="full">Activar con todo</button><button class="btn ghost" data-act="ai-mode" data-v="basic">Solo lo básico</button></div><button class="link small" data-sub-go="ia">Elegir qué sabe</button></section>` : ""}
       ${chips ? `<div class="suggest" aria-label="Sugerencias">${chips.map((s) => `<button data-say="${esc(s)}">${esc(s)}</button>`).join("")}</div>` : `<div class="quick-cards" aria-label="Sugerencias">${cards.map(([e, label, how, text]) => `<button class="qcard" ${how === "say" ? `data-say="${esc(text)}"` : `data-fill="${esc(text)}"`}><span class="qe" aria-hidden="true">${e}</span><span>${esc(label)}</span></button>`).join("")}</div>`}
       <div class="chat" id="chat" aria-live="polite">${[...history, ...(refuge?.messages ?? [])].map((b) => `<div class="bubble ${b.from}${b.safety ? " safety" : ""}">${b.ai ? '<span class="ai-tag">IA</span>' : ""}${b.imageId ? `<img class="chat-img" data-img="${esc(b.imageId)}" alt="Captura">` : ""}${esc(b.text)}${b.url ? ` <a class="link small" href="${esc(b.url)}" target="_blank" rel="noopener">Abrir</a>` : ""}${b.proposal ? `${b.proposal.state ? "" : `<p class="small proposal-what">Se enviará a Google solo tu frase: <b>«${esc(b.proposal.message)}»</b>, con las instrucciones fijas de MANU. Nada de tus datos.</p>`}<details><summary class="muted small">${b.proposal.state ? "Ver lo enviado" : "Ver detalles técnicos"}</summary><pre class="payload">${esc(shownPayload(b.proposal))}</pre></details>${b.proposal.state ? `<p class="muted small">${b.proposal.state === "sent" ? (b.proposal.auto ? "Enviado a Gemini sin preguntar (lo activaste en Tú → IA)." : "Enviado a Gemini.") : "No enviado."}</p>` : `<div class="btns"><button class="btn" data-act="ai-send" data-id="${esc(b.proposal.id)}">Enviar a Gemini</button><button class="btn ghost" data-act="ai-cancel" data-id="${esc(b.proposal.id)}">No</button></div><div class="btns"><button class="link small" data-act="ask-elsewhere" data-app="chatgpt" data-id="${esc(b.proposal.id)}">Preguntar en ChatGPT</button><button class="link small" data-act="ask-elsewhere" data-app="claude" data-id="${esc(b.proposal.id)}">Preguntar en Claude</button></div>`}` : ""}${b.action ? `<div class="btns"><a class="btn" href="${esc(b.action.href)}">${esc(b.action.label)}</a></div>` : ""}${(b.calls ?? []).map((c, i) => callCard(b, c, i)).join("")}</div>`).join("")}</div>
       ${chatImage ? `<div class="chat-attach glass"><img src="${esc(chatImage)}" alt="Captura adjunta"><div class="grow small">${aiReady() ? "La captura se enviará a Google (Gemini) al pulsar «Enviar a Gemini». No uses capturas del banco o de salud si no quieres compartirlas." : '<button type="button" class="link small" data-act="gemini-guide">Activa la IA para que MANU lea la captura</button>'}</div><button type="button" class="qa-close" data-act="chat-image-remove" aria-label="Quitar captura">✕</button></div>` : ""}
@@ -879,6 +882,7 @@ const subpages = {
         <div class="row"><div class="grow"><div>Recordar la clave en este móvil</div><div class="muted small">Más cómodo, pero cualquier código que corra en esta web podría leerla (ADR-0013).</div></div><button class="check" data-act="ai-remember" aria-pressed="${aiStore.remember}" aria-label="Recordar clave">${I.check}</button></div>
         ${key ? `<div class="row"><span>Ofrecer la IA en el chat</span><button class="check" data-act="ai-toggle" aria-pressed="${vault.settings.aiEnabled !== false}" aria-label="Usar IA">${I.check}</button></div>
         <div class="row"><div class="grow"><div>Enviar a Gemini sin preguntar</div><div class="muted small">Desactivado por defecto. Si lo activas, lo que MANU no entienda irá directo a Gemini. Lo que parezca privado (salud, dinero, ánimo, teléfonos…) seguirá sin enviarse nunca.</div></div><button class="check" data-act="ai-auto" aria-pressed="${vault.settings.aiAutoSend === true}" aria-label="Enviar sin preguntar">${I.check}</button></div>` : ""}</section>
+      ${aiReady() ? aiModeCard() : ""}
       <section class="card"><h2>Qué puede hacer</h2><p class="muted small">Dile cosas normales: «apúntame llamar al taller», «recuérdame el viernes a las 10 pagar el seguro», «llévame a Hábitos», «quiero importar el extracto» o «me gustaría que el calendario tuviera vista semanal». Gemini <b>propone</b> y tú confirmas cada acción con un toque; nada se hace solo.</p><p class="muted small">Las mejoras de la app se preparan como una petición en GitHub que tú envías y que Claude lee. Ese repositorio es <b>público</b>: no pongas datos personales.</p></section>
       <section class="card"><h2>Privacidad</h2><ul class="muted small">
         <li>MANU responde primero sin IA. Cuando no entiende algo, te enseña <b>exactamente</b> lo que enviaría y solo lo manda si pulsas «Enviar a Gemini» (o si activaste «Enviar sin preguntar»).</li>
@@ -1171,6 +1175,21 @@ function say(text) {
     render();
     return;
   }
+  // Conversation mode: what MANU does not do by itself (greetings, questions,
+  // the day, the weather, anything else) goes to Gemini with the chosen context.
+  // Short commands («gasté 3 en café») stay instant and local; longer or
+  // compound sentences go to Gemini, which can do several things at once.
+  const longCommand = ["expense", "reminder", "idea", "alarm"].includes(intent.kind) && clean.split(/\s+/).length > 8;
+  if (aiMode().on && aiReady() && navigator.onLine && (["unknown", "greeting", "thanks", "agenda", "weather"].includes(intent.kind) || longCommand)) {
+    const check = allowedToSend(clean, aiMode().context);
+    vault.chat.push({ from: "me", text: clean, at });
+    if (!check.ok) {
+      const why = check.blocked.includes("secret") ? "lleva datos que nunca envío (claves, tarjetas, teléfonos…)" : `habla de ${check.blocked.map((k) => ({ money: "dinero", health: "salud", mood: "ánimo" }[k] ?? k)).join(" y ")}, y no me dejaste compartirlo`;
+      vault.chat.push({ from: "manu", text: `${localAnswer(intent) ?? reply(intent, variant++)} (No lo envío a Gemini: ${why}. Lo cambias en Tú → IA.)`, at });
+      persist(); render(); return;
+    }
+    converse(clean); return;
+  }
   let action = null;
   if (intent.kind === "expense") vault.spending.push(newEntry({ id: uid("s"), cents: intent.cents, merchant: intent.merchant, at }, vault.settings.categoryRules ?? {}));
   if (intent.kind === "idea") vault.inbox.push(capture({ id: uid("c"), text: intent.text, at }));
@@ -1185,7 +1204,7 @@ function say(text) {
     vault.reminders.push(r);
     action = { label: "Añadir al iPhone", href: reminderIphoneUrl(r) };
   }
-  if (intent.kind === "agenda") { setTimeout(() => go("agenda"), 900); }
+  if (intent.kind === "agenda" && !(aiMode().on && aiReady() && navigator.onLine)) { setTimeout(() => go("agenda"), 900); }
   if (intent.kind === "unknown" && aiReady() && navigator.onLine) {
     if (isSensitive(clean)) {
       vault.chat.push({ from: "me", text: clean, at }, { from: "manu", text: `${reply(intent, variant++)} (Parece privado: no te ofrezco enviarlo a la IA.)`, at });
@@ -1242,6 +1261,73 @@ function localAnswer(intent) {
   return null;
 }
 
+// ---------- Conversation mode (WEB-27) ----------
+function aiModeCard() {
+  const m = aiMode();
+  return `<section class="card"><h2>💬 Modo conversación</h2>
+    <p class="muted small">MANU habla contigo usando Gemini: recuerda la conversación, sabe lo que elijas de tu vida y gestiona tus cosas. Lo que escribes y lo que marques aquí se envía a Google en cada mensaje.</p>
+    ${m.on ? `<div class="row"><span class="grow">Activado</span><button class="btn ghost small-btn" data-act="ai-mode" data-v="off">Desactivar</button></div>` : `<div class="btns"><button class="btn" data-act="ai-mode" data-v="full">Activar con todo</button><button class="btn ghost" data-act="ai-mode" data-v="basic">Solo lo básico</button></div><p class="muted small">«Con todo» incluye también dinero, salud, ánimo y personas. «Solo lo básico»: agenda, tareas, tiempo y hábitos.</p>`}
+    ${m.on ? `<p class="small"><b>Qué sabe MANU</b></p>${CONTEXT_CATEGORIES.map((c) => `<div class="row"><div class="grow"><div>${c.sensitive ? "🔒 " : ""}${esc(c.label)}</div>${c.sensitive ? '<div class="muted small">Dato sensible: solo si tú lo marcas.</div>' : c.note ? `<div class="muted small">${esc(c.note)}</div>` : ""}</div><button class="check" data-act="ai-ctx" data-k="${c.key}" aria-pressed="${Boolean(m.context[c.key])}" aria-label="${esc(c.label)}">${I.check}</button></div>`).join("")}
+      <div class="row"><div class="grow"><div>Que haga las cosas sin preguntar</div><div class="muted small">Crear tareas, ideas y recordatorios, completar tareas. Siempre con «Deshacer». Gastos y cambios de la app siguen pidiendo tu toque.</div></div><button class="check" data-act="ai-auto-actions" aria-pressed="${m.autoActions}" aria-label="Hacer sin preguntar">${I.check}</button></div>
+      <p class="muted small">Nunca se envían contraseñas, tarjetas, IBAN, teléfonos ni el Refugio.</p>` : ""}
+  </section>`;
+}
+
+const aiMode = () => ({ on: false, context: BASIC_CONTEXT, autoActions: false, ...(vault.settings.aiMode ?? {}) });
+function lifeSnapshot() {
+  const now = today();
+  const events = {};
+  for (let d = 0; d < 2; d++) { const x = new Date(now); x.setDate(x.getDate() + d); const k = dayKey(x); events[k] = eventsFor(k).filter((e) => !e.multi || e.first || d === 0); }
+  const w = currentWeather()?.data;
+  const [s, e] = monthRange();
+  const month = summary(vault.spending, s, e);
+  const key = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const st = monthStats(vault.spending, vault.income ?? [], key, now);
+  const hs = healthSummary(vault.health);
+  const mood = vault.moods.find((m) => m.day === localDay())?.value;
+  return {
+    events, reminders: vault.reminders, tasks: tasks(vault.inbox).filter((t) => !t.done), ideas: ideas(vault.inbox),
+    weather: w ? { city: activeCity().name, text: w.now.text, temp: w.now.temp, min: w.today.min, max: w.today.max, rain: w.today.rain ?? null } : null,
+    habits: vault.habits.map((h) => ({ name: h.name, doneToday: (h.done ?? []).includes(localDay()) })),
+    money: { spent: st.spent, earned: st.earned, payroll: st.payroll.cents, balance: vault.settings.balance?.cents ?? null, byCategory: Object.entries(month.byCategory).sort((a, b) => b[1] - a[1]) },
+    health: hs.sleep !== null || hs.steps !== null ? { sleep: hs.sleep !== null ? dec(hs.sleep) : null, steps: hs.steps !== null ? Math.round(hs.steps) : null } : null,
+    mood: mood ? MOODS[mood - 1].label : null,
+    birthdays: upcomingBirthdays(vault.people, now, 14).map((b) => ({ name: b.person.name, days: b.days })),
+  };
+}
+
+async function converse(message) {
+  const mode = aiMode();
+  const history = vault.chat.slice(0, -1).filter((b) => !b.proposal);
+  const contextText = buildContext(lifeSnapshot(), mode.context, today());
+  const payload = buildConversationPayload({ message, history, contextText, context: mode.context, now: today(), autoActions: mode.autoActions });
+  const answer = { from: "manu", text: "Pensando…", at: new Date(Date.now() + 1).toISOString(), ai: true, sentContext: Object.keys(mode.context).filter((k) => mode.context[k]) };
+  vault.chat.push(answer);
+  persist(); render();
+  try {
+    const { text, calls } = await askWithActions({ key: aiStore.key, model: aiStore.model, payload, confirmed: true, permit: (t) => allowedToSend(t, mode.context).ok });
+    answer.text = text || (calls.length ? "Hecho:" : "…");
+    if (calls.length) {
+      answer.calls = calls.map((c) => ({ ...c, state: null }));
+      if (mode.autoActions) for (const c of answer.calls) if (AUTO_SAFE.has(c.name) && c.name !== "ir_a") { runCall(c, { quiet: true }); c.auto = true; }
+    }
+  } catch (err) {
+    answer.ai = false;
+    answer.text = err.code === "quota" ? "Hoy ya no queda IA gratuita. Sigo sin IA." : err.code === "key" ? "La clave de Gemini no funciona. Revísala en Tú → IA." : err.code === "sensitive" ? "Algo de la conversación parece privado y no lo envío." : "La IA no ha respondido ahora.";
+  }
+  persist(); if (tab === "manu") render();
+}
+
+// Undo an action MANU did by itself.
+function undoCall(c) {
+  if (!c?.undo) return;
+  const u = c.undo;
+  if (u.list === "inbox" && u.completed) vault.inbox = vault.inbox.map((i) => (i.id === u.id ? { ...i, done: false } : i));
+  else if (u.list) vault[u.list] = (vault[u.list] ?? []).filter((x) => x.id !== u.id);
+  c.state = "undone"; delete c.undo;
+  persist(); render(); toast("Deshecho");
+}
+
 async function askAi(proposalId, { auto = false } = {}) {
   const bubble = vault.chat.find((b) => b.proposal?.id === proposalId);
   if (!bubble || bubble.proposal.state) return;
@@ -1269,6 +1355,7 @@ const SCREEN_NAMES = { hoy: "Hoy", agenda: "Agenda", dinero: "Dinero", tu: "Tú"
 function callLabel(c) {
   switch (c.name) {
     case "anadir_tarea": return `Añadir tarea «${c.texto}»`;
+    case "completar_tarea": return `Completar «${c.texto}»`;
     case "anadir_idea": return `Guardar idea «${c.texto}»`;
     case "apuntar_gasto": return `Apuntar gasto de ${euros(c.cents)}${c.concepto ? ` · ${c.concepto}` : ""}`;
     case "crear_recordatorio": { const d = new Date(c.at); return `Recordatorio «${c.texto}» · ${d.toLocaleDateString("es-ES", { weekday: "short", day: "numeric", month: "short" })} ${hhmm(d)}`; }
@@ -1285,7 +1372,8 @@ function callCard(b, c, i) {
     if (c.sensitive) return `<div class="ai-call"><b>${esc(callLabel(c))}</b><p class="muted small">Parece que incluye datos privados: no la preparo para GitHub. Díselo sin datos personales.</p></div>`;
     return `<div class="ai-call"><b>${esc(callLabel(c))}</b><p class="small">${esc(c.descripcion)}</p>${c.state ? `<p class="muted small">${c.state === "done" ? "Abierta en GitHub." : "Descartada."}</p>` : `<p class="muted small">Se abre GitHub con la petición escrita; la envías tú. El repositorio es público.</p><div class="btns"><a class="btn" href="${esc(issueUrl(c, APP_VERSION))}" target="_blank" rel="noopener" data-act="ai-issue" data-at="${at}" data-n="${n}">Abrir en GitHub</a><button class="btn ghost" data-act="ai-skip" data-at="${at}" data-n="${n}">No</button></div>`}</div>`;
   }
-  return `<div class="ai-call"><b>${esc(callLabel(c))}</b>${c.state ? `<p class="muted small">${c.state === "done" ? "Hecho." : "Descartado."}</p>` : `<div class="btns"><button class="btn" data-act="ai-do" data-at="${at}" data-n="${n}">${c.name === "ir_a" || c.name === "importar_extracto" ? "Ir" : "Hacer"}</button><button class="btn ghost" data-act="ai-skip" data-at="${at}" data-n="${n}">No</button></div>`}</div>`;
+  if (c.auto) return `<div class="ai-call${c.state === "done" ? " done" : ""}"><b>${c.state === "done" ? "✓ " : ""}${esc(callLabel(c))}</b>${c.state === "done" && c.undo ? `<div class="btns"><button class="link small" data-act="ai-undo" data-at="${at}" data-n="${n}">Deshacer</button></div>` : c.state === "undone" ? '<p class="muted small">Deshecho.</p>' : c.state === "missing" ? '<p class="muted small">No encontré esa tarea.</p>' : ""}</div>`;
+  return `<div class="ai-call"><b>${esc(callLabel(c))}</b>${c.state ? `<p class="muted small">${c.state === "done" ? "Hecho." : c.state === "missing" ? "No encontré esa tarea." : "Descartado."}</p>` : `<div class="btns"><button class="btn" data-act="ai-do" data-at="${at}" data-n="${n}">${c.name === "ir_a" || c.name === "importar_extracto" ? "Ir" : "Hacer"}</button><button class="btn ghost" data-act="ai-skip" data-at="${at}" data-n="${n}">No</button></div>`}</div>`;
 }
 
 const findCall = (el) => { const b = vault.chat.find((x) => x.at === el.dataset.at && x.calls); return b ? b.calls[Number(el.dataset.n)] : null; };
@@ -1364,15 +1452,22 @@ async function shareToAi(from = null) {
   persist(); if (tab === "manu") render();
 }
 
-function runCall(c) {
+function runCall(c, { quiet = false } = {}) {
   if (!c || c.state) return;
   c.state = "done";
   const at = new Date().toISOString();
+  const say = (t) => { if (!quiet) toast(t); };
   switch (c.name) {
-    case "anadir_tarea": vault.inbox.push({ ...capture({ id: uid("c"), text: c.texto, at }), status: "TASK", ...shared(c) }); toast("Tarea añadida"); break;
-    case "anadir_idea": vault.inbox.push({ ...capture({ id: uid("c"), text: c.texto, at }), status: "IDEA", ...shared(c) }); toast("Idea guardada"); break;
+    case "anadir_tarea": { const id = uid("c"); vault.inbox.push({ ...capture({ id, text: c.texto, at }), status: "TASK", ...shared(c) }); c.undo = { list: "inbox", id }; say("Tarea añadida"); break; }
+    case "anadir_idea": { const id = uid("c"); vault.inbox.push({ ...capture({ id, text: c.texto, at }), status: "IDEA", ...shared(c) }); c.undo = { list: "inbox", id }; say("Idea guardada"); break; }
+    case "completar_tarea": {
+      const q = normalise(c.texto);
+      const t = tasks(vault.inbox).find((x) => !x.done && normalise(x.text).includes(q)) ?? tasks(vault.inbox).find((x) => !x.done && q.includes(normalise(x.text)));
+      if (!t) { c.state = "missing"; say("No encuentro esa tarea"); break; }
+      vault.inbox = vault.inbox.map((i) => (i.id === t.id ? { ...i, done: true } : i)); c.undo = { list: "inbox", id: t.id, completed: true }; c.texto = t.text; say("Tarea completada"); break;
+    }
     case "apuntar_gasto": vault.spending.push({ ...newEntry({ id: uid("s"), cents: c.cents, merchant: c.concepto, at }, vault.settings.categoryRules ?? {}), ...shared(c) }); toast("Gasto apuntado"); break;
-    case "crear_recordatorio": vault.reminders.push({ id: uid("r"), text: c.texto, at: c.at, done: false, notified: false, ...shared(c) }); toast("Recordatorio creado"); break;
+    case "crear_recordatorio": { const id = uid("r"); vault.reminders.push({ id, text: c.texto, at: c.at, done: false, notified: false, ...shared(c) }); c.undo = { list: "reminders", id }; say("Recordatorio creado"); break; }
     case "ir_a": case "importar_extracto": {
       persist();
       const [t, s2, ov] = c.name === "ir_a" ? SCREENS[c.pantalla] : ["dinero"];
@@ -1447,6 +1542,10 @@ document.addEventListener("click", async (e) => {
     case "gfeature": { const k = a.dataset.k; vault.settings.google = { ...(vault.settings.google ?? {}), [k]: !googleOn(k) }; if (!googleOn(k)) delete gcal.tokens[SCOPE[k]]; persist(); render(); break; }
     case "ai-send": askAi(id); break;
     case "ai-do": runCall(findCall(a)); break;
+    case "ai-undo": undoCall(findCall(a)); break;
+    case "ai-mode": { const m = aiMode(); const v = a.dataset.v; vault.settings.aiMode = v === "off" ? { ...m, on: false } : v === "full" ? { ...m, on: true, context: { ...FULL_CONTEXT } } : v === "basic" ? { ...m, on: true, context: { ...BASIC_CONTEXT } } : m; persist(); render(); toast(v === "off" ? "Modo conversación desactivado" : "Modo conversación activado"); break; }
+    case "ai-ctx": { const m = aiMode(); vault.settings.aiMode = { ...m, context: { ...m.context, [a.dataset.k]: !m.context[a.dataset.k] } }; persist(); render(); break; }
+    case "ai-auto-actions": { const m = aiMode(); vault.settings.aiMode = { ...m, autoActions: !m.autoActions }; persist(); render(); break; }
     case "ai-skip": { const c = findCall(a); if (c && !c.state) { c.state = "no"; persist(); render(); } break; }
     case "ai-issue": { const c = findCall(a); if (c && !c.state) { c.state = "done"; persist(); setTimeout(render, 300); } break; }
     case "ai-auto": vault.settings.aiAutoSend = vault.settings.aiAutoSend !== true; persist(); render(); toast(vault.settings.aiAutoSend ? "Enviará sin preguntar (nunca lo privado)" : "Volverá a preguntarte antes de enviar"); break;
