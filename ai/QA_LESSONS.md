@@ -85,3 +85,8 @@ Si un id sirve para descartar duplicados, un hash de 32 bits puede hacer que dos
 ### QAL-019 — Reproducir el ejemplo de un hallazgo externo antes de usarlo como fixture
 
 En la revisión de ChatGPT del 2026-09-29, el defecto (posible colisión) era real, pero la pareja de filas de ejemplo no colisionaba en los commits revisados. Un fixture sin comprobar habría dado una regresión que pasa sin probar nada. Antes de convertir el ejemplo de un hallazgo en test, hay que ejecutarlo contra el código antiguo y ver que falla.
+
+### QAL-020 — No reutilizar en contenedores globales un atributo que busca un manejador delegado
+
+Si un manejador delegado usa `e.target.closest("[data-x]")` y se pone `data-x` en `body` o en otro ancestro común, cualquier toque coincide con ese ancestro y dispara la acción equivocada. En WEB-20, `body[data-tab]` hacía que tocar cualquier cosa volviese a Hoy. El estado global lleva un nombre propio (`data-screen`). Prueba: recorrido de navegador de WEB-20 («weather page: whole screen is the sky»).
+

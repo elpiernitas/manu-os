@@ -19,7 +19,7 @@ import { isSpotifyClientId, pkceValid, randomVerifier, challengeFor, authorizeUr
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "19";
+export const APP_VERSION = "20";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -243,7 +243,7 @@ function weatherPage() {
   const lo = Math.min(...f.days.map((d) => d.min)), hi = Math.max(...f.days.map((d) => d.max));
   const span = Math.max(1, hi - lo);
   return `<button class="link" data-act="overlay-close">${I.back} Hoy</button>
-    <div class="weather-head scene-card sc-${sceneFor(f.now.icon)}">${sceneLayer(sceneFor(f.now.icon))}<p class="muted">${esc(city.name)}</p>${wxE(f.now.icon, "xl")}<div class="temp xl"><span data-count="${f.now.temp}">${f.now.temp}</span>°</div><p>${esc(f.now.text)}</p><p class="muted">Máx. ${f.today.max}° · Mín. ${f.today.min}°</p></div>
+    <div class="weather-head"><p class="muted">${esc(city.name)}</p>${wxE(f.now.icon, "xl")}<div class="temp xl"><span data-count="${f.now.temp}">${f.now.temp}</span>°</div><p>${esc(f.now.text)}</p><p class="muted">Máx. ${f.today.max}° · Mín. ${f.today.min}°</p></div>
     <section class="card"><p class="small">${esc(advice(f))}</p><div class="hours scroll">${f.hours.map((h) => `<div><span class="muted small">${esc(h.time)}</span>${wxE(h.icon)}${h.rain >= 20 ? `<span class="rain small">${h.rain}%</span>` : ""}<b>${h.temp}°</b></div>`).join("")}</div></section>
     ${sectionTitle("Próximos 7 días")}
     <section class="card">${f.days.map((d) => `<div class="row day"><span class="wd">${esc(d.weekday)}</span><span class="dicon">${wxE(d.icon)}${d.rain >= 20 ? `<span class="rain small">${d.rain}%</span>` : ""}</span><span class="num muted">${d.min}°</span><span class="range"><i data-l="${Math.round(((d.min - lo) / span) * 100)}" data-w="${Math.max(6, Math.round(((d.max - d.min) / span) * 100))}"></i></span><span class="num">${d.max}°</span></div>`).join("")}</section>
@@ -838,6 +838,12 @@ function render({ focus = false, enter = null } = {}) {
   celebrateMoney = Boolean(enter) && tab === "dinero" && !overlay && !reduceMotion();
   const w = currentWeather();
   if (w?.data?.now) document.body.dataset.wx = sceneFor(w.data.now.icon); else delete document.body.dataset.wx;
+  document.body.dataset.screen = overlay === "weather" ? "weather" : tab; // not data-tab: that attribute marks the tab buttons
+  // Full-screen living background: the weather scene behind Hoy and the weather
+  // page. Rebuilt only when it changes, so the animation never restarts on render.
+  const skyScene = (tab === "hoy" || overlay === "weather") && w?.data?.now ? sceneFor(w.data.now.icon) : "";
+  const sky = $("sky");
+  if (sky && sky.dataset.scene !== skyScene) { sky.dataset.scene = skyScene; sky.innerHTML = skyScene ? sceneLayer(skyScene) : ""; }
   const todayMood = vault.moods.find((m) => m.day === localDay())?.value;
   if (todayMood) document.body.dataset.mood = String(todayMood); else delete document.body.dataset.mood;
   if (tab === "tu" && (!sub || sub === "gcal") && isClientId(gClientId())) loadGis().catch(() => {});
