@@ -10,6 +10,48 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
+## WEB-36 — seis escenas del tiempo, sin saltos, y el fondo animado recuperado
+
+Manu (2026-09-29, captura): «la animación cuando hay nublado se ralla». Pidió escenas para sol mucho, sol normal, sol con nubes, nubes, nubes con lluvia y nubes con lluvia y truenos.
+
+### Causas
+
+- **El salto:** cada repintado (cada minuto en Hoy, y al actualizar el tiempo o Google) reconstruía la escena y todas las animaciones empezaban de cero.
+- **El peso:** nubes enormes con `filter: blur()` moviéndose bajo tarjetas translúcidas.
+- **Fondo negro:** la página del tiempo y el fondo animado de toda la app salían negros desde WEB-31. `html { background }` impedía que el color de `body` pasara al lienzo, y `body` tapaba la capa `.ambient` (`z-index: -1`).
+
+### Cambios
+
+- `web/core/scene.js`:
+  - `sceneFor(icon, today)` devuelve `hot` (despejado y máx ≥ 29° o UV ≥ 8), `sun`, `sun-cloud` (antes era `cloud`), `cloud`, `rain` y `storm`, además de `night`, `snow` y `fog`;
+  - `SHAPES` define sol, rayos, calima, nubes, fogonazo y rayo como elementos reales.
+- `web/app.js`:
+  - `sceneLayer` pinta las formas;
+  - `syncAnimations` hace que tras cada repintado cada animación siga desde el reloj de la app (un desfase negativo en `animation-delay`, aplicado por CSSOM, compatible con la CSP);
+  - versión 36.
+- `web/styles.css`:
+  - escenas nuevas con solo `transform`/`opacity`, sin desenfoque;
+  - nubes hechas con degradados suaves y más sutiles;
+  - tormenta con fogonazo y rayo sincronizados;
+  - colores de fondo para `hot` y `sun-cloud`;
+  - `html` ya no tiene fondo;
+  - con movimiento reducido no hay animaciones y se ocultan los rayos.
+
+### Resultados
+
+- `npm test`: 121/121 PASS (`web/tests/scene.test.js` con las seis escenas y los umbrales). `node --check` pasa.
+- e2e36 (seis previsiones simuladas, iPhone 14): 20/20. Cubre:
+  - cada código lleva a su escena;
+  - tras un repintado la nube continúa (1,7 s → 3,4 s) en vez de reiniciarse;
+  - ninguna nube lleva `filter`;
+  - `html` no tiene fondo, así que el cielo animado se ve.
+- e2e20 actualizado (las nubes son `.cloud`). e2e3, e2e4 y e2e10–e2e35 en PASS, salvo las 3 expectativas antiguas de e2e18.
+
+### NO_VERIFICADO
+
+- La fluidez en el iPhone real. Chromium no mide el coste de `backdrop-filter` en iOS.
+- Los umbrales de «sol mucho» (29° / UV 8) son una elección razonable pendiente de que Manu los valide.
+
 ## WEB-35 — Pregúntale a tu archivo, tu perfil y recuerdos en la conversación
 
 Manu (2026-09-29): «sí» a preguntar lo que sea y al perfil (enmienda WEB-35 de ADR-0016).
