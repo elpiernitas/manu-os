@@ -18,7 +18,7 @@ import { isSpotifyClientId, pkceValid, randomVerifier, challengeFor, authorizeUr
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "13";
+export const APP_VERSION = "14";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -203,6 +203,19 @@ function weatherCard() {
     <p>${esc(advice(f))}</p>
     ${f.tomorrow ? `<p class="muted small">Mañana: ${esc(f.tomorrow.text.toLowerCase())}, ${f.tomorrow.min}°–${f.tomorrow.max}°${f.tomorrow.rain !== null ? `, lluvia ${f.tomorrow.rain} %` : ""}.</p>` : ""}
     <div class="btns">${cityChips}</div></section>`;
+}
+
+// Step-by-step Gemini setup, opened from «Activar». Disappears once the key works.
+let guideStep = 0;
+function geminiGuide() {
+  const step = (n, title, body, action = "") => `<section class="card guide-step${guideStep > n ? " done" : ""}"><div class="row"><span class="step-n" aria-hidden="true">${guideStep > n ? I.check : n + 1}</span><h2 class="grow">${title}</h2></div><p class="muted small">${body}</p>${action}</section>`;
+  return `<button class="link" data-act="overlay-close">${I.back} Volver</button><h1>Activar la IA</h1><p class="subtitle">Gratis, con tu cuenta de Google. Unos 2 minutos.</p>
+    <div class="stack">
+    ${step(0, "Abre Google AI Studio", "Se abre la página de claves de Google. Si te lo pide, entra con tu Gmail y acepta las condiciones.", '<a class="btn block" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" data-act="guide-step" data-n="1">Abrir la página de claves</a>')}
+    ${step(1, "Crea la clave", "Pulsa <b>«Create API key»</b> (puede aparecer como «Crear clave de API»). Si te pregunta por un proyecto, elige el que te proponga o uno nuevo. <b>No actives la facturación</b>: la clave gratuita no la necesita.")}
+    ${step(2, "Cópiala", "Aparece una clave larga que empieza por <b>AIza</b>. Pulsa el icono de copiar que tiene al lado.")}
+    ${step(3, "Vuelve aquí y pégala", "MANU la lee del portapapeles, la prueba y la recuerda en este móvil. No va a Google Drive, ni a las copias, ni al repositorio.", '<button class="btn block" data-act="ai-paste">Pegar y activar</button><form id="guideForm" class="stack"><label for="guideKey" class="muted small">¿No funciona el botón? Pégala aquí a mano:</label><input id="guideKey" type="password" autocomplete="off" spellcheck="false" placeholder="AIza…"><button class="btn ghost" type="submit">Activar con esta clave</button></form>')}
+    </div>`;
 }
 
 function weatherPage() {
@@ -533,7 +546,7 @@ const screens = {
 function setupCard() {
   const steps = [];
   if (!["calendar", "tasks", "contacts", "drive"].some(googleOn)) steps.push(["Google", "Calendar, Tasks y Contactos con un toque", '<button class="btn small-btn" data-act="google-connect-all">Conectar</button>']);
-  if (!aiReady()) steps.push(["IA (Gemini)", "Crear la clave y pegarla: 2 toques", '<button class="btn small-btn" data-sub-go="ia">Activar</button>']);
+  if (!aiReady()) steps.push(["IA (Gemini)", "Crear la clave y pegarla: 2 toques", '<button class="btn small-btn" data-act="gemini-guide">Activar</button>']);
   if (notificationStatus() === "default") steps.push(["Avisos", "Para que MANU te avise", '<button class="btn small-btn" data-act="notify-on">Activar</button>']);
   if (shortcutsPending()) steps.push(["Atajos del iPhone", `${shortcutsPending()} por crear (alarmas y recordatorios que suenan siempre)`, '<button class="btn small-btn" data-sub-go="atajos">Ver</button>']);
   if (!steps.length) return "";
@@ -658,8 +671,7 @@ const subpages = {
   ia() {
     const key = aiStore.key;
     return `${backBar("IA (Gemini)")}
-      ${aiReady() ? "" : `<section class="card"><h2>Actívala en 2 toques</h2><ol class="muted small"><li>Crea tu clave gratis con tu Gmail («Create API key»). No pide tarjeta; si te pide activar facturación, no lo hagas. Cópiala.</li><li>Vuelve aquí y pulsa «Pegar y activar». MANU la prueba y la recuerda en este móvil.</li></ol>
-        <div class="btns"><a class="btn ghost" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">1. Crear mi clave</a><button class="btn" data-act="ai-paste">2. Pegar y activar</button></div></section>`}
+      ${aiReady() ? "" : `<section class="card"><h2>Actívala paso a paso</h2><p class="muted small">Te guío: crear la clave gratis, copiarla y pegarla aquí.</p><button class="btn block" data-act="gemini-guide">Empezar</button></section>`}
       <section class="card"><h2>Estado</h2><p>${aiReady() ? `Activada con <b>${esc(aiStore.model)}</b>.` : key ? "Clave guardada. Pulsa «Probar clave»." : "Sin clave: MANU funciona sin IA."}</p>
         <form id="aiForm" class="stack"><label for="aiKey" class="muted small">Clave de API de Gemini. Nunca va en las copias. Por defecto solo dura mientras MANU está abierta.</label><input id="aiKey" type="password" value="${esc(key)}" autocomplete="off" spellcheck="false" placeholder="AIza…"><div class="btns"><button class="btn" type="submit">Guardar y probar clave</button>${key ? '<button class="btn danger" type="button" data-act="ai-forget">Borrar clave</button>' : ""}</div></form>
         <div class="row"><div class="grow"><div>Recordar la clave en este móvil</div><div class="muted small">Más cómodo, pero cualquier código que corra en esta web podría leerla (ADR-0013).</div></div><button class="check" data-act="ai-remember" aria-pressed="${aiStore.remember}" aria-label="Recordar clave">${I.check}</button></div>
@@ -776,7 +788,7 @@ function render({ focus = false, enter = null } = {}) {
   if (tab === "tu" && (!sub || sub === "gcal") && isClientId(gClientId())) loadGis().catch(() => {});
   document.body.dataset.mode = modeState(today(), undefined, vault.settings.override).mode;
   renderTabs();
-  $("screen").innerHTML = overlay === "weather" ? weatherPage() : (screens[tab] ?? screens.hoy)();
+  $("screen").innerHTML = overlay === "weather" ? weatherPage() : overlay === "gemini" ? geminiGuide() : (screens[tab] ?? screens.hoy)();
   animateEnter(enter);
   $("screen").querySelectorAll(".bar > i[data-w]").forEach((el) => { el.style.width = `${el.dataset.w}%`; });
   $("screen").querySelectorAll(".range > i").forEach((el) => { el.style.left = `${el.dataset.l}%`; el.style.width = `${el.dataset.w}%`; });
@@ -995,6 +1007,8 @@ document.addEventListener("click", async (e) => {
     case "leave-refuge": refuge = null; render(); break;
     case "back": sub = null; render({ focus: true, enter: "tab" }); break;
     case "weather-open": overlay = "weather"; render({ focus: true, enter: "page" }); scrollTo(0, 0); refreshWeather(); break;
+    case "gemini-guide": overlay = "gemini"; guideStep = 0; render({ focus: true, enter: "page" }); scrollTo(0, 0); break;
+    case "guide-step": guideStep = Math.max(guideStep, Number(a.dataset.n)); setTimeout(render, 400); break;
     case "overlay-close": overlay = null; render({ focus: true, enter: "tab" }); scrollTo(0, 0); break;
     case "goto-gcal": tab = "tu"; sub = "gcal"; render({ focus: true }); scrollTo(0, 0); break;
     case "gcal-sync": syncGoogle(); break;
@@ -1030,7 +1044,7 @@ document.addEventListener("click", async (e) => {
       try { text = (await navigator.clipboard.readText()).trim(); } catch { toast("No puedo leer el portapapeles: pega la clave en el campo de abajo."); break; }
       if (!GEMINI_KEY_RE.test(text)) { toast("No veo una clave de Gemini copiada (empieza por «AIza»)."); break; }
       aiStore.remember = true; // the button says it: remembered on this phone (ADR-0013)
-      await activateGemini(text);
+      if (await activateGemini(text) && overlay === "gemini") { overlay = null; tab = "tu"; sub = null; render({ focus: true, enter: "tab" }); scrollTo(0, 0); toast("IA activada. Ya puedes hablar con MANU."); }
       break;
     }
     case "ai-remember": { const k = aiStore.key; aiStore.remember = !aiStore.remember; aiStore.key = k; render(); break; }
@@ -1117,6 +1131,13 @@ document.addEventListener("submit", async (e) => {
         render();
       }
     } catch (err) { toast(err.message || "No se pudo completar la copia"); }
+    return;
+  }
+  if (f === "guideForm") {
+    const key = $("guideKey").value.trim();
+    if (!GEMINI_KEY_RE.test(key)) { toast("Eso no parece una clave de Gemini (empieza por «AIza»)."); return; }
+    aiStore.remember = true;
+    if (await activateGemini(key)) { overlay = null; tab = "tu"; sub = null; render({ focus: true, enter: "tab" }); scrollTo(0, 0); toast("IA activada. Ya puedes hablar con MANU."); }
     return;
   }
   if (f === "aiForm") {

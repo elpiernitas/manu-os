@@ -2,11 +2,11 @@
 
 Status: **REVIEW_PENDING**
 
-WEB-13 implementado por Claude Code. Está listo, pero **no se fusiona** hasta que Manu lo confirme: un comentario suyo en el PR #21 (2026-09-29 00:43 UTC), posterior a la enmienda de `AGENTS.md`, pide no fusionar, y prevalece lo más restrictivo.
+WEB-14 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
 
 ## Tarea activa
 
-WEB-13 — correcciones de los hallazgos 1–5 de la revisión de ChatGPT sobre los PR #15/#16, con regresiones (`ai/HANDOFF.md`, «WEB-13»).
+WEB-14 — tutorial paso a paso para activar Gemini (`ai/HANDOFF.md`, «WEB-14»).
 
 ## Autorización
 
@@ -41,6 +41,7 @@ WEB-13 — correcciones de los hallazgos 1–5 de la revisión de ChatGPT sobre 
 
 ## Historial (cerrado)
 
+- **WEB-13** (revisión de ChatGPT, calendario automático, gastos del Excel, puesta a punto): CERRADA. Fusionada mediante el PR #21 (`750589e`), con el «sí» de Manu.
 - **WEB-12** (IA que propone acciones): CERRADA. Fusionada mediante el PR #20 (`9a5bf6f`).
 - **WEB-11** (todos los calendarios con color, WhatsApp): CERRADA. Fusionada mediante el PR #19 (`88b3df3`).
 - **WEB-10** (calendario de mes, cobros fijos, cuándo gastas): CERRADA. Fusionada mediante el PR #18 (`505c6bf`).
