@@ -42,7 +42,7 @@ const realEvents = (list) => (list ?? []).filter((e) => !String(e.title ?? "").s
  * @param {Array} x.inbox           vault.inbox (to count tasks done today)
  * @param {number} x.importantMail  unread important mails (or 0)
  */
-export function briefing({ now = new Date(), weather = null, advice = null, today = [], tomorrow = [], reminders = [], tasks = [], birthdays = [], spending = [], inbox = [], importantMail = 0 }) {
+export function briefing({ now = new Date(), weather = null, advice = null, today = [], tomorrow = [], reminders = [], tasks = [], birthdays = [], spending = [], inbox = [], importantMail = 0, budgetAlerts = [] }) {
   const h = now.getHours();
   const evening = h >= 20 || h < 5;
   const lines = [];
@@ -69,6 +69,8 @@ export function briefing({ now = new Date(), weather = null, advice = null, toda
   }
   for (const b of birthdays ?? []) if (b.days <= 1) lines.push({ e: "🎂", t: `${b.person.name} cumple ${b.days === 0 ? "hoy" : "mañana"}.` });
   if (importantMail > 0 && !evening) lines.push({ e: "📬", t: `${plural(importantMail, "correo importante", "correos importantes")} sin leer.` });
+  // WEB-47: budgets that are over or going too fast (already worded).
+  for (const t of budgetAlerts ?? []) lines.push({ e: "🎯", t });
   const pace = monthPace(spending, now);
   if (pace.cur > 0 && !evening) lines.push({ e: "💶", t: `Llevas ${euros(pace.cur)} este mes${pace.diff === null ? "." : pace.diff === 0 ? ", igual que el mes pasado a estas alturas." : `, un ${Math.abs(pace.diff)} % ${pace.diff < 0 ? "menos" : "más"} que el mes pasado a estas alturas.`}` });
   return { title: evening ? "Tu día, en resumen" : "Tu día de un vistazo", evening, lines: lines.slice(0, 7) };

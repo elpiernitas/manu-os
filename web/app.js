@@ -24,6 +24,7 @@ import { findExcerpts, askPayload, profileDigest, profilePayload, memoryContext 
 import { diaryDocs, dayLines, dayFromText, isDiaryQuestion, dayTitle } from "./core/diary.js";
 import { applyBuzon, buzonSummary } from "./core/buzon.js";
 import { briefing, briefingText, isBriefingQuestion } from "./core/briefing.js";
+import { budgetStatus, budgetLine, budgetCommand } from "./core/budget.js";
 import { weatherEmoji, sceneFor, PARTICLES, SHAPES, MONEY_EMOJI, dayPhase, cityMinutes } from "./core/scene.js";
 import { buildImagePayload, buildLinkPayload, isGeminiKey, mayGo, setSensitiveOk, sensitiveAllowed, pickModel, listModels, buildActionPayload, askWithActions, issueUrl } from "./core/ai.js";
 import { encryptBackup, decryptBackup, passphraseProblem, isEnvelope } from "./core/crypto.js";
@@ -32,7 +33,7 @@ import { isSpotifyClientId, pkceValid, randomVerifier, challengeFor, authorizeUr
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "46";
+export const APP_VERSION = "47";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -237,6 +238,17 @@ let celebrateMoney = false; // short money shower, only when entering Dinero
 const moneyRain = () => `<div class="money-rain" aria-hidden="true">${Array.from({ length: 12 }, (_, i) => `<i>${MONEY_EMOJI[i % MONEY_EMOJI.length]}</i>`).join("")}</div>`;
 const catLabel = (c) => `${CATEGORY_EMOJI[c] ?? "📦"} ${CATEGORIES[c] ?? c}`;
 
+// ---------- Presupuestos (WEB-47) ----------
+const budgetsNow = () => budgetStatus(vault.spending, vault.settings.budgets ?? {}, today());
+function budgetCard() {
+  const list = budgetsNow();
+  const used = new Set(list.map((b) => b.cat));
+  const icon = { ok: "🟢", warn: "🟠", over: "🔴" };
+  return `<section class="card"><h2>🎯 Presupuestos del mes</h2>
+    ${list.length ? list.map((b) => `<div class="row budget-row"><span aria-hidden="true">${icon[b.status]}</span><div class="grow"><div>${esc(catLabel(b.cat))}</div><div class="muted small">${b.status === "over" ? `Te has pasado ${euros(-b.left)}` : `Quedan ${euros(b.left)}`} · ${euros(b.spent)} de ${euros(b.limit)}</div></div><button class="link small" data-act="budget-del" data-cat="${esc(b.cat)}" aria-label="Quitar presupuesto de ${esc(CATEGORIES[b.cat])}">Quitar</button></div>`).join("") : '<p class="muted small">Pon un límite al mes para lo que más se te va (comer fuera, ocio…). MANU te avisa en «Tu día» si vas demasiado rápido. También puedes decírselo: «pon un presupuesto de 150 para comer».</p>'}
+    <form id="budgetForm" class="budget-form"><label for="budgetCat" class="sr">Categoría</label><select id="budgetCat">${Object.keys(CATEGORIES).filter((k) => !used.has(k)).map((k) => `<option value="${k}">${esc(catLabel(k))}</option>`).join("")}</select><label for="budgetAmount" class="sr">Límite al mes en euros</label><input id="budgetAmount" inputmode="decimal" placeholder="€ al mes" maxlength="9"><button class="btn" type="submit">Poner</button></form></section>`;
+}
+
 // ---------- Tu día de un vistazo (WEB-46) ----------
 function dayBriefing() {
   const city = activeCity();
@@ -247,6 +259,7 @@ function dayBriefing() {
     today: eventsFor(localDay()), tomorrow: eventsFor(tomorrowKey()),
     reminders: vault.reminders, tasks: tasks(vault.inbox), birthdays: upcomingBirthdays(vault.people, today(), 1),
     spending: vault.spending, inbox: vault.inbox, importantMail: googleOn("gmail") ? vault.mail?.important?.length ?? 0 : 0,
+    budgetAlerts: budgetsNow().filter((b) => b.status !== "ok").slice(0, 2).map(budgetLine),
   });
 }
 function briefingCard() {
@@ -758,7 +771,8 @@ const screens = {
     return `<h1>Dinero</h1><p class="subtitle">${esc(cap(monthName))}</p>
       <div class="stack">
       <section class="card hero money-hero">${celebrateMoney ? moneyRain() : ""}<div class="row cal-head"><button class="link" data-act="money-prev" aria-label="Mes anterior">${I.back}</button><h2>${moneyMonth === 0 ? "Gastado este mes" : `Gastado en ${esc(monthName.replace(/ de \d{4}$/, ""))}`}</h2><button class="link" data-act="money-next" aria-label="Mes siguiente"${moneyMonth === 0 ? " disabled" : ""}>${I.chev}</button></div><div class="big-money" data-count-money="${month.total}">${euros(month.total)}</div>
-        ${cats.map(([c, v]) => `<div class="stack"><div class="row"><span>${esc(catLabel(c))}</span><span class="num">${euros(v)}</span></div><div class="bar"><i data-w="${Math.max(3, Math.round((v / max) * 100))}"></i></div></div>`).join("")}</section>
+        ${cats.map(([c, v]) => { const lim = moneyMonth === 0 ? vault.settings.budgets?.[c] : null; return `<div class="stack"><div class="row"><span>${esc(catLabel(c))}</span><span class="num">${euros(v)}${lim ? `<span class="muted small"> / ${euros(lim)}</span>` : ""}</span></div><div class="bar${lim && v > lim ? " over" : lim && v >= lim * 0.8 ? " warn" : ""}"><i data-w="${Math.max(3, Math.round((v / (lim ? Math.max(lim, v) : max)) * 100))}"></i></div></div>`; }).join("")}</section>
+      ${moneyMonth === 0 ? budgetCard() : ""}
       ${moneyStatsSection(ref, monthName)}
       <section class="card"><h2>${I.box} Importar del banco</h2>
         <p class="muted small">Descarga los movimientos de tu banco (Sabadell: Excel .xls; también vale CSV) y elígelo aquí. Se analiza en tu móvil y no se envía a nadie. Importo gastos e ingresos (nómina, Bizum…) y no duplico los que ya tengas. Si corriges la categoría de un comercio, la aprendo para todos sus movimientos.</p>
@@ -1369,6 +1383,16 @@ function say(text) {
     refuge = { state: { phase: "HUMAN_HELP", turn: 0 }, messages: [{ from: "me", text: clean }, { from: "manu", text: reply(intent), safety: true }] };
     render();
     return;
+  }
+  // WEB-47: «pon un presupuesto de 150 para comer», «¿cómo voy de presupuesto?».
+  const bc = budgetCommand(clean);
+  if (bc) {
+    let text;
+    if (bc.kind === "set") { vault.settings.budgets = { ...(vault.settings.budgets ?? {}), [bc.cat]: bc.cents }; text = `Hecho: ${CATEGORIES[bc.cat]}, ${euros(bc.cents)} al mes. Te aviso en «Tu día» si vas demasiado rápido.`; }
+    else if (bc.kind === "remove") { const b = { ...(vault.settings.budgets ?? {}) }; delete b[bc.cat]; vault.settings.budgets = b; text = `Quitado el presupuesto de ${CATEGORIES[bc.cat]}.`; }
+    else { const l = budgetsNow(); text = l.length ? l.map((b) => `${{ ok: "🟢", warn: "🟠", over: "🔴" }[b.status]} ${budgetLine(b)}`).join("\n") : "Aún no tienes presupuestos. Di «pon un presupuesto de 150 para comer» o ponlos en Dinero."; }
+    vault.chat.push({ from: "me", text: clean, at }, { from: "manu", text, at });
+    persist(); render(); return;
   }
   // WEB-46: «¿cómo va mi día?», «resumen del día».
   if (isBriefingQuestion(normalise(clean))) {
@@ -2117,6 +2141,7 @@ document.addEventListener("click", async (e) => {
     case "notify-on": await enableNotifications(); render(); break;
     case "notify-test": if (!(await testNotification())) toast("No se ha podido mostrar el aviso."); break;
     case "export": exportBackup(); break;
+    case "budget-del": { const b = { ...(vault.settings.budgets ?? {}) }; delete b[a.dataset.cat]; vault.settings.budgets = b; persist(); render(); break; }
     case "full-restore-yes": doFullRestore(); break;
     case "full-restore-no": full.pending = null; render(); break;
     case "backup-later": vault.settings.backupSnooze = new Date(Date.now() + 3 * 86400000).toISOString(); persist(); render(); break;
@@ -2260,6 +2285,12 @@ document.addEventListener("submit", async (e) => {
     persist(); render(); toast("Persona guardada");
     if (toCalendar) addBirthdayToCalendar(person.id);
     return;
+  }
+  if (f === "budgetForm") {
+    const cat = $("budgetCat").value, cents = toCents($("budgetAmount").value.replace(/[€\s]/g, ""));
+    if (!CATEGORIES[cat] || !cents) { toast("Escribe el límite en euros, por ejemplo 150"); return; }
+    vault.settings.budgets = { ...(vault.settings.budgets ?? {}), [cat]: cents };
+    persist(); render(); toast(`Presupuesto de ${CATEGORIES[cat]}: ${euros(cents)} al mes`); return;
   }
   if (f === "healthForm") {
     const t = localDay();

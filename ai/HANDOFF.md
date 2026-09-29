@@ -10,6 +10,46 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
+## WEB-47 — presupuestos por categoría
+
+Segunda mejora del análisis (inspirada en actualbudget/actual, sin copiar código): saber si vas bien de dinero sin mirar gráficos.
+
+### Cambios
+
+- `web/core/budget.js` (nuevo, puro):
+  - `budgetStatus` devuelve, por categoría con límite, lo gastado en el mes, lo que queda, el porcentaje y el estado:
+    - `over` si pasa del límite;
+    - `warn` si llega al 80 % o va claramente por delante del mes;
+    - `ok` en el resto.
+  - `budgetLine` redacta el estado en una frase.
+  - `categoryFromText` entiende «comida», «súper», «ocio nocturno» o «gasolina».
+  - `budgetCommand` reconoce «pon un presupuesto de 200 € para comida», «quita el presupuesto de tabaco» y «¿cómo voy de presupuesto?». Sin categoría no adivina.
+- `web/app.js`:
+  - Dinero, en el mes actual:
+    - cada barra muestra «gastado / límite» y se pone naranja o roja;
+    - la tarjeta «🎯 Presupuestos del mes» tiene semáforo, «Quitar» y un formulario con categoría e importe;
+  - «Tu día» avisa, como mucho, de 2 presupuestos pasados o que van demasiado rápido;
+  - el chat entiende las órdenes y la pregunta de presupuestos;
+  - los límites se guardan en `vault.settings.budgets` (céntimos), así que entran en las copias;
+  - versión 47.
+- `web/sw.js`: `core/budget.js` y caché v47.
+
+### Resultados
+
+- `npm test`: 150/150 PASS (`budget.test.js` con 3 tests; más el aviso en `briefing.test.js`).
+- e2e47: 9/9. Cubre:
+  - el formulario y el rojo al pasarse;
+  - que la categoría ya usada no se vuelva a ofrecer;
+  - el chat (poner y preguntar);
+  - que «gasté 5 en comida» siga siendo un gasto;
+  - el aviso en Hoy;
+  - «Quitar».
+- Toda la batería e2e en PASS. e2e18 se ha actualizado a la bola con la M (WEB-18) y a las escenas de WEB-36.
+
+### NO_VERIFICADO
+
+- En el iPhone real, con los gastos reales de Manu.
+
 ## WEB-46 — «Tu día de un vistazo» y arreglos de la auditoría
 
 Manu (2026-09-29) pidió seguir mejorando sin parar. La primera vuelta es una auditoría automática: 60 pantallas (todas las pestañas y subpáginas) en iPhone 14, iPhone SE y escritorio, buscando errores de JavaScript, desbordes, textos cortados y zonas táctiles pequeñas. Después viene la mejora de más valor según el análisis anterior: que MANU diga lo importante sin que Manu tenga que meter datos.
