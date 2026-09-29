@@ -24,7 +24,7 @@ import { isSpotifyClientId, pkceValid, randomVerifier, challengeFor, authorizeUr
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "28";
+export const APP_VERSION = "29";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -1032,11 +1032,23 @@ function keyboardMode() {
   const vv = window.visualViewport;
   if (vv) fullHeight = Math.max(fullHeight, vv.height, document.activeElement?.matches("input, textarea") ? 0 : window.innerHeight);
   const open = Boolean(vv) && vv.height < fullHeight * 0.78 && document.activeElement?.matches("input, textarea");
+  const was = document.body.classList.contains("kb");
   document.body.classList.toggle("kb", open);
+  placeComposer();
+  if (open && !was && tab === "manu") $("chat")?.lastElementChild?.scrollIntoView({ block: "end" });
+}
+// iOS keeps the layout viewport full height under the keyboard, so a sticky
+// composer ends up hidden behind it (or floating mid-screen). With the
+// keyboard open it is fixed to the bottom of the visible area instead (WEB-29).
+function placeComposer() {
+  const vv = window.visualViewport;
+  if (!vv || !document.body.classList.contains("kb")) { document.body.style.removeProperty("--kb-bottom"); return; }
+  document.body.style.setProperty("--kb-bottom", `${Math.round(vv.offsetTop + vv.height)}px`);
 }
 window.visualViewport?.addEventListener("resize", keyboardMode);
 document.addEventListener("focusout", () => setTimeout(keyboardMode, 50));
 window.visualViewport?.addEventListener("scroll", fitSheet);
+window.visualViewport?.addEventListener("scroll", placeComposer);
 
 function rerenderSheet() {
   const t = $("qText"); const pos = t?.selectionStart ?? null;
