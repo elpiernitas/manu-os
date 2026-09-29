@@ -2,11 +2,11 @@
 
 Status: **REVIEW_PENDING**
 
-WEB-48 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
+WEB-49 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
 
 ## Tarea activa
 
-WEB-48 — «Buscar en todo»: una caja en Tú y en el chat (`ai/HANDOFF.md`, «WEB-48»).
+WEB-49 — rendimiento con un año de datos, sin conexión y pasos de Google con la Gmail API (`ai/HANDOFF.md`, «WEB-49»).
 
 ## Autorización
 
@@ -49,6 +49,7 @@ WEB-48 — «Buscar en todo»: una caja en Tú y en el chat (`ai/HANDOFF.md`, «
 
 ## Historial (cerrado)
 
+- **WEB-48** (buscar en todo): CERRADA. Fusionada mediante el PR #55 (`c0974ff`).
 - **WEB-47** (presupuestos): CERRADA. Fusionada mediante el PR #54 (`a9fa039`).
 - **WEB-46** (resumen del día y auditoría): CERRADA. Fusionada mediante el PR #53 (`22479a3`).
 - **WEB-45** (chat, luz del día, Gmail y órdenes de correo): CERRADA. Fusionada mediante el PR #52 (`d7781f5`).

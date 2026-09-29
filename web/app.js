@@ -34,7 +34,7 @@ import { isSpotifyClientId, pkceValid, randomVerifier, challengeFor, authorizeUr
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "48";
+export const APP_VERSION = "49";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -63,6 +63,7 @@ let overlay = null; // "weather" | "gemini" | "image"
 let viewImageId = null;
 let chatImage = null; // screenshot attached in the MANU chat (not sent until «Enviar a Gemini»)
 let openProject = null; // id of the project being viewed
+let catEditing = null; // WEB-49: the only movement whose category <select> is drawn
 let projSourceKind = "note";
 const gcal = { tokens: {}, busy: false, error: null, consentError: null };
 let confirmDriveRestore = null;
@@ -702,6 +703,10 @@ const taskRow = (t) => `<div class="row"><button class="check" data-act="toggle"
 const reminderAt = (r) => { const d = new Date(r.at); return `${d.toDateString() === today().toDateString() ? "Hoy" : d.toLocaleDateString("es-ES", { weekday: "short", day: "numeric" })} ${hhmm(d)}`; };
 const reminderIphoneUrl = (r) => { const d = new Date(r.at); return shortcutUrl(SHORTCUT_REMINDER, `${r.text} | ${dayKey(d)} ${hhmm(d)}`); };
 const reminderRow = (r) => `<div class="row"><button class="check" data-act="rem-done" data-id="${esc(r.id)}" aria-pressed="${Boolean(r.done)}" aria-label="Hecho: ${esc(r.text)}">${I.check}</button><div class="grow"><div class="${r.done ? "done-text" : ""}">${esc(r.text)}</div><div class="muted small">${esc(reminderAt(r))}</div></div>${attach(r)}<a class="link small" href="${esc(reminderIphoneUrl(r))}">Al iPhone</a></div>`;
+// WEB-49: long lists draw the first LIST_STEP items; «Ver todas» shows the rest.
+const LIST_STEP = 25;
+const showAll = { rems: false, tasks: false, ideas: false };
+const moreButton = (key, n) => (n > LIST_STEP && !showAll[key] ? `<button class="link small" data-act="show-all" data-k="${key}">Ver todas (${n})</button>` : "");
 const sectionTitle = (t, extra = "") => `<div class="section-title"><h2>${t}</h2>${extra}</div>`;
 const addLink = (kind, label = "Añadir") => `<button class="link small" data-act="sheet" data-kind="${kind}">${label}</button>`;
 
@@ -750,11 +755,11 @@ const screens = {
         ? (vault.agenda.events.length ? vault.agenda.events.map((ev) => `<div class="row"><span class="num chip">${esc(ev.time ? ev.time + (ev.end ? "–" + ev.end : "") : "Todo el día")}</span><span class="grow">${esc(ev.title)}</span></div>`).join("") : "") : ""}
       <form id="pasteEvents" class="stack"><label for="eventsText" class="muted small">Uno por línea: «09:30 Dentista», «10:00-11:00 Reunión», «todo el día Cumpleaños».</label><textarea id="eventsText" rows="3" placeholder="09:30 Dentista"></textarea><button class="btn ghost" type="submit">Guardar agenda de hoy</button></form></details>
       ${sectionTitle("Recordatorios", addLink("REMINDER"))}
-      <section class="card">${rems.length ? rems.map(reminderRow).join("") : '<p class="muted">Sin recordatorios. Dile a MANU «recuérdame … a las 18».</p>'}</section>
+      <section class="card">${rems.length ? (showAll.rems ? rems : rems.slice(0, LIST_STEP)).map(reminderRow).join("") + moreButton("rems", rems.length) : '<p class="muted">Sin recordatorios. Dile a MANU «recuérdame … a las 18».</p>'}</section>
       ${sectionTitle("Tareas", addLink("TASK"))}
-      <section class="card">${open.length ? open.map(taskRow).join("") : '<p class="muted">Sin tareas pendientes.</p>'}${done.length ? `<details><summary>Hechas (${done.length})</summary>${done.map(taskRow).join("")}</details>` : ""}</section>
+      <section class="card">${open.length ? (showAll.tasks ? open : open.slice(0, LIST_STEP)).map(taskRow).join("") + moreButton("tasks", open.length) : '<p class="muted">Sin tareas pendientes.</p>'}${done.length ? `<details><summary>Hechas (${done.length})</summary>${done.map(taskRow).join("")}</details>` : ""}</section>
       ${sectionTitle("Ideas", addLink("IDEA"))}
-      <section class="card">${idea.length ? idea.map((i) => `<div class="row"><span class="grow">${esc(i.text)}</span>${attach(i)}<button class="link small" data-act="idea-to-task" data-id="${esc(i.id)}">Hacer tarea</button></div>`).join("") : '<p class="muted">Tus ideas quedan aquí, sin convertirse en proyectos sin tu permiso.</p>'}</section>`;
+      <section class="card">${idea.length ? (showAll.ideas ? idea : idea.slice(0, LIST_STEP)).map((i) => `<div class="row"><span class="grow">${esc(i.text)}</span>${attach(i)}<button class="link small" data-act="idea-to-task" data-id="${esc(i.id)}">Hacer tarea</button></div>`).join("") + moreButton("ideas", idea.length) : '<p class="muted">Tus ideas quedan aquí, sin convertirse en proyectos sin tu permiso.</p>'}</section>`;
   },
   manu() {
     const chips = refuge ? ["quiero entender por qué", "buscar una solución", "necesito desconectar"] : null;
@@ -802,7 +807,7 @@ const screens = {
       ${moneyInsights()}
       ${sectionTitle("Movimientos", `${toReview ? `<button class="link small" data-act="money-filter">${moneyFilter === "review" ? "Ver todos" : `Por revisar (${toReview})`}</button>` : ""}${addLink("EXPENSE")}`)}
       <section class="card">${entries.length ? entries.map((x) => `<div class="row"><span class="cat-emoji" aria-hidden="true">${CATEGORY_EMOJI[x.category] ?? "📦"}</span><div class="grow"><div>${esc(x.merchant ?? "Sin concepto")}</div><div class="muted small">${new Date(x.at).toLocaleDateString("es-ES", { day: "numeric", month: "short" })}${x.sub ? ` · ${esc(x.sub)}` : ""}${x.source === "BANK" ? " · banco" : ""}${x.review ? ' · <b class="review">revisar</b>' : x.inferred ? " · categoría propuesta" : x.ruled ? " · según tus reglas" : ""}</div></div>
-          <div class="stack"><span class="num">${euros(x.cents)}</span><label class="sr" for="cat-${esc(x.id)}">Categoría</label><select id="cat-${esc(x.id)}" data-cat="${esc(x.id)}">${Object.keys(CATEGORIES).map((k) => `<option value="${k}"${k === x.category ? " selected" : ""}>${esc(catLabel(k))}</option>`).join("")}</select></div></div>`).join("")
+          <div class="stack"><span class="num">${euros(x.cents)}</span>${catEditing === x.id ? `<label class="sr" for="cat-${esc(x.id)}">Categoría</label><select id="cat-${esc(x.id)}" data-cat="${esc(x.id)}">${Object.keys(CATEGORIES).map((k) => `<option value="${k}"${k === x.category ? " selected" : ""}>${esc(catLabel(k))}</option>`).join("")}</select>` : `<button class="cat-chip" data-act="cat-edit" data-id="${esc(x.id)}" aria-label="Cambiar categoría: ${esc(CATEGORIES[x.category] ?? "Otros")}">${esc(catLabel(x.category))}</button>`}</div></div>`).join("")
         : '<p class="muted">Sin gastos. Escribe a MANU «gasté 12,50 en café» o importa el extracto del banco.</p>'}</section>
       </div>`;
   },
@@ -981,7 +986,7 @@ const subpages = {
         ${confirmDriveRestore ? `<p>La copia de Drive es del ${esc(new Date(confirmDriveRestore.file.modifiedTime).toLocaleString("es-ES"))} y se ha descifrado bien. Reemplazará lo que hay en este móvil.</p><div class="btns"><button class="btn danger" data-act="drive-restore-yes">Sí, restaurar</button><button class="btn ghost" data-act="drive-restore-no">Cancelar</button></div>` : ""}</section>` : ""}
       <section class="card"><h2>Cómo conseguir el ID (una vez, mejor desde el ordenador)</h2><ol class="muted small">
         <li>Entra en <b>console.cloud.google.com</b> y crea un proyecto «MANU OS». Es gratis.</li>
-        <li>«APIs y servicios» → «Biblioteca»: habilita las APIs que vayas a usar (Google Calendar API, Google Tasks API, People API, Google Drive API).</li>
+        <li>«APIs y servicios» → «Biblioteca»: habilita las APIs que vayas a usar (Google Calendar API, Google Tasks API, People API, Google Drive API y <b>Gmail API</b>). Si falta una, ese servicio falla con «API no activada».</li>
         <li>«Pantalla de consentimiento de OAuth»: tipo <b>Externo</b>, nombre «MANU OS», tu correo; añade tu Gmail en «Usuarios de prueba».</li>
         <li>«Credenciales» → «Crear credenciales» → <b>ID de cliente de OAuth</b> → «Aplicación web».</li>
         <li>«Orígenes de JavaScript autorizados»: <code>https://elpiernitas.github.io</code></li>
@@ -1128,6 +1133,8 @@ let chatUnseen = false;
 function updateChatDown() {
   const b = document.getElementById("chatDown");
   if (!b) return;
+  // WEB-49: measuring the page forces a layout; outside MANU there is nothing to measure.
+  if (tab !== "manu") { if (!b.hidden) b.hidden = true; return; }
   const show = tab === "manu" && !sheet && !chatPinned && !chatAtEnd();
   if (!show && chatAtEnd()) chatUnseen = false;
   b.hidden = !show;
@@ -2172,6 +2179,8 @@ document.addEventListener("click", async (e) => {
     case "notify-on": await enableNotifications(); render(); break;
     case "notify-test": if (!(await testNotification())) toast("No se ha podido mostrar el aviso."); break;
     case "export": exportBackup(); break;
+    case "show-all": showAll[a.dataset.k] = true; render(); break;
+    case "cat-edit": catEditing = a.dataset.id; render(); $(`cat-${catEditing}`)?.focus(); break;
     case "find-clear": findQ = ""; render(); break;
     case "find-go": if (a.dataset.project) { openProject = a.dataset.project; go("proyectos"); } else go(a.dataset.tab); break;
     case "budget-del": { const b = { ...(vault.settings.budgets ?? {}) }; delete b[a.dataset.cat]; vault.settings.budgets = b; persist(); render(); break; }
@@ -2397,6 +2406,7 @@ document.addEventListener("change", async (e) => {
   }
   if (e.target.id === "workStart" && /^\d{2}:\d{2}$/.test(e.target.value)) { vault.settings.workStart = e.target.value; persist(); toast(`Entrada: ${e.target.value}`); return; }
   if (e.target.dataset.cat) {
+    catEditing = null;
     const r = learnCategory(vault.spending, vault.settings.categoryRules ?? {}, e.target.dataset.cat, e.target.value);
     vault.spending = r.entries; vault.settings.categoryRules = r.learned;
     if (r.applied) toast(`Aprendido: ${r.applied} movimiento${r.applied === 1 ? "" : "s"} más del mismo comercio`);
