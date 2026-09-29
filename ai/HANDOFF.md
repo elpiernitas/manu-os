@@ -10,6 +10,34 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
+## WEB-20 — fondos vivos en todas las pantallas
+
+Petición de Manu (2026-09-29), con capturas de la app Tiempo del iPhone: «quiero animaciones en el fondo, algo más dinámico, y eso en todas».
+
+### Cambios
+
+- `web/index.html`: el fondo (`.ambient`) tiene 3 manchas de luz y una capa `#sky`.
+- `web/app.js`: `body[data-screen]` indica la pantalla. `#sky` pone la escena del tiempo a pantalla completa en Hoy y en la página del tiempo, y solo se reconstruye cuando cambia la escena, así que la animación no se reinicia al repintar. La cabecera del tiempo pasa a ser parte del cielo. Versión 20.
+- `web/styles.css`:
+  - manchas de luz que se desplazan lentamente (26 a 41 s), con colores por pantalla: Dinero verde y dorado, Agenda azul y violeta, MANU azul y cian, Tú violeta con el tono del ánimo;
+  - en Hoy y en la página del tiempo, nubes, lluvia, nieve, estrellas o sol a pantalla completa;
+  - la página del tiempo tiene un cielo con degradado según el clima y tarjetas translúcidas, como la app Tiempo, y Hoy tiene una versión más oscura del mismo cielo;
+  - las tarjetas son semitransparentes para que se vea el fondo;
+  - con «Reducir movimiento», todo queda quieto.
+
+### Error encontrado y corregido antes de publicar
+
+- La primera versión marcaba la pantalla con `body[data-tab]`. El manejador de las pestañas usa `closest("[data-tab]")`, así que cualquier toque encontraba el `body` y volvía a Hoy: la página del tiempo no se abría. Se renombró a `data-screen` (QAL-020).
+
+### Resultados
+
+- `npm test`: 84/84 PASS.
+- Chromium: 13 checks en PASS. Cubren el cielo a pantalla completa en Hoy, que las nubes y las manchas se mueven, que repintar no reinicia el cielo, el degradado de la página del tiempo, los fondos animados de Dinero, Agenda, MANU y Tú sin partículas del tiempo, «Reducir movimiento» y que no hay desplazamiento horizontal.
+
+### NO_VERIFICADO
+
+- El rendimiento y la batería en el iPhone real (las animaciones solo usan `transform`, sin `filter: blur` a pantalla completa).
+
 ## WEB-19 — claves de Gemini con el formato nuevo «AQ.»
 
 Capturas de Manu (2026-09-29): AI Studio le da una clave que empieza por «AQ.», no por «AIza». MANU la rechazaba con «No veo una clave de Gemini copiada» porque solo aceptaba el formato antiguo.

@@ -2,11 +2,11 @@
 
 Status: **REVIEW_PENDING**
 
-WEB-19 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
+WEB-20 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
 
 ## Tarea activa
 
-WEB-19 — aceptar las claves de Gemini con el formato nuevo «AQ.» (`ai/HANDOFF.md`, «WEB-19»).
+WEB-20 — fondos vivos en todas las pantallas (`ai/HANDOFF.md`, «WEB-20»).
 
 ## Autorización
 
@@ -41,6 +41,7 @@ WEB-19 — aceptar las claves de Gemini con el formato nuevo «AQ.» (`ai/HANDOF
 
 ## Historial (cerrado)
 
+- **WEB-19** (claves «AQ.» de Gemini): CERRADA. Fusionada mediante el PR #27 (`8e57b3c`).
 - **WEB-18** (la bola con la M vuelve): CERRADA. Fusionada mediante el PR #26 (`5bad2b9`), hecha por ChatGPT/Codex.
 - **WEB-17** (quitar la bola con la M por un malentendido): CERRADA. Fusionada mediante el PR #25 (`18a9c7d`); WEB-18 revierte ese cambio.
 - **WEB-16** (escenas vivas): CERRADA. Fusionada mediante el PR #24 (`0caa79d`).
