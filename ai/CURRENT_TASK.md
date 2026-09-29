@@ -2,11 +2,11 @@
 
 Status: **REVIEW_PENDING**
 
-WEB-22 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
+WEB-23 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
 
 ## Tarea activa
 
-WEB-22 — hoja «+» rediseñada con detección del tipo (`ai/HANDOFF.md`, «WEB-22»).
+WEB-23 — capturas y enlaces de vídeo que MANU lee y apunta (`ai/HANDOFF.md`, «WEB-23»; enmienda WEB-23 de ADR-0013).
 
 ## Autorización
 
@@ -15,6 +15,7 @@ WEB-22 — hoja «+» rediseñada con detección del tipo (`ai/HANDOFF.md`, «WE
 - 2026-09-28: Manu sube su extracto de Sabadell (.xls) para que la app lo lea. El archivo real no entra en el repositorio; solo se usan recuentos en local y un fixture inventado.
 - 2026-09-29: Manu pide una IA integrada a la que decirle cosas de la app y con la que subir sus gastos. El envío sin preguntar queda como ajuste que decide Manu, desactivado por defecto.
 - 2026-09-29: Manu ordena «cambia agents.md para que tú puedas decidir cuándo fusionar y cuándo no». `AGENTS.md` y `CLAUDE.md` recogen la regla de fusión, lo que resuelve el hallazgo 6 de la revisión de ChatGPT.
+- 2026-09-29: Manu elige que la IA pueda leer capturas y vídeos compartidos (TikTok, reels), con el aviso de que la imagen se envía a Google.
 - 2026-09-29: **cambio de gobernanza decidido por Manu.** El orquestador (ChatGPT/Codex) ya no revisa automáticamente, porque frenaba el avance. Claude Code fusiona los PR web cuando `npm test` y los dos workflows remotos están en verde y no hay conflictos. Cuando haga falta una revisión, Claude Code prepara un prompt, Manu se lo pasa a ChatGPT y le devuelve la respuesta; los defectos se corrigen en un PR nuevo con su regresión. Los PR #7, #8 y #9 siguen en borrador o pausa.
 
 ## Alcance autorizado
@@ -41,6 +42,7 @@ WEB-22 — hoja «+» rediseñada con detección del tipo (`ai/HANDOFF.md`, «WE
 
 ## Historial (cerrado)
 
+- **WEB-22** (hoja «+»): CERRADA. Fusionada mediante el PR #30 (`a86c01a`); su fallo en Dinero se corrigió en WEB-23.
 - **WEB-21** (estadísticas de dinero): CERRADA. Fusionada mediante el PR #29 (`f375782`).
 - **WEB-20** (fondos vivos): CERRADA. Fusionada mediante el PR #28 (`26ce9b1`).
 - **WEB-19** (claves «AQ.» de Gemini): CERRADA. Fusionada mediante el PR #27 (`8e57b3c`).
