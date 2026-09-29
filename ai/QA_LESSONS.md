@@ -146,3 +146,7 @@ En WEB-45, `borra\w*` sin ancla coincidía con «emborrache», y una pregunta cu
 ### QAL-034 — Texto en español: `\b` con tildes y el punto de los miles
 
 En WEB-51, `/cobr[eé]\b/` nunca coincidía con «cobré 200», porque para JavaScript «é» no es carácter de palabra y no hay límite entre «é» y el espacio. Además, «1.200» se leía como 1,20 €. En texto en español hay que usar `(?=\s|$)` en vez de `\b` tras letras con tilde (o normalizar antes). Los importes se interpretan con los miles españoles (`\d{1,3}(\.\d{3})+`) antes que como decimales. Cada caso lleva un test con la frase real.
+
+### QAL-035 — Probar cada pantalla con una URL larga sin espacios
+
+En WEB-53, una URL larga en una rejilla `1fr` o en un título ensanchaba la página, el iPhone reducía el zoom y la barra de pestañas dejaba de responder. Las columnas que se estiran usan `minmax(0, 1fr)` o `min-width: 0`, y el texto del usuario lleva `overflow-wrap: anywhere`. Las auditorías visuales incluyen un texto largo sin espacios en todos los campos.
