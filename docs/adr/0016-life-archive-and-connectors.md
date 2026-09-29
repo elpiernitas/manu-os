@@ -26,6 +26,13 @@ Manu quiere que MANU «tenga su cerebro»: acceso a toda su vida digital. MANU e
    - Drive completo;
    - resumen diario.
 
+## Enmienda (2026-09-29, WEB-35): preguntar, perfil y recuerdos
+
+Manu dijo «sí» a «preguntar lo que sea» y al perfil.
+- **Preguntar:** la búsqueda se hace en el dispositivo y a Gemini solo le llegan los fragmentos relevantes, como máximo 6 conversaciones y unas 9.000 letras, con su título y fecha. Cada mensaje y cada título pasa por `mayGo`: crisis, Refugio y secretos nunca; salud, dinero y ánimo solo con el interruptor de datos sensibles. El control global de `askWithActions` sigue de red de seguridad.
+- **Perfil:** Gemini recibe los títulos de las conversaciones y la primera frase permitida de Manu en cada una, hasta unas 40.000 letras, y devuelve un retrato por secciones. Se guarda en el vault; Manu lo puede corregir o borrar.
+- **Modo conversación:** hay dos categorías sensibles nuevas, «Tu perfil» y «Recuerdos de tu archivo». «Con todo» las incluye. Los recuerdos son como máximo 3 fragmentos relacionados con cada mensaje.
+
 ## Consecuencias
 
 - El archivo puede ocupar decenas de MB en el iPhone. La cuota de IndexedDB en Safari es NO_VERIFICADO con exportaciones reales grandes.

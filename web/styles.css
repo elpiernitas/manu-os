@@ -555,3 +555,6 @@ html { min-height: calc(100% + env(safe-area-inset-top, 0px)); background: var(-
 .arch-hit { border-top: 1px solid var(--line); padding: 10px 0; }
 .arch-hit summary { cursor: pointer; list-style: none; }
 .arch-hit .stack { margin-top: 10px; max-height: 60vh; overflow-y: auto; }
+/* ---------- WEB-35: perfil ---------- */
+.profile-text { white-space: pre-wrap; font-size: 15px; line-height: 1.5; }
+#profileText { width: 100%; min-height: 280px; font: inherit; font-size: 15px; }

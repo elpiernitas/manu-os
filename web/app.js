@@ -20,6 +20,7 @@ import { newProject, addSource, buildProjectPayload, citations, PRESETS } from "
 import { putImage, getImage, clearImages } from "./core/imagestore.js";
 import { readChatgptExport, search as archiveSearch, stats as archiveStats } from "./core/archive.js";
 import { putDocs, allDocs, clearArchive } from "./core/archivestore.js";
+import { findExcerpts, askPayload, profileDigest, profilePayload, memoryContext } from "./core/recall.js";
 import { weatherEmoji, sceneFor, PARTICLES, MONEY_EMOJI } from "./core/scene.js";
 import { buildImagePayload, buildLinkPayload, isGeminiKey, mayGo, setSensitiveOk, sensitiveAllowed, pickModel, listModels, buildActionPayload, askWithActions, issueUrl } from "./core/ai.js";
 import { encryptBackup, decryptBackup, passphraseProblem } from "./core/crypto.js";
@@ -27,7 +28,7 @@ import { isSpotifyClientId, pkceValid, randomVerifier, challengeFor, authorizeUr
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "34";
+export const APP_VERSION = "35";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -781,7 +782,10 @@ const subpages = {
         ${s?.count ? `<p><b>${s.count}</b> conversaciones · ${s.mine} mensajes tuyos · de ${esc(d(s.from))} a ${esc(d(s.to))}</p>` : '<p class="muted">Cuando te llegue el correo de ChatGPT, descarga el .zip y elígelo aquí (sin descomprimir). También vale el archivo conversations.json.</p>'}
         <label class="btn ${s?.count ? "ghost" : ""} block" for="archiveFile" role="button" tabindex="0">${archive.busy ? "Importando…" : s?.count ? "Volver a importar" : "Elegir la exportación de ChatGPT"}</label><input id="archiveFile" type="file" accept=".zip,.json,application/zip,application/json" class="sr">
         <p class="muted small">En ChatGPT: Ajustes → Controles de datos → Exportar datos. Llega un correo con el enlace.</p></section>
-      ${s?.count ? `<section class="card"><h2>Buscar en tu archivo</h2><form id="archiveSearch" class="composer-inline"><label for="archiveQ" class="sr">Buscar</label><input id="archiveQ" value="${esc(archive.query)}" placeholder="Lisboa, lentejas, trabajo…" autocomplete="off"><button class="btn" type="submit">Buscar</button></form>
+      ${s?.count ? `<section class="card"><h2>Pregúntale a tu archivo</h2>${aiReady() ? `<form id="archiveAsk" class="composer-inline"><label for="archiveAskQ" class="sr">Pregunta</label><input id="archiveAskQ" placeholder="¿Qué me recomendaron para Lisboa?" autocomplete="off"><button class="btn" type="submit">${archive.asking ? "Pensando…" : "Preguntar"}</button></form><p class="muted small">MANU busca aquí en tu iPhone y solo envía a Gemini los trozos que tienen que ver. Crisis, Refugio y contraseñas nunca salen${sensitiveAllowed() ? "" : "; salud, dinero y ánimo tampoco (Tú → IA)"}.</p>` : '<p class="muted">Activa la IA (Tú → IA) para preguntarle. Buscar funciona sin IA.</p>'}
+        ${archive.answer ? `<div class="stack"><p class="muted small">«${esc(archive.answer.q)}»</p><div class="bubble manu"><span class="ai-tag">IA</span>${esc(archive.answer.text)}</div>${archive.answer.sources.length ? `<p class="muted small">Fuentes: ${archive.answer.sources.map((x) => `[${x.n}] ${esc(x.title)} (${esc(x.date)})`).join(" · ")}</p>` : ""}</div>` : ""}</section>
+      <section class="card"><h2>Tu perfil</h2>${vault.profile?.text ? `${archive.editProfile ? `<form id="profileForm" class="stack"><label for="profileText" class="sr">Tu perfil</label><textarea id="profileText" rows="14">${esc(vault.profile.text)}</textarea><div class="btns"><button class="btn" type="submit">Guardar</button><button class="btn ghost" type="button" data-act="profile-cancel">Cancelar</button></div></form>` : `<div class="profile-text">${esc(vault.profile.text)}</div><p class="muted small">Hecho con ${vault.profile.basedOn} conversaciones · ${esc(new Date(vault.profile.at).toLocaleDateString("es-ES", { day: "numeric", month: "long" }))}. Corrige lo que no sea verdad: MANU usa este perfil al hablar contigo.</p><div class="btns"><button class="btn ghost" data-act="profile-edit">Corregir</button><button class="btn ghost" data-act="profile-make">${archive.profiling ? "Creando…" : "Rehacer"}</button><button class="link small danger-link" data-act="profile-delete">Borrar</button></div>`}` : `<p class="muted">Un retrato de quién eres a partir de tus conversaciones: gustos, rutinas, personas, lo que te preocupa y tus metas. Lo puedes corregir.</p>${aiReady() ? `<button class="btn block" data-act="profile-make">${archive.profiling ? "Creando tu perfil…" : "Crear mi perfil con Gemini"}</button><p class="muted small">Se envían a Gemini los títulos de tus conversaciones y la primera frase tuya de cada una (hasta unas 40.000 letras), sin crisis, Refugio ni contraseñas.</p>` : '<p class="muted small">Activa la IA en Tú → IA para crearlo.</p>'}`}</section>
+      <section class="card"><h2>Buscar en tu archivo</h2><form id="archiveSearch" class="composer-inline"><label for="archiveQ" class="sr">Buscar</label><input id="archiveQ" value="${esc(archive.query)}" placeholder="Lisboa, lentejas, trabajo…" autocomplete="off"><button class="btn" type="submit">Buscar</button></form>
         ${archive.results ? (archive.results.length ? archive.results.map((r) => `<details class="arch-hit"><summary><b>${esc(r.doc.title)}</b><br><span class="muted small">${esc(d(r.doc.at))} · ${esc(r.snippet)}</span></summary><div class="stack small">${r.doc.messages.slice(0, 40).map((m) => `<div class="bubble ${m.role === "me" ? "me" : "manu"}">${esc(m.text.slice(0, 1500))}</div>`).join("")}</div></details>`).join("") : '<p class="muted">Nada con esas palabras.</p>') : ""}</section>
       <button class="link small danger-link" data-act="archive-clear">Borrar el archivo de este iPhone</button>` : ""}`;
   },
@@ -1142,9 +1146,22 @@ function render({ focus = false, enter = null } = {}) {
   if (tab === "tu" && (!sub || sub === "gcal") && isClientId(gClientId())) loadGis().catch(() => {});
   document.body.dataset.mode = modeState(today(), undefined, vault.settings.override).mode;
   renderTabs();
+  // WEB-35: a background refresh (weather, Google, archive) must not wipe what
+  // Manu is typing nor close the keyboard: keep the focused field as it was.
+  const active = document.activeElement;
+  const typing = active?.id && active.closest?.("#screen") && active.matches("input:not([type=file]):not([type=checkbox]), textarea")
+    ? { id: active.id, value: active.value, start: active.selectionStart, end: active.selectionEnd } : null;
   $("screen").innerHTML = overlay === "weather" ? weatherPage() : overlay === "gemini" ? geminiGuide() : overlay === "image" ? `<button class="link" data-act="overlay-close">${I.back} Volver</button><img class="viewer" data-img="${esc(viewImageId ?? "")}" alt="Captura">` : (screens[tab] ?? screens.hoy)();
   animateEnter(enter);
-  const bars = $("screen").querySelectorAll(".bar > i[data-w]");
+  if (typing && !focus && !enter) {
+    const el = document.getElementById(typing.id);
+    if (el && el.matches("input, textarea")) {
+      if (el.value !== typing.value) el.value = typing.value;
+      el.focus({ preventScroll: true });
+      try { el.setSelectionRange(typing.start, typing.end); } catch { /* inputs without a caret */ }
+    }
+  }
+  const bars =$("screen").querySelectorAll(".bar > i[data-w]");
   if (enter && !reduceMotion()) { bars.forEach((el) => { el.style.width = "0%"; }); requestAnimationFrame(() => requestAnimationFrame(() => bars.forEach((el) => { el.style.width = `${el.dataset.w}%`; }))); }
   else bars.forEach((el) => { el.style.width = `${el.dataset.w}%`; });
   $("screen").querySelectorAll(".range > i").forEach((el) => { el.style.left = `${el.dataset.l}%`; el.style.width = `${el.dataset.w}%`; });
@@ -1218,6 +1235,19 @@ function say(text) {
   if (intent.kind === "crisis") {
     refuge = { state: { phase: "HUMAN_HELP", turn: 0 }, messages: [{ from: "me", text: clean }, { from: "manu", text: reply(intent), safety: true }] };
     render();
+    return;
+  }
+  // Profile and questions to the archive (WEB-35).
+  if (whoAmI(clean)) {
+    vault.chat.push({ from: "me", text: clean, at }, { from: "manu", at, text: vault.profile?.text ? `Esto es lo que sé de ti (lo puedes corregir en Tú → Tu archivo):\n\n${vault.profile.text}` : "Aún no tengo tu perfil. Importa tu exportación de ChatGPT y pulsa «Crear mi perfil» en Tú → Tu archivo." });
+    persist(); render(); return;
+  }
+  const ask = archiveAskCommand(clean);
+  if (ask && aiReady() && navigator.onLine) {
+    const answer = { from: "manu", text: "Pensando…", at: new Date(Date.now() + 1).toISOString(), ai: true };
+    vault.chat.push({ from: "me", text: clean, at }, answer);
+    persist(); render();
+    askArchive(ask).then((r) => { answer.text = r.sources.length ? `${r.text}\n\nFuentes: ${r.sources.map((x) => `[${x.n}] ${x.title} (${x.date})`).join(" · ")}` : r.text; persist(); render(); });
     return;
   }
   // Archive (WEB-34): «busca en mi archivo …», «qué hablé con ChatGPT de …».
@@ -1339,6 +1369,7 @@ const aiMode = () => {
   const m = { on: false, context: BASIC_CONTEXT, autoActions: false, ...(vault.settings.aiMode ?? {}) };
   // «Con todo» chosen before Gmail existed (WEB-33) also includes the mail summary.
   if (m.context.mail === undefined && m.context.money && m.context.people) m.context = { ...m.context, mail: true };
+  if (m.context.profile === undefined && m.context.money && m.context.people) m.context = { ...m.context, profile: true, archive: true };
   return m;
 };
 function lifeSnapshot() {
@@ -1361,13 +1392,16 @@ function lifeSnapshot() {
     mood: mood ? MOODS[mood - 1].label : null,
     birthdays: upcomingBirthdays(vault.people, now, 14).map((b) => ({ name: b.person.name, days: b.days })),
     mail: googleOn("gmail") ? vault.mail ?? null : null,
+    profile: vault.profile?.text ?? null,
   };
 }
 
 async function converse(message) {
   const mode = aiMode();
   const history = vault.chat.slice(0, -1).filter((b) => !b.proposal);
-  const contextText = buildContext(lifeSnapshot(), mode.context, today());
+  let contextText = buildContext(lifeSnapshot(), mode.context, today());
+  // WEB-35: what MANU remembers from Manu's archive, only if he shares it.
+  if (mode.context.archive) { const mem = memoryContext(await archiveDocs(), message, { permit: mayGo }); if (mem) contextText += `\n${mem}`; }
   const payload = buildConversationPayload({ message, history, contextText, context: sensitiveAllowed() ? FULL_CONTEXT : mode.context, now: today(), autoActions: mode.autoActions });
   const answer = { from: "manu", text: "Pensando…", at: new Date(Date.now() + 1).toISOString(), ai: true, sentContext: Object.keys(mode.context).filter((k) => mode.context[k]) };
   vault.chat.push(answer);
@@ -1564,12 +1598,47 @@ function runCall(c, { quiet = false } = {}) {
 }
 
 // ---------- Tu archivo (WEB-34) ----------
-const archive = { docs: null, stats: null, results: null, query: "", busy: false };
+const archive = { docs: null, stats: null, results: null, query: "", busy: false, answer: null, asking: false, profiling: false, editProfile: false };
+
+// «Pregúntale a tu archivo» (WEB-35): search here, send only the fragments.
+async function askArchive(q) {
+  const docs = await archiveDocs();
+  const ex = findExcerpts(docs, q, { permit: mayGo });
+  if (!ex.length) return { q, text: "No encuentro nada sobre eso en tu archivo.", sources: [] };
+  try {
+    const r = await askWithActions({ key: aiStore.key, model: aiStore.model, payload: askPayload(q, ex, today()), confirmed: true });
+    return { q, text: r.text ?? "Gemini no ha respondido.", sources: ex.map(({ n, title, date }) => ({ n, title, date })) };
+  } catch (err) {
+    return { q, text: err.code === "quota" ? "Hoy ya no queda IA gratuita." : err.code === "key" ? "La clave de Gemini no funciona. Revísala en Tú → IA." : err.code === "sensitive" ? "Algo parece privado: no lo envío." : `No he podido preguntar: ${err.message}`, sources: [] };
+  }
+}
+
+async function makeProfile() {
+  if (archive.profiling || !aiReady()) return;
+  archive.profiling = true; render();
+  try {
+    const docs = await archiveDocs();
+    const digest = profileDigest(docs, { permit: mayGo });
+    if (!digest.used) throw new Error("tu archivo está vacío");
+    const r = await askWithActions({ key: aiStore.key, model: aiStore.model, payload: profilePayload(digest, today()), confirmed: true });
+    if (!r.text) throw new Error("Gemini no ha respondido");
+    vault.profile = { text: r.text.slice(0, 12000), at: new Date().toISOString(), basedOn: digest.used };
+    persist(); toast("Tu perfil está listo");
+  } catch (err) { toast(err.code === "quota" ? "Hoy ya no queda IA gratuita" : `No he podido crear tu perfil: ${err.message}`); }
+  archive.profiling = false; render();
+}
 async function archiveDocs() {
   if (!archive.docs) { try { archive.docs = await allDocs(); } catch { archive.docs = []; } archive.stats = archiveStats(archive.docs); }
   return archive.docs;
 }
 archiveDocs().then(() => { if (archive.stats?.count && tab === "tu") render(); });
+
+// «Pregúntale a mi archivo …», «según mi archivo …».
+function archiveAskCommand(text) {
+  const m = normalise(text).match(/^(?:preguntale a mi archivo|pregunta a mi archivo|segun mi archivo|en mis conversaciones con chatgpt)[,:]?\s+(.+)$/);
+  return m ? text.slice(text.length - m[1].length).trim() : null;
+}
+const whoAmI = (text) => /^(?:que sabes de mi|quien soy|cual es mi perfil|como soy)\??$/.test(normalise(text).replace(/[¿?!.]/g, "").trim());
 
 // «¿Qué hablé con ChatGPT de Lisboa?», «busca en mi archivo lentejas».
 function archiveCommand(text) {
@@ -1706,6 +1775,10 @@ document.addEventListener("click", async (e) => {
     case "ai-send": askAi(id); break;
     case "ai-do": runCall(findCall(a)); break;
     case "ai-undo": undoCall(findCall(a)); break;
+    case "profile-make": makeProfile(); break;
+    case "profile-edit": archive.editProfile = true; render(); break;
+    case "profile-cancel": archive.editProfile = false; render(); break;
+    case "profile-delete": if (window.confirm("¿Borrar tu perfil?")) { delete vault.profile; persist(); render(); toast("Perfil borrado"); } break;
     case "archive-clear": if (window.confirm("¿Borrar todo tu archivo de este iPhone? No se puede deshacer.")) { clearArchive().then(() => { archive.docs = null; archive.stats = null; archive.results = null; render(); toast("Archivo borrado"); }); } break;
     case "mail-connect": vault.settings.google = { ...(vault.settings.google ?? {}), gmail: true }; persist(); syncGoogle(); break;
     case "mail-seen": markMailSeen(a.dataset.k); persist(); render(); break;
@@ -1815,6 +1888,8 @@ document.addEventListener("submit", async (e) => {
     return;
   }
   if (f === "projSource") { await addProjectSource(); return; }
+  if (f === "archiveAsk") { const q = $("archiveAskQ").value.trim(); if (!q || archive.asking) return; archive.asking = true; render(); archive.answer = await askArchive(q); archive.asking = false; render(); return; }
+  if (f === "profileForm") { const t = $("profileText").value.trim(); vault.profile = t ? { ...vault.profile, text: t.slice(0, 12000), edited: true } : undefined; if (!t) delete vault.profile; archive.editProfile = false; persist(); render(); toast("Perfil guardado"); return; }
   if (f === "archiveSearch") { archive.query = $("archiveQ").value.trim(); archive.results = archiveSearch(await archiveDocs(), archive.query); render(); return; }
   if (f === "projAsk") { const q = $("projQ").value.trim(); if (q) { $("projQ").value = ""; askProject(q); } return; }
   if (f === "composer") {

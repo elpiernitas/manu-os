@@ -2,11 +2,11 @@
 
 Status: **REVIEW_PENDING**
 
-WEB-34 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
+WEB-35 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
 
 ## Tarea activa
 
-WEB-34 — Tu archivo: importar la exportación de ChatGPT y buscar en ella, solo en el dispositivo (`ai/HANDOFF.md`, «WEB-34»; ADR-0016).
+WEB-35 — Pregúntale a tu archivo, tu perfil y recuerdos en la conversación (`ai/HANDOFF.md`, «WEB-35»; enmienda WEB-35 de ADR-0016).
 
 ## Autorización
 
@@ -47,6 +47,7 @@ WEB-34 — Tu archivo: importar la exportación de ChatGPT y buscar en ella, sol
 
 ## Historial (cerrado)
 
+- **WEB-34** (Tu archivo): CERRADA. Fusionada mediante el PR #42 (`1165404`).
 - **WEB-33** (Gmail): CERRADA. Fusionada mediante el PR #41 (`1f69e4e`).
 - **WEB-32** (sin «+», Agenda al instante): CERRADA. Fusionada mediante el PR #40 (`f3eb67e`).
 - **WEB-31** (páginas cortas en iOS): CERRADA. Fusionada mediante el PR #39 (`fb4f555`).

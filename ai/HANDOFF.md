@@ -10,6 +10,44 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
+## WEB-35 — Pregúntale a tu archivo, tu perfil y recuerdos en la conversación
+
+Manu (2026-09-29): «sí» a preguntar lo que sea y al perfil (enmienda WEB-35 de ADR-0016).
+
+### Cambios
+
+- `web/core/recall.js`:
+  - `findExcerpts`/`excerpts`: fragmentos alrededor del acierto, acotados, filtrados por `permit` en mensaje y título;
+  - `askPayload`: responder solo con los fragmentos y citar [n];
+  - `profileDigest` y `profilePayload`: 8 secciones, sin diagnósticos;
+  - `memoryContext`.
+- `web/app.js`:
+  - en Tú → Tu archivo: «Pregúntale a tu archivo» (respuesta con fuentes) y «Tu perfil» (crear con Gemini, corregir, rehacer y borrar);
+  - chat: «¿qué sabes de mí?» y «pregúntale a mi archivo …»;
+  - modo conversación: el perfil y los recuerdos entran en el contexto si sus categorías están marcadas;
+  - **arreglo general**: un repintado en segundo plano ya no borra lo que Manu está escribiendo ni cierra el teclado, porque se conservan el campo con foco, su texto y el cursor;
+  - versión 35.
+- `web/core/converse.js`: categorías sensibles «Tu perfil» y «Recuerdos de tu archivo».
+- Enmienda de ADR-0016 y threat model.
+
+### Resultados
+
+- `npm test`: 120/120 PASS (`web/tests/recall.test.js`). `node --check` pasa.
+- e2e35 (exportación sintética de 44 conversaciones, una de crisis y otra con una contraseña; Gemini simulado): 12/12. Cubre:
+  - la respuesta con fuentes y que solo se envían fragmentos relevantes;
+  - que nunca se envían ni la contraseña ni la crisis, aunque el interruptor de datos sensibles esté activo;
+  - el perfil (qué se envía, mostrarlo y corregirlo);
+  - el chat;
+  - el modo conversación, que conoce el perfil corregido y trae recuerdos sin la contraseña.
+- El recorrido encontró dos fallos, ya corregidos:
+  - un repintado en segundo plano vaciaba el campo de la pregunta;
+  - el título «Claves» de una conversación viajaba con su fragmento, y el control global bloqueaba toda la pregunta.
+- e2e3, e2e4 y e2e10–e2e34 en PASS, salvo las 3 expectativas antiguas de e2e18.
+
+### NO_VERIFICADO
+
+- Con la exportación real y Gemini real: calidad del perfil, cupo gratuito y respuesta con ~40.000 letras de entrada.
+
 ## WEB-34 — Tu archivo: importar la exportación de ChatGPT y buscar en ella
 
 Manu (2026-09-29): «quiero conectar mi vida entera». Autorizó exportaciones, Atajos, Spotify y YouTube, y Drive completo, con tres objetivos: perfil, preguntar lo que sea y resumen diario (ADR-0016). Esta es la primera entrega.

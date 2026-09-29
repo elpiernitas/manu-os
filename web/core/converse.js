@@ -14,8 +14,10 @@ export const CONTEXT_CATEGORIES = [
   { key: "mood", label: "Ánimo", sensitive: true },
   { key: "people", label: "Personas y cumpleaños", sensitive: true },
   { key: "mail", label: "Correo (remitentes y asuntos)", sensitive: true },
+  { key: "profile", label: "Tu perfil", sensitive: true },
+  { key: "archive", label: "Recuerdos de tu archivo (ChatGPT)", sensitive: true },
 ];
-export const BASIC_CONTEXT = { agenda: true, tasks: true, weather: true, habits: true, money: false, health: false, mood: false, people: false, mail: false };
+export const BASIC_CONTEXT = { agenda: true, tasks: true, weather: true, habits: true, money: false, health: false, mood: false, people: false, mail: false, profile: false, archive: false };
 export const FULL_CONTEXT = Object.fromEntries(CONTEXT_CATEGORIES.map((c) => [c.key, true]));
 
 // A message may go if every sensitive category it touches was allowed.
@@ -52,6 +54,7 @@ export function buildContext(data, context, now = new Date()) {
   if (context.health && data.health) out.push(`SALUD (media semanal): sueño ${data.health.sleep ?? "?"} h, pasos ${data.health.steps ?? "?"}.`);
   if (context.mood && data.mood) out.push(`ÁNIMO de hoy: ${data.mood}.`);
   if (context.people && data.birthdays?.length) out.push(`CUMPLEAÑOS próximos: ${data.birthdays.map((b) => `${b.name} (${b.days === 0 ? "hoy" : `en ${b.days} días`})`).join("; ")}.`);
+  if (context.profile && data.profile) out.push(`PERFIL de Manu (escrito a partir de sus conversaciones y revisado por él):\n${String(data.profile).slice(0, 4000)}`);
   if (context.mail && data.mail) {
     const m = data.mail;
     out.push(`CORREO (últimos 30 días, Gmail): quien más escribe: ${m.senders.slice(0, 10).map((s) => `${s.name} <${s.email}> ${s.count}${s.unsub ? " (tiene baja)" : ""}`).join("; ") || "nadie"}.${m.important.length ? ` Importantes sin leer: ${m.important.slice(0, 6).map((x) => `${x.name}: ${x.subject}`).join("; ")}.` : ""}${m.chatgptExport ? " Ha llegado la exportación de datos de ChatGPT." : ""} Para actuar usa correo_baja, correo_archivar, correo_papelera o correo_etiquetar con el remitente.`);
