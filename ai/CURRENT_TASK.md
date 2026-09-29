@@ -2,11 +2,11 @@
 
 Status: **REVIEW_PENDING**
 
-WEB-31 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
+WEB-32 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
 
 ## Tarea activa
 
-WEB-31 — la barra de pestañas sube en las páginas cortas del iPhone (`ai/HANDOFF.md`, «WEB-31»).
+WEB-32 — sin «+» y Agenda al instante sin verificación de Google al abrir (`ai/HANDOFF.md`, «WEB-32»).
 
 ## Autorización
 
@@ -16,6 +16,7 @@ WEB-31 — la barra de pestañas sube en las páginas cortas del iPhone (`ai/HAN
 - 2026-09-29: Manu pide una IA integrada a la que decirle cosas de la app y con la que subir sus gastos. El envío sin preguntar queda como ajuste que decide Manu, desactivado por defecto.
 - 2026-09-29: Manu ordena «cambia agents.md para que tú puedas decidir cuándo fusionar y cuándo no». `AGENTS.md` y `CLAUDE.md` recogen la regla de fusión, lo que resuelve el hallazgo 6 de la revisión de ChatGPT.
 - 2026-09-29: Manu elige que la IA pueda leer capturas y vídeos compartidos (TikTok, reels), con el aviso de que la imagen se envía a Google.
+- 2026-09-29: Manu pide quitar el «+» y que Agenda no espere a verificar Google al abrir. Esto sustituye la conducta de WEB-24.
 - 2026-09-29: Manu decide «que lo sensible vaya a la IA me da igual». Se implementa con un interruptor en su dispositivo; secretos, crisis y Refugio siguen sin enviarse.
 - 2026-09-29: Manu pide hablar con MANU «como si fuera Gemini integrado, que lo sepa todo y lo maneje él». Se implementa como un modo que Manu activa, con las categorías sensibles solo si él las marca.
 - 2026-09-29: **cambio de gobernanza decidido por Manu.** El orquestador (ChatGPT/Codex) ya no revisa automáticamente, porque frenaba el avance. Claude Code fusiona los PR web cuando `npm test` y los dos workflows remotos están en verde y no hay conflictos. Cuando haga falta una revisión, Claude Code prepara un prompt, Manu se lo pasa a ChatGPT y le devuelve la respuesta; los defectos se corrigen en un PR nuevo con su regresión. Los PR #7, #8 y #9 siguen en borrador o pausa.
@@ -44,6 +45,7 @@ WEB-31 — la barra de pestañas sube en las páginas cortas del iPhone (`ai/HAN
 
 ## Historial (cerrado)
 
+- **WEB-31** (páginas cortas en iOS): CERRADA. Fusionada mediante el PR #39 (`fb4f555`).
 - **WEB-30** (zona inferior): CERRADA. Fusionada mediante el PR #38 (`2f5fdad`).
 - **WEB-29** (chat con teclado y caché sin conexión): CERRADA. Fusionada mediante el PR #37 (`ffbcf52`).
 - **WEB-28** (datos sensibles permitidos por Manu): CERRADA. Fusionada mediante el PR #36 (`f1cd738`).

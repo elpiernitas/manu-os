@@ -10,6 +10,33 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
+## WEB-32 — sin «+» y Agenda al instante
+
+Manu (2026-09-29): «quiero quitar el +», y no quiere que Agenda «tarde en cargar para verificar que Calendar siga activado».
+
+### Cambios
+
+- **«+» retirado** (`index.html`, `app.js`).
+  - Cada sección conserva su «Añadir»: Tareas, Recordatorios, Ideas, «Nuevo evento» y Movimientos en Dinero.
+  - El chat sigue apuntando lo mismo.
+  - La barra de pestañas ocupa todo el ancho (`styles.css`).
+- **Agenda al instante.**
+  - Esto sustituye la decisión de WEB-24. Abrir Agenda u Hoy ya no pide permiso a Google (ya no se abre la ventana de verificación): se ve lo guardado al momento.
+  - Mientras el permiso de Google (alrededor de 1 hora, sin servidor) siga válido, se sincroniza sola en segundo plano, como antes.
+  - Cuando caduca, el texto dice «toca «Actualizar» para traer cambios»; el botón se llama ahora «Actualizar».
+- Versión 32.
+
+### Resultados
+
+- `npm test`: 106/106 PASS. `node --check` pasa.
+- e2e32 (4 checks): sin «+», barra centrada a todo el ancho y «Añadir» de Dinero abre el gasto.
+- e2e12 y e2e24 actualizados a la nueva conducta: abrir Agenda no abre ninguna ventana de Google, «Actualizar» renueva y sincroniza, y la sincronización silenciosa sigue funcionando con el permiso válido.
+- e2e22 y demás recorridos que usaban «+» ahora usan los «Añadir» de cada sección. Todos en PASS, salvo las 3 expectativas antiguas de e2e18.
+
+### NO_VERIFICADO
+
+- En el iPhone real.
+
 ## WEB-31 — la barra sube en las páginas cortas (iPhone)
 
 Manu (2026-09-29, capturas): «en proyecto la barra sube». En Proyectos, la barra de pestañas y el «+» aparecen unos 46 pt más arriba que en Dinero, con una franja negra debajo.
