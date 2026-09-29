@@ -2,7 +2,7 @@ import { normalise } from "./text.js";
 import { toCents, euros } from "./money.js";
 
 // Deterministic MANU (ADR-0009). Mirrors Sources/ManuOSCore/Assistant.swift.
-const CRISIS = ["suicid", "quitarme la vida", "no quiero vivir", "matarme", "hacerme dano", "acabar con todo", "no quiero seguir viviendo"];
+const CRISIS = ["suicid", "quiero morir", "ganas de morir", "quitarme la vida", "no quiero vivir", "matarme", "hacerme dano", "acabar con todo", "no quiero seguir viviendo"];
 const LOW_MOOD = ["de bajon", "estoy mal", "me siento mal", "estoy triste", "me siento fatal", "estoy fatal", "estoy hundido", "no tengo ganas de nada"];
 const EXPENSE = ["gaste", "he gastado", "pague", "he pagado", "gasto de", "registra un gasto"];
 const IDEA = ["idea:", "guarda una idea", "guarda la idea", "apunta", "anota", "nueva idea"];

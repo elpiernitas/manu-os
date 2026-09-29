@@ -18,13 +18,13 @@ import { allowedToSend, buildContext, buildConversationPayload, CONTEXT_CATEGORI
 import { newProject, addSource, buildProjectPayload, citations, PRESETS } from "./core/projects.js";
 import { putImage, getImage, clearImages } from "./core/imagestore.js";
 import { weatherEmoji, sceneFor, PARTICLES, MONEY_EMOJI } from "./core/scene.js";
-import { buildImagePayload, buildLinkPayload, isGeminiKey, isSensitive, pickModel, listModels, buildActionPayload, askWithActions, issueUrl } from "./core/ai.js";
+import { buildImagePayload, buildLinkPayload, isGeminiKey, mayGo, setSensitiveOk, sensitiveAllowed, pickModel, listModels, buildActionPayload, askWithActions, issueUrl } from "./core/ai.js";
 import { encryptBackup, decryptBackup, passphraseProblem } from "./core/crypto.js";
 import { isSpotifyClientId, pkceValid, randomVerifier, challengeFor, authorizeUrl, exchangeCode, refreshTokens, listDevices, findSpeaker, transferTo, DEFAULT_SPEAKER } from "./core/spotify.js";
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "27";
+export const APP_VERSION = "28";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -881,7 +881,8 @@ const subpages = {
         <form id="aiForm" class="stack"><label for="aiKey" class="muted small">Clave de API de Gemini. Nunca va en las copias. Por defecto solo dura mientras MANU está abierta.</label><input id="aiKey" type="password" value="${esc(key)}" autocomplete="off" spellcheck="false" placeholder="AQ.… o AIza…"><div class="btns"><button class="btn" type="submit">Guardar y probar clave</button>${key ? '<button class="btn danger" type="button" data-act="ai-forget">Borrar clave</button>' : ""}</div></form>
         <div class="row"><div class="grow"><div>Recordar la clave en este móvil</div><div class="muted small">Más cómodo, pero cualquier código que corra en esta web podría leerla (ADR-0013).</div></div><button class="check" data-act="ai-remember" aria-pressed="${aiStore.remember}" aria-label="Recordar clave">${I.check}</button></div>
         ${key ? `<div class="row"><span>Ofrecer la IA en el chat</span><button class="check" data-act="ai-toggle" aria-pressed="${vault.settings.aiEnabled !== false}" aria-label="Usar IA">${I.check}</button></div>
-        <div class="row"><div class="grow"><div>Enviar a Gemini sin preguntar</div><div class="muted small">Desactivado por defecto. Si lo activas, lo que MANU no entienda irá directo a Gemini. Lo que parezca privado (salud, dinero, ánimo, teléfonos…) seguirá sin enviarse nunca.</div></div><button class="check" data-act="ai-auto" aria-pressed="${vault.settings.aiAutoSend === true}" aria-label="Enviar sin preguntar">${I.check}</button></div>` : ""}</section>
+        <div class="row"><div class="grow"><div>Enviar a Gemini sin preguntar</div><div class="muted small">Desactivado por defecto. Si lo activas, lo que MANU no entienda irá directo a Gemini. ${vault.settings.aiSensitive === true ? "Contraseñas, tarjetas, IBAN, teléfonos, crisis y Refugio seguirán sin enviarse nunca." : "Lo que parezca privado (salud, dinero, ánimo, teléfonos…) seguirá sin enviarse nunca."}</div></div><button class="check" data-act="ai-auto" aria-pressed="${vault.settings.aiAutoSend === true}" aria-label="Enviar sin preguntar">${I.check}</button></div>
+        <div class="row"><div class="grow"><div>Permitir datos sensibles</div><div class="muted small">Salud, dinero, ánimo y personas podrán ir a Gemini en el chat, las capturas y los proyectos. Contraseñas, tarjetas, IBAN, teléfonos, correos, crisis y Refugio nunca.</div></div><button class="check" data-act="ai-sensitive" aria-pressed="${vault.settings.aiSensitive === true}" aria-label="Permitir datos sensibles">${I.check}</button></div>` : ""}</section>
       ${aiReady() ? aiModeCard() : ""}
       <section class="card"><h2>Qué puede hacer</h2><p class="muted small">Dile cosas normales: «apúntame llamar al taller», «recuérdame el viernes a las 10 pagar el seguro», «llévame a Hábitos», «quiero importar el extracto» o «me gustaría que el calendario tuviera vista semanal». Gemini <b>propone</b> y tú confirmas cada acción con un toque; nada se hace solo.</p><p class="muted small">Las mejoras de la app se preparan como una petición en GitHub que tú envías y que Claude lee. Ese repositorio es <b>público</b>: no pongas datos personales.</p></section>
       <section class="card"><h2>Privacidad</h2><ul class="muted small">
@@ -1081,6 +1082,7 @@ function closeSheet() {
 }
 
 function render({ focus = false, enter = null } = {}) {
+  setSensitiveOk(vault?.settings?.aiSensitive === true);
   celebrateMoney = Boolean(enter) && tab === "dinero" && !overlay && !reduceMotion();
   const w = currentWeather();
   if (w?.data?.now) document.body.dataset.wx = sceneFor(w.data.now.icon); else delete document.body.dataset.wx;
@@ -1181,10 +1183,10 @@ function say(text) {
   // compound sentences go to Gemini, which can do several things at once.
   const longCommand = ["expense", "reminder", "idea", "alarm"].includes(intent.kind) && clean.split(/\s+/).length > 8;
   if (aiMode().on && aiReady() && navigator.onLine && (["unknown", "greeting", "thanks", "agenda", "weather"].includes(intent.kind) || longCommand)) {
-    const check = allowedToSend(clean, aiMode().context);
+    const check = allowedToSend(clean, sensitiveAllowed() ? FULL_CONTEXT : aiMode().context);
     vault.chat.push({ from: "me", text: clean, at });
     if (!check.ok) {
-      const why = check.blocked.includes("secret") ? "lleva datos que nunca envío (claves, tarjetas, teléfonos…)" : `habla de ${check.blocked.map((k) => ({ money: "dinero", health: "salud", mood: "ánimo" }[k] ?? k)).join(" y ")}, y no me dejaste compartirlo`;
+      const why = check.blocked.includes("secret") ? "lleva datos que nunca envío (claves, tarjetas, teléfonos…)" : check.blocked.includes("crisis") ? "eso se queda en el móvil" : `habla de ${check.blocked.map((k) => ({ money: "dinero", health: "salud", mood: "ánimo" }[k] ?? k)).join(" y ")}, y no me dejaste compartirlo`;
       vault.chat.push({ from: "manu", text: `${localAnswer(intent) ?? reply(intent, variant++)} (No lo envío a Gemini: ${why}. Lo cambias en Tú → IA.)`, at });
       persist(); render(); return;
     }
@@ -1206,7 +1208,7 @@ function say(text) {
   }
   if (intent.kind === "agenda" && !(aiMode().on && aiReady() && navigator.onLine)) { setTimeout(() => go("agenda"), 900); }
   if (intent.kind === "unknown" && aiReady() && navigator.onLine) {
-    if (isSensitive(clean)) {
+    if (!mayGo(clean)) {
       vault.chat.push({ from: "me", text: clean, at }, { from: "manu", text: `${reply(intent, variant++)} (Parece privado: no te ofrezco enviarlo a la IA.)`, at });
       persist(); render(); return;
     }
@@ -1300,12 +1302,12 @@ async function converse(message) {
   const mode = aiMode();
   const history = vault.chat.slice(0, -1).filter((b) => !b.proposal);
   const contextText = buildContext(lifeSnapshot(), mode.context, today());
-  const payload = buildConversationPayload({ message, history, contextText, context: mode.context, now: today(), autoActions: mode.autoActions });
+  const payload = buildConversationPayload({ message, history, contextText, context: sensitiveAllowed() ? FULL_CONTEXT : mode.context, now: today(), autoActions: mode.autoActions });
   const answer = { from: "manu", text: "Pensando…", at: new Date(Date.now() + 1).toISOString(), ai: true, sentContext: Object.keys(mode.context).filter((k) => mode.context[k]) };
   vault.chat.push(answer);
   persist(); render();
   try {
-    const { text, calls } = await askWithActions({ key: aiStore.key, model: aiStore.model, payload, confirmed: true, permit: (t) => allowedToSend(t, mode.context).ok });
+    const { text, calls } = await askWithActions({ key: aiStore.key, model: aiStore.model, payload, confirmed: true, permit: (t) => allowedToSend(t, sensitiveAllowed() ? FULL_CONTEXT : mode.context).ok });
     answer.text = text || (calls.length ? "Hecho:" : "…");
     if (calls.length) {
       answer.calls = calls.map((c) => ({ ...c, state: null }));
@@ -1543,11 +1545,12 @@ document.addEventListener("click", async (e) => {
     case "ai-send": askAi(id); break;
     case "ai-do": runCall(findCall(a)); break;
     case "ai-undo": undoCall(findCall(a)); break;
-    case "ai-mode": { const m = aiMode(); const v = a.dataset.v; vault.settings.aiMode = v === "off" ? { ...m, on: false } : v === "full" ? { ...m, on: true, context: { ...FULL_CONTEXT } } : v === "basic" ? { ...m, on: true, context: { ...BASIC_CONTEXT } } : m; persist(); render(); toast(v === "off" ? "Modo conversación desactivado" : "Modo conversación activado"); break; }
+    case "ai-mode": { const m = aiMode(); const v = a.dataset.v; vault.settings.aiMode = v === "off" ? { ...m, on: false } : v === "full" ? (vault.settings.aiSensitive = true, { ...m, on: true, context: { ...FULL_CONTEXT } }) : v === "basic" ? { ...m, on: true, context: { ...BASIC_CONTEXT } } : m; persist(); render(); toast(v === "off" ? "Modo conversación desactivado" : "Modo conversación activado"); break; }
     case "ai-ctx": { const m = aiMode(); vault.settings.aiMode = { ...m, context: { ...m.context, [a.dataset.k]: !m.context[a.dataset.k] } }; persist(); render(); break; }
     case "ai-auto-actions": { const m = aiMode(); vault.settings.aiMode = { ...m, autoActions: !m.autoActions }; persist(); render(); break; }
     case "ai-skip": { const c = findCall(a); if (c && !c.state) { c.state = "no"; persist(); render(); } break; }
     case "ai-issue": { const c = findCall(a); if (c && !c.state) { c.state = "done"; persist(); setTimeout(render, 300); } break; }
+    case "ai-sensitive": vault.settings.aiSensitive = vault.settings.aiSensitive !== true; persist(); render(); toast(vault.settings.aiSensitive ? "Lo sensible podrá ir a Gemini (nunca claves ni crisis)" : "Lo sensible vuelve a quedarse en el móvil"); break;
     case "ai-auto": vault.settings.aiAutoSend = vault.settings.aiAutoSend !== true; persist(); render(); toast(vault.settings.aiAutoSend ? "Enviará sin preguntar (nunca lo privado)" : "Volverá a preguntarte antes de enviar"); break;
     case "music": musicToSpeaker(); break;
     case "shortcut-done": vault.settings.shortcutsDone = { ...(vault.settings.shortcutsDone ?? {}), [id]: true }; persist(); render(); toast("Quitado de pendientes"); break;

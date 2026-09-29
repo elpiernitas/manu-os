@@ -1,7 +1,7 @@
 // «Proyectos», like NotebookLM: notebooks with sources (notes, pasted text,
 // screenshots, video captions). Gemini answers only from those sources and
 // cites them as [n]. Sources that look sensitive are never sent (AGENTS.md).
-import { isSensitive } from "./ai.js";
+import { mayGo } from "./ai.js";
 
 export const PROJECT_LIMITS = { sources: 40, textChars: 20000, imagesPerAsk: 4, promptChars: 60000 };
 const clip = (v, n) => String(v ?? "").replace(/\u0000/g, "").trim().slice(0, n);
@@ -33,9 +33,9 @@ export const PRESETS = {
 export function buildProjectPayload({ project, question, images = {} }) {
   const q = clip(question, 2000);
   if (!q) throw new Error("Escribe una pregunta");
-  if (isSensitive(q)) throw Object.assign(new Error("sensible"), { code: "sensitive" });
+  if (!mayGo(q)) throw Object.assign(new Error("sensible"), { code: "sensitive" });
   const numbered = project.sources.map((s, i) => ({ ...s, n: i + 1 }));
-  const excluded = numbered.filter((s) => s.kind !== "image" && isSensitive(`${s.title} ${s.text}`));
+  const excluded = numbered.filter((s) => s.kind !== "image" && !mayGo(`${s.title} ${s.text}`));
   const textSources = numbered.filter((s) => s.kind !== "image" && !excluded.includes(s));
   const imageSources = numbered.filter((s) => s.kind === "image" && images[s.imageId]).slice(-PROJECT_LIMITS.imagesPerAsk);
   let budget = PROJECT_LIMITS.promptChars;

@@ -98,3 +98,7 @@ WEB-22 se fusionó tras pasar su recorrido nuevo y 5 regresiones, pero no el rec
 
 `npm test` no importa `web/app.js`, así que un error de sintaxis en una plantilla solo aparece al cargar la página. El CI ya ejecuta `node --check` sobre `app.js`, `sw.js` y `core/*.js`. En WEB-26, un recorrido de navegador falló por esa causa antes de publicar. Antes de los recorridos, hay que ejecutar en local el mismo bucle de `node --check`.
 
+
+### QAL-023 — Al relajar un filtro de privacidad, separar antes lo que nunca debe salir
+
+En WEB-28, al dejar que el ánimo fuera a la IA, «morir» y «refugio» estaban dentro del grupo «ánimo» y se habrían relajado con él. Además, «quiero morir» no activaba la ayuda de crisis. Antes de ampliar lo que se envía, hay que sacar a una categoría que nunca se permite lo que debe quedarse en el móvil (crisis y secretos), y probar frases reales de crisis contra el detector.

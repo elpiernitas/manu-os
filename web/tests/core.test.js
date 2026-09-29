@@ -8,7 +8,7 @@ import { initialRefuge, refugeReply } from "../core/refuge.js";
 import { LocalStore, emptyVault, validateVault } from "../core/storage.js";
 
 test("crisis phrases always win and give 112 and 024", () => {
-  for (const text of ["No quiero vivir", "estoy de bajón y no quiero vivir", "pensé en SUICIDARME", "gasté 5 en algo y quiero acabar con todo"]) {
+  for (const text of ["No quiero vivir", "estoy de bajón y no quiero vivir", "pensé en SUICIDARME", "gasté 5 en algo y quiero acabar con todo", "me quiero morir", "tengo ganas de morir"]) {
     assert.equal(parse(text).kind, "crisis", text);
   }
   assert.ok(CRISIS_REPLY.includes("112") && CRISIS_REPLY.includes("024"));
