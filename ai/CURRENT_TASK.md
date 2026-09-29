@@ -2,11 +2,11 @@
 
 Status: **REVIEW_PENDING**
 
-WEB-18 implementado. Se fusiona según la regla de fusión de `AGENTS.md`.
+WEB-19 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
 
 ## Tarea activa
 
-WEB-18 — volver a poner la bola animada con la M en MANU, sin cara ni aspecto humano (`ai/HANDOFF.md`, «WEB-18»).
+WEB-19 — aceptar las claves de Gemini con el formato nuevo «AQ.» (`ai/HANDOFF.md`, «WEB-19»).
 
 ## Autorización
 
@@ -41,6 +41,7 @@ WEB-18 — volver a poner la bola animada con la M en MANU, sin cara ni aspecto 
 
 ## Historial (cerrado)
 
+- **WEB-18** (la bola con la M vuelve): CERRADA. Fusionada mediante el PR #26 (`5bad2b9`), hecha por ChatGPT/Codex.
 - **WEB-17** (quitar la bola con la M por un malentendido): CERRADA. Fusionada mediante el PR #25 (`18a9c7d`); WEB-18 revierte ese cambio.
 - **WEB-16** (escenas vivas): CERRADA. Fusionada mediante el PR #24 (`0caa79d`).
 - **WEB-15** (Spotify con un toque): CERRADA. Fusionada mediante el PR #23 (`c657d99`).

@@ -26,8 +26,14 @@ export function isSensitive(text) {
   if (/\b(?:\d[ -]?){13,19}\b/.test(raw)) return true; // card-like numbers
   if (/(\+34)?[ ]?[6-9]\d{2}[ ]?\d{3}[ ]?\d{3}\b/.test(raw)) return true; // phone
   if (/[^\s@]+@[^\s@]+\.[a-z]{2,}/i.test(raw)) return true; // email
+  if (GEMINI_KEY_IN_TEXT.test(raw)) return true; // an API key pasted in the chat
   return false;
 }
+
+// Gemini API keys: the classic «AIza…» format and the newer «AQ.…» one that
+// AI Studio started issuing (seen on Manu's account, 2026-09-29).
+export const isGeminiKey = (s) => /^(AIza[0-9A-Za-z_-]{30,60}|AQ\.[0-9A-Za-z_.-]{20,400})$/.test(String(s ?? "").trim());
+const GEMINI_KEY_IN_TEXT = /(AIza[0-9A-Za-z_-]{30,}|\bAQ\.[0-9A-Za-z_.-]{20,})/;
 
 // Picks a current "flash" text model from the account's list instead of
 // hard-coding a name that may be retired.

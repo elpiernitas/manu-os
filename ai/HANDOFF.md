@@ -10,6 +10,28 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
+## WEB-19 — claves de Gemini con el formato nuevo «AQ.»
+
+Capturas de Manu (2026-09-29): AI Studio le da una clave que empieza por «AQ.», no por «AIza». MANU la rechazaba con «No veo una clave de Gemini copiada» porque solo aceptaba el formato antiguo.
+
+### Cambios
+
+- `web/core/ai.js`: `isGeminiKey` acepta `AIza…` y `AQ.…`. `isSensitive` bloquea cualquiera de los dos si se pega en el chat, para que nunca se ofrezca a Gemini.
+- `web/app.js`:
+  - usa `isGeminiKey` en «Pegar y activar» y en el campo manual;
+  - el paso 3 del tutorial explica el formato nuevo y avisa de no copiar el nombre ni el número del proyecto;
+  - el aviso de portapapeles explica el «Pegar» de iOS;
+  - versión 19.
+
+### Resultados
+
+- `npm test`: 84/84 PASS (`web/tests/gemini-key.test.js`, con claves inventadas).
+- Chromium: el tutorial activa una clave inventada con formato `AQ.` (Gemini simulado).
+
+### NO_VERIFICADO
+
+- Que la API de Gemini acepte las claves `AQ.` en la cabecera `x-goog-api-key`. MANU prueba la clave al activarla (`listModels`); si Google la rechaza, se verá «La clave de Gemini no es válida».
+
 ## WEB-18 — la bola con la M vuelve
 
 Manu aclara el 2026-09-29 que WEB-17 interpretó mal su petición: no quiere un avatar con cara ni aspecto humano, pero sí quiere la esfera animada con la M. Se revierte el commit `18a9c7d` del PR #25 y vuelven `.orb`, `.manu-head` y sus estados de respirar, escuchar mientras Manu escribe y pensar mientras responde la IA. No se crea ninguna figura humana. Versión 18 (`manuos-v18`).
