@@ -2,11 +2,11 @@
 
 Status: **REVIEW_PENDING**
 
-WEB-23 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
+WEB-24 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
 
 ## Tarea activa
 
-WEB-23 — capturas y enlaces de vídeo que MANU lee y apunta (`ai/HANDOFF.md`, «WEB-23»; enmienda WEB-23 de ADR-0013).
+WEB-24 — calendario al abrir Agenda u Hoy y hoja «+» con el teclado (`ai/HANDOFF.md`, «WEB-24»).
 
 ## Autorización
 
@@ -42,6 +42,7 @@ WEB-23 — capturas y enlaces de vídeo que MANU lee y apunta (`ai/HANDOFF.md`, 
 
 ## Historial (cerrado)
 
+- **WEB-23** (capturas y enlaces): CERRADA. Fusionada mediante el PR #31 (`6b95cf1`).
 - **WEB-22** (hoja «+»): CERRADA. Fusionada mediante el PR #30 (`a86c01a`); su fallo en Dinero se corrigió en WEB-23.
 - **WEB-21** (estadísticas de dinero): CERRADA. Fusionada mediante el PR #29 (`f375782`).
 - **WEB-20** (fondos vivos): CERRADA. Fusionada mediante el PR #28 (`26ce9b1`).

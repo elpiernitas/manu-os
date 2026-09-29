@@ -21,7 +21,7 @@ import { isSpotifyClientId, pkceValid, randomVerifier, challengeFor, authorizeUr
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "23";
+export const APP_VERSION = "24";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -549,7 +549,7 @@ const screens = {
     const synced = vault.settings.gcalSyncedAt ? new Date(vault.settings.gcalSyncedAt).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }) : null;
     const gCal = isClientId(gClientId()) && googleOn("calendar");
     return `<h1>Agenda</h1><p class="subtitle">${esc(longDate())}</p>
-      ${g ? `<div class="btns"><button class="btn ghost" data-act="gcal-sync">${gcal.busy ? "Sincronizando…" : "Sincronizar con Google"}</button></div><p class="muted small">${synced ? `Última sincronización: ${synced}` : "Aún sin sincronizar."}${gcal.error ? ` · ${esc(gcal.error)}` : ""}${validToken(SCOPE.calendar) ? " · se actualiza sola cada 10 min" : ""}</p>` : `<p class="muted small"><button class="link small" data-act="goto-gcal">Conectar Google (Calendar, Tasks, Contactos y Drive)</button></p>`}
+      ${g ? `<div class="btns"><button class="btn ghost" data-act="gcal-sync">${gcal.busy ? "Sincronizando…" : "Sincronizar con Google"}</button></div><p class="muted small">${synced ? `Última sincronización: ${synced}` : "Aún sin sincronizar."}${gcal.error ? ` · ${esc(gcal.error)}` : ""}${vault.settings.googleAutoOpen !== false ? " · se actualiza al abrir Agenda u Hoy" : ""}</p>` : `<p class="muted small"><button class="link small" data-act="goto-gcal">Conectar Google (Calendar, Tasks, Contactos y Drive)</button></p>`}
       ${upcomingCard()}
       ${calendarCard(gCal)}
       <details class="card"><summary class="muted small">Sin Google: pegar los eventos de hoy</summary><p class="muted small">Si tu calendario no es de Google, pega aquí tus eventos (o usa el atajo «MANU Agenda»).</p>${agendaToday() && vault.agenda.source !== "GOOGLE"
@@ -727,6 +727,7 @@ const subpages = {
         <form id="gcalForm" class="stack"><label for="gcalId" class="muted small">ID de cliente OAuth (termina en .apps.googleusercontent.com). No es una contraseña.</label><input id="gcalId" value="${esc(id)}" autocomplete="off" spellcheck="false" placeholder="123-abc.apps.googleusercontent.com"><button class="btn ghost" type="submit">Guardar ID</button></form></section>
       ${ok && !anyOn ? `<section class="card"><h2>Conectar Google</h2><p class="muted small">Activa Calendar, Tasks y los cumpleaños de Contactos y pide los permisos en una sola ventana. Puedes desactivar cualquiera después.</p><button class="btn block" data-act="google-connect-all">Conectar Google</button></section>` : ""}
       ${ok ? `<section class="card"><h2>Servicios</h2><p class="muted small">Cada servicio pide solo su permiso. Al sincronizar, los que actives se piden juntos en una sola ventana; si rechazas uno, los demás siguen funcionando.</p>
+        <div class="row"><div class="grow"><div>Actualizar al abrir Agenda u Hoy</div><div class="muted small">Si han pasado más de 10 minutos. Cuando el permiso de Google ha caducado (cada hora, aprox.), puede abrirse un momento su ventana.</div></div><button class="check" data-act="gauto" aria-pressed="${vault.settings.googleAutoOpen !== false}" aria-label="Actualizar al abrir">${I.check}</button></div>
         ${GOOGLE_FEATURES.map(([k, label, desc]) => `<div class="row"><div class="grow"><div>${label}</div><div class="muted small">${esc(desc)}${st[k] && st[k] !== "off" ? ` · ${esc(st[k].replace(/^ok: /, "").replace(/^error: /, "⚠︎ "))}` : ""}</div></div><button class="check" data-act="gfeature" data-k="${k}" aria-pressed="${googleOn(k)}" aria-label="${label}">${I.check}</button></div>`).join("")}
         ${["calendar", "tasks", "contacts"].some(googleOn) ? `<button class="btn" data-act="gcal-sync">${gcal.busy ? "Sincronizando…" : "Sincronizar ahora"}</button>` : ""}</section>` : ""}
       ${ok && googleOn("drive") ? `<section class="card"><h2>Copia cifrada en Drive</h2>
@@ -906,6 +907,18 @@ function openSheet(kind, manual = false) {
 
 // Typing in the sheet: guess the kind and prefill fields, without rebuilding
 // the sheet (and losing the keyboard) unless the kind changes.
+// With the iPhone keyboard open the visible area shrinks: keep the whole sheet
+// (title and ✕ included) inside it.
+function fitSheet() {
+  const bg = $("sheetBg"), vv = window.visualViewport;
+  if (!bg || !vv) return;
+  bg.style.top = `${Math.round(vv.offsetTop)}px`;
+  bg.style.height = `${Math.round(vv.height)}px`;
+  bg.style.bottom = "auto";
+}
+window.visualViewport?.addEventListener("resize", fitSheet);
+window.visualViewport?.addEventListener("scroll", fitSheet);
+
 function rerenderSheet() {
   const t = $("qText"); const pos = t?.selectionStart ?? null;
   renderedSheetKind = undefined; render();
@@ -983,6 +996,7 @@ function render({ focus = false, enter = null } = {}) {
     const bg = $("sheetBg");
     if (bg && !wasOpen && !reduceMotion()) { bg.dataset.state = "opening"; requestAnimationFrame(() => requestAnimationFrame(() => { bg.dataset.state = "open"; })); }
     else if (bg) bg.dataset.state = "open";
+    fitSheet();
     if (sheet) { const t = $("qText"); if (t) { t.focus(); t.setSelectionRange(t.value.length, t.value.length); } }
   }
   if (tab === "manu") {
@@ -1003,6 +1017,21 @@ function go(newTab) {
   render({ focus: true, enter: "tab" });
   scrollTo(0, 0);
   if (tab === "hoy") refreshWeather();
+  syncOnOpen();
+}
+
+// «Que el calendario se actualice siempre» (WEB-24). Without a server the
+// Google permission lasts about an hour and can only be renewed inside a tap
+// (iOS). So the tap that opens Agenda or Hoy also renews it and syncs when the
+// data is older than 10 minutes. While the permission is valid it syncs silently.
+const OPEN_SYNC_MS = 10 * 60000;
+function syncOnOpen() {
+  if (!["agenda", "hoy"].includes(tab) || !navigator.onLine || gcal.busy) return;
+  if (!["calendar", "tasks", "contacts"].some((k) => googleOn(k)) || vault.settings.googleAutoOpen === false) return;
+  const last = Math.max(Date.parse(vault.settings.gcalSyncedAt ?? "") || 0, gcal.lastRun ?? 0);
+  if (Date.now() - last < OPEN_SYNC_MS) return;
+  if (validToken(SCOPE.calendar)) syncGoogle({ silent: true }).catch(() => { gcal.busy = false; });
+  else if (globalThis.google?.accounts?.oauth2) syncGoogle({ quiet: true }).catch(() => { gcal.busy = false; }); // needs this tap
 }
 
 // ---------- Chat ----------
@@ -1272,6 +1301,7 @@ document.addEventListener("click", async (e) => {
     case "google-connect-all": vault.settings.google = { ...(vault.settings.google ?? {}), calendar: true, tasks: true, contacts: true }; persist(); syncGoogle(); break;
     case "drive-restore-no": confirmDriveRestore = null; render(); break;
     case "drive-restore-yes": { const r = validateVault(confirmDriveRestore?.data); confirmDriveRestore = null; if (!r.ok) { toast(r.reason); render(); break; } vault = r.vault; persist(); render(); toast("Copia de Drive restaurada"); break; }
+    case "gauto": vault.settings.googleAutoOpen = vault.settings.googleAutoOpen === false; persist(); render(); break;
     case "gfeature": { const k = a.dataset.k; vault.settings.google = { ...(vault.settings.google ?? {}), [k]: !googleOn(k) }; if (!googleOn(k)) delete gcal.tokens[SCOPE[k]]; persist(); render(); break; }
     case "ai-send": askAi(id); break;
     case "ai-do": runCall(findCall(a)); break;
@@ -1616,7 +1646,7 @@ async function withRetry(scope, fn) {
 
 // silent: automatic refresh. Never opens a Google window (iOS would block it
 // and it would interrupt Manu); it only uses tokens still valid in memory.
-async function syncGoogle({ silent = false } = {}) {
+async function syncGoogle({ silent = false, quiet = false } = {}) {
   if (gcal.busy) return;
   gcal.busy = true; gcal.lastRun = Date.now(); if (!silent) { gcal.error = null; render(); }
   const services = [
@@ -1671,7 +1701,7 @@ async function syncGoogle({ silent = false } = {}) {
   persist();
   if (silent) { if (!sheet && !document.activeElement?.matches("input, textarea")) render(); return; }
   render();
-  toast(failed.length ? "Google: algo no se ha sincronizado" : "Google sincronizado");
+  if (!quiet || failed.length) toast(failed.length ? "Google: algo no se ha sincronizado" : "Google sincronizado");
 }
 
 const validToken = (scope) => { const t = gcal.tokens[scope]; return Boolean(t && Date.now() < t.expires - 60000); };

@@ -495,3 +495,6 @@ body[data-screen="hoy"][data-wx="fog"] .ambient { background: linear-gradient(18
 .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .chat-img { display: block; max-width: 220px; max-height: 260px; border-radius: 14px; margin-bottom: 6px; object-fit: cover; }
 .viewer { display: block; width: 100%; height: auto; border-radius: 18px; margin-top: 12px; }
+/* ---------- WEB-24: la hoja cabe con el teclado ---------- */
+.sheet { max-height: min(88vh, calc(100% - 8px)); }
+.qa-head { position: sticky; top: -10px; z-index: 2; padding-top: 4px; background: var(--glass-strong); }
