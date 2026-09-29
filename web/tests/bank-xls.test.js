@@ -12,7 +12,7 @@ function loadXlsx() {
   return ctx.XLSX;
 }
 
-test("Sabadell .xls (BIFF, synthetic data): expenses imported, income skipped, header found after preamble", () => {
+test("Sabadell .xls (BIFF, synthetic data): expenses and income imported apart, header found after preamble", () => {
   const XLSX = loadXlsx();
   const wb = XLSX.read(fs.readFileSync(new URL("./fixtures-sabadell-ejemplo.xls", import.meta.url)), { type: "buffer" });
   const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: "" });
@@ -22,10 +22,13 @@ test("Sabadell .xls (BIFF, synthetic data): expenses imported, income skipped, h
     ["COMPRA TARJ. SUPERMERCADO EJEMPLO", 3450, "GROCERIES"],
     ["CARGO SPOTIFY EJEMPLO", 1199, "SUBSCRIPTIONS"],
   ]);
-  assert.equal(r.skippedIncome, 1);
+  assert.equal(r.income.length, 1, "income kept apart from expenses (WEB-21)");
+  assert.ok(r.balance && Number.isInteger(r.balance.cents));
   assert.ok(r.entries[0].at.startsWith("2026-09-2"));
   const again = importStatementRows(rows, new Set(r.entries.map((e) => e.id)));
   assert.equal(again.entries.length, 0);
+  const again2 = importStatementRows(rows, new Set([...r.entries, ...r.income].map((e) => e.id)));
+  assert.deepEqual([again2.income.length, again2.incomeDuplicates], [0, 1]);
   assert.equal(again.duplicates, 2);
 });
 

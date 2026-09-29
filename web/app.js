@@ -10,7 +10,7 @@ import { fetchForecast, searchCities, advice, WEATHER_TTL_MS } from "./core/weat
 import { importStatement, importStatementRows, classifiedFromRows, dropCrossSource } from "./core/bank.js";
 import { CITIES, proposeAlarm, shouldAskTomorrow, shortcutUrl, guessCity } from "./core/night.js";
 import { isClientId, listEvents, createEvent, newEventBody, monthGrid, listCalendars, mergeDays } from "./core/gcal.js";
-import { detectRecurring, upcomingRecurring, spendingPattern } from "./core/insights.js";
+import { detectRecurring, upcomingRecurring, spendingPattern, monthStats, monthlySeries } from "./core/insights.js";
 import { SCOPE, runServices, planTaskSync, listOpenTasks, insertTask, completeTask, contactBirthdays, mergePeople, saveBackup, loadBackup } from "./core/google.js";
 import { weatherEmoji, sceneFor, PARTICLES, MONEY_EMOJI } from "./core/scene.js";
 import { isGeminiKey, isSensitive, pickModel, listModels, buildActionPayload, askWithActions, issueUrl } from "./core/ai.js";
@@ -19,7 +19,7 @@ import { isSpotifyClientId, pkceValid, randomVerifier, challengeFor, authorizeUr
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "20";
+export const APP_VERSION = "21";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -40,6 +40,7 @@ let sheet = null; // quick add: { kind }
 let confirmWipe = false;
 let cityResults = null;
 let moneyFilter = null; // "review"
+let seriesPick = null; // month tapped in the income vs spending chart
 let moneyMonth = 0; // months back from the current one in Dinero
 let calView = null; // { y, m } month shown in Agenda
 let calSelected = null; // "YYYY-MM-DD"
@@ -345,6 +346,48 @@ async function finishSpotifyAuth(params) {
   } catch { toast("Spotify no ha dado permiso"); }
 }
 
+// ---------- Money statistics (WEB-21) ----------
+const INCOME_KIND = { PAYROLL: "💼 Nómina", BIZUM: "📲 Bizum recibidos", TRANSFER: "🏦 Transferencias", REFUND: "↩️ Devoluciones", OTHER: "➕ Otros ingresos" };
+const pctText = (p) => (p === null ? "" : `${p > 0 ? "▲" : p < 0 ? "▼" : "="} ${Math.abs(p)} %`);
+function moneyStatsSection(ref, monthName) {
+  const key = `${ref.getFullYear()}-${String(ref.getMonth() + 1).padStart(2, "0")}`;
+  const income = vault.income ?? [];
+  const st = monthStats(vault.spending, income, key, today());
+  const series = monthlySeries(vault.spending, income, 6, today());
+  const top = Math.max(1, ...series.map((m) => Math.max(m.spent, m.earned)));
+  const pick = series.find((m) => m.key === seriesPick) ?? null;
+  const bal = vault.settings.balance;
+  const month = monthName.replace(/ de \d{4}$/, "");
+  const tile = (label, value, sub = "", dot = "") => `<div class="stat-tile"><div class="muted small">${dot ? `<i class="dot ${dot}" aria-hidden="true"></i>` : ""}${label}</div><div class="stat-v num">${value}</div>${sub ? `<div class="muted small">${sub}</div>` : ""}</div>`;
+  const noIncome = !income.length;
+  return `${sectionTitle("Estadísticas")}
+    <section class="card">
+      <div class="stat-grid">
+        ${tile("Ingresado", euros(st.earned), st.earnedDelta !== null ? `${pctText(st.earnedDelta)} vs mes anterior` : "", "inc")}
+        ${tile("Gastado", euros(st.spent), st.spentDelta !== null ? `${pctText(st.spentDelta)} vs mes anterior` : "", "exp")}
+        ${tile(st.saved >= 0 ? "Ahorrado" : "Has gastado de más", euros(Math.abs(st.saved)), st.savingRate !== null ? `${st.savingRate} % de lo ingresado` : "")}
+        ${tile("Nómina", st.payroll.cents ? euros(st.payroll.cents) : "—", st.payroll.days.length ? `Día ${st.payroll.days.join(" y ")}` : noIncome ? "Importa el extracto" : "Aún no ha llegado")}
+      </div>
+      ${bal ? `<div class="row"><span class="muted small">Saldo en cuenta el ${new Date(bal.at).toLocaleDateString("es-ES", { day: "numeric", month: "short" })}</span><b class="num">${euros(bal.cents)}</b></div>` : ""}
+      ${noIncome ? '<p class="small">Para ver ingresos, nómina y ahorro, importa el <b>extracto del banco</b> (el .xls de Sabadell) en «Importar del banco». El Excel de ChatGPT solo trae gastos.</p>' : ""}
+    </section>
+    <section class="card"><h2>Ingresos vs gastos · 6 meses</h2>
+      <div class="legend small"><span><i class="dot inc" aria-hidden="true"></i>Ingresado</span><span><i class="dot exp" aria-hidden="true"></i>Gastado</span></div>
+      <div class="ie-chart" role="img" aria-label="Ingresos y gastos de los últimos 6 meses">${series.map((m) => `<button class="ie-col${m.key === seriesPick ? " sel" : ""}" data-act="series-pick" data-k="${m.key}" aria-label="${esc(m.label)}: ingresado ${euros(m.earned)}, gastado ${euros(m.spent)}"><span class="ie-bars"><i class="inc" data-h="${Math.round((m.earned / top) * 100)}"></i><i class="exp" data-h="${Math.round((m.spent / top) * 100)}"></i></span><span class="muted small">${esc(m.label)}</span></button>`).join("")}</div>
+      <p class="muted small">${pick ? `${esc(cap(new Date(`${pick.key}-15T12:00:00`).toLocaleDateString("es-ES", { month: "long" })))}: ingresado <b>${euros(pick.earned)}</b> · gastado <b>${euros(pick.spent)}</b> · ${pick.earned - pick.spent >= 0 ? "ahorro" : "déficit"} ${euros(Math.abs(pick.earned - pick.spent))}` : "Toca un mes para ver sus cifras."}</p>
+      <details><summary class="muted small">Ver tabla</summary><table class="stat-table"><thead><tr><th>Mes</th><th>Ingresado</th><th>Gastado</th><th>Ahorro</th></tr></thead><tbody>${series.map((m) => `<tr><td>${esc(m.label)}</td><td class="num">${euros(m.earned)}</td><td class="num">${euros(m.spent)}</td><td class="num">${euros(m.earned - m.spent)}</td></tr>`).join("")}</tbody></table></details>
+    </section>
+    <section class="card"><h2>Ritmo de ${esc(month)}</h2>
+      <div class="row"><span>Media diaria</span><b class="num">${euros(st.avgDaily)}</b></div>
+      ${st.projection !== null ? `<div class="row"><span>Si sigues así, a fin de mes</span><b class="num">${euros(st.projection)}</b></div>` : ""}
+      <div class="row"><span>Movimientos</span><b class="num">${st.count}</b></div>
+      ${st.biggest ? `<div class="row"><span class="grow">Mayor gasto<br><span class="muted small">${esc(st.biggest.merchant ?? "Sin concepto")} · ${new Date(st.biggest.at).toLocaleDateString("es-ES", { day: "numeric", month: "short" })}</span></span><b class="num">${euros(st.biggest.cents)}</b></div>` : ""}
+    </section>
+    ${st.topMerchants.length ? `<section class="card"><h2>Dónde más gastas en ${esc(month)}</h2>${st.topMerchants.map((m, i) => `<div class="row"><span class="rank" aria-hidden="true">${i + 1}</span><span class="grow">${esc(m.name)}<br><span class="muted small">${m.count} ${m.count === 1 ? "vez" : "veces"}</span></span><b class="num">${euros(m.cents)}</b></div>`).join("")}</section>` : ""}
+    ${st.income.length ? `<section class="card"><h2>Ingresos de ${esc(month)}</h2>${st.incomeByKind.map(([k, c]) => `<div class="row"><span>${INCOME_KIND[k]}</span><b class="num">${euros(c)}</b></div>`).join("")}
+      <details><summary class="muted small">Ver los ${st.income.length} ingresos</summary>${st.income.map((i) => `<div class="row"><div class="grow"><div>${esc(i.concept ?? "Ingreso")}</div><div class="muted small">${new Date(i.at).toLocaleDateString("es-ES", { day: "numeric", month: "short" })}${i.payroll ? " · nómina" : ""}</div></div><span class="num">+${euros(i.cents)}</span></div>`).join("")}</details></section>` : ""}`;
+}
+
 // ---------- Money insights ----------
 function moneyInsights() {
   if (!vault.spending.length) return "";
@@ -543,14 +586,15 @@ const screens = {
       <div class="stack">
       <section class="card hero money-hero">${celebrateMoney ? moneyRain() : ""}<div class="row cal-head"><button class="link" data-act="money-prev" aria-label="Mes anterior">${I.back}</button><h2>${moneyMonth === 0 ? "Gastado este mes" : `Gastado en ${esc(monthName.replace(/ de \d{4}$/, ""))}`}</h2><button class="link" data-act="money-next" aria-label="Mes siguiente"${moneyMonth === 0 ? " disabled" : ""}>${I.chev}</button></div><div class="big-money" data-count-money="${month.total}">${euros(month.total)}</div>
         ${cats.map(([c, v]) => `<div class="stack"><div class="row"><span>${esc(catLabel(c))}</span><span class="num">${euros(v)}</span></div><div class="bar"><i data-w="${Math.max(3, Math.round((v / max) * 100))}"></i></div></div>`).join("")}</section>
+      ${moneyStatsSection(ref, monthName)}
       <section class="card"><h2>${I.box} Importar del banco</h2>
-        <p class="muted small">Descarga los movimientos de tu banco (Sabadell: Excel .xls; también vale CSV) y elígelo aquí. Se analiza en tu móvil y no se envía a nadie. Solo importo gastos y no duplico los que ya tengas. Si corriges la categoría de un comercio, la aprendo para todos sus movimientos.</p>
+        <p class="muted small">Descarga los movimientos de tu banco (Sabadell: Excel .xls; también vale CSV) y elígelo aquí. Se analiza en tu móvil y no se envía a nadie. Importo gastos e ingresos (nómina, Bizum…) y no duplico los que ya tengas. Si corriges la categoría de un comercio, la aprendo para todos sus movimientos.</p>
         <label class="btn ghost" for="bankFile" role="button" tabindex="0">Elegir archivo (Excel o CSV)</label><input id="bankFile" type="file" accept=".xls,.xlsx,.csv,text/csv,text/plain,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="sr">
         <label class="btn ghost" for="rulesFile" role="button" tabindex="0">Importar reglas (Excel de ChatGPT)</label><input id="rulesFile" type="file" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="sr">
         ${rulesCount ? `<p class="muted small">${rulesCount} reglas de categorías guardadas en este móvil.</p>` : ""}
         ${ri ? `<p class="muted small">Excel de ChatGPT: ${ri.rules} reglas, ${ri.added} gastos nuevos${ri.duplicates ? `, ${ri.duplicates} ya estaban` : ""}${ri.review ? `, ${ri.review} por revisar` : ""}${ri.reclassified ? `, ${ri.reclassified} reclasificados` : ""}.</p>` : ""}
         ${rulesCount && !vault.spending.length ? '<p class="small"><b>Las reglas solas no son gastos.</b> Importa el extracto del banco o vuelve a elegir el Excel de ChatGPT, que trae la hoja «Gastos clasificados», y verás aquí tus números.</p>' : ""}
-        ${imp ? `<p class="muted small">Última importación: ${imp.added} gastos nuevos, ${imp.duplicates} repetidos, ${imp.income} ingresos ignorados${imp.invalid ? `, ${imp.invalid} filas no reconocidas` : ""}.</p>` : ""}</section>
+        ${imp ? `<p class="muted small">Última importación: ${imp.added} gastos nuevos, ${imp.duplicates} repetidos${imp.incomeAdded !== undefined ? `, ${imp.incomeAdded} ingresos nuevos${imp.incomeDuplicates ? ` (${imp.incomeDuplicates} ya estaban)` : ""}` : imp.income ? ` · ${imp.income} ingresos sin importar: vuelve a elegir el archivo para añadirlos` : ""}${imp.invalid ? `, ${imp.invalid} filas no reconocidas` : ""}.</p>` : ""}</section>
       ${moneyInsights()}
       ${sectionTitle("Movimientos", `${toReview ? `<button class="link small" data-act="money-filter">${moneyFilter === "review" ? "Ver todos" : `Por revisar (${toReview})`}</button>` : ""}${addLink("EXPENSE")}`)}
       <section class="card">${entries.length ? entries.map((x) => `<div class="row"><span class="cat-emoji" aria-hidden="true">${CATEGORY_EMOJI[x.category] ?? "📦"}</span><div class="grow"><div>${esc(x.merchant ?? "Sin concepto")}</div><div class="muted small">${new Date(x.at).toLocaleDateString("es-ES", { day: "numeric", month: "short" })}${x.sub ? ` · ${esc(x.sub)}` : ""}${x.source === "BANK" ? " · banco" : ""}${x.review ? ' · <b class="review">revisar</b>' : x.inferred ? " · categoría propuesta" : x.ruled ? " · según tus reglas" : ""}</div></div>
@@ -855,7 +899,7 @@ function render({ focus = false, enter = null } = {}) {
   if (enter && !reduceMotion()) { bars.forEach((el) => { el.style.width = "0%"; }); requestAnimationFrame(() => requestAnimationFrame(() => bars.forEach((el) => { el.style.width = `${el.dataset.w}%`; }))); }
   else bars.forEach((el) => { el.style.width = `${el.dataset.w}%`; });
   $("screen").querySelectorAll(".range > i").forEach((el) => { el.style.left = `${el.dataset.l}%`; el.style.width = `${el.dataset.w}%`; });
-  $("screen").querySelectorAll(".week-bars i[data-h]").forEach((el) => { el.style.height = `${el.dataset.h}%`; });
+  $("screen").querySelectorAll(".week-bars i[data-h], .ie-bars i[data-h]").forEach((el) => { el.style.height = `${Math.max(Number(el.dataset.h) ? 2 : 0, Number(el.dataset.h))}%`; });
   $("screen").querySelectorAll("[data-c]").forEach((el) => { if (/^#[0-9a-f]{6}$/i.test(el.dataset.c)) el.style.setProperty("--ev", el.dataset.c); });
   $("topTitle").textContent = sub ? { habitos: "Hábitos", salud: "Salud", comidas: "Comidas", personas: "Personas", tiempo: "Tiempo", avisos: "Avisos", datos: "Tus datos", gcal: "Google", ia: "IA", spotify: "Spotify", atajos: "Atajos" }[sub] : TABS.find(([id]) => id === tab)[1];
   $("fab").hidden = tab === "manu" || Boolean(sheet);
@@ -1096,6 +1140,7 @@ document.addEventListener("click", async (e) => {
     }
     case "cal-day": calSelected = a.dataset.day; { const d = new Date(`${calSelected}T12:00:00`); if (calView && (d.getMonth() !== calView.m)) calView = { y: d.getFullYear(), m: d.getMonth() }; } render(); break;
     case "cal-today": calView = null; calSelected = null; render(); break;
+    case "series-pick": seriesPick = seriesPick === a.dataset.k ? null : a.dataset.k; render(); break;
     case "money-prev": moneyMonth++; render(); break;
     case "money-next": moneyMonth = Math.max(0, moneyMonth - 1); render(); break;
     case "money-filter": moneyFilter = moneyFilter === "review" ? null : "review"; render(); break;
@@ -1309,7 +1354,7 @@ document.addEventListener("change", async (e) => {
   }
   if (e.target.id === "bankFile" && e.target.files?.[0]) {
     const file = e.target.files[0];
-    const ids = new Set(vault.spending.map((x) => x.id));
+    const ids = new Set([...vault.spending, ...(vault.income ?? [])].map((x) => x.id));
     const legacy = new Map(vault.spending.filter((x) => /^bank-[0-9a-z]+$/.test(x.id)).map((x) => [x.id, x]));
     const rules = vault.settings.categoryRules ?? {};
     let r;
@@ -1328,8 +1373,10 @@ document.addEventListener("change", async (e) => {
     r.entries = cross.entries; r.duplicates += cross.duplicates;
     vault.spending.push(...r.entries);
     moneyMonth = latestMonthOffset();
-    vault.settings.lastImport = { at: new Date().toISOString(), added: r.entries.length, duplicates: r.duplicates, income: r.skippedIncome, invalid: r.skippedInvalid };
-    persist(); render(); toast(`${r.entries.length} gastos importados`); return;
+    vault.income = [...(vault.income ?? []), ...(r.income ?? [])];
+    if (r.balance && (!vault.settings.balance || r.balance.at >= vault.settings.balance.at)) vault.settings.balance = r.balance;
+    vault.settings.lastImport = { at: new Date().toISOString(), added: r.entries.length, duplicates: r.duplicates, incomeAdded: (r.income ?? []).length, incomeDuplicates: r.incomeDuplicates ?? 0, invalid: r.skippedInvalid };
+    persist(); render(); toast(`${r.entries.length} gastos y ${(r.income ?? []).length} ingresos importados`); return;
   }
   if (e.target.id === "import" && e.target.files?.[0]) {
     try {

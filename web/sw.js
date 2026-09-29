@@ -1,5 +1,5 @@
 // Offline shell: every file of the app is cached; data never leaves the device.
-const VERSION = "manuos-v20";
+const VERSION = "manuos-v21";
 const SHELL = [
   "./", "index.html", "styles.css", "app.js", "manifest.webmanifest",
   "core/text.js", "core/money.js", "core/modes.js", "core/assistant.js",

@@ -10,6 +10,38 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
+## WEB-21 — estadísticas de dinero: ingresos, nómina y ahorro
+
+Petición de Manu (2026-09-29), con captura de Dinero: «no solo quiero tener lo gastado, quiero muchas más estadísticas, nómina, ingresado…».
+
+### Cambios
+
+- `web/core/bank.js`:
+  - el extracto importa también los ingresos, en `vault.income` y separados de los gastos, sin duplicarlos al reimportar;
+  - guarda el último saldo del archivo;
+  - `incomeKind` clasifica cada ingreso como nómina, Bizum, transferencia, devolución u otros. Sabadell escribe «ABONO BIZUM»: se comprueba Bizum primero, y «abono» solo no cuenta como devolución.
+- `web/core/insights.js`:
+  - `markPayroll` detecta la nómina por palabra clave, o por un mismo pagador de 600 € o más en 2 meses o más. Es una inferencia, no una decisión;
+  - `monthStats` calcula ingresado, gastado, ahorro y tasa, nómina y su día, la comparación con el mes anterior, la media diaria, la proyección a fin de mes, el mayor gasto, los 5 comercios principales y los ingresos por tipo;
+  - `monthlySeries` da los datos de los últimos 6 meses.
+- `web/core/storage.js`: `income` es una lista opcional validada (importe entero positivo y fecha); las copias antiguas siguen siendo válidas.
+- `web/app.js`:
+  - Dinero tiene una sección «Estadísticas»: 4 fichas (ingresado, gastado, ahorrado y nómina), el saldo en cuenta y la gráfica de ingresos frente a gastos de 6 meses;
+  - la gráfica tiene un solo eje, leyenda y tabla; al tocar un mes se ven sus cifras;
+  - le siguen el ritmo del mes, los comercios donde más gastas y los ingresos del mes;
+  - versión 21.
+- Colores de ingreso y gasto (`#24A86F` / `#4D8DFF`) validados con el validador de la skill dataviz en modo oscuro: todos los checks en PASS.
+
+### Resultados
+
+- `npm test`: 88/88 PASS. Tiene tests nuevos en `web/tests/money-stats.test.js`; los dos tests de importación que esperaban «ingresos ignorados» se actualizaron al nuevo comportamiento.
+- Con el .xls real de Manu, en local y solo con recuentos: 368 gastos y 80 ingresos (61 Bizum, 10 devoluciones, 4 transferencias, 3 nóminas y 2 otros), y saldo del 29/09.
+- Chromium con un extracto inventado: 15 checks en PASS (fichas, nómina y día, comparación, saldo, gráfica y tabla, toque en un mes, ritmo, comercios, desglose de ingresos, reimportación sin duplicados y persistencia).
+
+### Para Manu
+
+- Los ingresos solo llegan con el extracto del banco (el .xls de Sabadell). Hay que volver a elegirlo en Dinero: los gastos no se duplican y los ingresos se añaden.
+
 ## WEB-20 — fondos vivos en todas las pantallas
 
 Petición de Manu (2026-09-29), con capturas de la app Tiempo del iPhone: «quiero animaciones en el fondo, algo más dinámico, y eso en todas».

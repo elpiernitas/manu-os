@@ -59,3 +59,66 @@ export function spendingPattern(entries) {
   const top = [...byWeekday].sort((a, b) => b.cents - a.cents)[0];
   return { byWeekday, byMonthPart, byMoment: timed ? byMoment : null, topWeekday: top.cents ? top.label : null };
 }
+
+const monthKey = (iso) => iso.slice(0, 7);
+const inMonth = (list, key) => list.filter((e) => monthKey(e.at) === key);
+const sum = (list) => list.reduce((a, e) => a + e.cents, 0);
+
+// Payroll: keyword lines, plus any payer that pays ≥ 600 € in 2+ different
+// months (a salary without «nómina» in the concept). Inferred, never confirmed.
+export function markPayroll(income) {
+  const byPayer = new Map();
+  for (const e of income) {
+    if (e.kind !== "OTHER" && e.kind !== "TRANSFER") continue;
+    const k = merchantKey(e.concept);
+    if (!k || e.cents < 60000) continue;
+    if (!byPayer.has(k)) byPayer.set(k, new Set());
+    byPayer.get(k).add(monthKey(e.at));
+  }
+  const payroll = new Set([...byPayer].filter(([, months]) => months.size >= 2).map(([k]) => k));
+  return income.map((e) => (e.kind === "PAYROLL" || (payroll.has(merchantKey(e.concept)) && e.cents >= 60000) ? { ...e, payroll: true } : e));
+}
+
+// Everything the Dinero statistics need for one month («YYYY-MM»).
+export function monthStats(spending, income, key, now = new Date()) {
+  const prevDate = new Date(Number(key.slice(0, 4)), Number(key.slice(5, 7)) - 2, 1);
+  const prevKey = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, "0")}`;
+  const sp = inMonth(spending, key), inc = markPayroll(inMonth(income, key));
+  const spent = sum(sp), earned = sum(inc);
+  const prevSpent = sum(inMonth(spending, prevKey)), prevEarned = sum(inMonth(income, prevKey));
+  const payroll = inc.filter((e) => e.payroll).sort((a, b) => (a.at < b.at ? -1 : 1));
+  const y = Number(key.slice(0, 4)), m = Number(key.slice(5, 7)) - 1;
+  const daysInMonth = new Date(y, m + 1, 0).getDate();
+  const current = now.getFullYear() === y && now.getMonth() === m;
+  const daysElapsed = current ? now.getDate() : daysInMonth;
+  const merchants = new Map();
+  for (const e of sp) {
+    const k = merchantKey(e.merchant) ?? "sin concepto";
+    const cur = merchants.get(k) ?? { name: e.merchant ?? "Sin concepto", cents: 0, count: 0 };
+    cur.cents += e.cents; cur.count++;
+    merchants.set(k, cur);
+  }
+  const pct = (a, b) => (b > 0 ? Math.round(((a - b) / b) * 100) : null);
+  return {
+    key, spent, earned, saved: earned - spent,
+    savingRate: earned > 0 ? Math.round(((earned - spent) / earned) * 100) : null,
+    payroll: { cents: sum(payroll), days: payroll.map((e) => Number(e.at.slice(8, 10))) },
+    incomeByKind: ["PAYROLL", "BIZUM", "TRANSFER", "REFUND", "OTHER"].map((k) => [k, sum(inc.filter((e) => (k === "PAYROLL" ? e.payroll : !e.payroll && e.kind === k)))]).filter(([, c]) => c > 0),
+    prevSpent, prevEarned, spentDelta: pct(spent, prevSpent), earnedDelta: pct(earned, prevEarned),
+    avgDaily: daysElapsed ? Math.round(spent / daysElapsed) : 0,
+    projection: current && daysElapsed ? Math.round((spent / daysElapsed) * daysInMonth) : null,
+    count: sp.length,
+    biggest: sp.reduce((b, e) => (!b || e.cents > b.cents ? e : b), null),
+    topMerchants: [...merchants.values()].sort((a, b) => b.cents - a.cents).slice(0, 5),
+    income: inc.sort((a, b) => (a.at < b.at ? 1 : -1)),
+  };
+}
+
+// Last n months, oldest first, for the income vs spending chart.
+export function monthlySeries(spending, income, n = 6, now = new Date()) {
+  return Array.from({ length: n }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - (n - 1 - i), 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    return { key, label: d.toLocaleDateString("es-ES", { month: "short" }).replace(".", ""), spent: sum(inMonth(spending, key)), earned: sum(inMonth(income, key)) };
+  });
+}
