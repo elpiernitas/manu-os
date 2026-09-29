@@ -38,3 +38,10 @@ Manu quiere que MANU abra sus apps según el momento del día y que la música e
 
 - **Reproducir automáticamente una lista concreta**: Manu prefiere elegir él.
 - **Controlar el Chromecast directamente (Cast SDK)**: requiere Chrome o un SDK nativo; no funciona en Safari de iOS.
+
+## Enmienda (2026-09-29, WEB-15)
+
+- Manu creó (con Claude en Chrome) la app de Spotify for Developers «MANU OS» en modo Development: redirección `https://elpiernitas.github.io/manu-os/`, solo Web API y Manu como único usuario autorizado. El secreto de cliente no se abrió ni se copió.
+- La web trae su Client ID por defecto (`DEFAULT_SPOTIFY_CLIENT_ID`), igual que el de Google (enmienda WEB-08 de ADR-0013). Con PKCE es público por diseño y solo acepta esa redirección. Manu puede usar otro en «Ajustes avanzados»; al cambiarlo se borran los tokens, porque pertenecen a la app que los emitió.
+- «Puesta a punto» ofrece «Conectar» Spotify con un toque.
+- NO_VERIFICADO: que el modo Development de Spotify permita cambiar de altavoz, y que en el iPhone la vuelta desde Spotify llegue a la app instalada con su almacenamiento, donde se guarda el PKCE. Si iOS devuelve a Safari en lugar de a la app instalada, la conexión fallará con «sesión caducada».
