@@ -106,3 +106,31 @@ export function reply(intent, variant = 0) {
       ][v];
   }
 }
+
+// Quick add («+»): one free-text field; MANU guesses what it is. The guess is
+// only a suggestion shown on the type tiles — Manu can always pick another.
+export function quickDetect(input, now = new Date()) {
+  const raw = String(input ?? "").trim();
+  if (!raw) return { kind: "TASK" };
+  const intent = parse(raw);
+  if (intent.kind === "idea") return { kind: "IDEA", text: intent.text };
+  if (intent.kind === "reminder" || intent.kind === "alarm") {
+    const [h, m] = intent.time.split(":").map(Number);
+    const at = new Date(now); at.setHours(h, m, 0, 0);
+    if (intent.tomorrow) at.setDate(at.getDate() + 1);
+    else if (at <= now) at.setDate(at.getDate() + 1);
+    return { kind: "REMINDER", text: intent.kind === "alarm" ? "Alarma" : intent.text, at };
+  }
+  if (intent.kind === "expense") return { kind: "EXPENSE", cents: intent.cents, merchant: intent.merchant };
+  // «12,50 café», «café 3€», «20 euros gasolina»: an amount with a currency, or a
+  // leading number followed by words, reads as an expense.
+  const withCurrency = raw.match(/(\d{1,7}(?:[.,]\d{1,2})?)\s*(?:€|eur\b|euros?\b)/i);
+  const leading = raw.match(/^(\d{1,7}(?:[.,]\d{1,2})?)\s+(\D.*)$/);
+  const m = withCurrency ?? leading;
+  if (m) {
+    const cents = toCents(m[1]);
+    const rest = raw.replace(m[0], m === leading ? m[2] : "").replace(/\s+/g, " ").replace(/^(en|de)\s+/i, "").trim();
+    if (cents) return { kind: "EXPENSE", cents, merchant: rest.slice(0, 80) || null };
+  }
+  return { kind: "TASK", text: raw };
+}
