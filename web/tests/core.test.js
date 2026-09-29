@@ -17,7 +17,7 @@ test("crisis phrases always win and give 112 and 024", () => {
 
 test("expenses parse amount in cents and merchant", () => {
   assert.deepEqual(parse("gasté 12,50 en Café"), { kind: "expense", cents: 1250, merchant: "Café" });
-  assert.deepEqual(parse("He pagado 3.2€ en el bus."), { kind: "expense", cents: 320, merchant: "el bus" });
+  assert.deepEqual(parse("He pagado 3.2€ en el bus."), { kind: "expense", cents: 320, merchant: "bus" }); // WEB-50: without the article
   assert.deepEqual(parse("pagué 40 euros"), { kind: "expense", cents: 4000, merchant: null });
   assert.equal(parse("gasté mucho").kind, "unknown");
   assert.equal(amountCents("gaste 0"), null);

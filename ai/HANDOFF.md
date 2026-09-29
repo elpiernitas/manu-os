@@ -10,6 +10,47 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
+## WEB-50 — MANU entiende más frases sin IA
+
+Se probó `parse` con 25 formas habituales de decir lo mismo. No entendía:
+- gastos: «12€ cine», «20 euros en cena», «me costó 3 el bus», «compré pan por 2»;
+- comercios: «pagué 30 de gasolina» y «he pagado 45,90 del gimnasio» se quedaban sin él;
+- recordatorios: «recuérdame mañana a las 9 ir al médico», «avísame en 20 minutos de sacar la ropa»;
+- alarmas: «despiértame a las 7:30»;
+- tareas: «tengo que comprar leche», «tarea: renovar el dni»;
+- preguntas de dinero: «¿cuánto llevo gastado este mes?», «¿cuánto gasté en comida?».
+
+Además, «apunta idea: …» guardaba el texto con «idea:» delante.
+
+### Cambios
+
+- `web/core/assistant.js`:
+  - **Gastos:**
+    - reconoce «me costó», «compré» y «he comprado»;
+    - acepta un importe con moneda al principio («12€ cine»). Un número sin moneda no cuenta: «3 cosas que hacer» sigue sin ser un gasto;
+    - `merchant` saca el comercio de «en / de / del / al / por / para», de «me costó N X» y de «compré X por N», sin artículo. Por eso «el bus» pasa a ser «bus» (test actualizado).
+  - **Tareas:** nuevo `kind: "task"` para «tarea: …», «añade tarea …» y, en frases de hasta 8 palabras sin pregunta, «tengo que …» y «hay que …». «Tengo que contarte / decirte / preguntarte / hablar…» sigue siendo conversación.
+  - **Recordatorios:** «avísame» vale igual que «recuérdame»; la hora puede ir antes del texto; «en / dentro de N minutos | horas | media hora» da `inMinutes`.
+  - **Alarmas:** «despiértame», «levántame» y «alarma a las …».
+  - **Ideas:** «apunta idea: X» guarda solo «X».
+  - **Preguntas de dinero:** nuevo `kind: "spendQuery"` con categoría opcional (usa `categoryFromText` de WEB-47).
+  - `quickDetect` también entiende las tareas y los recordatorios relativos.
+- `web/app.js`:
+  - las tareas se crean en la bandeja como `TASK`;
+  - los recordatorios «en N minutos» se crean con esa hora;
+  - la pregunta de dinero se responde **en el móvil** con el total, la comparación con el mes anterior, las tres categorías que más suman y el presupuesto si lo hay. No se envía a Gemini ni en el modo conversación: es más exacto y no saca datos de dinero (e2e27 actualizado);
+  - versión 50.
+
+### Resultados
+
+- `npm test`: 157/157 PASS (`assistant-phrases.test.js` con 4 tests).
+- e2e50: 9/9 en el chat real.
+- Las 50 pruebas e2e en PASS.
+
+### NO_VERIFICADO
+
+- Frases de Manu que no estén en la batería. Las nuevas que falle se pueden añadir como test.
+
 ## WEB-49 — rendimiento con un año de datos, uso sin conexión y pasos de Google
 
 Vuelta de calidad sin funciones nuevas.
