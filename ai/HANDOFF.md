@@ -10,6 +10,41 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
+## WEB-53 — seguridad frente a inyección de HTML y textos largos
+
+### Seguridad (XSS)
+
+- Revisión del código: cada texto de Manu, de Gmail, de Google o de Gemini que se pinta en HTML pasa por `esc()`. El chat usa `esc(b.text)` y los avisos usan `textContent`.
+- Prueba en navegador (xss.mjs): la carga `<img src=x onerror=…><b class=pwn>` se metió en todos los campos:
+  - ideas, tareas, gastos, ingresos, recordatorios y hábitos;
+  - personas y notas;
+  - proyectos, sus fuentes y su chat;
+  - el chat y el correo (remitentes y asuntos);
+  - eventos del calendario, la ciudad y los lugares.
+
+  Se recorrieron las 6 pestañas, un proyecto, 12 subpáginas, la búsqueda y 8 órdenes del chat. **No se inyectó nada** (ni script ni elemento) y no se pintó ningún enlace `javascript:`. Además, la CSP (`script-src 'self'`, sin `unsafe-inline`) bloquearía los manejadores en línea.
+
+### Textos largos (bug encontrado por la misma prueba)
+
+- Un texto largo sin espacios (una URL) ensanchaba la página en tres sitios:
+  - «Tu día» (su lista era una rejilla de columnas `1fr`);
+  - las tarjetas de Proyectos;
+  - la cabecera de un proyecto.
+
+  El iPhone reducía el zoom y **la barra de pestañas dejaba de responder** (la tapaba el contenido).
+- `web/styles.css`:
+  - `overflow-wrap: anywhere` en `#screen`, avisos y hoja;
+  - `minmax(0, 1fr)` en «Tu día» y en Proyectos, que mantiene sus dos columnas;
+  - `min-width: 0` en los hijos que se estiran.
+- Versión 53.
+
+### Resultados
+
+- overflow.mjs: 9 pantallas con URLs largas sin desborde (antes: Hoy 869 px, Proyectos 839 px y un proyecto 1765 px, sobre 390 px).
+- xss.mjs: PASS.
+- La auditoría visual (60 pantallas) y las 50 pruebas e2e en PASS.
+- `npm test`: 166/166 PASS.
+
 ## WEB-52 — varios gastos en una frase y la hoja rápida
 
 ### Errores encontrados

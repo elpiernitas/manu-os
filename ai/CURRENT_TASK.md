@@ -2,11 +2,11 @@
 
 Status: **REVIEW_PENDING**
 
-WEB-52 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
+WEB-53 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
 
 ## Tarea activa
 
-WEB-52 — varios gastos en una frase y la hoja rápida con importes y fechas correctos (`ai/HANDOFF.md`, «WEB-52»).
+WEB-53 — seguridad (inyección de HTML) y textos largos que ensanchaban la página (`ai/HANDOFF.md`, «WEB-53»).
 
 ## Autorización
 
@@ -49,6 +49,7 @@ WEB-52 — varios gastos en una frase y la hoja rápida con importes y fechas co
 
 ## Historial (cerrado)
 
+- **WEB-52** (varios gastos y hoja rápida): CERRADA. Fusionada mediante el PR #59 (`1816ae5`).
 - **WEB-51** (fechas, miles, ingresos, salud y ánimo): CERRADA. Fusionada mediante el PR #58 (`7079ee9`).
 - **WEB-50** (frases sin IA): CERRADA. Fusionada mediante el PR #57 (`ba66180`).
 - **WEB-49** (rendimiento): CERRADA. Fusionada mediante el PR #56 (`20a4a7f`).
