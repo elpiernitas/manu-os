@@ -620,3 +620,9 @@ body[data-screen="hoy"][data-wx="sun-cloud"] .ambient { background: linear-gradi
 
 /* ---------- WEB-37: nueva conversación ---------- */
 .chat-tools { display: flex; justify-content: flex-end; margin: 4px 0 6px; }
+
+/* ---------- WEB-38: personas ---------- */
+.bday { display: grid; grid-template-columns: 1fr 2fr; gap: 8px; }
+.bday select { min-height: 44px; }
+.check-row { display: flex; align-items: center; gap: 10px; min-height: 44px; }
+.check-row input { width: 22px; height: 22px; }

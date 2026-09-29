@@ -36,3 +36,17 @@ test("urls, bodies and adapter errors", async () => {
   assert.equal(sent.headers.Authorization, "Bearer tok");
   assert.equal(JSON.parse(sent.body).summary, "Dentista");
 });
+
+test("WEB-38: a birthday becomes a yearly all-day event on its next date", async () => {
+  const { birthdayEventBody } = await import("../core/gcal.js");
+  const now = new Date(2026, 8, 29); // 29 Sep 2026
+  const b = birthdayEventBody({ name: "Persona Ejemplo", birthday: "12-05" }, now);
+  assert.deepEqual(b.start, { date: "2026-12-05" });
+  assert.deepEqual(b.end, { date: "2026-12-06" });
+  assert.deepEqual(b.recurrence, ["RRULE:FREQ=YEARLY"]);
+  assert.equal(b.summary, "🎂 Cumpleaños de Persona Ejemplo");
+  assert.equal(birthdayEventBody({ name: "X", birthday: "03-01" }, now).start.date, "2027-03-01"); // already passed this year
+  assert.equal(birthdayEventBody({ name: "X", birthday: "12-31" }, now).end.date, "2027-01-01");
+  assert.equal(birthdayEventBody({ name: "X", birthday: "02-29" }, now).start.date, "2028-02-29"); // next leap year
+  assert.throws(() => birthdayEventBody({ name: "X", birthday: "5 dic" }, now));
+});

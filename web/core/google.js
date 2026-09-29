@@ -30,7 +30,7 @@ export async function runServices(services, enabled, tokenFor) {
 }
 
 const TASKS = "https://tasks.googleapis.com/tasks/v1/lists/@default/tasks";
-const PEOPLE = "https://people.googleapis.com/v1/people/me/connections?personFields=names,birthdays&pageSize=1000";
+const PEOPLE = "https://people.googleapis.com/v1/people/me/connections?personFields=names,birthdays,phoneNumbers&pageSize=1000";
 const DRIVE = "https://www.googleapis.com/drive/v3/files";
 const UPLOAD = "https://www.googleapis.com/upload/drive/v3/files";
 export const BACKUP_NAME = "manu-os-vault.json";
@@ -109,6 +109,19 @@ export function birthdaysFrom(json) {
   return out;
 }
 
+// Every contact, for autocompleting names in Personas (WEB-38). Stays on the device.
+export function contactsFrom(json) {
+  const out = [];
+  for (const p of json?.connections ?? []) {
+    const name = p.names?.[0]?.displayName;
+    if (!name) continue;
+    const b = (p.birthdays ?? []).find((x) => x.date?.month && x.date?.day)?.date;
+    const phone = (p.phoneNumbers ?? []).map((x) => String(x.canonicalForm ?? x.value ?? "").replace(/[^\d+]/g, "")).find(Boolean) ?? null;
+    out.push({ googleId: p.resourceName, name: String(name).slice(0, 60), birthday: b ? `${String(b.month).padStart(2, "0")}-${String(b.day).padStart(2, "0")}` : null, phone: phone ? phone.slice(0, 20) : null });
+  }
+  return out.sort((a, b) => a.name.localeCompare(b.name, "es"));
+}
+
 // Returns { people, complete }. Merging only adds or updates; nothing is ever
 // deleted because a contact is missing, so a partial listing is harmless.
 export async function contactBirthdays(token, fetchImpl) {
@@ -116,7 +129,7 @@ export async function contactBirthdays(token, fetchImpl) {
     const json = await call(token, `${PEOPLE}${pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ""}`, {}, fetchImpl);
     return { items: json?.connections ?? [], nextPageToken: json?.nextPageToken };
   });
-  return { people: birthdaysFrom({ connections: items }), total: items.length, complete };
+  return { people: birthdaysFrom({ connections: items }), contacts: contactsFrom({ connections: items }).slice(0, 3000), total: items.length, complete };
 }
 
 export function mergePeople(people, fromGoogle, makeId) {

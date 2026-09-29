@@ -89,6 +89,23 @@ export function newEventBody({ title, start, minutes = 60 }) {
   return { summary: String(title).slice(0, 200), start: { dateTime: s.toISOString(), timeZone: tz }, end: { dateTime: e.toISOString(), timeZone: tz } };
 }
 
+// A yearly all-day birthday (WEB-38). birthday: "MM-DD". Starts on the next
+// occurrence; 29 February repeats only in leap years (Google's own rule).
+export function birthdayEventBody({ name, birthday }, now = new Date()) {
+  const m = /^(\d{2})-(\d{2})$/.exec(String(birthday ?? ""));
+  if (!name || !m) throw new Error("Cumpleaños no válido");
+  const month = Number(m[1]), day = Number(m[2]);
+  let year = now.getFullYear();
+  const todayKey = `${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  if (birthday < todayKey) year++;
+  if (month === 2 && day === 29) while (!(year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0))) year++;
+  const pad = (n) => String(n).padStart(2, "0");
+  const start = `${year}-${pad(month)}-${pad(day)}`;
+  const next = new Date(Date.UTC(year, month - 1, day + 1));
+  const end = `${next.getUTCFullYear()}-${pad(next.getUTCMonth() + 1)}-${pad(next.getUTCDate())}`;
+  return { summary: `🎂 Cumpleaños de ${String(name).slice(0, 60)}`, start: { date: start }, end: { date: end }, recurrence: ["RRULE:FREQ=YEARLY"], transparency: "transparent" };
+}
+
 // Paginated: follows nextPageToken (max 10 pages) so a busy month is complete.
 export async function listEvents(token, from, to, fetchImpl = fetch, { calendarId = "primary", color = null, calendar = null } = {}) {
   const items = [];
