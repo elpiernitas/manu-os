@@ -22,6 +22,12 @@ export const CATEGORIES = {
   OTHER: "Otros",
 };
 
+export const CATEGORY_EMOJI = {
+  FOOD_AND_DRINK: "🍔", GROCERIES: "🛒", TRANSPORT: "🚕", SUBSCRIPTIONS: "📺", LEISURE: "🎟️",
+  HOME: "🏠", HEALTH: "💊", SHOPPING: "👕", TRANSFERS: "🔁", CASH: "💵", NIGHTLIFE: "🍸",
+  TOBACCO: "🚬", TRAVEL: "✈️", SERVICES: "🧾", FINANCE: "🏦", ADMIN: "📋", DONATIONS: "🤝", OTHER: "📦",
+};
+
 // Keywords are matched as whole words (or phrases) on the normalised text, so
 // "super" does not match "superior". Order matters: first match wins.
 const RULES = [

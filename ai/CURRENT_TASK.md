@@ -2,11 +2,11 @@
 
 Status: **REVIEW_PENDING**
 
-WEB-15 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
+WEB-16 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
 
 ## Tarea activa
 
-WEB-15 — Spotify conectado con un toque usando la app «MANU OS» de Manu (`ai/HANDOFF.md`, «WEB-15»; enmienda WEB-15 de ADR-0014).
+WEB-16 — escenas vivas: tiempo, dinero, MANU, ánimo y agenda (`ai/HANDOFF.md`, «WEB-16»).
 
 ## Autorización
 
@@ -41,6 +41,7 @@ WEB-15 — Spotify conectado con un toque usando la app «MANU OS» de Manu (`ai
 
 ## Historial (cerrado)
 
+- **WEB-15** (Spotify con un toque): CERRADA. Fusionada mediante el PR #23 (`c657d99`).
 - **WEB-14** (tutorial de Gemini): CERRADA. Fusionada mediante el PR #22 (`c8109ee`).
 - **WEB-13** (revisión de ChatGPT, calendario automático, gastos del Excel, puesta a punto): CERRADA. Fusionada mediante el PR #21 (`750589e`), con el «sí» de Manu.
 - **WEB-12** (IA que propone acciones): CERRADA. Fusionada mediante el PR #20 (`9a5bf6f`).

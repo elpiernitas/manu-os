@@ -1,5 +1,5 @@
 import { parse, reply } from "./core/assistant.js";
-import { CATEGORIES, euros, newEntry, learnCategory, summary, toCents, rulesFromRows, applyRules } from "./core/money.js";
+import { CATEGORIES, CATEGORY_EMOJI, euros, newEntry, learnCategory, summary, toCents, rulesFromRows, applyRules } from "./core/money.js";
 import { MODE_TITLES, modeState } from "./core/modes.js";
 import { capture, confirm, markUnclassified, pending, tasks, ideas, toggleDone } from "./core/inbox.js";
 import { initialRefuge, refugeReply } from "./core/refuge.js";
@@ -12,13 +12,14 @@ import { CITIES, proposeAlarm, shouldAskTomorrow, shortcutUrl, guessCity } from 
 import { isClientId, listEvents, createEvent, newEventBody, monthGrid, listCalendars, mergeDays } from "./core/gcal.js";
 import { detectRecurring, upcomingRecurring, spendingPattern } from "./core/insights.js";
 import { SCOPE, runServices, planTaskSync, listOpenTasks, insertTask, completeTask, contactBirthdays, mergePeople, saveBackup, loadBackup } from "./core/google.js";
+import { weatherEmoji, sceneFor, PARTICLES, MONEY_EMOJI } from "./core/scene.js";
 import { isSensitive, pickModel, listModels, buildActionPayload, askWithActions, issueUrl } from "./core/ai.js";
 import { encryptBackup, decryptBackup, passphraseProblem } from "./core/crypto.js";
 import { isSpotifyClientId, pkceValid, randomVerifier, challengeFor, authorizeUrl, exchangeCode, refreshTokens, listDevices, findSpeaker, transferTo, DEFAULT_SPEAKER } from "./core/spotify.js";
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "15";
+export const APP_VERSION = "16";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -187,6 +188,16 @@ async function refreshWeather(force = false) {
   }
 }
 
+const wxE = (icon, cls = "") => `<span class="wx-emoji${cls ? ` ${cls}` : ""}" aria-hidden="true">${weatherEmoji(icon)}</span>`;
+const sceneLayer = (scene) => `<div class="scene scene-${scene}" aria-hidden="true">${"<i></i>".repeat(PARTICLES[scene] ?? 0)}</div>`;
+function currentWeather() {
+  const city = activeCity();
+  return vault.weather && vault.weather.city?.name === city.name ? vault.weather : null;
+}
+let celebrateMoney = false; // short money shower, only when entering Dinero
+const moneyRain = () => `<div class="money-rain" aria-hidden="true">${Array.from({ length: 12 }, (_, i) => `<i>${MONEY_EMOJI[i % MONEY_EMOJI.length]}</i>`).join("")}</div>`;
+const catLabel = (c) => `${CATEGORY_EMOJI[c] ?? "📦"} ${CATEGORIES[c] ?? c}`;
+
 function weatherCard() {
   const city = activeCity();
   const w = vault.weather && vault.weather.city?.name === city.name ? vault.weather : null;
@@ -199,11 +210,13 @@ function weatherCard() {
   }
   const f = w.data;
   const age = Math.round((Date.now() - new Date(w.at).getTime()) / 60000);
-  return `<section class="card hero" aria-label="Tiempo en ${esc(city.name)}">
+  const scene = sceneFor(f.now.icon);
+  return `<section class="card hero scene-card sc-${scene}" aria-label="Tiempo en ${esc(city.name)}">
+    ${sceneLayer(scene)}
     <button class="hero-tap" data-act="weather-open" aria-label="Ver el tiempo completo"></button>
     <div class="row"><h2>${esc(city.name)}</h2><span class="muted small">${age < 2 ? "ahora" : `hace ${age} min`} ›</span></div>
-    <div class="weather-now">${I[f.now.icon] ?? I.cloud}<div><div class="temp">${f.now.temp}°</div><div class="muted">${esc(f.now.text)} · ${f.today.min}° / ${f.today.max}°</div></div></div>
-    ${f.hours?.length ? `<div class="hours">${f.hours.slice(0, 8).map((h) => `<div><span class="muted small">${esc(h.time)}</span>${I[h.icon] ?? I.cloud}<b>${h.temp}°</b></div>`).join("")}</div>` : ""}
+    <div class="weather-now">${wxE(f.now.icon, "big")}<div><div class="temp"><span data-count="${f.now.temp}">${f.now.temp}</span>°</div><div class="muted">${esc(f.now.text)} · ${f.today.min}° / ${f.today.max}°</div></div></div>
+    ${f.hours?.length ? `<div class="hours">${f.hours.slice(0, 8).map((h) => `<div><span class="muted small">${esc(h.time)}</span>${wxE(h.icon)}<b>${h.temp}°</b></div>`).join("")}</div>` : ""}
     <p>${esc(advice(f))}</p>
     ${f.tomorrow ? `<p class="muted small">Mañana: ${esc(f.tomorrow.text.toLowerCase())}, ${f.tomorrow.min}°–${f.tomorrow.max}°${f.tomorrow.rain !== null ? `, lluvia ${f.tomorrow.rain} %` : ""}.</p>` : ""}
     <div class="btns">${cityChips}</div></section>`;
@@ -230,10 +243,10 @@ function weatherPage() {
   const lo = Math.min(...f.days.map((d) => d.min)), hi = Math.max(...f.days.map((d) => d.max));
   const span = Math.max(1, hi - lo);
   return `<button class="link" data-act="overlay-close">${I.back} Hoy</button>
-    <div class="weather-head"><p class="muted">${esc(city.name)}</p><div class="temp xl"><span data-count="${f.now.temp}">${f.now.temp}</span>°</div><p>${esc(f.now.text)}</p><p class="muted">Máx. ${f.today.max}° · Mín. ${f.today.min}°</p></div>
-    <section class="card"><p class="small">${esc(advice(f))}</p><div class="hours scroll">${f.hours.map((h) => `<div><span class="muted small">${esc(h.time)}</span>${I[h.icon] ?? I.cloud}${h.rain >= 20 ? `<span class="rain small">${h.rain}%</span>` : ""}<b>${h.temp}°</b></div>`).join("")}</div></section>
+    <div class="weather-head scene-card sc-${sceneFor(f.now.icon)}">${sceneLayer(sceneFor(f.now.icon))}<p class="muted">${esc(city.name)}</p>${wxE(f.now.icon, "xl")}<div class="temp xl"><span data-count="${f.now.temp}">${f.now.temp}</span>°</div><p>${esc(f.now.text)}</p><p class="muted">Máx. ${f.today.max}° · Mín. ${f.today.min}°</p></div>
+    <section class="card"><p class="small">${esc(advice(f))}</p><div class="hours scroll">${f.hours.map((h) => `<div><span class="muted small">${esc(h.time)}</span>${wxE(h.icon)}${h.rain >= 20 ? `<span class="rain small">${h.rain}%</span>` : ""}<b>${h.temp}°</b></div>`).join("")}</div></section>
     ${sectionTitle("Próximos 7 días")}
-    <section class="card">${f.days.map((d) => `<div class="row day"><span class="wd">${esc(d.weekday)}</span><span class="dicon">${I[d.icon] ?? I.cloud}${d.rain >= 20 ? `<span class="rain small">${d.rain}%</span>` : ""}</span><span class="num muted">${d.min}°</span><span class="range"><i data-l="${Math.round(((d.min - lo) / span) * 100)}" data-w="${Math.max(6, Math.round(((d.max - d.min) / span) * 100))}"></i></span><span class="num">${d.max}°</span></div>`).join("")}</section>
+    <section class="card">${f.days.map((d) => `<div class="row day"><span class="wd">${esc(d.weekday)}</span><span class="dicon">${wxE(d.icon)}${d.rain >= 20 ? `<span class="rain small">${d.rain}%</span>` : ""}</span><span class="num muted">${d.min}°</span><span class="range"><i data-l="${Math.round(((d.min - lo) / span) * 100)}" data-w="${Math.max(6, Math.round(((d.max - d.min) / span) * 100))}"></i></span><span class="num">${d.max}°</span></div>`).join("")}</section>
     <div class="tiles">
       <section class="card"><h2>${I["cloud-sun"]} Sensación</h2><div class="tile-v">${f.now.feels ?? "—"}°</div><p class="muted small">${f.now.feels !== null && f.now.feels > f.now.temp ? "Se nota más calor por la humedad." : "Parecida a la real."}</p></section>
       <section class="card"><h2>${I.drop} Humedad</h2><div class="tile-v">${f.now.humidity ?? "—"} %</div></section>
@@ -375,6 +388,35 @@ function eventsFor(day) {
   return [];
 }
 
+// «Lo próximo»: the next 48 h as a short timeline (events and reminders).
+function upcomingItems(now = today(), hours = 48) {
+  const until = new Date(now.getTime() + hours * 3600000);
+  const items = [];
+  for (let d = 0; d < 3; d++) {
+    const day = new Date(now); day.setDate(day.getDate() + d);
+    const key = dayKey(day);
+    for (const ev of eventsFor(key)) {
+      if (ev.multi && !ev.first && d > 0) continue; // an ongoing multi-day event shows once, today
+      const at = ev.time ? new Date(`${key}T${ev.time}:00`) : new Date(`${key}T00:00:00`);
+      const end = ev.end ? new Date(`${key}T${ev.end}:00`) : null;
+      if ((end ?? at) < now && ev.time) continue;
+      if (at > until) continue;
+      items.push({ at, allDay: !ev.time, title: ev.title, color: ev.color ?? null, kind: "event" });
+    }
+  }
+  for (const r of vault.reminders) {
+    const at = new Date(r.at);
+    if (!r.done && at >= now && at <= until) items.push({ at, allDay: false, title: r.text, color: null, kind: "reminder" });
+  }
+  return items.sort((a, b) => a.at - b.at || (a.allDay ? -1 : 1)).slice(0, 6);
+}
+
+function upcomingCard() {
+  const items = upcomingItems();
+  const dayWord = (d) => { const k = dayKey(d); return k === localDay() ? "Hoy" : k === tomorrowKey() ? "Mañana" : cap(d.toLocaleDateString("es-ES", { weekday: "long" })); };
+  return `<section class="card upcoming"><h2>Lo próximo</h2>${items.length ? `<ol class="timeline">${items.map((it) => `<li class="tl-item${it.kind === "reminder" ? " rem" : ""}"><span class="tl-dot" data-c="${esc(it.color ?? "")}"></span><div class="grow"><div>${it.kind === "reminder" ? "🔔 " : ""}${esc(it.title)}</div><div class="muted small">${dayWord(it.at)} · ${it.allDay ? "todo el día" : hhmm(it.at)}</div></div></li>`).join("")}</ol>` : '<p class="muted">Nada en las próximas 48 horas. 🌿</p>'}</section>`;
+}
+
 function calendarCard(canCreate) {
   const now = today();
   const view = calView ?? { y: now.getFullYear(), m: now.getMonth() };
@@ -384,7 +426,8 @@ function calendarCard(canCreate) {
   const tasksDue = vault.reminders.filter((r) => !r.done && dayKey(new Date(r.at)) === selected);
   const events = eventsFor(selected);
   const selDate = new Date(`${selected}T12:00:00`);
-  return `<section class="card cal" aria-label="Calendario">
+  const monthEmpty = grid.every((d) => !d.inMonth || !eventsFor(d.day).length);
+  return `<section class="card cal${monthEmpty ? " compact" : ""}" aria-label="Calendario">
       <div class="row cal-head"><button class="link" data-act="cal-prev" aria-label="Mes anterior">${I.back}</button><strong class="cal-title">${esc(title)}</strong><button class="link" data-act="cal-next" aria-label="Mes siguiente">${I.chev}</button></div>
       <div class="cal-grid" id="calGrid">${["L", "M", "X", "J", "V", "S", "D"].map((d) => `<span class="cal-dow">${d}</span>`).join("")}
         ${grid.map((d) => { const evs = eventsFor(d.day); const n = evs.length; return `<button class="cal-day${d.inMonth ? "" : " out"}${d.day === localDay() ? " today" : ""}${d.day === selected ? " sel" : ""}" data-act="cal-day" data-day="${d.day}" aria-label="${d.day}${n ? `, ${n} eventos` : ""}"><span class="num-d">${d.date}</span><span class="chips">${evs.slice(0, 3).map((ev) => `<i class="ev${ev.multi ? " multi" : ""}${ev.multi && !ev.first ? " cont" : ""}${ev.multi && !ev.last ? " open" : ""}" data-c="${esc(ev.color ?? "")}">${ev.multi && !ev.first && (new Date(`${d.day}T12:00:00`).getDay() !== 1) ? "&nbsp;" : esc(ev.title)}</i>`).join("")}${n > 3 ? `<i class="more">+${n - 3}</i>` : ""}</span></button>`; }).join("")}</div>
@@ -459,6 +502,7 @@ const screens = {
     const gCal = isClientId(gClientId()) && googleOn("calendar");
     return `<h1>Agenda</h1><p class="subtitle">${esc(longDate())}</p>
       ${g ? `<div class="btns"><button class="btn ghost" data-act="gcal-sync">${gcal.busy ? "Sincronizando…" : "Sincronizar con Google"}</button></div><p class="muted small">${synced ? `Última sincronización: ${synced}` : "Aún sin sincronizar."}${gcal.error ? ` · ${esc(gcal.error)}` : ""}${validToken(SCOPE.calendar) ? " · se actualiza sola cada 10 min" : ""}</p>` : `<p class="muted small"><button class="link small" data-act="goto-gcal">Conectar Google (Calendar, Tasks, Contactos y Drive)</button></p>`}
+      ${upcomingCard()}
       ${calendarCard(gCal)}
       <details class="card"><summary class="muted small">Sin Google: pegar los eventos de hoy</summary><p class="muted small">Si tu calendario no es de Google, pega aquí tus eventos (o usa el atajo «MANU Agenda»).</p>${agendaToday() && vault.agenda.source !== "GOOGLE"
         ? (vault.agenda.events.length ? vault.agenda.events.map((ev) => `<div class="row"><span class="num chip">${esc(ev.time ? ev.time + (ev.end ? "–" + ev.end : "") : "Todo el día")}</span><span class="grow">${esc(ev.title)}</span></div>`).join("") : "") : ""}
@@ -471,11 +515,15 @@ const screens = {
       <section class="card">${idea.length ? idea.map((i) => `<div class="row"><span class="grow">${esc(i.text)}</span><button class="link small" data-act="idea-to-task" data-id="${esc(i.id)}">Hacer tarea</button></div>`).join("") : '<p class="muted">Tus ideas quedan aquí, sin convertirse en proyectos sin tu permiso.</p>'}</section>`;
   },
   manu() {
-    const chips = refuge ? ["quiero entender por qué", "buscar una solución", "necesito desconectar"] : ["gasté 3,20 en café", "recuérdame llamar al taller a las 18", "pon una alarma a las 7:30", "apunta idea: viaje", "refugio"];
+    const chips = refuge ? ["quiero entender por qué", "buscar una solución", "necesito desconectar"] : null;
+    // Short cards: «fill» starts the sentence for Manu; «say» sends it directly.
+    const cards = [["💸", "Apuntar gasto", "fill", "gasté "], ["⏰", "Crear alarma", "fill", "pon una alarma a las "], ["🔔", "Recordatorio", "fill", "recuérdame "], ["💡", "Guardar idea", "fill", "apunta idea: "], ["🗓️", "¿Qué tengo hoy?", "say", "qué tengo hoy"], ["🌿", "Refugio", "say", "refugio"]];
+    const thinking = vault.chat.at(-1)?.text === "Pensando…";
+    const empty = !vault.chat.length && !refuge;
     const history = vault.chat.length ? vault.chat : [{ from: "manu", text: "Hola, Manu. Puedo apuntar gastos, ideas y tareas, crear recordatorios y alarmas, y acompañarte en el Refugio. Aún funciono sin IA: habla claro y corto." }];
-    return `<h1>MANU</h1><p class="subtitle">Tu asistente · ${aiReady() ? "IA disponible, siempre con tu confirmación" : '<button class="link small" data-sub-go="ia">activar IA</button>'}</p>
+    return `<div class="manu-head${empty ? " big" : ""}"><div class="orb${thinking ? " thinking" : ""}" id="orb" aria-hidden="true"><span>M</span></div><div><h1>MANU</h1><p class="subtitle">Tu asistente · ${aiReady() ? "IA disponible, siempre con tu confirmación" : '<button class="link small" data-act="gemini-guide">activar IA</button>'}</p></div></div>
       ${refuge ? `<div class="refuge-bar"><span>Refugio · no se guarda</span><button class="link" data-act="leave-refuge">Salir</button></div>` : ""}
-      <div class="suggest" aria-label="Sugerencias">${chips.map((s) => `<button data-say="${esc(s)}">${esc(s)}</button>`).join("")}</div>
+      ${chips ? `<div class="suggest" aria-label="Sugerencias">${chips.map((s) => `<button data-say="${esc(s)}">${esc(s)}</button>`).join("")}</div>` : `<div class="quick-cards" aria-label="Sugerencias">${cards.map(([e, label, how, text]) => `<button class="qcard" ${how === "say" ? `data-say="${esc(text)}"` : `data-fill="${esc(text)}"`}><span class="qe" aria-hidden="true">${e}</span><span>${esc(label)}</span></button>`).join("")}</div>`}
       <div class="chat" id="chat" aria-live="polite">${[...history, ...(refuge?.messages ?? [])].map((b) => `<div class="bubble ${b.from}${b.safety ? " safety" : ""}">${b.ai ? '<span class="ai-tag">IA</span>' : ""}${esc(b.text)}${b.proposal ? `${b.proposal.state ? `<details><summary class="muted small">Ver lo enviado</summary><pre class="payload">${esc(shownPayload(b.proposal))}</pre></details>` : `<pre class="payload">${esc(shownPayload(b.proposal))}</pre>`}${b.proposal.state ? `<p class="muted small">${b.proposal.state === "sent" ? (b.proposal.auto ? "Enviado a Gemini sin preguntar (lo activaste en Tú → IA)." : "Enviado a Gemini.") : "No enviado."}</p>` : `<div class="btns"><button class="btn" data-act="ai-send" data-id="${esc(b.proposal.id)}">Enviar a Gemini</button><button class="btn ghost" data-act="ai-cancel" data-id="${esc(b.proposal.id)}">No</button></div><div class="btns"><button class="link small" data-act="ask-elsewhere" data-app="chatgpt" data-id="${esc(b.proposal.id)}">Preguntar en ChatGPT</button><button class="link small" data-act="ask-elsewhere" data-app="claude" data-id="${esc(b.proposal.id)}">Preguntar en Claude</button></div>`}` : ""}${b.action ? `<div class="btns"><a class="btn" href="${esc(b.action.href)}">${esc(b.action.label)}</a></div>` : ""}${(b.calls ?? []).map((c, i) => callCard(b, c, i)).join("")}</div>`).join("")}</div>
       <form class="composer glass" id="composer"><label for="msg" class="sr">Mensaje para MANU</label><input id="msg" autocomplete="off" enterkeyhint="send" placeholder="${refuge ? "Cuéntame" : "Escribe a MANU"}"><button class="btn" type="submit">Enviar</button></form>`;
   },
@@ -493,8 +541,8 @@ const screens = {
     const imp = vault.settings.lastImport;
     return `<h1>Dinero</h1><p class="subtitle">${esc(cap(monthName))}</p>
       <div class="stack">
-      <section class="card hero"><div class="row cal-head"><button class="link" data-act="money-prev" aria-label="Mes anterior">${I.back}</button><h2>${moneyMonth === 0 ? "Gastado este mes" : `Gastado en ${esc(monthName.replace(/ de \d{4}$/, ""))}`}</h2><button class="link" data-act="money-next" aria-label="Mes siguiente"${moneyMonth === 0 ? " disabled" : ""}>${I.chev}</button></div><div class="big-money" data-count-money="${month.total}">${euros(month.total)}</div>
-        ${cats.map(([c, v]) => `<div class="stack"><div class="row"><span>${esc(CATEGORIES[c])}</span><span class="num">${euros(v)}</span></div><div class="bar"><i data-w="${Math.max(3, Math.round((v / max) * 100))}"></i></div></div>`).join("")}</section>
+      <section class="card hero money-hero">${celebrateMoney ? moneyRain() : ""}<div class="row cal-head"><button class="link" data-act="money-prev" aria-label="Mes anterior">${I.back}</button><h2>${moneyMonth === 0 ? "Gastado este mes" : `Gastado en ${esc(monthName.replace(/ de \d{4}$/, ""))}`}</h2><button class="link" data-act="money-next" aria-label="Mes siguiente"${moneyMonth === 0 ? " disabled" : ""}>${I.chev}</button></div><div class="big-money" data-count-money="${month.total}">${euros(month.total)}</div>
+        ${cats.map(([c, v]) => `<div class="stack"><div class="row"><span>${esc(catLabel(c))}</span><span class="num">${euros(v)}</span></div><div class="bar"><i data-w="${Math.max(3, Math.round((v / max) * 100))}"></i></div></div>`).join("")}</section>
       <section class="card"><h2>${I.box} Importar del banco</h2>
         <p class="muted small">Descarga los movimientos de tu banco (Sabadell: Excel .xls; también vale CSV) y elígelo aquí. Se analiza en tu móvil y no se envía a nadie. Solo importo gastos y no duplico los que ya tengas. Si corriges la categoría de un comercio, la aprendo para todos sus movimientos.</p>
         <label class="btn ghost" for="bankFile" role="button" tabindex="0">Elegir archivo (Excel o CSV)</label><input id="bankFile" type="file" accept=".xls,.xlsx,.csv,text/csv,text/plain,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="sr">
@@ -505,8 +553,8 @@ const screens = {
         ${imp ? `<p class="muted small">Última importación: ${imp.added} gastos nuevos, ${imp.duplicates} repetidos, ${imp.income} ingresos ignorados${imp.invalid ? `, ${imp.invalid} filas no reconocidas` : ""}.</p>` : ""}</section>
       ${moneyInsights()}
       ${sectionTitle("Movimientos", `${toReview ? `<button class="link small" data-act="money-filter">${moneyFilter === "review" ? "Ver todos" : `Por revisar (${toReview})`}</button>` : ""}${addLink("EXPENSE")}`)}
-      <section class="card">${entries.length ? entries.map((x) => `<div class="row"><div class="grow"><div>${esc(x.merchant ?? "Sin concepto")}</div><div class="muted small">${new Date(x.at).toLocaleDateString("es-ES", { day: "numeric", month: "short" })}${x.sub ? ` · ${esc(x.sub)}` : ""}${x.source === "BANK" ? " · banco" : ""}${x.review ? ' · <b class="review">revisar</b>' : x.inferred ? " · categoría propuesta" : x.ruled ? " · según tus reglas" : ""}</div></div>
-          <div class="stack"><span class="num">${euros(x.cents)}</span><label class="sr" for="cat-${esc(x.id)}">Categoría</label><select id="cat-${esc(x.id)}" data-cat="${esc(x.id)}">${Object.entries(CATEGORIES).map(([k, t]) => `<option value="${k}"${k === x.category ? " selected" : ""}>${esc(t)}</option>`).join("")}</select></div></div>`).join("")
+      <section class="card">${entries.length ? entries.map((x) => `<div class="row"><span class="cat-emoji" aria-hidden="true">${CATEGORY_EMOJI[x.category] ?? "📦"}</span><div class="grow"><div>${esc(x.merchant ?? "Sin concepto")}</div><div class="muted small">${new Date(x.at).toLocaleDateString("es-ES", { day: "numeric", month: "short" })}${x.sub ? ` · ${esc(x.sub)}` : ""}${x.source === "BANK" ? " · banco" : ""}${x.review ? ' · <b class="review">revisar</b>' : x.inferred ? " · categoría propuesta" : x.ruled ? " · según tus reglas" : ""}</div></div>
+          <div class="stack"><span class="num">${euros(x.cents)}</span><label class="sr" for="cat-${esc(x.id)}">Categoría</label><select id="cat-${esc(x.id)}" data-cat="${esc(x.id)}">${Object.keys(CATEGORIES).map((k) => `<option value="${k}"${k === x.category ? " selected" : ""}>${esc(catLabel(k))}</option>`).join("")}</select></div></div>`).join("")
         : '<p class="muted">Sin gastos. Toca «+», escribe a MANU «gasté 12,50 en café» o importa el CSV del banco.</p>'}</section>
       </div>`;
   },
@@ -521,7 +569,7 @@ const screens = {
     return `<div class="row"><div class="avatar" aria-hidden="true">M</div><div class="grow"><h1>Manu</h1><p class="muted">${esc(longDate())}</p></div></div>
       ${setupCard()}
       ${sectionTitle("¿Cómo estás hoy?")}
-      <section class="card"><div class="mood">${MOODS.map((m) => `<button data-act="mood" data-v="${m.value}" aria-pressed="${mood === m.value}"><b>${m.value}</b>${m.label}</button>`).join("")}</div>
+      <section class="card"><div class="mood">${MOODS.map((m) => `<button data-act="mood" data-v="${m.value}" aria-pressed="${mood === m.value}" aria-label="${m.label}"><b class="mood-e" aria-hidden="true">${m.emoji}</b>${m.label}</button>`).join("")}</div>
         <div class="row"><span class="muted small">Últimos 7 días</span><span class="dots">${week.map((v) => `<i data-v="${v}" title="${v ? MOODS[v - 1].label : "Sin dato"}"></i>`).join("")}</span></div>
         ${mood === 1 ? '<button class="btn ghost" data-act="refuge">Abrir el Refugio</button>' : ""}</section>
       ${sectionTitle("Tu vida")}
@@ -768,7 +816,7 @@ function animateEnter(kind) {
   screen.classList.remove("enter-tab", "enter-page");
   void screen.offsetWidth; // restart the animation
   screen.classList.add(kind === "tab" ? "enter-tab" : "enter-page");
-  if (kind === "page") {
+  {
     screen.querySelectorAll("[data-count]").forEach((el) => countUp(el, Number(el.dataset.count), (v) => String(v)));
     screen.querySelectorAll("[data-count-money]").forEach((el) => countUp(el, Number(el.dataset.countMoney), euros));
   }
@@ -787,12 +835,19 @@ function closeSheet() {
 }
 
 function render({ focus = false, enter = null } = {}) {
+  celebrateMoney = Boolean(enter) && tab === "dinero" && !overlay && !reduceMotion();
+  const w = currentWeather();
+  if (w?.data?.now) document.body.dataset.wx = sceneFor(w.data.now.icon); else delete document.body.dataset.wx;
+  const todayMood = vault.moods.find((m) => m.day === localDay())?.value;
+  if (todayMood) document.body.dataset.mood = String(todayMood); else delete document.body.dataset.mood;
   if (tab === "tu" && (!sub || sub === "gcal") && isClientId(gClientId())) loadGis().catch(() => {});
   document.body.dataset.mode = modeState(today(), undefined, vault.settings.override).mode;
   renderTabs();
   $("screen").innerHTML = overlay === "weather" ? weatherPage() : overlay === "gemini" ? geminiGuide() : (screens[tab] ?? screens.hoy)();
   animateEnter(enter);
-  $("screen").querySelectorAll(".bar > i[data-w]").forEach((el) => { el.style.width = `${el.dataset.w}%`; });
+  const bars = $("screen").querySelectorAll(".bar > i[data-w]");
+  if (enter && !reduceMotion()) { bars.forEach((el) => { el.style.width = "0%"; }); requestAnimationFrame(() => requestAnimationFrame(() => bars.forEach((el) => { el.style.width = `${el.dataset.w}%`; }))); }
+  else bars.forEach((el) => { el.style.width = `${el.dataset.w}%`; });
   $("screen").querySelectorAll(".range > i").forEach((el) => { el.style.left = `${el.dataset.l}%`; el.style.width = `${el.dataset.w}%`; });
   $("screen").querySelectorAll(".week-bars i[data-h]").forEach((el) => { el.style.height = `${el.dataset.h}%`; });
   $("screen").querySelectorAll("[data-c]").forEach((el) => { if (/^#[0-9a-f]{6}$/i.test(el.dataset.c)) el.style.setProperty("--ev", el.dataset.c); });
@@ -991,6 +1046,8 @@ document.addEventListener("click", async (e) => {
   if (sb) { sub = sb.dataset.sub; cityResults = null; render({ focus: true, enter: "page" }); scrollTo(0, 0); return; }
   const s = e.target.closest("[data-say]");
   if (s) { say(s.dataset.say); return; }
+  const fill = e.target.closest("[data-fill]");
+  if (fill) { const m = $("msg"); if (m) { m.value = fill.dataset.fill; m.focus(); m.setSelectionRange(m.value.length, m.value.length); $("orb")?.classList.add("listening"); } return; }
   if (e.target.id === "fab" || e.target.closest("#fab")) { openSheet(tab === "dinero" ? "EXPENSE" : "TASK"); return; }
   if (e.target.id === "sheetBg") { closeSheet(); return; }
   const a = e.target.closest("[data-act]");
@@ -1052,7 +1109,11 @@ document.addEventListener("click", async (e) => {
     case "ai-remember": { const k = aiStore.key; aiStore.remember = !aiStore.remember; aiStore.key = k; render(); break; }
     case "ai-forget": aiStore.key = ""; aiStore.model = ""; render(); toast("Clave borrada de este móvil"); break;
     case "ai-toggle": vault.settings.aiEnabled = vault.settings.aiEnabled === false; persist(); render(); break;
-    case "mood": vault.moods = setMood(vault.moods, localDay(), Number(a.dataset.v)); persist(); render(); break;
+    case "mood": {
+      vault.moods = setMood(vault.moods, localDay(), Number(a.dataset.v)); persist(); render();
+      if (!reduceMotion()) document.querySelector(`[data-act="mood"][data-v="${Number(a.dataset.v)}"] .mood-e`)?.classList.add("bounce");
+      break;
+    }
     case "habit": vault.habits = vault.habits.map((h) => (h.id === id ? toggleHabit(h, localDay()) : h)); persist(); render(); break;
     case "talked": vault.people = vault.people.map((p) => (p.id === id ? { ...p, lastContact: new Date().toISOString() } : p)); persist(); render(); toast("Anotado"); break;
     case "del": vault[a.dataset.list] = vault[a.dataset.list].filter((x) => x.id !== id); persist(); render(); break;
@@ -1196,6 +1257,10 @@ document.addEventListener("submit", async (e) => {
     sheet = null; persist(); render();
     toast({ TASK: "Tarea añadida", IDEA: "Idea guardada", EXPENSE: "Gasto apuntado", REMINDER: "Recordatorio creado" }[k]);
   }
+});
+
+document.addEventListener("input", (e) => {
+  if (e.target.id === "msg") $("orb")?.classList.toggle("listening", e.target.value.trim().length > 0);
 });
 
 document.addEventListener("change", async (e) => {
