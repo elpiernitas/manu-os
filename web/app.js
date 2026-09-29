@@ -18,6 +18,8 @@ import { detectLink, linkInfo, PROVIDER_NAME } from "./core/links.js";
 import { allowedToSend, buildContext, buildConversationPayload, CONTEXT_CATEGORIES, BASIC_CONTEXT, FULL_CONTEXT, AUTO_SAFE } from "./core/converse.js";
 import { newProject, addSource, buildProjectPayload, citations, PRESETS } from "./core/projects.js";
 import { putImage, getImage, clearImages } from "./core/imagestore.js";
+import { readChatgptExport, search as archiveSearch, stats as archiveStats } from "./core/archive.js";
+import { putDocs, allDocs, clearArchive } from "./core/archivestore.js";
 import { weatherEmoji, sceneFor, PARTICLES, MONEY_EMOJI } from "./core/scene.js";
 import { buildImagePayload, buildLinkPayload, isGeminiKey, mayGo, setSensitiveOk, sensitiveAllowed, pickModel, listModels, buildActionPayload, askWithActions, issueUrl } from "./core/ai.js";
 import { encryptBackup, decryptBackup, passphraseProblem } from "./core/crypto.js";
@@ -25,7 +27,7 @@ import { isSpotifyClientId, pkceValid, randomVerifier, challengeFor, authorizeUr
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "33";
+export const APP_VERSION = "34";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -736,6 +738,7 @@ const screens = {
         ${item("habitos", "repeat", "green", "Hábitos", vault.habits.length ? `${habitsDone} de ${vault.habits.length} hechos hoy` : "Crea tu primer hábito")}
         ${item("salud", "pulse", "red", "Salud", hs.sleep !== null || hs.steps !== null ? [hs.sleep !== null ? `${dec(hs.sleep)} h de sueño` : null, hs.steps !== null ? `${Math.round(hs.steps)} pasos` : null].filter(Boolean).join(" · ") + " (media semanal)" : "Sueño, pasos y peso")}
         ${item("comidas", "fork", "orange", "Comidas", `${vault.meals.filter((m) => m.day === t).length} apuntadas hoy`)}
+        ${item("archivo", "box", "teal", "Tu archivo", archive.stats?.count ? `${archive.stats.count} conversaciones de ChatGPT` : "Importa tu exportación de ChatGPT")}
         ${item("personas", "people", "purple", "Personas", vault.people.length ? `${vault.people.length} personas` : "Cumpleaños y detalles")}
         <button class="item" data-act="refuge"><span class="ico teal">${I.leaf}</span><span class="grow"><span>Refugio</span><br><span class="muted small">Para cuando no estás bien</span></span><span class="chev">${I.chev}</span></button>
       </div>
@@ -769,6 +772,19 @@ function setupCard() {
 const backBar = (title) => `<button class="link" data-act="back">${I.back} Tú</button><h1>${title}</h1>`;
 
 const subpages = {
+  archivo() {
+    const s = archive.stats;
+    const d = (t) => (t ? new Date(t).toLocaleDateString("es-ES", { month: "short", year: "numeric" }) : "?");
+    return `${backBar("Tu archivo")}
+      <p class="subtitle">Tu memoria digital: lo que importes se queda solo en este iPhone. No va a GitHub, ni a las copias, ni a ninguna IA salvo que tú lo pidas.</p>
+      <section class="card"><h2>ChatGPT</h2>
+        ${s?.count ? `<p><b>${s.count}</b> conversaciones · ${s.mine} mensajes tuyos · de ${esc(d(s.from))} a ${esc(d(s.to))}</p>` : '<p class="muted">Cuando te llegue el correo de ChatGPT, descarga el .zip y elígelo aquí (sin descomprimir). También vale el archivo conversations.json.</p>'}
+        <label class="btn ${s?.count ? "ghost" : ""} block" for="archiveFile" role="button" tabindex="0">${archive.busy ? "Importando…" : s?.count ? "Volver a importar" : "Elegir la exportación de ChatGPT"}</label><input id="archiveFile" type="file" accept=".zip,.json,application/zip,application/json" class="sr">
+        <p class="muted small">En ChatGPT: Ajustes → Controles de datos → Exportar datos. Llega un correo con el enlace.</p></section>
+      ${s?.count ? `<section class="card"><h2>Buscar en tu archivo</h2><form id="archiveSearch" class="composer-inline"><label for="archiveQ" class="sr">Buscar</label><input id="archiveQ" value="${esc(archive.query)}" placeholder="Lisboa, lentejas, trabajo…" autocomplete="off"><button class="btn" type="submit">Buscar</button></form>
+        ${archive.results ? (archive.results.length ? archive.results.map((r) => `<details class="arch-hit"><summary><b>${esc(r.doc.title)}</b><br><span class="muted small">${esc(d(r.doc.at))} · ${esc(r.snippet)}</span></summary><div class="stack small">${r.doc.messages.slice(0, 40).map((m) => `<div class="bubble ${m.role === "me" ? "me" : "manu"}">${esc(m.text.slice(0, 1500))}</div>`).join("")}</div></details>`).join("") : '<p class="muted">Nada con esas palabras.</p>') : ""}</section>
+      <button class="link small danger-link" data-act="archive-clear">Borrar el archivo de este iPhone</button>` : ""}`;
+  },
   correo() {
     if (!googleOn("gmail")) return `${backBar("Correo")}<section class="card"><p>MANU puede leer tu Gmail, avisarte de lo importante, darte de baja de lo que no quieres y archivar, etiquetar o mandar a la papelera.</p><button class="btn block" data-act="mail-connect">Conectar Gmail</button><p class="muted small">Antes activa la API de Gmail en tu proyecto de Google Cloud. Nunca borra nada para siempre: la papelera se recupera durante 30 días.</p></section>`;
     const m = vault.mail;
@@ -1135,7 +1151,7 @@ function render({ focus = false, enter = null } = {}) {
   $("screen").querySelectorAll(".week-bars i[data-h], .ie-bars i[data-h]").forEach((el) => { el.style.height = `${Math.max(Number(el.dataset.h) ? 2 : 0, Number(el.dataset.h))}%`; });
   $("screen").querySelectorAll("[data-c]").forEach((el) => { if (/^#[0-9a-f]{6}$/i.test(el.dataset.c)) el.style.setProperty("--ev", el.dataset.c); });
   hydrateImages($("screen"));
-  $("topTitle").textContent = sub ? { habitos: "Hábitos", salud: "Salud", comidas: "Comidas", personas: "Personas", tiempo: "Tiempo", avisos: "Avisos", datos: "Tus datos", gcal: "Google", correo: "Correo", ia: "IA", spotify: "Spotify", atajos: "Atajos" }[sub] : TABS.find(([id]) => id === tab)[1];
+  $("topTitle").textContent = sub ? { habitos: "Hábitos", salud: "Salud", comidas: "Comidas", personas: "Personas", tiempo: "Tiempo", avisos: "Avisos", datos: "Tus datos", gcal: "Google", correo: "Correo", archivo: "Tu archivo", ia: "IA", spotify: "Spotify", atajos: "Atajos" }[sub] : TABS.find(([id]) => id === tab)[1];
   const sheetKey = sheet ? sheet.kind : null;
   if (sheetKey !== renderedSheetKind || !sheet) {
     const wasOpen = Boolean($("sheetBg"));
@@ -1203,6 +1219,17 @@ function say(text) {
     refuge = { state: { phase: "HUMAN_HELP", turn: 0 }, messages: [{ from: "me", text: clean }, { from: "manu", text: reply(intent), safety: true }] };
     render();
     return;
+  }
+  // Archive (WEB-34): «busca en mi archivo …», «qué hablé con ChatGPT de …».
+  const aq = archiveCommand(clean);
+  if (aq) {
+    vault.chat.push({ from: "me", text: clean, at });
+    archiveDocs().then((docs) => {
+      const r = archiveSearch(docs, aq, { limit: 5 });
+      vault.chat.push({ from: "manu", at: new Date().toISOString(), text: !docs.length ? "Tu archivo está vacío. Importa tu exportación de ChatGPT en Tú → Tu archivo." : r.length ? `En tu archivo sobre «${aq}»:\n${r.map((x) => `• ${x.doc.title} (${new Date(x.doc.at).toLocaleDateString("es-ES", { month: "short", year: "numeric" })}): ${x.snippet}`).join("\n")}` : `No encuentro nada sobre «${aq}» en tu archivo.` });
+      persist(); render();
+    });
+    persist(); render(); return;
   }
   // Mail (WEB-33): «¿de quién me llegan más correos?», «dame de baja de X».
   const mail = mailCommand(clean);
@@ -1536,6 +1563,21 @@ function runCall(c, { quiet = false } = {}) {
   persist(); render();
 }
 
+// ---------- Tu archivo (WEB-34) ----------
+const archive = { docs: null, stats: null, results: null, query: "", busy: false };
+async function archiveDocs() {
+  if (!archive.docs) { try { archive.docs = await allDocs(); } catch { archive.docs = []; } archive.stats = archiveStats(archive.docs); }
+  return archive.docs;
+}
+archiveDocs().then(() => { if (archive.stats?.count && tab === "tu") render(); });
+
+// «¿Qué hablé con ChatGPT de Lisboa?», «busca en mi archivo lentejas».
+function archiveCommand(text) {
+  const t = normalise(text);
+  const m = t.match(/(?:busca(?:me)? en (?:mi|el) archivo|que (?:hable|he hablado|le dije|le conte) (?:con|a) chatgpt (?:de|sobre)|busca en chatgpt|en mi archivo)\s+(.+)$/);
+  return m ? m[1].trim() : null;
+}
+
 // ---------- Gmail (WEB-33) ----------
 const mailSeen = () => vault.settings.mailSeen ?? [];
 function markMailSeen(key) { if (key) vault.settings.mailSeen = [...new Set([...mailSeen(), key])].slice(-300); }
@@ -1664,11 +1706,12 @@ document.addEventListener("click", async (e) => {
     case "ai-send": askAi(id); break;
     case "ai-do": runCall(findCall(a)); break;
     case "ai-undo": undoCall(findCall(a)); break;
+    case "archive-clear": if (window.confirm("¿Borrar todo tu archivo de este iPhone? No se puede deshacer.")) { clearArchive().then(() => { archive.docs = null; archive.stats = null; archive.results = null; render(); toast("Archivo borrado"); }); } break;
     case "mail-connect": vault.settings.google = { ...(vault.settings.google ?? {}), gmail: true }; persist(); syncGoogle(); break;
     case "mail-seen": markMailSeen(a.dataset.k); persist(); render(); break;
     case "mail-do": {
       const email = a.dataset.email, kind = a.dataset.kind;
-      const label = kind === "label" ? (prompt("Nombre de la etiqueta", senderName(email)) ?? "").trim() : "";
+      const label = kind === "label" ? (window.prompt("Nombre de la etiqueta", senderName(email)) ?? "").trim() : "";
       if (kind === "label" && !label) break;
       markMailSeen(`sender:${email}`);
       mailDo(kind, email, label).then((r) => { if (!r) return; vault.chat.push({ from: "manu", text: r.text, at: new Date().toISOString(), ...(r.undo ? { mailUndo: r.undo } : {}) }); persist(); render(); toast(r.undo ? `${r.text} Deshacer en el chat.` : r.text); });
@@ -1741,7 +1784,7 @@ document.addEventListener("click", async (e) => {
     case "export": exportBackup(); break;
     case "wipe": confirmWipe = true; render(); break;
     case "wipe-no": confirmWipe = false; render(); break;
-    case "wipe-yes": { let ss = null, ls = null; try { ss = sessionStorage; ls = localStorage; } catch {} wipeDeviceKeys([ls, ss]); clearImages(); imageCache.clear(); gcal.tokens = {}; vault = emptyVault(); confirmWipe = false; persist(); render(); toast("Datos borrados de este dispositivo"); break; }
+    case "wipe-yes": { let ss = null, ls = null; try { ss = sessionStorage; ls = localStorage; } catch {} wipeDeviceKeys([ls, ss]); clearImages(); clearArchive(); archive.docs = null; archive.stats = null; imageCache.clear(); gcal.tokens = {}; vault = emptyVault(); confirmWipe = false; persist(); render(); toast("Datos borrados de este dispositivo"); break; }
   }
 });
 
@@ -1772,6 +1815,7 @@ document.addEventListener("submit", async (e) => {
     return;
   }
   if (f === "projSource") { await addProjectSource(); return; }
+  if (f === "archiveSearch") { archive.query = $("archiveQ").value.trim(); archive.results = archiveSearch(await archiveDocs(), archive.query); render(); return; }
   if (f === "projAsk") { const q = $("projQ").value.trim(); if (q) { $("projQ").value = ""; askProject(q); } return; }
   if (f === "composer") {
     const input = $("msg"); const v = input.value; input.value = "";
@@ -1942,6 +1986,17 @@ document.addEventListener("change", async (e) => {
       toast(`${Object.keys(result.rules).length} reglas · ${added.length} gastos importados`);
     } catch { toast("No he podido leer ese Excel."); }
     return;
+  }
+  if (e.target.id === "archiveFile" && e.target.files?.[0]) {
+    const file = e.target.files[0]; e.target.value = "";
+    archive.busy = true; render();
+    try {
+      const docs = await readChatgptExport(file);
+      await putDocs(docs);
+      archive.docs = null; await archiveDocs();
+      toast(`Importadas ${docs.length} conversaciones de ChatGPT`);
+    } catch (err) { toast(`No he podido importarlo: ${err.message}`); }
+    archive.busy = false; render(); return;
   }
   if (e.target.id === "bankFile" && e.target.files?.[0]) {
     const file = e.target.files[0];
