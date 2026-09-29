@@ -151,3 +151,11 @@ test("alarms and reminders from the chat", () => {
   assert.deepEqual(parse("recuérdame sacar la basura mañana a las 21"), { kind: "reminder", text: "sacar la basura", tomorrow: true, time: "21:00" });
   assert.equal(parse("recuérdame no quiero vivir a las 9").kind, "crisis", "crisis still wins");
 });
+
+test("WEB-46: a project without sources or chat is repaired, not fatal", () => {
+  const v = emptyVault();
+  v.projects = [{ id: "p1", name: "Viejo" }];
+  const r = validateVault(v);
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.vault.projects, [{ id: "p1", name: "Viejo", emoji: "📁", sources: [], chat: [] }]);
+});

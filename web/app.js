@@ -23,6 +23,7 @@ import { putDocs, allDocs, clearArchive } from "./core/archivestore.js";
 import { findExcerpts, askPayload, profileDigest, profilePayload, memoryContext } from "./core/recall.js";
 import { diaryDocs, dayLines, dayFromText, isDiaryQuestion, dayTitle } from "./core/diary.js";
 import { applyBuzon, buzonSummary } from "./core/buzon.js";
+import { briefing, briefingText, isBriefingQuestion } from "./core/briefing.js";
 import { weatherEmoji, sceneFor, PARTICLES, SHAPES, MONEY_EMOJI, dayPhase, cityMinutes } from "./core/scene.js";
 import { buildImagePayload, buildLinkPayload, isGeminiKey, mayGo, setSensitiveOk, sensitiveAllowed, pickModel, listModels, buildActionPayload, askWithActions, issueUrl } from "./core/ai.js";
 import { encryptBackup, decryptBackup, passphraseProblem, isEnvelope } from "./core/crypto.js";
@@ -31,7 +32,7 @@ import { isSpotifyClientId, pkceValid, randomVerifier, challengeFor, authorizeUr
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "45";
+export const APP_VERSION = "46";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -235,6 +236,24 @@ function currentWeather() {
 let celebrateMoney = false; // short money shower, only when entering Dinero
 const moneyRain = () => `<div class="money-rain" aria-hidden="true">${Array.from({ length: 12 }, (_, i) => `<i>${MONEY_EMOJI[i % MONEY_EMOJI.length]}</i>`).join("")}</div>`;
 const catLabel = (c) => `${CATEGORY_EMOJI[c] ?? "📦"} ${CATEGORIES[c] ?? c}`;
+
+// ---------- Tu día de un vistazo (WEB-46) ----------
+function dayBriefing() {
+  const city = activeCity();
+  const w = vault.weather && vault.weather.city?.name === city.name ? vault.weather : null;
+  const f = w?.data ?? null;
+  return briefing({
+    now: today(), weather: f, advice: f ? advice(f) : null,
+    today: eventsFor(localDay()), tomorrow: eventsFor(tomorrowKey()),
+    reminders: vault.reminders, tasks: tasks(vault.inbox), birthdays: upcomingBirthdays(vault.people, today(), 1),
+    spending: vault.spending, inbox: vault.inbox, importantMail: googleOn("gmail") ? vault.mail?.important?.length ?? 0 : 0,
+  });
+}
+function briefingCard() {
+  const b = dayBriefing();
+  if (!b.lines.length) return "";
+  return `<section class="card brief${b.evening ? " evening" : ""}"><h2>${b.evening ? "🌙" : "☀️"} ${esc(b.title)}</h2><ul class="brief-list">${b.lines.map((l) => `<li><span aria-hidden="true">${l.e}</span><span>${esc(l.t)}</span></li>`).join("")}</ul></section>`;
+}
 
 function weatherCard() {
   const city = activeCity();
@@ -669,6 +688,7 @@ const screens = {
     const bdays = upcomingBirthdays(vault.people, today(), 7);
     return `<h1>${greeting()}, Manu</h1><p class="subtitle">${esc(longDate())} · <span class="chip">${esc(MODE_TITLES[m.mode])}</span></p>
       <div class="stack">
+      ${briefingCard()}
       ${nightCard()}
       ${weatherCard()}
       ${backupNudge()}
@@ -679,7 +699,7 @@ const screens = {
       ${inbox.length ? `<section class="card"><h2>Bandeja · ${inbox.length}</h2>${inbox.map((c) => `<div class="stack"><div>${esc(c.text)}</div><div class="btns">
           <button class="btn" data-act="task" data-id="${esc(c.id)}">Tarea</button><button class="btn ghost" data-act="idea" data-id="${esc(c.id)}">Idea</button><button class="btn ghost" data-act="forget" data-id="${esc(c.id)}">No recuerdo</button></div></div>`).join("")}</section>` : ""}
       ${hubCard(m.mode)}
-      <section class="card"><div class="row"><h2>Tareas</h2>${addLink("TASK")}</div>${open.length ? open.slice(0, 5).map(taskRow).join("") + (open.length > 5 ? `<p class="muted small">Y ${open.length - 5} más en Agenda.</p>` : "") : '<p class="muted">Nada pendiente. Toca «+» para añadir.</p>'}</section>
+      <section class="card"><div class="row"><h2>Tareas</h2>${addLink("TASK")}</div>${open.length ? open.slice(0, 5).map(taskRow).join("") + (open.length > 5 ? `<p class="muted small">Y ${open.length - 5} más en Agenda.</p>` : "") : '<p class="muted">Nada pendiente. Toca «Añadir» o díselo a MANU.</p>'}</section>
       ${bdays.length ? `<section class="card"><h2>${I.people} Cumpleaños</h2>${bdays.map((b) => { const wa = b.days === 0 ? whatsappUrl(b.person.phone, `¡Feliz cumpleaños, ${b.person.name.split(" ")[0]}! 🎉`) : null; return `<div class="row"><span class="grow">${esc(b.person.name)}</span>${wa ? `<a class="btn" href="${esc(wa)}" target="_blank" rel="noopener">Felicitar por WhatsApp</a>` : `<span class="muted">${b.days === 0 ? "¡Hoy!" : b.days === 1 ? "Mañana" : (b.days === 1 ? "Mañana" : `En ${b.days} días`)}</span>`}</div>`; }).join("")}</section>` : ""}
       <section class="card"><div class="row"><h2>Este mes</h2><button class="link small" data-tab="dinero">Ver dinero</button></div><div class="big-money">${euros(month.total)}</div></section>
       </div>`;
@@ -752,7 +772,7 @@ const screens = {
       ${sectionTitle("Movimientos", `${toReview ? `<button class="link small" data-act="money-filter">${moneyFilter === "review" ? "Ver todos" : `Por revisar (${toReview})`}</button>` : ""}${addLink("EXPENSE")}`)}
       <section class="card">${entries.length ? entries.map((x) => `<div class="row"><span class="cat-emoji" aria-hidden="true">${CATEGORY_EMOJI[x.category] ?? "📦"}</span><div class="grow"><div>${esc(x.merchant ?? "Sin concepto")}</div><div class="muted small">${new Date(x.at).toLocaleDateString("es-ES", { day: "numeric", month: "short" })}${x.sub ? ` · ${esc(x.sub)}` : ""}${x.source === "BANK" ? " · banco" : ""}${x.review ? ' · <b class="review">revisar</b>' : x.inferred ? " · categoría propuesta" : x.ruled ? " · según tus reglas" : ""}</div></div>
           <div class="stack"><span class="num">${euros(x.cents)}</span><label class="sr" for="cat-${esc(x.id)}">Categoría</label><select id="cat-${esc(x.id)}" data-cat="${esc(x.id)}">${Object.keys(CATEGORIES).map((k) => `<option value="${k}"${k === x.category ? " selected" : ""}>${esc(catLabel(k))}</option>`).join("")}</select></div></div>`).join("")
-        : '<p class="muted">Sin gastos. Toca «+», escribe a MANU «gasté 12,50 en café» o importa el CSV del banco.</p>'}</section>
+        : '<p class="muted">Sin gastos. Escribe a MANU «gasté 12,50 en café» o importa el extracto del banco.</p>'}</section>
       </div>`;
   },
   proyectos() {
@@ -1350,6 +1370,11 @@ function say(text) {
     render();
     return;
   }
+  // WEB-46: «¿cómo va mi día?», «resumen del día».
+  if (isBriefingQuestion(normalise(clean))) {
+    vault.chat.push({ from: "me", text: clean, at }, { from: "manu", text: briefingText(dayBriefing()), at });
+    persist(); render(); return;
+  }
   // WEB-41: «¿qué hice ayer?», «¿cuánto gasté el martes?» from the diary.
   if (isDiaryQuestion(clean)) {
     vault.chat.push({ from: "me", text: clean, at }, { from: "manu", text: diaryAnswer(clean), at });
@@ -1692,7 +1717,7 @@ function runCall(c, { quiet = false } = {}) {
       const q = normalise(c.texto);
       const t = tasks(vault.inbox).find((x) => !x.done && normalise(x.text).includes(q)) ?? tasks(vault.inbox).find((x) => !x.done && q.includes(normalise(x.text)));
       if (!t) { c.state = "missing"; say("No encuentro esa tarea"); break; }
-      vault.inbox = vault.inbox.map((i) => (i.id === t.id ? { ...i, done: true } : i)); c.undo = { list: "inbox", id: t.id, completed: true }; c.texto = t.text; say("Tarea completada"); break;
+      vault.inbox = vault.inbox.map((i) => (i.id === t.id ? { ...i, done: true, doneAt: new Date().toISOString() } : i)); c.undo = { list: "inbox", id: t.id, completed: true }; c.texto = t.text; say("Tarea completada"); break;
     }
     case "apuntar_gasto": vault.spending.push({ ...newEntry({ id: uid("s"), cents: c.cents, merchant: c.concepto, at }, vault.settings.categoryRules ?? {}), ...shared(c) }); toast("Gasto apuntado"); break;
     case "crear_recordatorio": { const id = uid("r"); vault.reminders.push({ id, text: c.texto, at: c.at, done: false, notified: false, ...shared(c) }); c.undo = { list: "reminders", id }; say("Recordatorio creado"); break; }

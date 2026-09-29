@@ -10,6 +10,48 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
+## WEB-46 — «Tu día de un vistazo» y arreglos de la auditoría
+
+Manu (2026-09-29) pidió seguir mejorando sin parar. La primera vuelta es una auditoría automática: 60 pantallas (todas las pestañas y subpáginas) en iPhone 14, iPhone SE y escritorio, buscando errores de JavaScript, desbordes, textos cortados y zonas táctiles pequeñas. Después viene la mejora de más valor según el análisis anterior: que MANU diga lo importante sin que Manu tenga que meter datos.
+
+### Hallazgos de la auditoría y arreglos
+
+- Los círculos para marcar tareas y hábitos medían 28 px. Ahora tienen una zona táctil de 44 px (`::after`) sin cambiar su aspecto.
+- Un proyecto sin `sources` o `chat` (copia antigua o editada a mano) rompía toda la pestaña Proyectos. `validateVault` lo repara.
+- Textos obsoletos que mandaban tocar «+» (se quitó en WEB-32): ahora dicen «Añadir» o «díselo a MANU».
+- Sin desbordes horizontales en las 60 pantallas.
+
+### «Tu día de un vistazo»
+
+- `web/core/briefing.js` (nuevo, puro), la primera tarjeta de Hoy:
+  - **Mañana y tarde:**
+    - el consejo del tiempo;
+    - el próximo evento;
+    - el próximo recordatorio de hoy;
+    - las tareas pendientes;
+    - cumpleaños de hoy y mañana;
+    - correos importantes sin leer;
+    - el gasto del mes comparado con los mismos días del mes anterior (`monthPace`).
+  - **Desde las 20:00:**
+    - lo gastado hoy;
+    - las tareas terminadas hoy;
+    - lo primero de mañana;
+    - el tiempo de mañana.
+  - Los cumpleaños no se repiten como eventos. Un evento sin hora se escribe «X (todo el día)».
+- El chat responde a «¿cómo va mi día?», «resumen del día» y «¿qué tal voy?».
+- `toggleDone` guarda `doneAt` para contar lo terminado hoy.
+- `web/sw.js`: `core/briefing.js` en SHELL, caché v46. Versión 46.
+
+### Resultados
+
+- `npm test`: 146/146 PASS (`briefing.test.js` con 5 tests, más la regresión de proyectos).
+- e2e46: 8/8. Cubre mañana, noche, el chat y el `doneAt` al marcar una tarea.
+- Resto de e2e en PASS, salvo las 3 expectativas antiguas de e2e18. e2e26 fija ahora el reloj y pasa.
+
+### NO_VERIFICADO
+
+- En el iPhone real: la tarjeta con los datos reales de Manu.
+
 ## WEB-45 — «↓» en el chat, luz a ±45 min, errores de Gmail accionables y órdenes de correo
 
 Manu pidió, con prioridad sobre el resto de su propuesta «WEB-19», lo que WEB-40 aún no cubría. Gmail mantiene el acceso total (`gmail.modify`), por decisión suya del 2026-09-29. Durante la tarea envió una captura: «…me venís 4/5 me emborrache sabes? puedes decirme más opciones» recibió «No encuentro a «sabes? puedes decirme mas opciones» entre quienes más te escriben».

@@ -2,11 +2,11 @@
 
 Status: **REVIEW_PENDING**
 
-WEB-45 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
+WEB-46 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
 
 ## Tarea activa
 
-WEB-45 — chat («↓»), luz del día a ±45 min, errores de Gmail con acción concreta y la orden de correo que cazaba cualquier frase (`ai/HANDOFF.md`, «WEB-45»).
+WEB-46 — «Tu día de un vistazo» (resumen de mañana y de noche) y arreglos de la auditoría (`ai/HANDOFF.md`, «WEB-46»).
 
 ## Autorización
 
@@ -22,6 +22,7 @@ WEB-45 — chat («↓»), luz del día a ±45 min, errores de Gmail con acción
 - 2026-09-29: Manu decide «que lo sensible vaya a la IA me da igual». Se implementa con un interruptor en su dispositivo; secretos, crisis y Refugio siguen sin enviarse.
 - 2026-09-29: Manu pide hablar con MANU «como si fuera Gemini integrado, que lo sepa todo y lo maneje él». Se implementa como un modo que Manu activa, con las categorías sensibles solo si él las marca.
 - 2026-09-29: Manu acepta «todo»: la copia completa cifrada (WEB-44, con `backup-manager.js`) y después el borrador del chat, el tiempo y Gmail (WEB-45).
+- 2026-09-29: Manu pide seguir sin parar: probar, encontrar fallos, mejorar y publicar en ciclos. Cada ciclo es una tarea WEB-NN con su PR, dentro del alcance autorizado (sin servicios nuevos, costes ni permisos nuevos).
 - 2026-09-29: **cambio de gobernanza decidido por Manu.** El orquestador (ChatGPT/Codex) ya no revisa automáticamente, porque frenaba el avance. Claude Code fusiona los PR web cuando `npm test` y los dos workflows remotos están en verde y no hay conflictos. Cuando haga falta una revisión, Claude Code prepara un prompt, Manu se lo pasa a ChatGPT y le devuelve la respuesta; los defectos se corrigen en un PR nuevo con su regresión. Los PR #7, #8 y #9 siguen en borrador o pausa.
 
 ## Alcance autorizado
@@ -48,6 +49,7 @@ WEB-45 — chat («↓»), luz del día a ±45 min, errores de Gmail con acción
 
 ## Historial (cerrado)
 
+- **WEB-45** (chat, luz del día, Gmail y órdenes de correo): CERRADA. Fusionada mediante el PR #52 (`d7781f5`).
 - **WEB-44** (copia completa cifrada): CERRADA. Fusionada mediante el PR #51 (`ea9f790`).
 - **WEB-42/43** (aviso de la exportación de ChatGPT y buzón de Atajos): CERRADAS. Fusionadas mediante el PR #50 (`f268c32`).
 - **WEB-41** (Tu diario): CERRADA. Fusionada mediante el PR #49 (`8aa480a`).
