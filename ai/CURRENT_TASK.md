@@ -2,11 +2,11 @@
 
 Status: **REVIEW_PENDING**
 
-WEB-38 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
+WEB-39 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
 
 ## Tarea activa
 
-WEB-38 — Personas: autocompletar desde Google Contactos y cumpleaños anuales en Google Calendar (`ai/HANDOFF.md`, «WEB-38»).
+WEB-39 — el Refugio empieza limpio, sin el historial del chat (`ai/HANDOFF.md`, «WEB-39»).
 
 ## Autorización
 
@@ -47,6 +47,7 @@ WEB-38 — Personas: autocompletar desde Google Contactos y cumpleaños anuales 
 
 ## Historial (cerrado)
 
+- **WEB-38** (Personas y cumpleaños): CERRADA. Fusionada mediante el PR #46 (`42bbc61`).
 - **WEB-37** (conversaciones nuevas): CERRADA. Fusionada mediante el PR #45 (`46f5829`).
 - **WEB-36** (escenas del tiempo): CERRADA. Fusionada mediante el PR #44 (`7f14488`).
 - **WEB-35** (preguntar, perfil y recuerdos): CERRADA. Fusionada mediante el PR #43 (`9729316`).
