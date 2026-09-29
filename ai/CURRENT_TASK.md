@@ -2,11 +2,11 @@
 
 Status: **REVIEW_PENDING**
 
-WEB-36 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
+WEB-37 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
 
 ## Tarea activa
 
-WEB-36 — seis escenas del tiempo sin saltos y fondo animado recuperado (`ai/HANDOFF.md`, «WEB-36»).
+WEB-37 — cada chat es una conversación nueva y la anterior va a «Tu archivo» (`ai/HANDOFF.md`, «WEB-37»).
 
 ## Autorización
 
@@ -47,6 +47,7 @@ WEB-36 — seis escenas del tiempo sin saltos y fondo animado recuperado (`ai/HA
 
 ## Historial (cerrado)
 
+- **WEB-36** (escenas del tiempo): CERRADA. Fusionada mediante el PR #44 (`7f14488`).
 - **WEB-35** (preguntar, perfil y recuerdos): CERRADA. Fusionada mediante el PR #43 (`9729316`).
 - **WEB-34** (Tu archivo): CERRADA. Fusionada mediante el PR #42 (`1165404`).
 - **WEB-33** (Gmail): CERRADA. Fusionada mediante el PR #41 (`1f69e4e`).

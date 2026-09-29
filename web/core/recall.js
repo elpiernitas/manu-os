@@ -18,7 +18,7 @@ export function excerpts(results, { perDoc = 1500, total = 9000, permit = () => 
     if (!msgs.length) continue;
     const hit = Math.max(0, msgs.findIndex((m) => ts.some((t) => normalise(m.text).includes(t))));
     const around = msgs.slice(Math.max(0, hit - 1), hit + 3);
-    let text = around.map((m) => `${m.role === "me" ? "Manu" : "ChatGPT"}: ${m.text.replace(/\s+/g, " ").trim()}`).join("\n");
+    let text = around.map((m) => `${m.role === "me" ? "Manu" : r.doc.source === "manu" ? "MANU" : "ChatGPT"}: ${m.text.replace(/\s+/g, " ").trim()}`).join("\n");
     text = text.slice(0, Math.min(perDoc, budget));
     budget -= text.length;
     out.push({ n: out.length + 1, id: r.doc.id, title: r.doc.title, date: month(r.doc.at), text });
@@ -34,7 +34,7 @@ export function findExcerpts(docs, question, opts = {}) {
 const block = (ex) => ex.map((e) => `[${e.n}] «${e.title}» (${e.date})\n${e.text}`).join("\n\n");
 
 export function askPayload(question, ex, now = new Date()) {
-  const system = `Eres MANU, el asistente personal de Manu. Responde en español de España, cercano y claro, usando SOLO los fragmentos de sus conversaciones pasadas con ChatGPT que tienes abajo. Cita con [n] de qué conversación sale cada dato. Si la respuesta no está, dilo sin inventar. Hoy es ${now.toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" })}.`;
+  const system = `Eres MANU, el asistente personal de Manu. Responde en español de España, cercano y claro, usando SOLO los fragmentos de sus conversaciones pasadas (con ChatGPT o contigo, MANU) que tienes abajo. Cita con [n] de qué conversación sale cada dato. Si la respuesta no está, dilo sin inventar. Hoy es ${now.toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" })}.`;
   return {
     systemInstruction: { parts: [{ text: system }] },
     contents: [{ role: "user", parts: [{ text: `FRAGMENTOS DE TU ARCHIVO:\n\n${block(ex)}\n\nPREGUNTA: ${String(question).slice(0, 1000)}` }] }],
@@ -71,5 +71,5 @@ export function profilePayload(digest, now = new Date()) {
 // For the conversation mode: short memories related to what Manu just said.
 export function memoryContext(docs, message, { permit = () => true } = {}) {
   const ex = findExcerpts(docs, message, { limit: 3, perDoc: 600, total: 1600, permit });
-  return ex.length ? `RECUERDOS de sus conversaciones con ChatGPT relacionados:\n${ex.map((e) => `«${e.title}» (${e.date}): ${e.text}`).join("\n")}` : "";
+  return ex.length ? `RECUERDOS de conversaciones pasadas (con ChatGPT o con MANU) relacionados:\n${ex.map((e) => `«${e.title}» (${e.date}): ${e.text}`).join("\n")}` : "";
 }
