@@ -166,6 +166,17 @@ export function parse(input, now = new Date()) {
   const mood = text.match(/^(?:hoy\s+)?(?:estoy|me siento|me encuentro|ando)\s+(genial|muy bien|fenomenal|de lujo|contento|feliz|bien|regular|normal|mas o menos|cansado|cansada)\b/);
   // Only a short statement («hoy estoy bien»); «estoy cansado desde el lunes, ¿por qué…?» is conversation.
   if (mood && !/[?¿]/.test(original) && text.split(/\s+/).length <= 5) return { kind: "mood", value: { genial: 4, "muy bien": 4, fenomenal: 4, "de lujo": 4, contento: 4, feliz: 4, bien: 3 }[mood[1]] ?? 2 };
+  // WEB-52: several in one go — «gasté 12 en café y 5 en pan», «hoy: 3 de café,
+  // 12 de comida y 40 de gasolina». Each part needs its own amount.
+  if ((EXPENSE.some((p) => text.includes(p)) || /^(?:hoy|ayer)\s*:/.test(text)) && (text.match(/\d+(?:[.,]\d+)*/g) ?? []).length >= 2) {
+    const body = original.replace(/^[^\d]*?(?=\d)/, "");
+    const parts = body.split(/\s*,\s+|\s+y\s+/i) // «45,90» is one amount: split on «, » and « y ».map((x) => x.trim()).filter(Boolean);
+    const items = parts.map((part) => ({ cents: amountCents(part), merchant: tidy(part.replace(/^(\d{1,3}(?:\.\d{3})+(?:,\d{1,2})?|\d+(?:[.,]\d{1,2})?)\s*(?:€|eur\b|euros?\b)?\s*(?:en|de|del|al|por|para)?\s*/i, "")) }));
+    if (items.length >= 2 && items.every((x) => x.cents)) {
+      const d = dayFromText(text, now);
+      return { kind: "expenses", items, ...(d && d !== dayKeyOf(now) ? { day: d } : {}) };
+    }
+  }
   if (EXPENSE.some((p) => text.includes(p)) || /^gasto\s+\d/.test(text)) {
     const cents = amountCents(text);
     if (cents) {
@@ -235,6 +246,8 @@ export function reply(intent, variant = 0) {
     case "reminder":
       if (intent.inMinutes) return `Apuntado: «${intent.text}» dentro de ${intent.inMinutes >= 60 && intent.inMinutes % 60 === 0 ? `${intent.inMinutes / 60} h` : `${intent.inMinutes} min`}. Te aviso si tienes MANU abierta; para que suene siempre, añádelo al iPhone.`;
       return `Apuntado: «${intent.text}» ${intent.day ? dayWords(intent.day) : intent.tomorrow ? "mañana" : "hoy"} a las ${intent.time}. Te aviso si tienes MANU abierta; para que suene siempre, añádelo al iPhone.`;
+    case "expenses":
+      return `Anotados ${intent.items.length} gastos${intent.day ? ` (${dayWords(intent.day)})` : ""}: ${intent.items.map((x) => `${euros(x.cents)}${x.merchant ? ` en ${x.merchant}` : ""}`).join(", ")}. Total ${euros(intent.items.reduce((s, x) => s + x.cents, 0))}.`;
     case "income":
       return `Anotado: ingreso de ${euros(intent.cents)}${intent.concept ? ` (${intent.concept})` : ""}.`;
     case "health":
@@ -268,12 +281,14 @@ export function quickDetect(input, now = new Date()) {
   if (intent.kind === "reminder" && intent.inMinutes) return { kind: "REMINDER", text: intent.text, at: new Date(now.getTime() + intent.inMinutes * 60000) };
   if (intent.kind === "reminder" || intent.kind === "alarm") {
     const [h, m] = intent.time.split(":").map(Number);
-    const at = new Date(now); at.setHours(h, m, 0, 0);
-    if (intent.tomorrow) at.setDate(at.getDate() + 1);
+    let at = new Date(now); at.setHours(h, m, 0, 0);
+    if (intent.day) { const [y, mo, d] = intent.day.split("-").map(Number); at = new Date(y, mo - 1, d, h, m); } // WEB-52: «el viernes a las 10»
+    else if (intent.tomorrow) at.setDate(at.getDate() + 1);
     else if (at <= now) at.setDate(at.getDate() + 1);
     return { kind: "REMINDER", text: intent.kind === "alarm" ? "Alarma" : intent.text, at };
   }
-  if (intent.kind === "expense") return { kind: "EXPENSE", cents: intent.cents, merchant: intent.merchant };
+  if (intent.kind === "expense") return { kind: "EXPENSE", cents: intent.cents, merchant: intent.merchant, ...(intent.day ? { day: intent.day } : {}) };
+  if (intent.kind === "expenses") return { kind: "EXPENSE", cents: intent.items[0].cents, merchant: intent.items[0].merchant, ...(intent.day ? { day: intent.day } : {}) };
   // «12,50 café», «café 3€», «20 euros gasolina»: an amount with a currency, or a
   // leading number followed by words, reads as an expense.
   const NUM = "(\\d{1,3}(?:\\.\\d{3})+(?:,\\d{1,2})?|\\d{1,7}(?:[.,]\\d{1,2})?)";

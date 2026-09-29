@@ -2,11 +2,11 @@
 
 Status: **REVIEW_PENDING**
 
-WEB-51 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
+WEB-52 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
 
 ## Tarea activa
 
-WEB-51 — fechas y horas en lo que dice Manu, miles, ingresos, salud y ánimo desde el chat (`ai/HANDOFF.md`, «WEB-51»).
+WEB-52 — varios gastos en una frase y la hoja rápida con importes y fechas correctos (`ai/HANDOFF.md`, «WEB-52»).
 
 ## Autorización
 
@@ -49,6 +49,7 @@ WEB-51 — fechas y horas en lo que dice Manu, miles, ingresos, salud y ánimo d
 
 ## Historial (cerrado)
 
+- **WEB-51** (fechas, miles, ingresos, salud y ánimo): CERRADA. Fusionada mediante el PR #58 (`7079ee9`).
 - **WEB-50** (frases sin IA): CERRADA. Fusionada mediante el PR #57 (`ba66180`).
 - **WEB-49** (rendimiento): CERRADA. Fusionada mediante el PR #56 (`20a4a7f`).
 - **WEB-48** (buscar en todo): CERRADA. Fusionada mediante el PR #55 (`c0974ff`).
