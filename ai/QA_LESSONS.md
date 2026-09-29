@@ -114,3 +114,7 @@ Cinco módulos añadidos entre WEB-22 y WEB-27 no estaban en `SHELL`, así que s
 ### QAL-026 — No usar globales del navegador cuyo nombre está importado
 
 `app.js` importa `confirm` de `core/inbox.js`. En WEB-34, `confirm("¿Borrar…?")` llamó a esa función y lanzó «Unknown kind», en lugar de abrir el diálogo. Para los diálogos del navegador hay que usar `window.confirm` y `window.prompt`, y un recorrido debe pulsar cada botón de confirmación nuevo.
+
+### QAL-027 — Al filtrar para un modelo, filtrar también lo que acompaña al texto (títulos, etiquetas)
+
+En WEB-35 se filtraban los mensajes de cada fragmento, pero el título de la conversación («Claves») viajaba con él y hacía saltar el control global. Todo el texto que forma parte de la petición debe pasar el mismo filtro que el contenido. Y hay que probar con datos sintéticos que contengan crisis y secretos.
