@@ -544,7 +544,7 @@ body.kb::after { top: auto; bottom: calc(100% - var(--kb-bottom, 100%)); height:
 /* With «black-translucent», iOS lays out a document shorter than the screen as
    if it were one status bar shorter: the tab bar rises and a black band shows
    below. Every page is at least the full screen tall, like the long ones. */
-html { min-height: calc(100% + env(safe-area-inset-top, 0px)); background: var(--bg); }
+html { min-height: calc(100% + env(safe-area-inset-top, 0px)); } /* no background here: the body colour must reach the canvas so the .ambient layer (z-index -1) shows */
 .app { min-height: 100dvh; box-sizing: border-box; }
 /* ---------- WEB-32: sin «+»; la barra ocupa todo el ancho ---------- */
 .tabbar { left: max(12px, calc(50% - 260px)); right: max(12px, calc(50% - 260px)); width: auto; }
@@ -558,3 +558,62 @@ html { min-height: calc(100% + env(safe-area-inset-top, 0px)); background: var(-
 /* ---------- WEB-35: perfil ---------- */
 .profile-text { white-space: pre-wrap; font-size: 15px; line-height: 1.5; }
 #profileText { width: 100%; min-height: 280px; font: inherit; font-size: 15px; }
+/* ---------- WEB-36: seis escenas del tiempo (sol mucho, sol, sol con nubes, nubes, lluvia, tormenta) ---------- */
+/* Only transform and opacity move; no blur. Shapes are real elements so a
+   redraw can resume them (syncAnimations) instead of restarting. */
+.scene { contain: strict; }
+.scene-sun::before, .scene-hot::before { content: none; }
+.scene b { position: absolute; display: block; will-change: transform, opacity; backface-visibility: hidden; }
+.wx-emoji.big, .wx-emoji.xl { will-change: transform; }
+/* sol */
+.scene .sun { width: 120px; height: 120px; right: -18px; top: -34px; border-radius: 50%; background: radial-gradient(circle, #fff7da 0 20%, #ffd45e 30%, rgba(255,190,80,.5) 45%, rgba(255,170,60,0) 70%); animation: sun-breathe 5s ease-in-out infinite alternate; }
+.scene .sun.hot { width: 180px; height: 180px; right: -48px; top: -60px; background: radial-gradient(circle, #fffbe9 0 18%, #ffc23a 28%, rgba(255,140,40,.62) 46%, rgba(255,100,40,0) 72%); animation-duration: 3.5s; }
+.scene .rays { width: 260px; height: 260px; right: -88px; top: -104px; border-radius: 50%; background: repeating-conic-gradient(rgba(255,226,150,.22) 0deg 7deg, rgba(255,226,150,0) 7deg 20deg); -webkit-mask: radial-gradient(circle, #000 18%, transparent 68%); mask: radial-gradient(circle, #000 18%, transparent 68%); animation: rays-spin 70s linear infinite; }
+.scene .rays.fast { width: 340px; height: 340px; right: -128px; top: -140px; animation-duration: 40s; background: repeating-conic-gradient(rgba(255,200,110,.28) 0deg 8deg, rgba(255,200,110,0) 8deg 18deg); }
+.scene .haze { left: 0; right: 0; bottom: 0; height: 45%; background: linear-gradient(rgba(255,140,60,0), rgba(255,140,60,.2)); animation: haze 4s ease-in-out infinite alternate; }
+@keyframes sun-breathe { from { transform: scale(.94); opacity: .85; } to { transform: scale(1.06); opacity: 1; } }
+@keyframes rays-spin { to { transform: rotate(360deg); } }
+@keyframes haze { from { opacity: .35; } to { opacity: .9; } }
+/* nubes */
+.scene .cloud { --cc: 255, 255, 255; width: 190px; height: 80px; opacity: .15;
+  background: radial-gradient(circle at 30% 60%, rgba(var(--cc), 1) 0 18px, rgba(var(--cc), 0) 27px),
+    radial-gradient(circle at 50% 40%, rgba(var(--cc), 1) 0 26px, rgba(var(--cc), 0) 36px),
+    radial-gradient(circle at 70% 58%, rgba(var(--cc), 1) 0 20px, rgba(var(--cc), 0) 29px),
+    radial-gradient(ellipse 42% 22% at 50% 72%, rgba(var(--cc), 1) 55%, rgba(var(--cc), 0) 100%);
+  animation: cloud-move ease-in-out infinite alternate; }
+.scene .cloud.c1 { left: -4%; top: 10%; animation-duration: 24s; }
+.scene .cloud.c2 { left: 52%; top: 30%; animation-duration: 31s; animation-delay: -11s; }
+.scene .cloud.c3 { left: 6%; top: 60%; animation-duration: 27s; animation-delay: -5s; }
+.scene-sun-cloud .cloud.c1 { left: 34%; top: 4%; opacity: .2; }
+.scene-sun-cloud .cloud.c2 { left: 58%; top: 40%; opacity: .12; }
+.scene .cloud.dark { --cc: 170, 178, 200; opacity: .24; }
+.scene-storm .cloud.dark { --cc: 140, 140, 170; opacity: .3; }
+@keyframes cloud-move { from { transform: translate3d(-10%, 0, 0); } to { transform: translate3d(10%, 0, 0); } }
+/* tormenta: fogonazo + rayo, a la vez */
+.scene .flash { inset: 0; background: rgb(225, 225, 255); opacity: 0; animation: flash-o 7s linear infinite; }
+.scene .bolt { left: 58%; top: 18%; width: 30px; height: 74px; background: #fff3a8; clip-path: polygon(45% 0, 100% 0, 62% 42%, 90% 42%, 20% 100%, 40% 55%, 8% 55%); opacity: 0; filter: drop-shadow(0 0 6px rgba(255,240,150,.9)); animation: bolt 7s linear infinite; }
+@keyframes flash-o { 0%, 90%, 94.5%, 100% { opacity: 0; } 91%, 93% { opacity: .2; } }
+@keyframes bolt { 0%, 90%, 94%, 100% { opacity: 0; } 90.6%, 92.5% { opacity: 1; } 91.6% { opacity: .35; } }
+.scene-storm::after { content: none; }
+/* fondo completo (Hoy y la página del tiempo) */
+.sky .scene .sun { width: 46vmax; height: 46vmax; right: -14vmax; top: -18vmax; opacity: .55; }
+.sky .scene .sun.hot { width: 62vmax; height: 62vmax; right: -24vmax; top: -28vmax; opacity: .45; }
+.sky .scene .rays { width: 90vmax; height: 90vmax; right: -36vmax; top: -40vmax; opacity: .6; }
+.sky .scene .rays.fast { width: 110vmax; height: 110vmax; right: -44vmax; top: -48vmax; }
+.sky .scene .cloud { width: 80vw; height: 34vw; opacity: .16; }
+.sky .scene .cloud.c1 { left: -12vw; top: 8vh; }
+.sky .scene .cloud.c2 { left: 38vw; top: 26vh; }
+.sky .scene .cloud.c3 { left: 4vw; top: 48vh; }
+.sky .scene .cloud.dark { opacity: .2; }
+.sky .scene .bolt { width: 60px; height: 150px; top: 14vh; }
+.sky .scene .flash { background: rgb(200, 200, 255); }
+/* colores de fondo de las escenas nuevas */
+.sc-hot { background: linear-gradient(160deg, rgba(255,150,40,.55), rgba(255,90,40,.22) 45%, rgba(17,19,24,.92) 85%); }
+.sc-sun-cloud { background: linear-gradient(160deg, rgba(255,190,90,.34), rgba(90,120,170,.35) 50%, rgba(17,19,24,.92)); }
+body[data-wx="hot"] { --ambient-1: rgba(255,150,50,.32); --ambient-2: rgba(255,90,40,.14); }
+body[data-wx="sun-cloud"] { --ambient-1: rgba(255,190,90,.20); --ambient-2: rgba(90,130,200,.14); }
+body[data-screen="weather"][data-wx="hot"] .ambient { background: linear-gradient(180deg, #e0842f 0%, #b85a2a 40%, #3a2016 100%); }
+body[data-screen="weather"][data-wx="sun-cloud"] .ambient { background: linear-gradient(180deg, #4f86c4 0%, #3a5f94 45%, #1c2c48 100%); }
+body[data-screen="hoy"][data-wx="hot"] .ambient { background: linear-gradient(180deg, #7a4418 0%, #3f2412 38%, #0c0806 78%); }
+body[data-screen="hoy"][data-wx="sun-cloud"] .ambient { background: linear-gradient(180deg, #2f5078 0%, #1c3050 38%, #0a0d14 78%); }
+@media (prefers-reduced-motion: reduce) { .scene b { animation: none !important; } .scene .bolt, .scene .flash { display: none; } }

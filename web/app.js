@@ -21,14 +21,14 @@ import { putImage, getImage, clearImages } from "./core/imagestore.js";
 import { readChatgptExport, search as archiveSearch, stats as archiveStats } from "./core/archive.js";
 import { putDocs, allDocs, clearArchive } from "./core/archivestore.js";
 import { findExcerpts, askPayload, profileDigest, profilePayload, memoryContext } from "./core/recall.js";
-import { weatherEmoji, sceneFor, PARTICLES, MONEY_EMOJI } from "./core/scene.js";
+import { weatherEmoji, sceneFor, PARTICLES, SHAPES, MONEY_EMOJI } from "./core/scene.js";
 import { buildImagePayload, buildLinkPayload, isGeminiKey, mayGo, setSensitiveOk, sensitiveAllowed, pickModel, listModels, buildActionPayload, askWithActions, issueUrl } from "./core/ai.js";
 import { encryptBackup, decryptBackup, passphraseProblem } from "./core/crypto.js";
 import { isSpotifyClientId, pkceValid, randomVerifier, challengeFor, authorizeUrl, exchangeCode, refreshTokens, listDevices, findSpeaker, transferTo, DEFAULT_SPEAKER } from "./core/spotify.js";
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "35";
+export const APP_VERSION = "36";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -205,7 +205,22 @@ async function refreshWeather(force = false) {
 }
 
 const wxE = (icon, cls = "") => `<span class="wx-emoji${cls ? ` ${cls}` : ""}" aria-hidden="true">${weatherEmoji(icon)}</span>`;
-const sceneLayer = (scene) => `<div class="scene scene-${scene}" aria-hidden="true">${"<i></i>".repeat(PARTICLES[scene] ?? 0)}</div>`;
+const sceneLayer = (scene) => `<div class="scene scene-${scene}" aria-hidden="true">${(SHAPES[scene] ?? []).map((c) => `<b class="${c}"></b>`).join("")}${"<i></i>".repeat(PARTICLES[scene] ?? 0)}</div>`;
+// A redraw rebuilds the screen; without this every animation would restart
+// from zero and «jump» (WEB-36). Each one continues from the app clock.
+function syncAnimations(root) {
+  const t = performance.now() / 1000;
+  root?.querySelectorAll(".scene b, .scene i, .wx-emoji.big, .wx-emoji.xl").forEach((el) => {
+    const cs = getComputedStyle(el);
+    if (!cs.animationName || cs.animationName === "none") return;
+    const dur = parseFloat(cs.animationDuration) || 0;
+    if (!dur) return;
+    const base = el.dataset.delay ?? String(parseFloat(cs.animationDelay) || 0);
+    el.dataset.delay = base;
+    const period = cs.animationDirection.includes("alternate") ? dur * 2 : dur;
+    el.style.animationDelay = `${(Number(base) - (t % period)).toFixed(3)}s`;
+  });
+}
 function currentWeather() {
   const city = activeCity();
   return vault.weather && vault.weather.city?.name === city.name ? vault.weather : null;
@@ -226,7 +241,7 @@ function weatherCard() {
   }
   const f = w.data;
   const age = Math.round((Date.now() - new Date(w.at).getTime()) / 60000);
-  const scene = sceneFor(f.now.icon);
+  const scene = sceneFor(f.now.icon, f.today);
   return `<section class="card hero scene-card sc-${scene}" aria-label="Tiempo en ${esc(city.name)}">
     ${sceneLayer(scene)}
     <button class="hero-tap" data-act="weather-open" aria-label="Ver el tiempo completo"></button>
@@ -1134,13 +1149,13 @@ function render({ focus = false, enter = null } = {}) {
   setSensitiveOk(vault?.settings?.aiSensitive === true);
   celebrateMoney = Boolean(enter) && tab === "dinero" && !overlay && !reduceMotion();
   const w = currentWeather();
-  if (w?.data?.now) document.body.dataset.wx = sceneFor(w.data.now.icon); else delete document.body.dataset.wx;
+  if (w?.data?.now) document.body.dataset.wx = sceneFor(w.data.now.icon, w.data.today); else delete document.body.dataset.wx;
   document.body.dataset.screen = overlay === "weather" ? "weather" : tab; // not data-tab: that attribute marks the tab buttons
   // Full-screen living background: the weather scene behind Hoy and the weather
   // page. Rebuilt only when it changes, so the animation never restarts on render.
-  const skyScene = (tab === "hoy" || overlay === "weather") && w?.data?.now ? sceneFor(w.data.now.icon) : "";
+  const skyScene = (tab === "hoy" || overlay === "weather") && w?.data?.now ? sceneFor(w.data.now.icon, w.data.today) : "";
   const sky = $("sky");
-  if (sky && sky.dataset.scene !== skyScene) { sky.dataset.scene = skyScene; sky.innerHTML = skyScene ? sceneLayer(skyScene) : ""; }
+  if (sky && sky.dataset.scene !== skyScene) { sky.dataset.scene = skyScene; sky.innerHTML = skyScene ? sceneLayer(skyScene) : ""; syncAnimations(sky); }
   const todayMood = vault.moods.find((m) => m.day === localDay())?.value;
   if (todayMood) document.body.dataset.mood = String(todayMood); else delete document.body.dataset.mood;
   if (tab === "tu" && (!sub || sub === "gcal") && isClientId(gClientId())) loadGis().catch(() => {});
@@ -1153,6 +1168,7 @@ function render({ focus = false, enter = null } = {}) {
     ? { id: active.id, value: active.value, start: active.selectionStart, end: active.selectionEnd } : null;
   $("screen").innerHTML = overlay === "weather" ? weatherPage() : overlay === "gemini" ? geminiGuide() : overlay === "image" ? `<button class="link" data-act="overlay-close">${I.back} Volver</button><img class="viewer" data-img="${esc(viewImageId ?? "")}" alt="Captura">` : (screens[tab] ?? screens.hoy)();
   animateEnter(enter);
+  syncAnimations($("screen"));
   if (typing && !focus && !enter) {
     const el = document.getElementById(typing.id);
     if (el && el.matches("input, textarea")) {

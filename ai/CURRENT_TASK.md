@@ -2,11 +2,11 @@
 
 Status: **REVIEW_PENDING**
 
-WEB-35 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
+WEB-36 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
 
 ## Tarea activa
 
-WEB-35 — Pregúntale a tu archivo, tu perfil y recuerdos en la conversación (`ai/HANDOFF.md`, «WEB-35»; enmienda WEB-35 de ADR-0016).
+WEB-36 — seis escenas del tiempo sin saltos y fondo animado recuperado (`ai/HANDOFF.md`, «WEB-36»).
 
 ## Autorización
 
@@ -47,6 +47,7 @@ WEB-35 — Pregúntale a tu archivo, tu perfil y recuerdos en la conversación (
 
 ## Historial (cerrado)
 
+- **WEB-35** (preguntar, perfil y recuerdos): CERRADA. Fusionada mediante el PR #43 (`9729316`).
 - **WEB-34** (Tu archivo): CERRADA. Fusionada mediante el PR #42 (`1165404`).
 - **WEB-33** (Gmail): CERRADA. Fusionada mediante el PR #41 (`1f69e4e`).
 - **WEB-32** (sin «+», Agenda al instante): CERRADA. Fusionada mediante el PR #40 (`f3eb67e`).

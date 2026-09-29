@@ -118,3 +118,7 @@ Cinco módulos añadidos entre WEB-22 y WEB-27 no estaban en `SHELL`, así que s
 ### QAL-027 — Al filtrar para un modelo, filtrar también lo que acompaña al texto (títulos, etiquetas)
 
 En WEB-35 se filtraban los mensajes de cada fragmento, pero el título de la conversación («Claves») viajaba con él y hacía saltar el control global. Todo el texto que forma parte de la petición debe pasar el mismo filtro que el contenido. Y hay que probar con datos sintéticos que contengan crisis y secretos.
+
+### QAL-028 — Un arreglo de CSS global necesita una captura de varias pantallas, no solo de la afectada
+
+En WEB-31 se dio fondo a `html` para arreglar la barra en Proyectos. Así `body` dejó de pasar su color al lienzo y tapó la capa `.ambient`: el fondo animado quedó negro en toda la app hasta WEB-36, y ningún recorrido lo detectó. Tras tocar `html`, `body` o capas fijas, hay que capturar Hoy y el tiempo con escena, y comprobar en un recorrido que la capa de fondo se ve.
