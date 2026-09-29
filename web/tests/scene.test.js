@@ -32,3 +32,21 @@ test("every spending category has an emoji; every mood has one", () => {
   for (const c of Object.keys(CATEGORIES)) assert.ok(CATEGORY_EMOJI[c], c);
   assert.deepEqual(MOODS.map((m) => m.emoji), ["😣", "😕", "🙂", "🤩"]);
 });
+
+test("WEB-40: dawn and dusk only around the real sunrise and sunset", async () => {
+  const { dayPhase, cityMinutes } = await import("../core/scene.js");
+  const at = (h, m = 0) => h * 60 + m;
+  // Oviedo, late September: sunrise 08:15, sunset 20:10
+  assert.equal(dayPhase(at(8, 0), "08:15", "20:10"), "dawn");
+  assert.equal(dayPhase(at(8, 50), "08:15", "20:10"), "dawn");
+  assert.equal(dayPhase(at(9, 0), "08:15", "20:10"), "day");
+  assert.equal(dayPhase(at(16, 51), "08:15", "20:10"), "day"); // afternoon is not sunset
+  assert.equal(dayPhase(at(19, 35), "08:15", "20:10"), "dusk");
+  assert.equal(dayPhase(at(20, 45), "08:15", "20:10"), "dusk");
+  assert.equal(dayPhase(at(21, 0), "08:15", "20:10"), "night");
+  assert.equal(dayPhase(at(3, 0), "08:15", "20:10"), "night");
+  assert.equal(dayPhase(at(12, 0), null, "20:10"), null);
+  // The city's time, not the phone's: 18:00 UTC is 20:00 in Madrid (UTC+2)
+  assert.equal(cityMinutes(Date.parse("2026-09-29T18:00:00Z"), 7200), at(20, 0));
+  assert.equal(cityMinutes(Date.parse("2026-09-29T23:30:00Z"), 7200), at(1, 30));
+});

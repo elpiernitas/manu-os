@@ -122,3 +122,11 @@ En WEB-35 se filtraban los mensajes de cada fragmento, pero el título de la con
 ### QAL-028 — Un arreglo de CSS global necesita una captura de varias pantallas, no solo de la afectada
 
 En WEB-31 se dio fondo a `html` para arreglar la barra en Proyectos. Así `body` dejó de pasar su color al lienzo y tapó la capa `.ambient`: el fondo animado quedó negro en toda la app hasta WEB-36, y ningún recorrido lo detectó. Tras tocar `html`, `body` o capas fijas, hay que capturar Hoy y el tiempo con escena, y comprobar en un recorrido que la capa de fondo se ve.
+
+### QAL-029 — Los fallos de servicios externos se muestran con su motivo real, nunca con un mensaje genérico
+
+En WEB-33, un 403 de Gmail se convertía en una frase ambigua y el aviso decía «algo no se ha sincronizado». Así Manu no podía saber si faltaba activar la API, el permiso o su cuenta de prueba. Hay que leer el cuerpo del error (`reason`, `message`), guardar un código por servicio y dar pasos concretos para cada código. Hay que probarlo con respuestas de error realistas.
+
+### QAL-030 — Un visualViewport simulado debe leer su altura de forma perezosa
+
+En WEB-40, el simulador de teclado fijaba `height = innerHeight` antes de aplicarse el tamaño del dispositivo, y daba 1669 px en una pantalla de 664 px. Eso falseaba las comprobaciones de «estar al final». La altura simulada debe ser un getter (`h ?? innerHeight`). Además, cada recorrido nuevo debe fallar en la versión anterior antes de darlo por válido.

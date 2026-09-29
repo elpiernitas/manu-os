@@ -7,11 +7,27 @@ export const GMAIL_SCOPE = "https://www.googleapis.com/auth/gmail.modify";
 const API = "https://gmail.googleapis.com/gmail/v1/users/me";
 export const LIMITS = { messages: 200, senders: 30, important: 12, perAction: 500 };
 
+// WEB-40: Google's own error, not a generic one. A 403 can mean the API is
+// off in the Cloud project, a token without the Gmail scope or a blocked app.
+export function explainGmailError(status, body) {
+  const e = body?.error ?? {};
+  const reasons = [...(e.details ?? []).map((d) => d?.reason), ...(e.errors ?? []).map((x) => x?.reason), e.status].filter(Boolean);
+  const has = (...r) => r.some((x) => reasons.includes(x));
+  const google = e.message ? ` (Google: ${String(e.message).replace(/\s+/g, " ").slice(0, 180)})` : "";
+  if (status === 401) return { code: "auth", message: "La sesión de Google ha caducado. Pulsa «Actualizar» otra vez." };
+  if (has("SERVICE_DISABLED", "accessNotConfigured")) return { code: "api-disabled", message: `La API de Gmail no está activada en tu proyecto de Google Cloud${google}` };
+  if (has("ACCESS_TOKEN_SCOPE_INSUFFICIENT", "insufficientPermissions")) return { code: "scope", message: `El permiso que dio Google no incluye Gmail${google}` };
+  if (status === 429 || has("rateLimitExceeded", "userRateLimitExceeded", "RATE_LIMIT_EXCEEDED")) return { code: "rate", message: "Gmail pide esperar un poco (demasiadas peticiones seguidas)." };
+  return { code: "http", message: `Gmail respondió ${status}${google}` };
+}
+
 async function call(token, url, init = {}, fetchImpl = fetch) {
   const res = await fetchImpl(url, { ...init, headers: { Authorization: `Bearer ${token}`, ...(init.headers ?? {}) } });
-  if (res.status === 401) throw Object.assign(new Error("Sesión de Google caducada"), { code: "auth" });
-  if (res.status === 403) throw Object.assign(new Error("Activa la API de Gmail en Google Cloud o da permiso"), { code: "forbidden" });
-  if (!res.ok) throw new Error(`Gmail respondió ${res.status}`);
+  if (!res.ok) {
+    const body = await Promise.resolve().then(() => res.json()).catch(() => null); // some errors come without a body
+    const x = explainGmailError(res.status, body);
+    throw Object.assign(new Error(x.message), { code: x.code, status: res.status });
+  }
   return res.status === 204 ? null : res.json().catch(() => null);
 }
 

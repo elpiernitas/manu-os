@@ -35,3 +35,24 @@ export const SHAPES = {
 
 // Money scene: a short shower of notes and coins when entering Dinero.
 export const MONEY_EMOJI = ["💶", "💸", "🪙"];
+
+// ---- Light of the day (WEB-40) ----
+// «dawn»/«dusk» only around the real sunrise and sunset of the chosen city;
+// «day» and «night» the rest of the time. Minutes are the city's local time.
+export const TWILIGHT = { before: 40, after: 40 };
+const mins = (hhmm) => { const m = /^(\d{2}):(\d{2})$/.exec(String(hhmm ?? "")); return m ? Number(m[1]) * 60 + Number(m[2]) : null; };
+
+// Local minutes of the day in the city, from its UTC offset (seconds).
+export function cityMinutes(now = Date.now(), offsetSeconds = null) {
+  if (!Number.isFinite(offsetSeconds)) { const d = new Date(now); return d.getHours() * 60 + d.getMinutes(); }
+  const m = Math.floor((now + offsetSeconds * 1000) / 60000) % 1440;
+  return (m + 1440) % 1440;
+}
+
+export function dayPhase(minutes, sunrise, sunset, w = TWILIGHT) {
+  const rise = mins(sunrise), set = mins(sunset);
+  if (rise === null || set === null || !Number.isFinite(minutes)) return null;
+  if (minutes >= rise - w.before && minutes <= rise + w.after) return "dawn";
+  if (minutes >= set - w.before && minutes <= set + w.after) return "dusk";
+  return minutes > rise && minutes < set ? "day" : "night";
+}

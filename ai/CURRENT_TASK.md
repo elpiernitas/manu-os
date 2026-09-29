@@ -2,11 +2,11 @@
 
 Status: **REVIEW_PENDING**
 
-WEB-39 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
+WEB-40 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
 
 ## Tarea activa
 
-WEB-39 — el Refugio empieza limpio, sin el historial del chat (`ai/HANDOFF.md`, «WEB-39»).
+WEB-40 — chat con teclado, luz del día según el amanecer y el atardecer reales, y errores reales de Gmail (`ai/HANDOFF.md`, «WEB-40»).
 
 ## Autorización
 
@@ -47,6 +47,7 @@ WEB-39 — el Refugio empieza limpio, sin el historial del chat (`ai/HANDOFF.md`
 
 ## Historial (cerrado)
 
+- **WEB-39** (Refugio limpio): CERRADA. Fusionada mediante el PR #47 (`4572d06`).
 - **WEB-38** (Personas y cumpleaños): CERRADA. Fusionada mediante el PR #46 (`42bbc61`).
 - **WEB-37** (conversaciones nuevas): CERRADA. Fusionada mediante el PR #45 (`46f5829`).
 - **WEB-36** (escenas del tiempo): CERRADA. Fusionada mediante el PR #44 (`7f14488`).

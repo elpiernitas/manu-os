@@ -10,6 +10,74 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
+## WEB-40 — chat con teclado, luz del día real y errores reales de Gmail
+
+Manu (2026-09-29) pidió tres correcciones:
+1. Que el chat baje al final al cerrarse el teclado, sin forzar el scroll si está leyendo.
+2. Que el fondo naranja y rojo salga solo al amanecer y al atardecer reales.
+3. Que Gmail funcione, diciendo la causa real, porque en Tú → Correo salía «Google: algo no se ha sincronizado».
+
+### 1. Chat y teclado (`web/app.js`)
+
+Causas encontradas:
+- Cada repintado forzaba `scrollIntoView` del último mensaje, aunque Manu estuviera leyendo mensajes anteriores.
+- Al abrir la pestaña MANU, `go()` hacía `scrollTo(0, 0)` justo después: era el «salto» al abrir.
+- Al cerrarse el teclado, iOS deja la página desplazada y no había nada que la devolviera al final.
+- Tras llegar al final, el contenido seguía creciendo (animación de entrada, «Pensando…» → respuesta) y la vista se quedaba corta.
+
+Cambios:
+- `chatPinned`: el chat sigue el final solo al abrirse, cuando Manu escribe o si ya estaba al final. Se mide con `visualViewport` y se ignoran los desplazamientos propios y los que ocurren con el teclado abierto.
+- Al cerrarse el teclado, si seguía la conversación, vuelve al final dos veces (60 ms y 360 ms), porque iOS anima el cambio.
+- Un `ResizeObserver` en `#screen` mantiene el final mientras crece el contenido.
+- La pestaña MANU ya no hace `scrollTo(0, 0)`.
+
+### 2. Luz del día (`web/core/scene.js`, `web/core/weather.js`, `web/styles.css`)
+
+- `parseForecast` guarda `offset` (`utc_offset_seconds`).
+- `cityMinutes` da la hora local de la ciudad, y `dayPhase` da `dawn`/`dusk` desde 40 minutos antes hasta 40 minutos después de la salida y la puesta reales del sol. El resto es `day` o `night`.
+- La fase va en `body[data-sky]` y en la tarjeta de Hoy (`ph-*`).
+- Amanecer y atardecer: naranja, rojo y dorado, salvo con lluvia, tormenta, nieve o niebla, que conservan sus colores.
+- Noche: fondo oscuro siempre.
+- «Sol mucho» de día pasa a azul intenso y ya no es naranja: el naranja de las 16:51 venía de esa escena.
+
+### 3. Gmail (`web/core/gmail.js`, `web/core/google.js`, `web/app.js`)
+
+Causa en el código:
+- El 403 de Gmail se convertía en una frase ambigua sin leer el cuerpo de la respuesta. El aviso final además era siempre «Google: algo no se ha sincronizado».
+- Si Google no daba el permiso, el motivo (`access_denied`, casilla sin marcar) se perdía.
+- «¿Qué correos me llegaron?» no coincidía con ninguna orden y llegaba a una IA sin datos del correo.
+
+Cambios:
+- `explainGmailError` lee `error.details[].reason`, `error.errors[].reason` y `error.message`, y distingue:
+  - `api-disabled` (`SERVICE_DISABLED` / `accessNotConfigured`);
+  - `scope` (`ACCESS_TOKEN_SCOPE_INSUFFICIENT` / `insufficientPermissions`);
+  - `auth` (401);
+  - `rate` (429);
+  - el resto, con el mensaje de Google.
+- `googleConsent` guarda el error de Google (`access_denied`, `popup_closed`…). `cachedToken` dice si Google negó el permiso o si solo no se concedió el de Gmail.
+- `runServices` guarda el código de cada fallo (`googleErrors`). El aviso nombra el servicio y su motivo.
+- En Tú → Correo hay una tarjeta «Gmail no ha funcionado» con el motivo exacto, los pasos según el código y «Reconectar Gmail».
+- El chat responde a «¿qué correos me llegaron?» con los importantes y lo que más llega. Si Gmail falla, explica el motivo. Solo reacciona a preguntas: «apunta idea: mandar un correo…» sigue siendo una idea.
+- Un fallo de Gmail no afecta a Calendar, Tasks, Contactos ni Drive: cada servicio va por separado, y hay prueba de ello.
+
+La causa en el iPhone de Manu no se puede ver desde aquí. La tarjeta mostrará cuál de los casos es. Los pasos para el más probable (API sin activar) son:
+1. console.cloud.google.com/apis/library/gmail.googleapis.com → proyecto de MANU → «Habilitar».
+2. En Google Auth Platform → Público: estado «Prueba» y su cuenta en «Usuarios de prueba».
+3. En «Acceso a datos», añadir `…/auth/gmail.modify`.
+4. En MANU, «Reconectar Gmail».
+
+### Resultados
+
+- `npm test`: 126/126 PASS (nuevos: `dayPhase`/`cityMinutes` y `explainGmailError`). `node --check` pasa.
+- e2e40a (chat con teclado de iOS simulado y Gemini con retraso): 7/7. Con la versión publicada fallaban 3 (abrir el chat, último mensaje tapado y scroll forzado al leer).
+- e2e40b (Gmail simulado): 11/11. Cubre la API desactivada, la casilla sin marcar y `access_denied`, con el motivo exacto; Calendar sigue bien; y el chat.
+- e2e40c (sol a las 08:15 y a las 20:10, UTC+2): 7/7. 16:51 es día y azul; 19:50, atardecer dorado; 08:30, amanecer; 22:30, noche oscura; y la lluvia conserva sus colores.
+- e2e3, e2e4 y e2e10–e2e39 en PASS, salvo las 3 expectativas antiguas de e2e18.
+
+### NO_VERIFICADO
+
+- En el iPhone real: el teclado (`visualViewport` real de Safari) y la causa concreta del fallo de Gmail de Manu.
+
 ## WEB-39 — el Refugio empieza limpio
 
 Manu (2026-09-29, captura): «en refugio aparece el historial; técnicamente tendría que ser como un chat de prueba que no se guarda ni tiene registro».

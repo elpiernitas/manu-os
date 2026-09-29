@@ -15,7 +15,7 @@ export const SCOPE = {
 
 // Runs each enabled service with a token for its own scope only. A denied or
 // failing service never stops the others. Returns { key: "ok: …" | "error: …" | "off" }.
-export async function runServices(services, enabled, tokenFor) {
+export async function runServices(services, enabled, tokenFor, errors = {}) {
   const status = {};
   for (const svc of services) {
     if (!enabled[svc.key]) { status[svc.key] = "off"; continue; }
@@ -24,6 +24,7 @@ export async function runServices(services, enabled, tokenFor) {
       status[svc.key] = `ok: ${await svc.run(token)}`;
     } catch (err) {
       status[svc.key] = `error: ${err?.message ?? "fallo"}`;
+      errors[svc.key] = { code: err?.code ?? "error", message: err?.message ?? "fallo" };
     }
   }
   return status;
