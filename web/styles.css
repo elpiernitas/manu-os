@@ -551,3 +551,7 @@ html { min-height: calc(100% + env(safe-area-inset-top, 0px)); background: var(-
 /* ---------- WEB-33: correo ---------- */
 .card a.row { color: inherit; text-decoration: none; }
 .mail-sender + .mail-sender { border-top: 1px solid var(--line); padding-top: 12px; margin-top: 4px; }
+/* ---------- WEB-34: tu archivo ---------- */
+.arch-hit { border-top: 1px solid var(--line); padding: 10px 0; }
+.arch-hit summary { cursor: pointer; list-style: none; }
+.arch-hit .stack { margin-top: 10px; max-height: 60vh; overflow-y: auto; }

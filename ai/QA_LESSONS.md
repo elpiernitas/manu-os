@@ -110,3 +110,7 @@ WEB-26 dio por bueno el composer con el teclado abierto, pero en el iPhone queda
 ### QAL-025 — Cada módulo nuevo debe entrar en la caché de instalación del service worker
 
 Cinco módulos añadidos entre WEB-22 y WEB-27 no estaban en `SHELL`, así que sin conexión la app podía no arrancar. Lo comprueba `web/tests/sw-shell.test.js`.
+
+### QAL-026 — No usar globales del navegador cuyo nombre está importado
+
+`app.js` importa `confirm` de `core/inbox.js`. En WEB-34, `confirm("¿Borrar…?")` llamó a esa función y lanzó «Unknown kind», en lugar de abrir el diálogo. Para los diálogos del navegador hay que usar `window.confirm` y `window.prompt`, y un recorrido debe pulsar cada botón de confirmación nuevo.

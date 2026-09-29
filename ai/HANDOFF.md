@@ -10,6 +10,46 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
+## WEB-34 — Tu archivo: importar la exportación de ChatGPT y buscar en ella
+
+Manu (2026-09-29): «quiero conectar mi vida entera». Autorizó exportaciones, Atajos, Spotify y YouTube, y Drive completo, con tres objetivos: perfil, preguntar lo que sea y resumen diario (ADR-0016). Esta es la primera entrega.
+
+### Cambios
+
+- `web/core/archive.js`:
+  - `unzip`: lector ZIP propio, `stored` y `deflate-raw` con `DecompressionStream`;
+  - `parseChatgpt`: sigue la rama `current_node` y quita sistema y ocultos;
+  - `readChatgptExport`: acepta el `.zip` o `conversations.json`;
+  - `search`: sin acentos, el título pesa el triple, fragmento alrededor del acierto;
+  - `stats`.
+- `web/core/archivestore.js`: IndexedDB `manuos-archive`, solo en el dispositivo.
+- `web/app.js`:
+  - Tú → Tu archivo: importar, resumen, buscar, ver la conversación y borrar el archivo;
+  - chat: «¿qué hablé con ChatGPT de …?» y «busca en mi archivo …»;
+  - «Borrar todos los datos» también borra el archivo;
+  - se usa `window.confirm` y `window.prompt`, porque `confirm` está importado de `inbox.js` (QAL-026);
+  - versión 34.
+- ADR-0016 y threat model.
+
+### Resultados
+
+- `npm test`: 116/116 PASS (`web/tests/archive.test.js`: rama correcta, ZIP real con `deflate` creado en el test y búsqueda). `node --check` pasa.
+- e2e34 con una exportación sintética de 42 conversaciones: 11/11. Cubre:
+  - la importación del `.zip`;
+  - que no queda nada en localStorage y que no hay peticiones externas al importar;
+  - la búsqueda, abrir una conversación y que persiste al recargar;
+  - las dos órdenes del chat y el borrado.
+- El recorrido encontró que `confirm` era la función de `inbox.js` y no el diálogo del navegador. Se arregló también en el `prompt` de Gmail, por precaución.
+- e2e3, e2e4 y e2e10–e2e33 en PASS, salvo las 3 expectativas antiguas de e2e18.
+
+### NO_VERIFICADO
+
+- Con la exportación real de Manu: el tamaño, la cuota de IndexedDB en Safari y posibles cambios de formato de OpenAI.
+
+### Siguiente
+
+- Preguntar lo que sea y perfil con Gemini sobre el archivo (ADR-0016).
+
 ## WEB-33 — Gmail: MANU vigila el correo y actúa
 
 Manu (2026-09-29): quiere que MANU le diga «te llegan muchos correos de X, ¿te desuscribes?» y le avise cuando llegue la exportación de ChatGPT. Autorizó acceso total al correo (ADR-0015). El modo automático bloqueó el paso de permisos y Manu pasó a modo manual y aprobó cada paso.

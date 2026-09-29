@@ -2,11 +2,11 @@
 
 Status: **REVIEW_PENDING**
 
-WEB-33 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
+WEB-34 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
 
 ## Tarea activa
 
-WEB-33 — Gmail con `gmail.modify`: MANU vigila el correo, propone bajas y archiva, etiqueta o manda a la papelera con deshacer (`ai/HANDOFF.md`, «WEB-33»; ADR-0015).
+WEB-34 — Tu archivo: importar la exportación de ChatGPT y buscar en ella, solo en el dispositivo (`ai/HANDOFF.md`, «WEB-34»; ADR-0016).
 
 ## Autorización
 
@@ -16,6 +16,7 @@ WEB-33 — Gmail con `gmail.modify`: MANU vigila el correo, propone bajas y arch
 - 2026-09-29: Manu pide una IA integrada a la que decirle cosas de la app y con la que subir sus gastos. El envío sin preguntar queda como ajuste que decide Manu, desactivado por defecto.
 - 2026-09-29: Manu ordena «cambia agents.md para que tú puedas decidir cuándo fusionar y cuándo no». `AGENTS.md` y `CLAUDE.md` recogen la regla de fusión, lo que resuelve el hallazgo 6 de la revisión de ChatGPT.
 - 2026-09-29: Manu elige que la IA pueda leer capturas y vídeos compartidos (TikTok, reels), con el aviso de que la imagen se envía a Google.
+- 2026-09-29: Manu quiere «conectar su vida entera». Autoriza exportaciones, Atajos, Spotify y YouTube, y Drive completo (ADR-0016). La primera entrega es «Tu archivo» con ChatGPT.
 - 2026-09-29: Manu autoriza acceso total a Gmail y que MANU vigile todo el correo (ADR-0015). Se implementa `gmail.modify` sin borrado definitivo.
 - 2026-09-29: Manu pide quitar el «+» y que Agenda no espere a verificar Google al abrir. Esto sustituye la conducta de WEB-24.
 - 2026-09-29: Manu decide «que lo sensible vaya a la IA me da igual». Se implementa con un interruptor en su dispositivo; secretos, crisis y Refugio siguen sin enviarse.
@@ -46,6 +47,7 @@ WEB-33 — Gmail con `gmail.modify`: MANU vigila el correo, propone bajas y arch
 
 ## Historial (cerrado)
 
+- **WEB-33** (Gmail): CERRADA. Fusionada mediante el PR #41 (`1f69e4e`).
 - **WEB-32** (sin «+», Agenda al instante): CERRADA. Fusionada mediante el PR #40 (`f3eb67e`).
 - **WEB-31** (páginas cortas en iOS): CERRADA. Fusionada mediante el PR #39 (`fb4f555`).
 - **WEB-30** (zona inferior): CERRADA. Fusionada mediante el PR #38 (`2f5fdad`).
