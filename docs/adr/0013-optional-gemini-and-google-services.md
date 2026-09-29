@@ -69,6 +69,14 @@ La app web (ADR-0012) funciona sin IA, pero el chat solo entiende órdenes concr
 - **Proyectos (tipo NotebookLM).** Cada proyecto tiene fuentes: notas, enlaces (con el texto de TikTok o YouTube) y capturas guardadas en IndexedDB. Al pulsar «Preguntar» o un botón de resumen, se envían a Gemini la pregunta, las fuentes de texto numeradas y hasta 4 capturas, y la respuesta cita las fuentes. Las fuentes de texto que parecen sensibles no se envían, y la respuesta dice cuáles se quedaron fuera. Una pregunta sensible no se envía. Las capturas no se pueden filtrar: el aviso lo dice.
 - Los proyectos están en el vault (`projects`) y entran en las copias. Sus capturas no, porque están en IndexedDB.
 
+## Enmienda (2026-09-29, WEB-28): datos sensibles permitidos por Manu
+
+Manu decidió de forma expresa: «que lo sensible vaya a la IA me da igual». Esta es la «decisión específica» que exige `AGENTS.md`, pero se aplica solo en su dispositivo y con un interruptor que él controla:
+- Tú → IA → «Permitir datos sensibles». Viene desactivado por defecto y se activa también con «Activar con todo». Mientras está activo, la salud, el dinero, el ánimo y las personas pueden ir a Gemini en el chat, el modo conversación, las capturas, los enlaces y los proyectos (`mayGo`).
+- El contexto del modo conversación sigue saliendo solo de las categorías que Manu marca. El interruptor deja pasar lo que él escribe, pero no añade más datos de su vida.
+- **Nunca se envían, aunque el interruptor esté activo**: contraseñas, tarjetas, IBAN, teléfonos, correos, claves de API (`secret`) y las frases de crisis y del Refugio (`crisis`). Las crisis se atienden en local con el 112 y el 024.
+- Las sugerencias de mejora para GitHub siguen bloqueando todo lo sensible, porque los issues son públicos.
+
 ## Enmienda (2026-09-29, WEB-27): modo conversación
 
 Manu pidió «hablar con MANU como si fuera Gemini integrado dentro, que lo sepa todo y que maneje él las cosas». Es una decisión material de privacidad, así que es Manu quien la toma en la app y no se aplica sola:

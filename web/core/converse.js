@@ -1,7 +1,7 @@
 // «Modo conversación» (WEB-27): MANU talks through Gemini, remembers the
 // conversation and knows the parts of Manu's life he chose to share. Each
 // category is Manu's explicit decision; secrets and the Refugio never go.
-import { sensitiveKinds, TOOLS, BASE_SYSTEM } from "./ai.js";
+import { sensitiveKinds, TOOLS, BASE_SYSTEM, NEVER } from "./ai.js";
 import { euros, CATEGORIES } from "./money.js";
 
 export const CONTEXT_CATEGORIES = [
@@ -20,7 +20,7 @@ export const FULL_CONTEXT = Object.fromEntries(CONTEXT_CATEGORIES.map((c) => [c.
 // A message may go if every sensitive category it touches was allowed.
 export function allowedToSend(text, context = {}) {
   const kinds = sensitiveKinds(text);
-  const blocked = [...kinds].filter((k) => k === "secret" || !context[k]);
+  const blocked = [...kinds].filter((k) => NEVER.includes(k) || !context[k]);
   return { ok: blocked.length === 0, blocked };
 }
 

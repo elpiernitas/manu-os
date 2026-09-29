@@ -11,13 +11,15 @@ const API = "https://generativelanguage.googleapis.com/v1beta";
 const SENSITIVE_GROUPS = {
   health: ["medico", "medica", "vih", "sida", "receta", "sertralina", "ibuprofeno", "paracetamol", "antidepresiv", "ansiolitic", "enfermedad", "pastilla", "medicacion", "medicamento", "diagnostic", "sintoma", "dolor", "hospital", "urgencias", "terapia", "psicolog", "psiquiatr", "ansiedad", "depresi", "salud", "analitica", "embaraz", "peso "],
   money: ["euro", "€", "cobro", "cobra", "gano ", "ingreso", "al mes", "banco", "sabadell", "nomina", "sueldo", "salario", "deuda", "prestamo", "hipoteca", "tarjeta", "cuenta corriente", "iban", "transferencia", "gaste", "pague", "dinero", "factura"],
-  mood: ["triste", "bajon", "suicid", "morir", "llorar", "solo y", "refugio"],
+  mood: ["triste", "bajon", "llorar", "solo y"],
+  // Crisis and the Refugio stay on the phone, like secrets: never allowed.
+  crisis: ["suicid", "morir", "matarme", "quitarme la vida", "no quiero vivir", "hacerme dano", "acabar con todo", "refugio"],
   secret: ["contrasena", "password", "pin ", "clave"],
 };
 const SENSITIVE = Object.values(SENSITIVE_GROUPS).flat();
 
 // Which sensitive categories a text touches. «secret» (passwords, cards,
-// IBAN, phones, emails, API keys) can never be allowed.
+// IBAN, phones, emails, API keys) and «crisis» can never be allowed.
 export function sensitiveKinds(text) {
   const raw = String(text ?? "");
   const t = ` ${normalise(raw)} `;
@@ -25,6 +27,18 @@ export function sensitiveKinds(text) {
   for (const [kind, words] of Object.entries(SENSITIVE_GROUPS)) if (words.some((k) => t.includes(k))) kinds.add(kind);
   if (/\b[A-Z]{2}\d{2}[ ]?\d{4}/.test(raw) || /\b(?:\d[ -]?){13,19}\b/.test(raw) || /(\+34)?[ ]?[6-9]\d{2}[ ]?\d{3}[ ]?\d{3}\b/.test(raw) || /[^\s@]+@[^\s@]+\.[a-z]{2,}/i.test(raw) || GEMINI_KEY_IN_TEXT.test(raw)) kinds.add("secret");
   return kinds;
+}
+
+// Manu's decision (2026-09-29, WEB-28): when he turns it on, health, money,
+// mood and people may go to Gemini everywhere. Secrets and crisis never do.
+export const NEVER = ["secret", "crisis"];
+let sensitiveOk = false;
+export const setSensitiveOk = (v) => { sensitiveOk = v === true; };
+export const sensitiveAllowed = () => sensitiveOk;
+// Whether a text may be sent to the model under the current policy.
+export function mayGo(text) {
+  const kinds = sensitiveKinds(text);
+  return sensitiveOk ? !NEVER.some((k) => kinds.has(k)) : kinds.size === 0;
 }
 
 export function isSensitive(text) {
@@ -57,7 +71,7 @@ export function pickModel(json) {
 }
 
 export function systemPrompt({ now = new Date(), city = null, tasks = [], events = [] } = {}) {
-  const safe = (list) => list.filter((x) => !isSensitive(x)).slice(0, 10);
+  const safe = (list) => list.filter(mayGo).slice(0, 10);
   return [
     "Eres MANU, el asistente personal de Manu, dentro de la app MANU OS. Hablas en español de España, cercano, honesto y breve (máximo 4 frases).",
     "No inventes datos sobre Manu. Si no sabes algo, dilo. No des diagnósticos médicos ni consejos financieros. No digas que has hecho acciones: la app las hace aparte.",
@@ -79,7 +93,7 @@ export function buildPayload(message, { history = null, system = BASE_SYSTEM } =
 
 // history: [{ from: "me"|"manu", text }] — sensitive turns are dropped.
 export function requestBody(message, history = [], system = "") {
-  const turns = history.filter((m) => m.text && !isSensitive(m.text)).slice(-6)
+  const turns = history.filter((m) => m.text && mayGo(m.text)).slice(-6)
     .map((m) => ({ role: m.from === "me" ? "user" : "model", parts: [{ text: String(m.text).slice(0, 1000) }] }));
   return {
     systemInstruction: { parts: [{ text: system }] },
@@ -106,7 +120,7 @@ export async function listModels(key, fetchImpl = fetch) {
 export async function ask({ key, model, payload, confirmed }, fetchImpl = fetch) {
   if (confirmed !== true) throw Object.assign(new Error("Falta tu confirmación"), { code: "unconfirmed" });
   const texts = (payload?.contents ?? []).flatMap((c) => c.parts.map((p) => p.text));
-  if (texts.some(isSensitive)) throw Object.assign(new Error("sensible"), { code: "sensitive" });
+  if (!texts.every(mayGo)) throw Object.assign(new Error("sensible"), { code: "sensitive" });
   const res = await fetchImpl(`${API}/models/${encodeURIComponent(model)}:generateContent`, {
     method: "POST",
     headers: { "x-goog-api-key": key, "Content-Type": "application/json" },
@@ -176,7 +190,7 @@ export function issueUrl({ titulo, descripcion }, version = "") {
 // Same privacy gates as ask(): explicit consent (per request or Manu's global opt-in) and no sensitive text.
 // `permit(text)` decides what may go; by default nothing sensitive. The
 // conversation mode passes the categories Manu allowed (secrets never).
-export async function askWithActions({ key, model, payload, confirmed, permit = (t) => !isSensitive(t) }, fetchImpl = fetch) {
+export async function askWithActions({ key, model, payload, confirmed, permit = mayGo }, fetchImpl = fetch) {
   if (confirmed !== true) throw Object.assign(new Error("Falta tu confirmación"), { code: "unconfirmed" });
   const texts = (payload?.contents ?? []).flatMap((c) => c.parts.map((p) => p.text)).filter((t) => typeof t === "string");
   if (!texts.every((t) => permit(t))) throw Object.assign(new Error("sensible"), { code: "sensitive" });

@@ -10,6 +10,35 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
+## WEB-28 — «Permitir datos sensibles» en la IA
+
+Manu (2026-09-29): «que lo sensible vaya a la IA me da igual».
+
+### Cambios
+
+- `web/core/ai.js`:
+  - `setSensitiveOk` y `mayGo` gobiernan todos los envíos: `ask`, `askWithActions` por defecto, el historial y `systemPrompt`;
+  - la nueva categoría `crisis` (suicidio, morir, Refugio…) y `secret` nunca se permiten (`NEVER`);
+  - «morir» y «refugio» salen de ánimo.
+- `web/core/projects.js`: la pregunta y las fuentes usan `mayGo`.
+- `web/core/converse.js`: `allowedToSend` bloquea siempre `NEVER`.
+- `web/core/assistant.js`: «quiero morir» y «ganas de morir» se detectan ya como crisis. Antes no abrían la ayuda.
+- `web/app.js`:
+  - interruptor «Permitir datos sensibles» en Tú → IA; «Activar con todo» también lo activa;
+  - con el interruptor activo, el modo conversación deja pasar mensajes sensibles aunque la categoría de contexto no esté marcada. El contexto sigue siendo solo lo marcado;
+  - versión 28.
+- Enmienda WEB-28 de ADR-0013, fila del threat model y QAL-023.
+
+### Resultados
+
+- `npm test`: 105/105 PASS. `node --check` pasa.
+- Chromium con Gemini simulado: 10 checks en PASS. Cubren que el interruptor esté desactivado por defecto; que sin él no se ofrece lo sensible; que «Activar con todo» lo activa; que un mensaje de salud y dinero se envía sin añadir el contexto de dinero no marcado; que un secreto no se envía; que «quiero morir» abre la ayuda y no va a Gemini; que el historial conserva lo sensible y quita el secreto y la crisis; y que al desactivarlo se vuelve a bloquear.
+- e2e10–e2e27: todos en PASS. En e2e18 fallan 3 expectativas antiguas (escenas y orbe) que también fallan en `main`: quedaron desfasadas por WEB-19/20, no por este cambio.
+
+### NO_VERIFICADO
+
+- Comportamiento con la clave real en el iPhone.
+
 ## WEB-27 — modo conversación: MANU con Gemini integrado
 
 Manu (2026-09-29): «quiero hablar con MANU como si fuera Gemini integrado dentro y que lo sepa todo, que lo maneje él las cosas».

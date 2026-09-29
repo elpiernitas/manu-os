@@ -48,3 +48,20 @@ test("new tool completar_tarea is parsed; auto actions exclude money and app cha
   assert.deepEqual(calls, [{ name: "completar_tarea", texto: "taller" }]);
   assert.ok(AUTO_SAFE.has("anadir_tarea") && !AUTO_SAFE.has("apuntar_gasto") && !AUTO_SAFE.has("sugerir_mejora") && !AUTO_SAFE.has("importar_extracto"));
 });
+
+test("WEB-28: Manu's switch lets sensitive categories go, never secrets or crisis", async () => {
+  const { mayGo, setSensitiveOk, askWithActions, buildActionPayload } = await import("../core/ai.js");
+  const { buildProjectPayload } = await import("../core/projects.js");
+  assert.equal(mayGo("cuánto gasté en el banco"), false);
+  setSensitiveOk(true);
+  try {
+    for (const t of ["cuánto gasté en el banco", "me duele la cabeza, tomo ibuprofeno", "estoy triste"]) assert.equal(mayGo(t), true, t);
+    for (const t of ["mi contraseña es hola123", "llámame al 612 345 678", "quiero morir", "abre el refugio"]) assert.equal(mayGo(t), false, t);
+    const project = { name: "P", sources: [{ kind: "text", title: "Nómina", text: "sueldo de septiembre" }, { kind: "text", title: "Clave", text: "contraseña: x" }] };
+    assert.deepEqual(buildProjectPayload({ project, question: "¿cuánto cobro?" }).excluded, [2]);
+    const r = await askWithActions({ key: "k", model: "m", payload: buildActionPayload("gasté 30 € en la farmacia"), confirmed: true }, async () => ({ ok: true, status: 200, json: async () => ({ candidates: [{ content: { parts: [{ text: "ok" }] } }] }) }));
+    assert.equal(r.text, "ok");
+    assert.equal(allowedToSend("quiero morir", FULL_CONTEXT).ok, false);
+  } finally { setSensitiveOk(false); }
+  assert.equal(mayGo("estoy triste"), false);
+});
