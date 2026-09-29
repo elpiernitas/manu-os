@@ -38,13 +38,15 @@ export function dayLines(vault, day, { calendar = null } = {}) {
   if (meals.length) lines.push(`Comidas: ${meals.slice(0, 10).map((m) => `${m.time ?? ""} ${m.text}`.trim()).join("; ")}.`);
   const health = (vault.health ?? []).filter((h) => h.day === day);
   if (health.length) lines.push(`Salud: ${health.map((h) => `${h.kind} ${h.value}`).join(", ")}.`);
+  const places = (vault.places ?? []).filter(on);
+  if (places.length) lines.push(`Lugares: ${places.slice(0, 12).map((x) => `${hm(x.at)} ${x.text}`).join("; ")}.`);
   return lines;
 }
 
 // Every day with something, from the oldest data up to today (max `limit`).
 export function diaryDocs(vault, { now = new Date(), limit = 400, calendar = null } = {}) {
   const days = new Set();
-  for (const list of [vault.spending, vault.income, vault.inbox, vault.reminders]) for (const x of list ?? []) { const d = x?.at && localDayOf(x.at); if (d) days.add(d); }
+  for (const list of [vault.spending, vault.income, vault.inbox, vault.reminders, vault.places]) for (const x of list ?? []) { const d = x?.at && localDayOf(x.at); if (d) days.add(d); }
   for (const x of vault.moods ?? []) if (x.day) days.add(x.day);
   for (const x of vault.meals ?? []) if (x.day) days.add(x.day);
   for (const x of vault.health ?? []) if (x.day) days.add(x.day);

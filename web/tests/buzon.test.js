@@ -1,0 +1,70 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { amountCents, parseWhen, parseLine, lineId, applyBuzon, buzonSummary } from "../core/buzon.js";
+import { newEntry } from "../core/money.js";
+
+const NOW = new Date(2026, 8, 29, 20, 0);
+
+test("amounts as Wallet and Shortcuts write them", () => {
+  assert.equal(amountCents("12,50 €"), 1250);
+  assert.equal(amountCents("€12.50"), 1250);
+  assert.equal(amountCents("1.234,56 €"), 123456);
+  assert.equal(amountCents("1,234.56"), 123456);
+  assert.equal(amountCents("-3,2"), 320);
+  assert.equal(amountCents("7"), 700);
+  assert.equal(amountCents("gratis"), null);
+  assert.equal(amountCents("0,00"), null);
+});
+
+test("dates: ISO, with offset and Spanish d/m/y", () => {
+  const a = parseWhen("2026-09-29 17:40");
+  assert.deepEqual([a.getFullYear(), a.getMonth(), a.getDate(), a.getHours(), a.getMinutes()], [2026, 8, 29, 17, 40]);
+  assert.equal(parseWhen("2026-09-29T15:40:00Z").toISOString(), "2026-09-29T15:40:00.000Z");
+  const b = parseWhen("29/9/2026, 8:05");
+  assert.deepEqual([b.getDate(), b.getMonth(), b.getHours(), b.getMinutes()], [29, 8, 8, 5]);
+  assert.equal(parseWhen("2026-09-29").getHours(), 12); // day only: midday, so time zones keep the day
+  assert.equal(parseWhen("31/2/2026"), null);
+  assert.equal(parseWhen("ayer"), null);
+});
+
+test("lines: every kind, accents and case, errors explained", () => {
+  assert.equal(parseLine("Gasto|2026-09-29 17:40|12,50 €|Mercadona", NOW).merchant, "Mercadona");
+  assert.equal(parseLine("MANU|pasos|2026-09-29|8432,0", NOW).value, 8432);
+  assert.equal(parseLine("Sueño|2026-09-29|7,46", NOW).value, 7.5);
+  assert.equal(parseLine("peso|2026-09-29|72,4", NOW).kind, "weight");
+  assert.equal(parseLine("lugar|2026-09-29 17:40|Calle Ejemplo 1|Gijón", NOW).text, "Calle Ejemplo 1 Gijón");
+  assert.equal(parseLine("   ", NOW), null);
+  assert.equal(parseLine("hola|2026-09-29|1", NOW).error, "tipo desconocido");
+  assert.equal(parseLine("gasto|mañana|3", NOW).error, "fecha no válida");
+  assert.equal(parseLine("gasto|2026-10-05 10:00|3|x", NOW).error, "fecha en el futuro");
+  assert.equal(parseLine("sueño|2026-09-29|30", NOW).error, "valor no válido");
+  assert.equal(lineId("Gasto|2026-09-29 17:40|12,50 €|Mercadona"), lineId("gasto | 2026-09-29 17:40 | 12,50 €|mercadona".replace(/ \| /g, "|")));
+});
+
+test("importing twice adds nothing; health keeps one value per day", () => {
+  const file = [
+    "gasto|2026-09-29 17:40|12,50 €|Mercadona",
+    "gasto|2026-09-29 18:02|3,20 €|Cafetería",
+    "pasos|2026-09-28|6000",
+    "pasos|2026-09-29|8432",
+    "sueño|2026-09-29|7,5",
+    "lugar|2026-09-29 17:40|Gijón",
+    "esto no es una línea",
+  ].join("\n");
+  const vault = { spending: [], health: [{ day: "2026-09-29", kind: "STEPS", value: 100 }], settings: {} };
+  const r = applyBuzon(file, vault, { now: NOW, newEntry });
+  assert.equal(r.added, 6);
+  assert.equal(r.spending.length, 2);
+  assert.equal(r.spending[0].source, "APPLEPAY");
+  assert.equal(r.spending[0].cents, 1250);
+  assert.ok(r.spending[0].category);
+  assert.deepEqual(r.health.filter((h) => h.kind === "STEPS").map((h) => [h.day, h.value]).sort(), [["2026-09-28", 6000], ["2026-09-29", 8432]]);
+  assert.equal(r.places.length, 1);
+  assert.deepEqual(r.errors, [{ line: 7, error: "tipo desconocido" }]);
+  assert.equal(buzonSummary(r), "2 gastos, pasos de 2 días, sueño de 1 día y 1 lugar · 1 líneas no entendidas");
+
+  const again = applyBuzon(file + "\ngasto|2026-09-29 20:00|1 €|Pan", { ...vault, settings: { buzonSeen: r.seenAll } }, { now: NOW, newEntry });
+  assert.equal(again.added, 1);
+  assert.equal(again.repeated, 6);
+  assert.equal(again.spending[0].merchant, "Pan");
+});

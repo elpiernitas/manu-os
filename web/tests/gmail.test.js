@@ -39,6 +39,17 @@ test("summary: bulk senders counted, important mail and ChatGPT export found", (
   assert.equal(findSender(s, "nadie"), null);
 });
 
+test("WEB-42: «data export has started» is not the export arriving", () => {
+  const started = [msg("s1", "OpenAI <noreply@tm.openai.com>", "ChatGPT - Your data export has started", ["INBOX", "IMPORTANT"]), msg("o1", "OpenAI <noreply@tm.openai.com>", "New sign-in to your OpenAI account", ["INBOX"])].map(slim);
+  const s = summarize(started, NOW);
+  assert.equal(s.chatgptExport, null);
+  assert.equal(s.chatgptExportPending.id, "s1");
+  assert.deepEqual(mailSuggestions(s), []); // no «te ha llegado» card
+  const ready = summarize([...started, slim(msg("r1", "OpenAI <noreply@tm.openai.com>", "Your ChatGPT data export is ready", ["INBOX"], [], NOW - 60000))], NOW);
+  assert.equal(ready.chatgptExport.id, "r1");
+  assert.equal(ready.chatgptExportPending, null);
+});
+
 test("snapshot asks only for metadata headers, never the body", async () => {
   const urls = [];
   const f = async (url) => {

@@ -22,6 +22,7 @@ import { readChatgptExport, search as archiveSearch, stats as archiveStats, chat
 import { putDocs, allDocs, clearArchive } from "./core/archivestore.js";
 import { findExcerpts, askPayload, profileDigest, profilePayload, memoryContext } from "./core/recall.js";
 import { diaryDocs, dayLines, dayFromText, isDiaryQuestion, dayTitle } from "./core/diary.js";
+import { applyBuzon, buzonSummary } from "./core/buzon.js";
 import { weatherEmoji, sceneFor, PARTICLES, SHAPES, MONEY_EMOJI, dayPhase, cityMinutes } from "./core/scene.js";
 import { buildImagePayload, buildLinkPayload, isGeminiKey, mayGo, setSensitiveOk, sensitiveAllowed, pickModel, listModels, buildActionPayload, askWithActions, issueUrl } from "./core/ai.js";
 import { encryptBackup, decryptBackup, passphraseProblem } from "./core/crypto.js";
@@ -29,7 +30,7 @@ import { isSpotifyClientId, pkceValid, randomVerifier, challengeFor, authorizeUr
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "41";
+export const APP_VERSION = "43";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -316,6 +317,25 @@ const SHORTCUTS = [
     "<b>«Solicitar entrada»</b> (texto).",
     `<b>«URL»</b>: <code>${esc(SITE)}?di=</code> seguido de la variable Entrada proporcionada.`,
     "<b>«Abrir URL»</b>. Aviso: se abre en Safari, que guarda sus datos aparte del icono de MANU (NO_VERIFICADO)."] },
+  // WEB-43: «buzón». Shortcuts append lines to iCloud Drive/Atajos/MANU-buzon.txt.
+  { id: "applepay", name: "MANU Apple Pay", purpose: "apuntar solo cada pago con Apple Pay", test: null, steps: [
+    "Atajos → <b>Automatización</b> → <b>+</b> → <b>«Transacción»</b> (Cartera). Elige tus tarjetas y <b>«Ejecutar inmediatamente»</b>.",
+    "Acción <b>«Formatear fecha»</b>: Fecha actual, formato <b>Personalizado</b> <code>yyyy-MM-dd HH:mm</code>.",
+    "Acción <b>«Texto»</b>: <code>gasto|</code> Fecha formateada <code>|</code> <b>Importe</b> <code>|</code> <b>Comercio</b> (las dos últimas son variables de la transacción).",
+    "Acción <b>«Añadir al archivo de texto»</b>: el Texto, archivo <code>MANU-buzon.txt</code> en la carpeta Atajos de iCloud Drive, con <b>«Nueva línea»</b> activado.",
+    "Cuando quieras, MANU → Tú → Atajos → <b>«Importar del buzón»</b>."] },
+  { id: "salud", name: "MANU Salud", purpose: "pasos (y sueño o peso) de cada día", test: null, steps: [
+    "Atajos → <b>Automatización</b> → <b>+</b> → <b>«Hora del día»</b> 23:30, a diario, <b>«Ejecutar inmediatamente»</b>.",
+    "<b>«Buscar muestras de salud»</b>: tipo <b>Pasos</b>, fecha de inicio <b>Hoy</b>.",
+    "<b>«Calcular estadísticas»</b>: <b>Suma</b> de las muestras.",
+    "<b>«Formatear fecha»</b>: Fecha actual, formato <code>yyyy-MM-dd</code>.",
+    "<b>«Texto»</b>: <code>pasos|</code> Fecha formateada <code>|</code> Suma. <b>«Añadir al archivo de texto»</b> igual que en Apple Pay.",
+    "Opcional, mismo formato: <code>sueño|fecha|horas</code> (por ejemplo 7,5) y <code>peso|fecha|kilos</code>."] },
+  { id: "lugar", name: "MANU Lugar", purpose: "dónde has estado (solo en tu iPhone)", test: null, steps: [
+    "Atajos → <b>Automatización</b> → <b>+</b> → <b>«Hora del día»</b> (por ejemplo 14:00 y otra a las 21:00), <b>«Ejecutar inmediatamente»</b>.",
+    "<b>«Obtener ubicación actual»</b> → <b>«Obtener detalles de ubicaciones»</b>: <b>Ciudad</b> (o Calle, si quieres más detalle).",
+    "<b>«Formatear fecha»</b>: Fecha actual, <code>yyyy-MM-dd HH:mm</code>.",
+    "<b>«Texto»</b>: <code>lugar|</code> Fecha formateada <code>|</code> Ciudad. <b>«Añadir al archivo de texto»</b> igual que en Apple Pay."] },
 ];
 const shortcutsPending = () => SHORTCUTS.filter((x) => !(vault.settings.shortcutsDone ?? {})[x.id]).length;
 
@@ -920,6 +940,7 @@ const subpages = {
       <div class="btns">${x.test ? `<a class="btn ghost" href="${esc(x.test)}">Probar</a>` : ""}${done[x.id] ? `<button class="btn ghost" data-act="shortcut-undo" data-id="${x.id}">Marcar como pendiente</button>` : `<button class="btn" data-act="shortcut-done" data-id="${x.id}">Ya lo tengo</button>`}</div></details>`;
     return `${backBar("Atajos")}
       <p class="muted small">Apple no deja que una web instale atajos por ti: cada uno se crea una vez en la app Atajos con el nombre exacto (unos 2 minutos). Pulsa «Probar» para comprobarlo y «Ya lo tengo» para quitarlo de pendientes. Los nombres de las acciones pueden variar según tu iOS.</p>
+      ${buzonCard()}
       ${sectionTitle(`Pendientes (${pending.length})`)}
       <div class="stack">${pending.map(card).join("") || '<p class="muted">Nada pendiente.</p>'}</div>
       ${created.length ? `${sectionTitle(`Creados (${created.length})`)}<div class="stack">${created.map(card).join("")}</div>` : ""}`;
@@ -1746,6 +1767,31 @@ function archiveCommand(text) {
   return m ? m[1].trim() : null;
 }
 
+// ---------- Buzón de Atajos (WEB-43) ----------
+function buzonCard() {
+  const last = vault.settings.lastBuzon;
+  return `<section class="card"><h2>📬 Buzón de Atajos</h2>
+    <p class="muted small">Apple Pay, Salud y ubicación no se pueden leer desde una web. Los atajos «MANU Apple Pay», «MANU Salud» y «MANU Lugar» los apuntan en <b>iCloud Drive → Atajos → MANU-buzon.txt</b> y aquí lo importas con un toque. Lo repetido se salta, así que no hace falta borrar el archivo. Todo se queda en tu iPhone.</p>
+    ${last ? `<p class="small">Última importación: ${esc(new Date(last.at).toLocaleString("es-ES", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }))} · ${esc(last.text)}</p>` : ""}
+    <label class="btn block" for="buzonFile" role="button" tabindex="0">Importar del buzón</label><input id="buzonFile" type="file" accept=".txt,text/plain" class="sr"></section>`;
+}
+function importBuzon(text) {
+  const r = applyBuzon(text, vault, { now: new Date(), newEntry: (e) => newEntry(e, vault.settings.categoryRules ?? {}) });
+  vault.spending.push(...r.spending);
+  vault.health = r.health;
+  vault.places = r.places;
+  vault.settings.buzonSeen = r.seenAll;
+  const summary = buzonSummary(r);
+  vault.settings.lastBuzon = { at: new Date().toISOString(), text: summary };
+  const done = { ...(vault.settings.shortcutsDone ?? {}) };
+  if (r.counts.expense) done.applepay = true;
+  if (r.counts.steps || r.counts.sleep || r.counts.weight) done.salud = true;
+  if (r.counts.place) done.lugar = true;
+  vault.settings.shortcutsDone = done;
+  persist(); render(); refreshDiary();
+  toast(`Buzón: ${summary}`);
+}
+
 // ---------- Personas (WEB-38) ----------
 async function addBirthdayToCalendar(id) {
   const p = vault.people.find((x) => x.id === id);
@@ -1792,7 +1838,7 @@ const senderName = (email) => vault.mail?.senders?.find((s) => s.email === email
 function mailCards() {
   if (!googleOn("gmail") || !vault.mail) return "";
   return mailSuggestions(vault.mail, mailSeen()).map((s) => s.kind === "export"
-    ? `<section class="card ai-offer"><b>📦 Te ha llegado la exportación de ChatGPT</b><p class="muted small">Descárgala desde el correo cuanto antes (el enlace caduca) y pásasela a Claude para que la estudie contigo.</p><div class="btns"><a class="btn" href="${esc(messageUrl(s.id))}" target="_blank" rel="noopener">Abrir el correo</a><button class="btn ghost" data-act="mail-seen" data-k="${esc(s.key)}">Hecho</button></div></section>`
+    ? `<section class="card ai-offer"><b>📦 Te ha llegado la exportación de ChatGPT</b><p class="muted small">Descárgala desde el correo cuanto antes (el enlace caduca) e impórtala en Tú → Tu archivo.</p><div class="btns"><a class="btn" href="${esc(messageUrl(s.id))}" target="_blank" rel="noopener">Abrir el correo</a><button class="btn ghost" data-act="mail-seen" data-k="${esc(s.key)}">Hecho</button></div></section>`
     : `<section class="card ai-offer"><b>📬 Este mes te han llegado ${s.count} correos de ${esc(s.name)}</b><p class="muted small">¿Qué hago con ellos? También puedes decírmelo en el chat: «¿de quién más me llegan muchos correos?»</p><div class="btns">${s.canUnsub ? `<button class="btn" data-act="mail-do" data-kind="unsub" data-email="${esc(s.email)}">Darme de baja</button>` : ""}<button class="btn ghost" data-act="mail-do" data-kind="archive" data-email="${esc(s.email)}">Archivarlos</button><button class="btn ghost" data-act="mail-do" data-kind="trash" data-email="${esc(s.email)}">Papelera</button></div><button class="link small" data-act="mail-seen" data-k="${esc(s.key)}">No, déjalo</button></section>`).join("");
 }
 
@@ -2223,6 +2269,12 @@ document.addEventListener("change", async (e) => {
     } catch { toast("No he podido leer ese Excel."); }
     return;
   }
+  if (e.target.id === "buzonFile" && e.target.files?.[0]) {
+    const file = e.target.files[0]; e.target.value = "";
+    if (file.size > 5_000_000) { toast("Ese archivo es demasiado grande para ser el buzón."); return; }
+    try { importBuzon(await file.text()); } catch { toast("No he podido leer el buzón."); }
+    return;
+  }
   if (e.target.id === "archiveFile" && e.target.files?.[0]) {
     const file = e.target.files[0]; e.target.value = "";
     archive.busy = true; render();
@@ -2253,6 +2305,8 @@ document.addEventListener("change", async (e) => {
     if (r.error) { toast(r.error); return; }
     const cross = dropCrossSource(r.entries, vault.spending, "CHATGPT");
     r.entries = cross.entries; r.duplicates += cross.duplicates;
+    const pay = dropCrossSource(r.entries, vault.spending, "APPLEPAY"); // WEB-43: already came from the buzón
+    r.entries = pay.entries; r.duplicates += pay.duplicates;
     vault.spending.push(...r.entries);
     moneyMonth = latestMonthOffset();
     vault.income = [...(vault.income ?? []), ...(r.income ?? [])];
