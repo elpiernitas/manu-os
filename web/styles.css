@@ -660,3 +660,12 @@ body[data-sky="night"] .scene .sun, body[data-sky="night"] .scene .rays, body[da
 body.kb .chat-down { bottom: auto; top: calc(var(--kb-bottom, 100dvh) - 124px); z-index: 41; }
 @keyframes chatDownIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .chat-down { animation: none; } }
+
+/* ---------- WEB-46: zonas táctiles de 44 px (HIG) sin cambiar el aspecto ---------- */
+.check { position: relative; }
+.check::after { content: ""; position: absolute; inset: -8px; border-radius: 50%; }
+
+/* ---------- WEB-46: tu día de un vistazo ---------- */
+.brief-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 10px; }
+.brief-list li { display: grid; grid-template-columns: 24px 1fr; gap: 10px; align-items: start; line-height: 1.35; }
+.brief-list li span:first-child { font-size: 18px; line-height: 1.2; }

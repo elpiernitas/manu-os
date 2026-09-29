@@ -42,6 +42,9 @@ export function validateVault(data) {
   }
   const vault = { ...emptyVault(), ...data, settings: data.settings ?? {} };
   for (const key of OPTIONAL_LISTS) vault[key] = data[key] ?? [];
+  // WEB-46: an old or hand-edited copy may lack a project's lists; one bad
+  // project must not break the whole Proyectos tab.
+  vault.projects = vault.projects.filter((p) => p && typeof p.id === "string").map((p) => ({ ...p, name: String(p.name ?? "Proyecto"), emoji: p.emoji ?? "📁", sources: Array.isArray(p.sources) ? p.sources : [], chat: Array.isArray(p.chat) ? p.chat : [] }));
   return { ok: true, vault };
 }
 

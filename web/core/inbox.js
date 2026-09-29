@@ -17,6 +17,7 @@ export const pending = (items) => items.filter((i) => i.status === "PENDING");
 export const tasks = (items) => items.filter((i) => i.status === "TASK" && !i.done);
 export const ideas = (items) => items.filter((i) => i.status === "IDEA");
 
-export function toggleDone(item) {
-  return item.status === "TASK" ? { ...item, done: !item.done } : item;
+export function toggleDone(item, now = new Date()) {
+  // WEB-46: doneAt lets the evening summary count what Manu finished today.
+  return item.status === "TASK" ? { ...item, done: !item.done, doneAt: item.done ? null : now.toISOString() } : item;
 }
