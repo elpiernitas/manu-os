@@ -2,10 +2,10 @@
 // Everything stays on the device; nothing is sent anywhere.
 export const SCHEMA_VERSION = 1;
 
-const OPTIONAL_LISTS = ["reminders", "habits", "people", "meals", "health", "moods", "income", "projects"];
+const OPTIONAL_LISTS = ["reminders", "habits", "people", "meals", "health", "moods", "income", "projects", "places"];
 
 export function emptyVault() {
-  return { schema: SCHEMA_VERSION, inbox: [], spending: [], chat: [], settings: {}, income: [], projects: [], reminders: [], habits: [], people: [], meals: [], health: [], moods: [] };
+  return { schema: SCHEMA_VERSION, inbox: [], spending: [], chat: [], settings: {}, income: [], projects: [], reminders: [], habits: [], people: [], meals: [], health: [], moods: [], places: [] };
 }
 
 // Validates a vault read from storage or from a backup file.

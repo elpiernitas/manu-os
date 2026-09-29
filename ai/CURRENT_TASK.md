@@ -2,11 +2,11 @@
 
 Status: **REVIEW_PENDING**
 
-WEB-42 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
+WEB-42 y WEB-43 implementados por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
 
 ## Tarea activa
 
-WEB-42 — aviso falso de la exportación de ChatGPT (`ai/HANDOFF.md`, «WEB-42»).
+WEB-42 — aviso falso de la exportación de ChatGPT, y WEB-43 — buzón de Atajos (Apple Pay, Salud y ubicación) (`ai/HANDOFF.md`, «WEB-42» y «WEB-43»).
 
 ## Autorización
 

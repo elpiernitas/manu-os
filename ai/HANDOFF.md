@@ -10,6 +10,43 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
+## WEB-43 — buzón de Atajos: Apple Pay, Salud y ubicación
+
+Manu (2026-09-29) aceptó el «buzón» si no hay otra manera. No la hay sin un servidor: una web no puede leer Cartera, Salud ni la ubicación en segundo plano. Además, una URL abierta desde Atajos va a Safari, cuyo almacenamiento es distinto del de la app instalada.
+
+### Cambios
+
+- `web/core/buzon.js` (nuevo): formato de una línea por evento, `tipo|fecha|valor|texto`, con los tipos `gasto`, `pasos`, `sueño`, `peso` y `lugar`.
+  - `amountCents` entiende «12,50 €», «€12.50» y «1.234,56». `parseWhen` entiende `yyyy-MM-dd HH:mm`, ISO con zona y `d/m/aaaa`.
+  - Se rechazan las fechas futuras y los valores fuera de rango.
+  - `lineId` es un hash estable, así que importar el mismo archivo otra vez no duplica nada. `applyBuzon` y `buzonSummary`.
+- `web/app.js`:
+  - Tú → Atajos tiene la tarjeta «📬 Buzón de Atajos» con «Importar del buzón», y tres atajos nuevos con sus pasos: «MANU Apple Pay» (automatización «Transacción»), «MANU Salud» y «MANU Lugar».
+  - Los gastos llevan `source: "APPLEPAY"`, y el extracto del banco descarta el mismo importe del mismo día.
+  - Salud guarda un valor por día.
+  - Los lugares se guardan en `vault.places`, con un máximo de 1000.
+  - Versión 43.
+- `web/core/diary.js`: línea «Lugares» en el diario.
+- `web/core/storage.js`: lista opcional `places`.
+- `web/sw.js`: `core/buzon.js` en SHELL y caché v43.
+
+### Resultados
+
+- `npm test`: 134/134 PASS (`web/tests/buzon.test.js`).
+- e2e43 (iPhone 14): 10/10. Cubre:
+  - la tarjeta y los atajos;
+  - la importación (2 gastos, pasos, sueño y lugar, y 1 línea no entendida);
+  - la segunda importación, que no añade nada;
+  - la recarga;
+  - el diario de hoy con el pago y el lugar;
+  - Dinero.
+- e2e3, e2e4 y e2e10–e2e41 en PASS, salvo las 3 expectativas antiguas de e2e18 (iguales en `main`).
+
+### NO_VERIFICADO
+
+- Los nombres exactos de las acciones de Atajos en el iOS de Manu. Tampoco se ha comprobado que la automatización «Transacción» entregue Importe y Comercio con ese formato, ni que «Ejecutar inmediatamente» no pida confirmación.
+- La fecha del cargo en el extracto del banco puede no coincidir con el día del pago, y entonces el mismo gasto saldría dos veces.
+
 ## WEB-42 — aviso falso de «Te ha llegado la exportación de ChatGPT»
 
 Manu (2026-09-29) vio la tarjeta «📦 Te ha llegado la exportación de ChatGPT» sin haber recibido la exportación.
