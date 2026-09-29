@@ -681,3 +681,7 @@ body.kb .chat-down { bottom: auto; top: calc(var(--kb-bottom, 100dvh) - 124px); 
 .find-row { width: 100%; text-align: left; background: none; border: 0; color: inherit; padding: 10px 0; gap: 10px; min-height: 44px; font: inherit; cursor: pointer; border-top: 1px solid rgba(255,255,255,.06); }
 .find-row:first-of-type { border-top: 0; }
 .find-row .grow { min-width: 0; overflow-wrap: anywhere; }
+
+/* ---------- WEB-49: categoría como botón (el desplegable solo al tocar) ---------- */
+.cat-chip { min-height: 36px; padding: 6px 12px; border-radius: 999px; border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.05); color: var(--text); font: inherit; font-size: 14px; cursor: pointer; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; position: relative; }
+.cat-chip::after { content: ""; position: absolute; inset: -4px 0; }

@@ -10,6 +10,40 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
+## WEB-49 — rendimiento con un año de datos, uso sin conexión y pasos de Google
+
+Vuelta de calidad sin funciones nuevas.
+
+### Pruebas y hallazgos
+
+- **Sin conexión:** con el service worker activo (caché v48, 43 archivos) y la red cortada, la app abre, recorre las 6 pestañas, apunta un gasto y busca. No hace falta cambiar nada.
+- **Rendimiento:** con datos sintéticos de un año (3000 gastos, 600 apuntes, 200 recordatorios y 150 personas; el vault ocupa 425 KB) y la CPU 4 veces más lenta (aproximación a un móvil), Agenda tardaba 415 ms y Dinero 410 ms en abrirse. El perfil de CPU mostraba tres causas:
+  1. `updateChatDown` (WEB-45) medía la página en cada redibujado, incluso fuera de MANU, y forzaba un layout de 45–70 ms;
+  2. Dinero dibujaba 60 `<select>` de 18 categorías, más de 1000 opciones;
+  3. Agenda dibujaba todas las tareas, recordatorios e ideas.
+- **Pasos de Google:** «habilita las APIs…» no nombraba la Gmail API, justo la que faltaba en el proyecto de Manu el 2026-09-29.
+
+### Cambios (`web/app.js`, `web/styles.css`)
+
+- `updateChatDown` no mide nada fuera de MANU.
+- En Dinero, la categoría de cada movimiento es un botón (`.cat-chip`). El desplegable se dibuja solo para el movimiento tocado, recibe el foco y se cierra al elegir. El aprendizaje por comercio no cambia.
+- Agenda muestra 25 tareas, 25 recordatorios y 25 ideas, con «Ver todas (N)».
+- Los pasos de Google nombran la **Gmail API** y avisan de que, si falta una API, ese servicio falla con «API no activada».
+- Versión 49, caché v49.
+- Se probó `content-visibility: auto` en los movimientos: no mejoraba nada medible y se descartó.
+
+### Resultados
+
+- Agenda pasa de 415 a 142 ms (−66 %) y Dinero de 410 a unos 275 ms (−33 %), medido igual.
+- `npm test`: 153/153 PASS.
+- Las 50 pruebas e2e en PASS. Se han actualizado las expectativas antiguas:
+  - e2e5 (desplegable de categoría bajo demanda; los ingresos se importan desde WEB-21);
+  - e2e7 (mensaje de permiso de WEB-40 y 7 atajos desde WEB-43).
+
+### NO_VERIFICADO
+
+- Tiempos en el iPhone 14 real (la CPU ralentizada es solo una aproximación).
+
 ## WEB-48 — «Buscar en todo»
 
 Tercera mejora del análisis (idea de memos y karakeep, sin copiar código): encontrar algo sin saber dónde se guardó.
