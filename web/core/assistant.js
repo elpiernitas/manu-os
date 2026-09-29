@@ -96,7 +96,8 @@ export function parse(input, now = new Date()) {
   // WEB-50: tasks — «tarea: renovar el dni», «añade tarea …», and short «tengo
   // que …» / «hay que …» (not «tengo que contarte algo»: that is conversation).
   const task = original.match(/^(?:(?:apunta|anota|añade|agrega|nueva|pon)(?:me)?\s+(?:una\s+)?tarea|tarea|pendiente|(?:apunta|anota)(?:me)?\s+que\s+(?:tengo|hay)\s+que)\s*[:,.\-]?\s+(.+)$/i)
-    ?? (/^(?:tengo que|hay que)\s+/i.test(original) && !/\?/.test(original) && original.split(/\s+/).length <= 8 && !/^(?:tengo|hay) que (?:decirte|contarte|preguntarte|hablar|pensar|admitir|reconocer)\b/i.test(text) ? original.match(/^(?:tengo que|hay que)\s+(.+)$/i) : null);
+    // WEB-55: «hay que ver…», «hay que joderse» are expressions, not tasks: only «tengo que».
+    ?? (/^tengo que\s+/i.test(original) && !/\?/.test(original) && original.split(/\s+/).length <= 8 && !/^tengo que (?:decirte|contarte|preguntarte|hablar|pensar|admitir|reconocer)\b/i.test(text) ? original.match(/^tengo que\s+(.+)$/i) : null);
   if (task && task[1].trim()) return { kind: "task", text: task[1].replace(/[\s.]+$/, "").trim().slice(0, 200) };
   const prefix = IDEA.find((p) => text.startsWith(p));
   if (prefix) {
@@ -163,7 +164,8 @@ export function parse(input, now = new Date()) {
   const steps = text.match(/(?:^|\s)(\d{3,6})\s*pasos\b/);
   if (steps) return { kind: "health", metric: "STEPS", value: Number(steps[1]) };
   // WEB-51: mood — «hoy estoy bien», «me siento genial» (the low ones are above)
-  const mood = text.match(/^(?:hoy\s+)?(?:estoy|me siento|me encuentro|ando)\s+(genial|muy bien|fenomenal|de lujo|contento|feliz|bien|regular|normal|mas o menos|cansado|cansada)\b/);
+  // WEB-55: only when the sentence ends there («me siento genial porque aprobé» is conversation).
+  const mood = text.replace(/[\s!.,]+$/, "").match(/^(?:hoy\s+)?(?:estoy|me siento|me encuentro|ando)\s+(genial|muy bien|fenomenal|de lujo|contento|feliz|bien|regular|normal|mas o menos|cansado|cansada)(?:\s+(?:hoy|manu))?$/);
   // Only a short statement («hoy estoy bien»); «estoy cansado desde el lunes, ¿por qué…?» is conversation.
   if (mood && !/[?¿]/.test(original) && text.split(/\s+/).length <= 5) return { kind: "mood", value: { genial: 4, "muy bien": 4, fenomenal: 4, "de lujo": 4, contento: 4, feliz: 4, bien: 3 }[mood[1]] ?? 2 };
   // WEB-52: several in one go — «gasté 12 en café y 5 en pan», «hoy: 3 de café,
@@ -195,7 +197,8 @@ export function parse(input, now = new Date()) {
   if ((text.includes("tiempo") && (text.includes("que tiempo") || text.includes("hace"))) || text.includes("va a llover") || text.includes("llueve")) {
     return { kind: "weather" };
   }
-  if (/\b(que tengo|tengo algo|agenda|mi dia|que hay)\b/.test(text) && !/\b(que tengo que (?!hacer)|agenda de contactos)/.test(text)) {
+  // WEB-55: «qué tengo que hacer para sacarme el carnet» is a question for the AI, not the agenda.
+  if (/\b(que tengo|tengo algo|agenda|mi dia|que hay)\b/.test(text) && !/\b(que tengo que (?!hacer)|agenda de contactos)/.test(text) && !/\bque tengo que hacer\b(?!\s*(?:hoy|manana|pasado manana|esta semana|el \w+|[?¿!.]*$))/.test(text)) {
     if (/\b(esta semana|la semana|semana que viene|proximos dias)\b/.test(text)) return { kind: "agenda", day: "week" };
     const fd = futureDay(text, now);
     if (!fd || fd.day === dayKeyOf(now)) return { kind: "agenda", day: "today" };

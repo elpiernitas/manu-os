@@ -16,7 +16,7 @@ test("WEB-50: tasks, and «tengo que contarte…» is conversation", () => {
   assert.deepEqual(parse("tengo que comprar leche"), { kind: "task", text: "comprar leche" });
   assert.deepEqual(parse("Tarea: renovar el DNI"), { kind: "task", text: "renovar el DNI" });
   assert.deepEqual(parse("añade tarea llamar al banco"), { kind: "task", text: "llamar al banco" });
-  assert.deepEqual(parse("hay que regar las plantas"), { kind: "task", text: "regar las plantas" });
+  assert.equal(parse("hay que regar las plantas").kind, "unknown"); // WEB-55: «hay que» is usually an expression
   assert.equal(parse("tengo que contarte algo que me pasó").kind, "unknown");
   assert.equal(parse("¿tengo que ir mañana?").kind, "unknown");
   assert.equal(parse("tengo que hacer tantas cosas que no sé ni por dónde empezar hoy").kind, "unknown"); // long: conversation

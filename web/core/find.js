@@ -44,6 +44,8 @@ export function findInVault(vault, query, { limit = 30 } = {}) {
 export function findCommand(text) {
   const t = normalise(text).replace(/[¿?¡!.]+/g, " ").trim();
   if (/en (mi|el) archivo|chatgpt/.test(t)) return null;
-  const m = t.match(/^(?:busca(?:me)?|buscar|encuentra(?:me)?|donde (?:apunte|guarde|puse|tengo|esta|estaba)(?: lo de| lo del| lo| el| la)?)\s+(.+)$/);
+  // WEB-55: the web is the AI's job, and «¿dónde está la farmacia?» is not about Manu's notes.
+  if (/\b(en internet|en google|en la web|online|vuelos?|hoteles?)\b/.test(t)) return null;
+  const m = t.match(/^(?:busca(?:me)?|buscar|encuentra(?:me)?|donde (?:apunte|guarde|puse|tengo|deje)(?: lo de| lo del| lo| el| la)?)\s+(.+)$/);
   return m && terms(m[1]).length ? m[1].replace(/^(lo de|lo del|el|la|los|las) /, "") : null;
 }
