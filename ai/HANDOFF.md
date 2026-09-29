@@ -10,6 +10,31 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
+## WEB-52 — varios gastos en una frase y la hoja rápida
+
+### Errores encontrados
+
+- **Hoja rápida, importe:** el campo quitaba todos los puntos antes de leer el número, así que «12.50» se guardaba como **1.250 €**. Ahora usa `amountCents` (miles españoles frente a decimales).
+- **Hoja rápida, días:** «recuérdame el viernes a las 10…» proponía mañana y «ayer gasté…» se guardaba hoy. Ahora `quickDetect` respeta `day` en los recordatorios y los gastos.
+- **Chat, varios gastos:** «gasté 12 en café y 5 en pan» era un solo gasto de 12 € con el comercio «café y 5 en pan».
+
+### Cambios
+
+- `web/core/assistant.js`:
+  - nuevo `kind: "expenses"` cuando hay un verbo de gasto (o «hoy: / ayer:») y dos o más importes. Separa por «, » y « y », sin partir «45,90». Cada parte lleva su importe y su comercio, y el conjunto puede llevar día;
+  - con un solo importe no se separa: «el bar de Pepe y Juan» sigue siendo un comercio;
+  - la respuesta enumera los gastos y da el total.
+- `web/app.js`:
+  - crea cada gasto;
+  - la hoja rápida usa `amountCents` y el día detectado;
+  - versión 52.
+
+### Resultados
+
+- `npm test`: 166/166 PASS (2 tests nuevos en `assistant-dates.test.js`).
+- e2e52: 4/4. Cubre 3 gastos de ayer en una frase con su total, y en la hoja «12.50» da 12,50 € con «ayer» conservado.
+- Las 50 pruebas e2e en PASS.
+
 ## WEB-51 — fechas, horas y miles en lo que dice Manu; ingresos, salud y ánimo desde el chat
 
 Segunda batería de frases, esta vez con fechas. Aparecieron errores de datos, no solo frases sin entender.

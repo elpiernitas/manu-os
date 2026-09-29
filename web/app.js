@@ -1,5 +1,5 @@
 import { normalise } from "./core/text.js";
-import { parse, reply, quickDetect } from "./core/assistant.js";
+import { parse, reply, quickDetect, amountCents } from "./core/assistant.js";
 import { CATEGORIES, CATEGORY_EMOJI, euros, newEntry, learnCategory, summary, toCents, rulesFromRows, applyRules } from "./core/money.js";
 import { MODE_TITLES, modeState } from "./core/modes.js";
 import { capture, confirm, markUnclassified, pending, tasks, ideas, toggleDone } from "./core/inbox.js";
@@ -34,7 +34,7 @@ import { isSpotifyClientId, pkceValid, randomVerifier, challengeFor, authorizeUr
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "51";
+export const APP_VERSION = "52";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -1476,7 +1476,7 @@ También puedes buscar en Tú → 🔎.` });
   // the day, the weather, anything else) goes to Gemini with the chosen context.
   // Short commands («gasté 3 en café») stay instant and local; longer or
   // compound sentences go to Gemini, which can do several things at once.
-  const longCommand = ["expense", "reminder", "idea", "alarm", "task"].includes(intent.kind) && clean.split(/\s+/).length > 8;
+  const longCommand = ["expense", "expenses", "reminder", "idea", "alarm", "task"].includes(intent.kind) && clean.split(/\s+/).length > 8;
   if (aiMode().on && aiReady() && navigator.onLine && (["unknown", "greeting", "thanks", "agenda", "weather"].includes(intent.kind) || longCommand)) {
     const check = allowedToSend(clean, sensitiveAllowed() ? FULL_CONTEXT : aiMode().context);
     vault.chat.push({ from: "me", text: clean, at });
@@ -1491,6 +1491,7 @@ También puedes buscar en Tú → 🔎.` });
   // WEB-51: «ayer gasté…» goes on that day (at midday, the hour is unknown).
   const onDay = (d) => (d ? new Date(`${d}T12:00:00`).toISOString() : at);
   if (intent.kind === "expense") vault.spending.push(newEntry({ id: uid("s"), cents: intent.cents, merchant: intent.merchant, at: onDay(intent.day) }, vault.settings.categoryRules ?? {}));
+  if (intent.kind === "expenses") for (const x of intent.items) vault.spending.push(newEntry({ id: uid("s"), cents: x.cents, merchant: x.merchant, at: onDay(intent.day) }, vault.settings.categoryRules ?? {})); // WEB-52
   if (intent.kind === "income") vault.income = [...(vault.income ?? []), { id: uid("n"), cents: intent.cents, concept: intent.concept ?? "Ingreso", at: onDay(intent.day), source: "MANU" }];
   if (intent.kind === "health") { const t = localDay(); vault.health = [...vault.health.filter((x) => !(x.day === t && x.kind === intent.metric)), { day: t, kind: intent.metric, value: intent.value }]; }
   if (intent.kind === "mood") vault.moods = setMood(vault.moods, localDay(), intent.value);
@@ -2399,9 +2400,11 @@ document.addEventListener("submit", async (e) => {
     if (k === "TASK" && text) vault.inbox.push({ ...capture({ id: uid("c"), text: text.slice(0, 140), at }), status: "TASK", ...extra });
     else if (k === "IDEA" && text) vault.inbox.push({ ...capture({ id: uid("c"), text: text.slice(0, 400), at }), status: "IDEA", ...extra });
     else if (k === "EXPENSE") {
-      const cents = toCents(($("qAmount")?.value ?? "").replace(/\s|€|\./g, ""));
+      // WEB-52: «12.50» is 12,50 € (before, every dot was removed: 1.250 €); «1.200» is 1.200 €.
+      const cents = amountCents(($("qAmount")?.value ?? "").replace(/\s|€/g, ""));
       if (!cents) { toast("Pon el importe, por ejemplo 12,50"); $("qAmount")?.focus(); return; }
-      vault.spending.push({ ...newEntry({ id: uid("s"), cents, merchant: text || null, at }, vault.settings.categoryRules ?? {}), ...extra });
+      const when = d.kind === "EXPENSE" && d.day ? new Date(`${d.day}T12:00:00`).toISOString() : at; // «ayer gasté…»
+      vault.spending.push({ ...newEntry({ id: uid("s"), cents, merchant: text || null, at: when }, vault.settings.categoryRules ?? {}), ...extra });
     } else if (k === "EVENT" && raw) {
       const minutes = Math.min(1440, Math.max(5, Number($("qMinutes").value) || 60));
       try {

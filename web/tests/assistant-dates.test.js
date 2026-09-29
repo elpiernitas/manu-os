@@ -65,3 +65,20 @@ test("WEB-51: a longer sentence or a question about how Manu feels is conversati
   assert.equal(parse("me siento bien pero no sé qué hacer con mi vida", NOW).kind, "unknown");
   assert.deepEqual(parse("estoy cansado", NOW), { kind: "mood", value: 2 });
 });
+
+test("WEB-52: several expenses in one sentence; decimals are not split", () => {
+  assert.deepEqual(parse("gasté 12 en café y 5 en pan", NOW), { kind: "expenses", items: [{ cents: 1200, merchant: "café" }, { cents: 500, merchant: "pan" }] });
+  assert.deepEqual(parse("gasté 1.200 en el alquiler y 45,90 en luz", NOW).items, [{ cents: 120000, merchant: "alquiler" }, { cents: 4590, merchant: "luz" }]);
+  assert.deepEqual(parse("hoy: 3 de café, 12 de comida y 40 de gasolina", NOW).items.map((x) => x.cents), [300, 1200, 4000]);
+  assert.equal(parse("ayer gasté 12 en café y 5 en pan", NOW).day, "2026-09-28");
+  assert.deepEqual(parse("gasté 12 en el bar de Pepe y Juan", NOW), { kind: "expense", cents: 1200, merchant: "bar de Pepe y Juan" }); // one amount: one expense
+  assert.match(reply(parse("gasté 12 en café y 5 en pan", NOW)), /Anotados 2 gastos: 12,00 € en café, 5,00 € en pan\. Total 17,00 €/);
+});
+
+test("WEB-52: the quick sheet keeps the day of reminders and expenses", async () => {
+  const { quickDetect } = await import("../core/assistant.js");
+  assert.equal(quickDetect("recuérdame el viernes a las 10 llamar al banco", NOW).at.getTime(), new Date(2026, 9, 2, 10, 0).getTime());
+  assert.equal(quickDetect("ayer gasté 20 en la cena", NOW).day, "2026-09-28");
+  assert.equal(quickDetect("12.50 café", NOW).cents, 1250);
+  assert.equal(quickDetect("1.200 alquiler", NOW).cents, 120000);
+});
