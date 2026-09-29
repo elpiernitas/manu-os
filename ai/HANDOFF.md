@@ -10,6 +10,54 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
+## WEB-33 — Gmail: MANU vigila el correo y actúa
+
+Manu (2026-09-29): quiere que MANU le diga «te llegan muchos correos de X, ¿te desuscribes?» y le avise cuando llegue la exportación de ChatGPT. Autorizó acceso total al correo (ADR-0015). El modo automático bloqueó el paso de permisos y Manu pasó a modo manual y aprobó cada paso.
+
+### Cambios
+
+- `web/core/gmail.js`:
+  - scope `gmail.modify`;
+  - `fetchSnapshot` (30 días, 200 correos, solo metadatos);
+  - `summarize` (remitentes masivos, importantes sin leer, exportación de ChatGPT) y `mailSuggestions`;
+  - `findSender`;
+  - acciones `archive`/`unarchive`, `trash`/`untrash` (nunca borrado definitivo) y `ensureLabel`/`addLabel`/`removeLabel`.
+- `web/app.js`:
+  - Gmail como quinto servicio de Google, con su sincronización;
+  - tarjetas de MANU en Hoy y en el chat: «Este mes te han llegado N correos de X» (baja, archivar, papelera o dejarlo) y «Te ha llegado la exportación de ChatGPT» (abrir el correo);
+  - tarjeta de importantes en Hoy y la página Tú → Correo;
+  - órdenes del chat: «¿de quién me llegan más correos?», «dame de baja de X», «archiva los de X», «a la papelera los de X»;
+  - «Deshacer» en el chat;
+  - versión 33.
+- `web/core/ai.js`: funciones `correo_baja`, `correo_archivar`, `correo_papelera` y `correo_etiquetar` (12 en total); `ir_a` incluye «correo».
+- `web/core/converse.js`: categoría sensible «Correo». Las elecciones anteriores de «Con todo» la incluyen.
+- CSP: `connect-src` añade `https://gmail.googleapis.com`; `form-action` sigue en `'none'`.
+- `sw.js`: `core/gmail.js` en la caché.
+- ADR-0015 y threat model.
+
+### Resultados
+
+- `npm test`: 113/113 PASS (`web/tests/gmail.test.js`, 7 tests). `node --check` pasa.
+- e2e33 (Chromium con Gmail simulado): 14/14. Cubre:
+  - que se pide `gmail.modify` y nunca el scope total, y que solo se piden metadatos;
+  - la página Correo y que el vault solo guarda el resumen;
+  - las tarjetas de Hoy (exportación, remitente ruidoso e importante);
+  - el chat («¿de quién…?» y «archiva los de tienda»);
+  - archivar (quita INBOX), «Deshacer» (lo devuelve), etiquetar (crea y aplica), papelera (por mensaje, nunca DELETE) y la baja (abre la página del remitente).
+- El recorrido detectó que la baja «one-click» por POST chocaba con la CSP (`form-action 'none'`). Se cambió a abrir la página del remitente en vez de relajar la CSP.
+- e2e3, e2e4 y e2e10–e2e32 en PASS. Se actualizaron las expectativas de 5 servicios de Google y 12 acciones. Siguen las 3 expectativas antiguas de e2e18.
+
+### NO_VERIFICADO
+
+- Con el Gmail real de Manu. Antes hay que activar la API de Gmail en su proyecto de Google Cloud.
+- Que Google le deje continuar tras el aviso de «app no verificada».
+
+### Pendiente (otra tarea)
+
+- Recibos y gastos desde el cuerpo de los correos.
+- Resúmenes del contenido.
+- Colores de etiqueta.
+
 ## WEB-32 — sin «+» y Agenda al instante
 
 Manu (2026-09-29): «quiero quitar el +», y no quiere que Agenda «tarde en cargar para verificar que Calendar siga activado».

@@ -10,6 +10,7 @@ export const SCOPE = {
   tasks: "https://www.googleapis.com/auth/tasks",
   contacts: "https://www.googleapis.com/auth/contacts.readonly",
   drive: "https://www.googleapis.com/auth/drive.appdata",
+  gmail: "https://www.googleapis.com/auth/gmail.modify", // WEB-33, Manu's decision
 };
 
 // Runs each enabled service with a token for its own scope only. A denied or

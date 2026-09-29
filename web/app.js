@@ -12,6 +12,7 @@ import { importStatement, importStatementRows, classifiedFromRows, dropCrossSour
 import { CITIES, proposeAlarm, shouldAskTomorrow, shortcutUrl, guessCity } from "./core/night.js";
 import { isClientId, listEvents, createEvent, newEventBody, monthGrid, listCalendars, mergeDays } from "./core/gcal.js";
 import { detectRecurring, upcomingRecurring, spendingPattern, monthStats, monthlySeries } from "./core/insights.js";
+import { fetchSnapshot, summarize as mailSummary, mailSuggestions, findSender, idsFrom, archive as mailArchive, unarchive as mailUnarchive, trash as mailTrash, untrash as mailUntrash, ensureLabel, addLabel, removeLabel, messageUrl } from "./core/gmail.js";
 import { SCOPE, runServices, planTaskSync, listOpenTasks, insertTask, completeTask, contactBirthdays, mergePeople, saveBackup, loadBackup } from "./core/google.js";
 import { detectLink, linkInfo, PROVIDER_NAME } from "./core/links.js";
 import { allowedToSend, buildContext, buildConversationPayload, CONTEXT_CATEGORIES, BASIC_CONTEXT, FULL_CONTEXT, AUTO_SAFE } from "./core/converse.js";
@@ -24,7 +25,7 @@ import { isSpotifyClientId, pkceValid, randomVerifier, challengeFor, authorizeUr
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "32";
+export const APP_VERSION = "33";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -73,7 +74,7 @@ const aiStore = {
   get model() { try { return localStorage.getItem("manuos.gemini.model") || ""; } catch { return ""; } },
   set model(v) { try { v ? localStorage.setItem("manuos.gemini.model", v) : localStorage.removeItem("manuos.gemini.model"); } catch {} },
 };
-const GOOGLE_FEATURES = [["calendar", "Calendar", "Ver tu agenda y crear eventos"], ["tasks", "Tasks", "Sincronizar tus tareas"], ["contacts", "Contactos", "Leer nombres y cumpleaños"], ["drive", "Drive", "Guardar una copia cifrada (solo cuando tú lo pidas)"]];
+const GOOGLE_FEATURES = [["calendar", "Calendar", "Ver tu agenda y crear eventos"], ["tasks", "Tasks", "Sincronizar tus tareas"], ["contacts", "Contactos", "Leer nombres y cumpleaños"], ["drive", "Drive", "Guardar una copia cifrada (solo cuando tú lo pidas)"], ["gmail", "Gmail", "Leer, archivar, etiquetar y mandar a la papelera tus correos (nunca borrar para siempre)"]];
 const googleOn = (k) => Boolean(vault.settings.google?.[k]);
 const gClientId = () => vault.settings.gcalClientId || DEFAULT_GOOGLE_CLIENT_ID;
 // Spotify tokens: device storage only, never in the vault or backups.
@@ -145,6 +146,7 @@ const I = {
   pin: svg('<path d="M12 21s-6-5.5-6-11a6 6 0 0 1 12 0c0 5.5-6 11-6 11z"/><circle cx="12" cy="10" r="2"/>'),
   bell: svg('<path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 20a2 2 0 0 0 4 0"/>'),
   bolt: svg('<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>'),
+  mail: svg('<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>'),
   box: svg('<path d="M3 7l9-4 9 4v10l-9 4-9-4z"/><path d="M3 7l9 4 9-4M12 11v10"/>'),
   alarm: svg('<circle cx="12" cy="13" r="7"/><path d="M12 9v4l2.5 2M4 4l3 2.5M20 4l-3 2.5"/>'),
 };
@@ -623,6 +625,8 @@ const screens = {
       <div class="stack">
       ${nightCard()}
       ${weatherCard()}
+      ${mailCards()}
+      ${googleOn("gmail") && vault.mail?.important?.length ? `<section class="card"><h2>${I.mail} ${vault.mail.important.length} correo${vault.mail.important.length === 1 ? "" : "s"} importante${vault.mail.important.length === 1 ? "" : "s"}</h2>${vault.mail.important.slice(0, 3).map((x) => `<a class="row" href="${esc(messageUrl(x.id))}" target="_blank" rel="noopener"><div class="grow"><div>${esc(x.name)}</div><div class="muted small">${esc(x.subject || "(sin asunto)")}</div></div></a>`).join("")}<button class="link small" data-sub-go="correo">Ver todo el correo</button></section>` : ""}
       ${next || agendaToday() ? `<section class="card"><h2>Próximo</h2>${next ? `<div class="row"><span class="chip num">${esc(next.time)}</span><span class="grow">${esc(next.title)}</span></div>` : '<p class="muted">No te queda nada más hoy.</p>'}</section>` : ""}
       ${rems.length ? `<section class="card"><h2>${I.bell} Recordatorios de hoy</h2>${rems.map(reminderRow).join("")}</section>` : ""}
       ${inbox.length ? `<section class="card"><h2>Bandeja · ${inbox.length}</h2>${inbox.map((c) => `<div class="stack"><div>${esc(c.text)}</div><div class="btns">
@@ -665,8 +669,9 @@ const screens = {
     return `<div class="manu-head${empty ? " big" : ""}"><div class="orb${thinking ? " thinking" : ""}" id="orb" aria-hidden="true"><span>M</span></div><div><h1>MANU</h1><p class="subtitle">${aiReady() && aiMode().on ? "Gemini integrado · conversación" : `Tu asistente · ${aiReady() ? "IA disponible, siempre con tu confirmación" : '<button class="link small" data-act="gemini-guide">activar IA</button>'}`}</p></div></div>
       ${refuge ? `<div class="refuge-bar"><span>Refugio · no se guarda</span><button class="link" data-act="leave-refuge">Salir</button></div>` : ""}
       ${aiReady() && !aiMode().on && !refuge ? `<section class="card ai-offer"><b>💬 ¿Hablamos como con Gemini?</b><p class="muted small">MANU conversa contigo, sabe lo que elijas de tu vida y gestiona tus cosas. Lo que escribas irá a Google.</p><div class="btns"><button class="btn" data-act="ai-mode" data-v="full">Activar con todo</button><button class="btn ghost" data-act="ai-mode" data-v="basic">Solo lo básico</button></div><button class="link small" data-sub-go="ia">Elegir qué sabe</button></section>` : ""}
+      ${refuge ? "" : mailCards()}
       ${chips ? `<div class="suggest" aria-label="Sugerencias">${chips.map((s) => `<button data-say="${esc(s)}">${esc(s)}</button>`).join("")}</div>` : `<div class="quick-cards" aria-label="Sugerencias">${cards.map(([e, label, how, text]) => `<button class="qcard" ${how === "say" ? `data-say="${esc(text)}"` : `data-fill="${esc(text)}"`}><span class="qe" aria-hidden="true">${e}</span><span>${esc(label)}</span></button>`).join("")}</div>`}
-      <div class="chat" id="chat" aria-live="polite">${[...history, ...(refuge?.messages ?? [])].map((b) => `<div class="bubble ${b.from}${b.safety ? " safety" : ""}">${b.ai ? '<span class="ai-tag">IA</span>' : ""}${b.imageId ? `<img class="chat-img" data-img="${esc(b.imageId)}" alt="Captura">` : ""}${esc(b.text)}${b.url ? ` <a class="link small" href="${esc(b.url)}" target="_blank" rel="noopener">Abrir</a>` : ""}${b.proposal ? `${b.proposal.state ? "" : `<p class="small proposal-what">Se enviará a Google solo tu frase: <b>«${esc(b.proposal.message)}»</b>, con las instrucciones fijas de MANU. Nada de tus datos.</p>`}<details><summary class="muted small">${b.proposal.state ? "Ver lo enviado" : "Ver detalles técnicos"}</summary><pre class="payload">${esc(shownPayload(b.proposal))}</pre></details>${b.proposal.state ? `<p class="muted small">${b.proposal.state === "sent" ? (b.proposal.auto ? "Enviado a Gemini sin preguntar (lo activaste en Tú → IA)." : "Enviado a Gemini.") : "No enviado."}</p>` : `<div class="btns"><button class="btn" data-act="ai-send" data-id="${esc(b.proposal.id)}">Enviar a Gemini</button><button class="btn ghost" data-act="ai-cancel" data-id="${esc(b.proposal.id)}">No</button></div><div class="btns"><button class="link small" data-act="ask-elsewhere" data-app="chatgpt" data-id="${esc(b.proposal.id)}">Preguntar en ChatGPT</button><button class="link small" data-act="ask-elsewhere" data-app="claude" data-id="${esc(b.proposal.id)}">Preguntar en Claude</button></div>`}` : ""}${b.action ? `<div class="btns"><a class="btn" href="${esc(b.action.href)}">${esc(b.action.label)}</a></div>` : ""}${(b.calls ?? []).map((c, i) => callCard(b, c, i)).join("")}</div>`).join("")}</div>
+      <div class="chat" id="chat" aria-live="polite">${[...history, ...(refuge?.messages ?? [])].map((b) => `<div class="bubble ${b.from}${b.safety ? " safety" : ""}">${b.ai ? '<span class="ai-tag">IA</span>' : ""}${b.imageId ? `<img class="chat-img" data-img="${esc(b.imageId)}" alt="Captura">` : ""}${esc(b.text)}${b.url ? ` <a class="link small" href="${esc(b.url)}" target="_blank" rel="noopener">Abrir</a>` : ""}${b.proposal ? `${b.proposal.state ? "" : `<p class="small proposal-what">Se enviará a Google solo tu frase: <b>«${esc(b.proposal.message)}»</b>, con las instrucciones fijas de MANU. Nada de tus datos.</p>`}<details><summary class="muted small">${b.proposal.state ? "Ver lo enviado" : "Ver detalles técnicos"}</summary><pre class="payload">${esc(shownPayload(b.proposal))}</pre></details>${b.proposal.state ? `<p class="muted small">${b.proposal.state === "sent" ? (b.proposal.auto ? "Enviado a Gemini sin preguntar (lo activaste en Tú → IA)." : "Enviado a Gemini.") : "No enviado."}</p>` : `<div class="btns"><button class="btn" data-act="ai-send" data-id="${esc(b.proposal.id)}">Enviar a Gemini</button><button class="btn ghost" data-act="ai-cancel" data-id="${esc(b.proposal.id)}">No</button></div><div class="btns"><button class="link small" data-act="ask-elsewhere" data-app="chatgpt" data-id="${esc(b.proposal.id)}">Preguntar en ChatGPT</button><button class="link small" data-act="ask-elsewhere" data-app="claude" data-id="${esc(b.proposal.id)}">Preguntar en Claude</button></div>`}` : ""}${b.action ? `<div class="btns"><a class="btn" href="${esc(b.action.href)}">${esc(b.action.label)}</a></div>` : ""}${(b.calls ?? []).map((c, i) => callCard(b, c, i)).join("")}${b.mailUndo ? `<div class="btns"><button class="link small" data-act="mail-undo" data-at="${esc(b.at)}">Deshacer</button></div>` : ""}</div>`).join("")}</div>
       ${chatImage ? `<div class="chat-attach glass"><img src="${esc(chatImage)}" alt="Captura adjunta"><div class="grow small">${aiReady() ? "La captura se enviará a Google (Gemini) al pulsar «Enviar a Gemini». No uses capturas del banco o de salud si no quieres compartirlas." : '<button type="button" class="link small" data-act="gemini-guide">Activa la IA para que MANU lea la captura</button>'}</div><button type="button" class="qa-close" data-act="chat-image-remove" aria-label="Quitar captura">✕</button></div>` : ""}
       <form class="composer glass" id="composer">${refuge ? "" : '<label class="composer-attach" for="chatImage" role="button" tabindex="0" aria-label="Adjuntar captura">📎</label><input id="chatImage" type="file" accept="image/*" class="sr">'}<label for="msg" class="sr">Mensaje para MANU</label><input id="msg" autocomplete="off" enterkeyhint="send" placeholder="${refuge ? "Cuéntame" : chatImage ? "¿Qué quieres saber de la captura?" : "Escribe a MANU"}"><button class="btn" type="submit">${chatImage && aiReady() ? "Enviar a Gemini" : "Enviar"}</button></form>`;
   },
@@ -737,7 +742,8 @@ const screens = {
       ${sectionTitle("Ajustes")}
       <div class="list">
         ${item("tiempo", "pin", "blue", "Tiempo y ciudades", `Casa: ${(vault.settings.homeCity ?? CITIES.GIJON).name}`)}
-        ${item("gcal", "google", "blue", "Google", isClientId(gClientId()) ? "Calendar, Tasks, Contactos y Drive" : "Conectar tus servicios de Google")}
+        ${item("gcal", "google", "blue", "Google", isClientId(gClientId()) ? "Calendar, Tasks, Contactos, Drive y Gmail" : "Conectar tus servicios de Google")}
+        ${item("correo", "mail", "red", "Correo", googleOn("gmail") ? (vault.mail ? `${vault.mail.senders.length} remitentes masivos · ${vault.mail.important.length} importantes` : "Conectado: toca «Actualizar»") : "Conectar Gmail")}
         ${item("spotify", "leaf", "green", "Spotify", spotifyStore.tokens ? `Conectado · altavoz «${vault.settings.spotifySpeaker || DEFAULT_SPEAKER}»` : "Sin conectar: un toque")}
         ${item("ia", "bolt", "purple", "IA (Gemini)", aiReady() ? `Activada · ${aiStore.model}` : "Chat con IA opcional")}
         ${item("atajos", "bolt", "orange", "Atajos del iPhone", shortcutsPending() ? `${shortcutsPending()} pendientes de crear` : "Todos creados")}
@@ -751,7 +757,7 @@ const screens = {
 // «Puesta a punto»: what is still missing, each with one button.
 function setupCard() {
   const steps = [];
-  if (!["calendar", "tasks", "contacts", "drive"].some(googleOn)) steps.push(["Google", "Calendar, Tasks y Contactos con un toque", '<button class="btn small-btn" data-act="google-connect-all">Conectar</button>']);
+  if (!["calendar", "tasks", "contacts", "drive", "gmail"].some(googleOn)) steps.push(["Google", "Calendar, Tasks, Contactos y Gmail con un toque", '<button class="btn small-btn" data-act="google-connect-all">Conectar</button>']);
   if (!aiReady()) steps.push(["IA (Gemini)", "Crear la clave y pegarla: 2 toques", '<button class="btn small-btn" data-act="gemini-guide">Activar</button>']);
   if (notificationStatus() === "default") steps.push(["Avisos", "Para que MANU te avise", '<button class="btn small-btn" data-act="notify-on">Activar</button>']);
   if (!spotifyStore.tokens) steps.push(["Spotify", `Música en tu altavoz «${vault.settings.spotifySpeaker || DEFAULT_SPEAKER}»: un toque`, '<button class="btn small-btn" data-act="spotify-connect">Conectar</button>']);
@@ -763,6 +769,17 @@ function setupCard() {
 const backBar = (title) => `<button class="link" data-act="back">${I.back} Tú</button><h1>${title}</h1>`;
 
 const subpages = {
+  correo() {
+    if (!googleOn("gmail")) return `${backBar("Correo")}<section class="card"><p>MANU puede leer tu Gmail, avisarte de lo importante, darte de baja de lo que no quieres y archivar, etiquetar o mandar a la papelera.</p><button class="btn block" data-act="mail-connect">Conectar Gmail</button><p class="muted small">Antes activa la API de Gmail en tu proyecto de Google Cloud. Nunca borra nada para siempre: la papelera se recupera durante 30 días.</p></section>`;
+    const m = vault.mail;
+    const when = m?.syncedAt ? new Date(m.syncedAt).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }) : null;
+    return `${backBar("Correo")}
+      <div class="btns"><button class="btn ghost" data-act="gcal-sync">${gcal.busy ? "Actualizando…" : "Actualizar"}</button></div><p class="muted small">${when ? `Leído a las ${when} · últimos 30 días` : "Aún sin leer: toca «Actualizar»."}${gcal.error ? ` · ${esc(gcal.error)}` : ""}</p>
+      ${mailCards()}
+      ${m ? `${sectionTitle("Importantes sin leer")}<section class="card">${m.important.length ? m.important.map((x) => `<a class="row" href="${esc(messageUrl(x.id))}" target="_blank" rel="noopener"><div class="grow"><div>${esc(x.name)}</div><div class="muted small">${esc(x.subject || "(sin asunto)")}</div></div><span class="chev">${I.chev}</span></a>`).join("") : '<p class="muted">Nada importante sin leer en los últimos 3 días. 🌿</p>'}</section>
+      ${sectionTitle("Quién te escribe más")}<section class="card">${m.senders.length ? m.senders.slice(0, 15).map((x) => `<div class="stack mail-sender"><div class="row"><div class="grow"><div>${esc(x.name)}</div><div class="muted small">${esc(x.email)} · ${x.count} en 30 días${x.unread ? ` · ${x.unread} sin leer` : ""}</div></div></div><div class="btns">${x.unsub ? `<button class="btn small-btn" data-act="mail-do" data-kind="unsub" data-email="${esc(x.email)}">Baja</button>` : ""}<button class="btn ghost small-btn" data-act="mail-do" data-kind="archive" data-email="${esc(x.email)}">Archivar</button><button class="btn ghost small-btn" data-act="mail-do" data-kind="label" data-email="${esc(x.email)}">Etiquetar</button><button class="btn ghost small-btn" data-act="mail-do" data-kind="trash" data-email="${esc(x.email)}">Papelera</button></div></div>`).join("") : '<p class="muted">Sin newsletters ni avisos masivos.</p>'}</section>
+      <p class="muted small">En el móvil solo se guarda este resumen (remitentes, asuntos y recuentos), nunca el texto de los correos. Archivar, etiquetar y papelera se pueden deshacer desde el chat.</p>` : ""}`;
+  },
   habitos() {
     const t = localDay();
     return `${backBar("Hábitos")}<p class="subtitle">Sin presión: lo que cuenta es volver.</p>
@@ -834,7 +851,7 @@ const subpages = {
       ${ok ? `<section class="card"><h2>Servicios</h2><p class="muted small">Cada servicio pide solo su permiso. Al sincronizar, los que actives se piden juntos en una sola ventana; si rechazas uno, los demás siguen funcionando.</p>
         <div class="row"><div class="grow"><div>Actualizar al abrir Agenda u Hoy</div><div class="muted small">Si han pasado más de 10 minutos. Cuando el permiso de Google ha caducado (cada hora, aprox.), puede abrirse un momento su ventana.</div></div><button class="check" data-act="gauto" aria-pressed="${vault.settings.googleAutoOpen !== false}" aria-label="Actualizar al abrir">${I.check}</button></div>
         ${GOOGLE_FEATURES.map(([k, label, desc]) => `<div class="row"><div class="grow"><div>${label}</div><div class="muted small">${esc(desc)}${st[k] && st[k] !== "off" ? ` · ${esc(st[k].replace(/^ok: /, "").replace(/^error: /, "⚠︎ "))}` : ""}</div></div><button class="check" data-act="gfeature" data-k="${k}" aria-pressed="${googleOn(k)}" aria-label="${label}">${I.check}</button></div>`).join("")}
-        ${["calendar", "tasks", "contacts"].some(googleOn) ? `<button class="btn" data-act="gcal-sync">${gcal.busy ? "Sincronizando…" : "Sincronizar ahora"}</button>` : ""}</section>` : ""}
+        ${["calendar", "tasks", "contacts", "gmail"].some(googleOn) ? `<button class="btn" data-act="gcal-sync">${gcal.busy ? "Sincronizando…" : "Sincronizar ahora"}</button>` : ""}</section>` : ""}
       ${ok && googleOn("drive") ? `<section class="card"><h2>Copia cifrada en Drive</h2>
         <p class="muted small">Se cifra en tu móvil (AES-256-GCM) con una frase que eliges tú y que nunca se guarda ni se sube. Sin la frase, nadie puede leerla, tampoco Google ni MANU. Si la olvidas, la copia no se puede recuperar. La copia solo se sube cuando pulsas el botón.</p>
         <form id="driveForm" class="stack"><label for="drivePass" class="muted small">Frase de la copia (mínimo 10 caracteres)</label><input id="drivePass" type="password" autocomplete="new-password" minlength="10">
@@ -1118,7 +1135,7 @@ function render({ focus = false, enter = null } = {}) {
   $("screen").querySelectorAll(".week-bars i[data-h], .ie-bars i[data-h]").forEach((el) => { el.style.height = `${Math.max(Number(el.dataset.h) ? 2 : 0, Number(el.dataset.h))}%`; });
   $("screen").querySelectorAll("[data-c]").forEach((el) => { if (/^#[0-9a-f]{6}$/i.test(el.dataset.c)) el.style.setProperty("--ev", el.dataset.c); });
   hydrateImages($("screen"));
-  $("topTitle").textContent = sub ? { habitos: "Hábitos", salud: "Salud", comidas: "Comidas", personas: "Personas", tiempo: "Tiempo", avisos: "Avisos", datos: "Tus datos", gcal: "Google", ia: "IA", spotify: "Spotify", atajos: "Atajos" }[sub] : TABS.find(([id]) => id === tab)[1];
+  $("topTitle").textContent = sub ? { habitos: "Hábitos", salud: "Salud", comidas: "Comidas", personas: "Personas", tiempo: "Tiempo", avisos: "Avisos", datos: "Tus datos", gcal: "Google", correo: "Correo", ia: "IA", spotify: "Spotify", atajos: "Atajos" }[sub] : TABS.find(([id]) => id === tab)[1];
   const sheetKey = sheet ? sheet.kind : null;
   if (sheetKey !== renderedSheetKind || !sheet) {
     const wasOpen = Boolean($("sheetBg"));
@@ -1158,7 +1175,7 @@ function go(newTab) {
 const OPEN_SYNC_MS = 10 * 60000;
 function syncOnOpen() {
   if (!["agenda", "hoy"].includes(tab) || !navigator.onLine || gcal.busy) return;
-  if (!["calendar", "tasks", "contacts"].some((k) => googleOn(k)) || vault.settings.googleAutoOpen === false) return;
+  if (!["calendar", "tasks", "contacts", "gmail"].some((k) => googleOn(k)) || vault.settings.googleAutoOpen === false) return;
   const last = Math.max(Date.parse(vault.settings.gcalSyncedAt ?? "") || 0, gcal.lastRun ?? 0);
   if (Date.now() - last < OPEN_SYNC_MS) return;
   if (validToken(SCOPE.calendar)) syncGoogle({ silent: true }).catch(() => { gcal.busy = false; });
@@ -1186,6 +1203,12 @@ function say(text) {
     refuge = { state: { phase: "HUMAN_HELP", turn: 0 }, messages: [{ from: "me", text: clean }, { from: "manu", text: reply(intent), safety: true }] };
     render();
     return;
+  }
+  // Mail (WEB-33): «¿de quién me llegan más correos?», «dame de baja de X».
+  const mail = mailCommand(clean);
+  if (mail) {
+    vault.chat.push({ from: "me", text: clean, at }, { from: "manu", text: mail.text, at, ...(mail.calls ? { calls: mail.calls } : {}) });
+    persist(); render(); return;
   }
   // Conversation mode: what MANU does not do by itself (greetings, questions,
   // the day, the weather, anything else) goes to Gemini with the chosen context.
@@ -1285,7 +1308,12 @@ function aiModeCard() {
   </section>`;
 }
 
-const aiMode = () => ({ on: false, context: BASIC_CONTEXT, autoActions: false, ...(vault.settings.aiMode ?? {}) });
+const aiMode = () => {
+  const m = { on: false, context: BASIC_CONTEXT, autoActions: false, ...(vault.settings.aiMode ?? {}) };
+  // «Con todo» chosen before Gmail existed (WEB-33) also includes the mail summary.
+  if (m.context.mail === undefined && m.context.money && m.context.people) m.context = { ...m.context, mail: true };
+  return m;
+};
 function lifeSnapshot() {
   const now = today();
   const events = {};
@@ -1305,6 +1333,7 @@ function lifeSnapshot() {
     health: hs.sleep !== null || hs.steps !== null ? { sleep: hs.sleep !== null ? dec(hs.sleep) : null, steps: hs.steps !== null ? Math.round(hs.steps) : null } : null,
     mood: mood ? MOODS[mood - 1].label : null,
     birthdays: upcomingBirthdays(vault.people, now, 14).map((b) => ({ name: b.person.name, days: b.days })),
+    mail: googleOn("gmail") ? vault.mail ?? null : null,
   };
 }
 
@@ -1361,8 +1390,8 @@ async function askAi(proposalId, { auto = false } = {}) {
   if (tab === "manu") render();
 }
 
-const SCREENS = { hoy: ["hoy"], agenda: ["agenda"], dinero: ["dinero"], tu: ["tu"], tiempo: ["hoy", null, "weather"], google: ["tu", "gcal"], ia: ["tu", "ia"], atajos: ["tu", "atajos"], habitos: ["tu", "habitos"], salud: ["tu", "salud"], comidas: ["tu", "comidas"], personas: ["tu", "personas"] };
-const SCREEN_NAMES = { hoy: "Hoy", agenda: "Agenda", dinero: "Dinero", tu: "Tú", tiempo: "El tiempo", google: "Google", ia: "IA", atajos: "Atajos", habitos: "Hábitos", salud: "Salud", comidas: "Comidas", personas: "Personas" };
+const SCREENS = { hoy: ["hoy"], agenda: ["agenda"], dinero: ["dinero"], tu: ["tu"], tiempo: ["hoy", null, "weather"], google: ["tu", "gcal"], correo: ["tu", "correo"], ia: ["tu", "ia"], atajos: ["tu", "atajos"], habitos: ["tu", "habitos"], salud: ["tu", "salud"], comidas: ["tu", "comidas"], personas: ["tu", "personas"] };
+const SCREEN_NAMES = { hoy: "Hoy", agenda: "Agenda", dinero: "Dinero", tu: "Tú", tiempo: "El tiempo", google: "Google", correo: "Correo", ia: "IA", atajos: "Atajos", habitos: "Hábitos", salud: "Salud", comidas: "Comidas", personas: "Personas" };
 
 function callLabel(c) {
   switch (c.name) {
@@ -1374,6 +1403,10 @@ function callLabel(c) {
     case "ir_a": return `Ir a ${SCREEN_NAMES[c.pantalla]}`;
     case "importar_extracto": return "Elegir el extracto del banco";
     case "sugerir_mejora": return `Mejora: ${c.titulo}`;
+    case "correo_baja": return `Darte de baja de ${senderName(findSender(vault.mail, c.remitente)?.email ?? c.remitente)}`;
+    case "correo_archivar": return `Archivar los correos de ${senderName(findSender(vault.mail, c.remitente)?.email ?? c.remitente)}`;
+    case "correo_papelera": return `Papelera: correos de ${senderName(findSender(vault.mail, c.remitente)?.email ?? c.remitente)}`;
+    case "correo_etiquetar": return `Etiquetar «${c.etiqueta}» los de ${senderName(findSender(vault.mail, c.remitente)?.email ?? c.remitente)}`;
     default: return c.name;
   }
 }
@@ -1385,7 +1418,7 @@ function callCard(b, c, i) {
     return `<div class="ai-call"><b>${esc(callLabel(c))}</b><p class="small">${esc(c.descripcion)}</p>${c.state ? `<p class="muted small">${c.state === "done" ? "Abierta en GitHub." : "Descartada."}</p>` : `<p class="muted small">Se abre GitHub con la petición escrita; la envías tú. El repositorio es público.</p><div class="btns"><a class="btn" href="${esc(issueUrl(c, APP_VERSION))}" target="_blank" rel="noopener" data-act="ai-issue" data-at="${at}" data-n="${n}">Abrir en GitHub</a><button class="btn ghost" data-act="ai-skip" data-at="${at}" data-n="${n}">No</button></div>`}</div>`;
   }
   if (c.auto) return `<div class="ai-call${c.state === "done" ? " done" : ""}"><b>${c.state === "done" ? "✓ " : ""}${esc(callLabel(c))}</b>${c.state === "done" && c.undo ? `<div class="btns"><button class="link small" data-act="ai-undo" data-at="${at}" data-n="${n}">Deshacer</button></div>` : c.state === "undone" ? '<p class="muted small">Deshecho.</p>' : c.state === "missing" ? '<p class="muted small">No encontré esa tarea.</p>' : ""}</div>`;
-  return `<div class="ai-call"><b>${esc(callLabel(c))}</b>${c.state ? `<p class="muted small">${c.state === "done" ? "Hecho." : c.state === "missing" ? "No encontré esa tarea." : "Descartado."}</p>` : `<div class="btns"><button class="btn" data-act="ai-do" data-at="${at}" data-n="${n}">${c.name === "ir_a" || c.name === "importar_extracto" ? "Ir" : "Hacer"}</button><button class="btn ghost" data-act="ai-skip" data-at="${at}" data-n="${n}">No</button></div>`}</div>`;
+  return `<div class="ai-call"><b>${esc(callLabel(c))}</b>${c.state ? `<p class="muted small">${c.state === "done" ? "Hecho." : c.state === "missing" ? (c.name.startsWith("correo_") ? "No encontré ese remitente." : "No encontré esa tarea.") : c.state === "working" ? "Haciéndolo…" : "Descartado."}</p>${c.result ? `<p class="small">${esc(c.result)}</p>` : ""}${c.mailUndo ? `<div class="btns"><button class="link small" data-act="mail-undo-call" data-at="${at}" data-n="${n}">Deshacer</button></div>` : ""}` : `<div class="btns"><button class="btn" data-act="ai-do" data-at="${at}" data-n="${n}">${c.name === "ir_a" || c.name === "importar_extracto" ? "Ir" : "Hacer"}</button><button class="btn ghost" data-act="ai-skip" data-at="${at}" data-n="${n}">No</button></div>`}</div>`;
 }
 
 const findCall = (el) => { const b = vault.chat.find((x) => x.at === el.dataset.at && x.calls); return b ? b.calls[Number(el.dataset.n)] : null; };
@@ -1489,9 +1522,86 @@ function runCall(c, { quiet = false } = {}) {
       if (c.name === "importar_extracto") $("bankFile")?.click();
       return;
     }
+    case "correo_baja": case "correo_archivar": case "correo_papelera": case "correo_etiquetar": {
+      const s = findSender(vault.mail, c.remitente);
+      if (!s) { c.state = "missing"; break; }
+      const kind = { correo_baja: "unsub", correo_archivar: "archive", correo_papelera: "trash", correo_etiquetar: "label" }[c.name];
+      markMailSeen(`sender:${s.email}`);
+      c.state = "working";
+      mailDo(kind, s.email, c.etiqueta ?? "").then((r) => { c.state = "done"; c.result = r?.text ?? null; if (r?.undo) c.mailUndo = r.undo; persist(); render(); });
+      break;
+    }
     default: c.state = null; return;
   }
   persist(); render();
+}
+
+// ---------- Gmail (WEB-33) ----------
+const mailSeen = () => vault.settings.mailSeen ?? [];
+function markMailSeen(key) { if (key) vault.settings.mailSeen = [...new Set([...mailSeen(), key])].slice(-300); }
+const senderName = (email) => vault.mail?.senders?.find((s) => s.email === email)?.name ?? email;
+
+// What MANU raises by itself: ChatGPT's export arrived, a sender that writes too much.
+function mailCards() {
+  if (!googleOn("gmail") || !vault.mail) return "";
+  return mailSuggestions(vault.mail, mailSeen()).map((s) => s.kind === "export"
+    ? `<section class="card ai-offer"><b>📦 Te ha llegado la exportación de ChatGPT</b><p class="muted small">Descárgala desde el correo cuanto antes (el enlace caduca) y pásasela a Claude para que la estudie contigo.</p><div class="btns"><a class="btn" href="${esc(messageUrl(s.id))}" target="_blank" rel="noopener">Abrir el correo</a><button class="btn ghost" data-act="mail-seen" data-k="${esc(s.key)}">Hecho</button></div></section>`
+    : `<section class="card ai-offer"><b>📬 Este mes te han llegado ${s.count} correos de ${esc(s.name)}</b><p class="muted small">¿Qué hago con ellos? También puedes decírmelo en el chat: «¿de quién más me llegan muchos correos?»</p><div class="btns">${s.canUnsub ? `<button class="btn" data-act="mail-do" data-kind="unsub" data-email="${esc(s.email)}">Darme de baja</button>` : ""}<button class="btn ghost" data-act="mail-do" data-kind="archive" data-email="${esc(s.email)}">Archivarlos</button><button class="btn ghost" data-act="mail-do" data-kind="trash" data-email="${esc(s.email)}">Papelera</button></div><button class="link small" data-act="mail-seen" data-k="${esc(s.key)}">No, déjalo</button></section>`).join("");
+}
+
+// Unsubscribing must start inside Manu's tap (it opens a page or the mail app).
+function unsubscribe(email) {
+  const u = vault.mail?.senders?.find((s) => s.email === email)?.unsub;
+  if (!u) return false;
+  // The sender's own page (the CSP keeps form-action 'none', so no silent POST).
+  if (u.http) window.open(u.http, "_blank", "noopener");
+  else location.href = u.mailto;
+  return true;
+}
+
+async function mailDo(kind, email, label = "") {
+  if (!googleOn("gmail")) { toast("Conecta Gmail en Tú → Correo"); return null; }
+  const name = senderName(email);
+  if (kind === "unsub") return { text: unsubscribe(email) ? `Abro la baja de ${name}. Si su página pide confirmar, confírmalo allí.` : `${name} no trae enlace de baja. Puedo archivarlos o mandarlos a la papelera.` };
+  try {
+    const token = await googleToken(SCOPE.gmail);
+    const ids = await idsFrom(token, email);
+    if (!ids.length) return { text: `No encuentro correos de ${name}.` };
+    let labelId = null;
+    if (kind === "archive") await mailArchive(token, ids);
+    else if (kind === "trash") await mailTrash(token, ids);
+    else if (kind === "label") { labelId = await ensureLabel(token, label); await addLabel(token, ids, labelId); }
+    else return null;
+    const verb = { archive: "Archivados", trash: "A la papelera", label: `Etiquetados como «${label}»` }[kind];
+    return { text: `${verb} ${ids.length} correos de ${name}.`, undo: { kind, ids, labelId } };
+  } catch (err) { return { text: `Gmail: ${err.message}` }; }
+}
+
+async function mailUndo(u) {
+  try {
+    const token = await googleToken(SCOPE.gmail);
+    if (u.kind === "archive") await mailUnarchive(token, u.ids);
+    else if (u.kind === "trash") await mailUntrash(token, u.ids);
+    else if (u.kind === "label") await removeLabel(token, u.ids, u.labelId);
+    toast("Deshecho en Gmail"); return true;
+  } catch (err) { toast(`Gmail: ${err.message}`); return false; }
+}
+
+// «¿De quién me llegan más correos?», «dame de baja de X», «archiva los de X».
+function mailCommand(text) {
+  if (!googleOn("gmail") || !vault.mail) return null;
+  const t = normalise(text);
+  if (/(correo|mail|email)/.test(t) && /(quien|quienes|cuales|remitentes|mas|muchos)/.test(t) && !/(baja|archiv|papelera|borra|etiquet)/.test(t)) {
+    const top = vault.mail.senders.slice(0, 6);
+    return { text: top.length ? `En los últimos 30 días, quien más te escribe: ${top.map((s) => `${s.name} (${s.count})`).join(", ")}. Dime «dame de baja de …», «archiva los de …» o «a la papelera los de …».` : "No veo newsletters ni avisos masivos en los últimos 30 días." };
+  }
+  const m = t.match(/(?:dame de baja|darme de baja|desuscrib\w*|quitame|archiva\w*|a la papelera|borra\w*|elimina\w*)(?: los correos| los)?(?: de| a)? (.+)$/);
+  if (!m) return null;
+  const who = m[1].replace(/^(los de |de )/, "").trim();
+  const s = findSender(vault.mail, who);
+  if (!s) return { text: `No encuentro a «${who}» entre quienes más te escriben. Toca «Actualizar» en Tú → Correo si es reciente.` };
+  const name = /(baja|desuscrib|quitame)/.test(t) ? "correo_baja" : /archiv/.test(t) ? "correo_archivar" : "correo_papelera";
+  return { text: "¿Lo hago?", calls: [{ name, remitente: s.email, state: null }] };
 }
 
 // ---------- Events ----------
@@ -1546,7 +1656,7 @@ document.addEventListener("click", async (e) => {
     case "overlay-close": overlay = null; render({ focus: true, enter: "tab" }); scrollTo(0, 0); break;
     case "goto-gcal": tab = "tu"; sub = "gcal"; render({ focus: true }); scrollTo(0, 0); break;
     case "gcal-sync": syncGoogle(); break;
-    case "google-connect-all": vault.settings.google = { ...(vault.settings.google ?? {}), calendar: true, tasks: true, contacts: true }; persist(); syncGoogle(); break;
+    case "google-connect-all": vault.settings.google = { ...(vault.settings.google ?? {}), calendar: true, tasks: true, contacts: true, gmail: true }; persist(); syncGoogle(); break;
     case "drive-restore-no": confirmDriveRestore = null; render(); break;
     case "drive-restore-yes": { const r = validateVault(confirmDriveRestore?.data); confirmDriveRestore = null; if (!r.ok) { toast(r.reason); render(); break; } vault = r.vault; persist(); render(); toast("Copia de Drive restaurada"); break; }
     case "gauto": vault.settings.googleAutoOpen = vault.settings.googleAutoOpen === false; persist(); render(); break;
@@ -1554,6 +1664,18 @@ document.addEventListener("click", async (e) => {
     case "ai-send": askAi(id); break;
     case "ai-do": runCall(findCall(a)); break;
     case "ai-undo": undoCall(findCall(a)); break;
+    case "mail-connect": vault.settings.google = { ...(vault.settings.google ?? {}), gmail: true }; persist(); syncGoogle(); break;
+    case "mail-seen": markMailSeen(a.dataset.k); persist(); render(); break;
+    case "mail-do": {
+      const email = a.dataset.email, kind = a.dataset.kind;
+      const label = kind === "label" ? (prompt("Nombre de la etiqueta", senderName(email)) ?? "").trim() : "";
+      if (kind === "label" && !label) break;
+      markMailSeen(`sender:${email}`);
+      mailDo(kind, email, label).then((r) => { if (!r) return; vault.chat.push({ from: "manu", text: r.text, at: new Date().toISOString(), ...(r.undo ? { mailUndo: r.undo } : {}) }); persist(); render(); toast(r.undo ? `${r.text} Deshacer en el chat.` : r.text); });
+      break;
+    }
+    case "mail-undo": { const b = vault.chat.find((x) => x.at === a.dataset.at && x.mailUndo); if (b) mailUndo(b.mailUndo).then((ok) => { if (ok) { delete b.mailUndo; b.text += " (deshecho)"; persist(); render(); } }); break; }
+    case "mail-undo-call": { const c = findCall(a); if (c?.mailUndo) mailUndo(c.mailUndo).then((ok) => { if (ok) { delete c.mailUndo; c.state = "undone"; persist(); render(); } }); break; }
     case "ai-mode": { const m = aiMode(); const v = a.dataset.v; vault.settings.aiMode = v === "off" ? { ...m, on: false } : v === "full" ? (vault.settings.aiSensitive = true, { ...m, on: true, context: { ...FULL_CONTEXT } }) : v === "basic" ? { ...m, on: true, context: { ...BASIC_CONTEXT } } : m; persist(); render(); toast(v === "off" ? "Modo conversación desactivado" : "Modo conversación activado"); break; }
     case "ai-ctx": { const m = aiMode(); vault.settings.aiMode = { ...m, context: { ...m.context, [a.dataset.k]: !m.context[a.dataset.k] } }; persist(); render(); break; }
     case "ai-auto-actions": { const m = aiMode(); vault.settings.aiMode = { ...m, autoActions: !m.autoActions }; persist(); render(); break; }
@@ -1954,8 +2076,13 @@ async function syncGoogle({ silent = false, quiet = false } = {}) {
       vault.people = merged.people;
       return `${fromGoogle.total} leídos · ${fromGoogle.people.length} con cumpleaños · ${merged.added} nuevos${fromGoogle.complete ? "" : " (lista incompleta)"}`;
     } },
+    { key: "gmail", scope: SCOPE.gmail, run: async (token) => {
+      const s = mailSummary(await fetchSnapshot(token), Date.now());
+      vault.mail = { ...s, syncedAt: new Date().toISOString() };
+      return `${s.total} correos (30 días) · ${s.senders.length} remitentes masivos · ${s.important.length} importantes`;
+    } },
   ];
-  const enabled = Object.fromEntries(["calendar", "tasks", "contacts"].map((k) => [k, googleOn(k)]));
+  const enabled = Object.fromEntries(["calendar", "tasks", "contacts", "gmail"].map((k) => [k, googleOn(k)]));
   const wanted = Object.keys(enabled).filter((k) => enabled[k]).map((k) => SCOPE[k]);
   if (enabled.calendar) wanted.push(SCOPE.calendarList); // to show all of Manu's calendars
   if (silent) {
@@ -1981,7 +2108,7 @@ const validToken = (scope) => { const t = gcal.tokens[scope]; return Boolean(t &
 const AUTO_SYNC_MS = 10 * 60000;
 function autoSyncGoogle() {
   if (document.visibilityState !== "visible" || !navigator.onLine || gcal.busy) return;
-  if (!["calendar", "tasks", "contacts"].some((k) => googleOn(k) && validToken(SCOPE[k]))) return;
+  if (!["calendar", "tasks", "contacts", "gmail"].some((k) => googleOn(k) && validToken(SCOPE[k]))) return;
   const last = Math.max(Date.parse(vault.settings.gcalSyncedAt ?? "") || 0, gcal.lastRun ?? 0);
   if (Date.now() - last < AUTO_SYNC_MS) return;
   syncGoogle({ silent: true }).catch(() => { gcal.busy = false; });
