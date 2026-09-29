@@ -25,3 +25,4 @@ Estados permitidos:
 - [ADR-0012 — App web instalable como vía operativa mientras la nativa no se puede instalar](0012-installable-web-app-as-operational-path.md) — modifica D-01 y ADR-0007
 - [ADR-0013 — IA opcional con Gemini y servicios de Google en la app web](0013-optional-gemini-and-google-services.md) — complementa ADR-0009 y ADR-0012
 - [ADR-0014 — Spotify en el altavoz «baño» y MANU como centro de accesos](0014-spotify-and-app-hub.md) — complementa ADR-0012 y ADR-0013
+- [ADR-0015 — Gmail con acceso de modificación](0015-gmail-full-access.md) — complementa ADR-0013

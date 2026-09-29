@@ -140,9 +140,13 @@ export const TOOLS = [{ functionDeclarations: [
   { name: "anadir_idea", description: "Propone guardar una idea.", parameters: { type: "OBJECT", properties: { texto: { type: "STRING" } }, required: ["texto"] } },
   { name: "apuntar_gasto", description: "Propone apuntar un gasto en euros.", parameters: { type: "OBJECT", properties: { importe_euros: { type: "NUMBER" }, concepto: { type: "STRING" } }, required: ["importe_euros"] } },
   { name: "crear_recordatorio", description: "Propone un recordatorio. 'cuando' en formato AAAA-MM-DD HH:MM, hora local.", parameters: { type: "OBJECT", properties: { texto: { type: "STRING" }, cuando: { type: "STRING" } }, required: ["texto", "cuando"] } },
-  { name: "ir_a", description: "Lleva a una pantalla de MANU.", parameters: { type: "OBJECT", properties: { pantalla: { type: "STRING", enum: ["hoy", "agenda", "dinero", "tu", "tiempo", "google", "ia", "atajos", "habitos", "salud", "comidas", "personas"] } }, required: ["pantalla"] } },
+  { name: "ir_a", description: "Lleva a una pantalla de MANU.", parameters: { type: "OBJECT", properties: { pantalla: { type: "STRING", enum: ["hoy", "agenda", "dinero", "tu", "tiempo", "google", "correo", "ia", "atajos", "habitos", "salud", "comidas", "personas"] } }, required: ["pantalla"] } },
   { name: "completar_tarea", description: "Marca como hecha una tarea pendiente de Manu. 'texto' es el texto (o parte) de la tarea.", parameters: { type: "OBJECT", properties: { texto: { type: "STRING" } }, required: ["texto"] } },
   { name: "importar_extracto", description: "Ofrece importar el extracto del banco (Excel o CSV) en Dinero.", parameters: { type: "OBJECT", properties: {} } },
+  { name: "correo_baja", description: "Propone dar de baja a Manu de un remitente de su Gmail (newsletter). 'remitente': nombre, correo o dominio.", parameters: { type: "OBJECT", properties: { remitente: { type: "STRING" } }, required: ["remitente"] } },
+  { name: "correo_archivar", description: "Propone archivar todos los correos de un remitente en Gmail.", parameters: { type: "OBJECT", properties: { remitente: { type: "STRING" } }, required: ["remitente"] } },
+  { name: "correo_papelera", description: "Propone mandar a la papelera (recuperable 30 días) los correos de un remitente.", parameters: { type: "OBJECT", properties: { remitente: { type: "STRING" } }, required: ["remitente"] } },
+  { name: "correo_etiquetar", description: "Propone poner una etiqueta de Gmail a los correos de un remitente (la crea si no existe).", parameters: { type: "OBJECT", properties: { remitente: { type: "STRING" }, etiqueta: { type: "STRING" } }, required: ["remitente", "etiqueta"] } },
   { name: "sugerir_mejora", description: "Cuando Manu pide un cambio o una mejora de la app MANU, prepara la sugerencia para el desarrollador. No incluyas datos personales.", parameters: { type: "OBJECT", properties: { titulo: { type: "STRING" }, descripcion: { type: "STRING" } }, required: ["titulo", "descripcion"] } },
 ] }];
 
@@ -174,6 +178,8 @@ export function parseCalls(json) {
       case "ir_a": { const ok = TOOLS[0].functionDeclarations.find((f) => f.name === "ir_a").parameters.properties.pantalla.enum; if (ok.includes(a.pantalla)) out.push({ name: c.name, pantalla: a.pantalla }); break; }
       case "completar_tarea": { const t = clip(a.texto, 140); if (t) out.push({ name: c.name, texto: t }); break; }
       case "importar_extracto": out.push({ name: c.name }); break;
+      case "correo_baja": case "correo_archivar": case "correo_papelera": { const r = clip(a.remitente, 120); if (r) out.push({ name: c.name, remitente: r }); break; }
+      case "correo_etiquetar": { const r = clip(a.remitente, 120), e = clip(a.etiqueta, 60); if (r && e) out.push({ name: c.name, remitente: r, etiqueta: e }); break; }
       case "sugerir_mejora": { const ti = clip(a.titulo, 100), de = clip(a.descripcion, 1500); if (ti && de) out.push({ name: c.name, titulo: ti, descripcion: de, sensitive: isSensitive(`${ti} ${de}`) }); break; }
       default: break; // unknown tools are ignored
     }
