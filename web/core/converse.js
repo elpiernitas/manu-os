@@ -57,7 +57,7 @@ export function buildContext(data, context, now = new Date()) {
   if (context.profile && data.profile) out.push(`PERFIL de Manu (escrito a partir de sus conversaciones y revisado por él):\n${String(data.profile).slice(0, 4000)}`);
   if (context.mail && data.mail) {
     const m = data.mail;
-    out.push(`CORREO (últimos 30 días, Gmail): quien más escribe: ${m.senders.slice(0, 10).map((s) => `${s.name} <${s.email}> ${s.count}${s.unsub ? " (tiene baja)" : ""}`).join("; ") || "nadie"}.${m.important.length ? ` Importantes sin leer: ${m.important.slice(0, 6).map((x) => `${x.name}: ${x.subject}`).join("; ")}.` : ""}${m.chatgptExport ? " Ha llegado la exportación de datos de ChatGPT." : ""} Para actuar usa correo_baja, correo_archivar, correo_papelera o correo_etiquetar con el remitente.`);
+    out.push(`CORREO (últimos 30 días, Gmail): quien más escribe: ${m.senders.slice(0, 10).map((s) => `${s.name} <${s.email}> ${s.count}${s.unsub ? " (tiene baja)" : ""}`).join("; ") || "nadie"}.${m.important.length ? ` Importantes sin leer: ${m.important.slice(0, 6).map((x) => `${x.name}: ${x.subject}`).join("; ")}.` : ""}${m.chatgptExport ? " Ha llegado la exportación de datos de ChatGPT." : m.chatgptExportPending ? " OpenAI está preparando la exportación de ChatGPT (aún no ha llegado el enlace)." : ""} Para actuar usa correo_baja, correo_archivar, correo_papelera o correo_etiquetar con el remitente.`);
   }
   return out.join("\n");
 }

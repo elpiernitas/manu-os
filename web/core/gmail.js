@@ -70,7 +70,12 @@ export function slim(msg) {
 
 const BULK_LABELS = ["CATEGORY_PROMOTIONS", "CATEGORY_SOCIAL", "CATEGORY_UPDATES", "CATEGORY_FORUMS"];
 const isBulk = (m) => Boolean(m.unsub) || m.labels.some((l) => BULK_LABELS.includes(l)) || /^(no-?reply|newsletter|news|info|marketing|notifications?)@/.test(m.from.email);
-const isChatgptExport = (m) => /(^|\.)openai\.com$/.test(m.from.domain) && /(export|exportaci|tus datos|your data|data)/i.test(m.subject);
+// WEB-42: OpenAI first sends «Your data export has started» and only days
+// later the mail with the download link. Only that second one counts.
+const isExportMail = (m) => /(^|\.)openai\.com$/.test(m.from.domain) && /(data export|export|exportaci|tus datos|your data)/i.test(m.subject);
+export const exportStarted = (subject) => /(started|has begun|preparing|requested|ha comenzado|ha empezado|preparando|solicitado)/i.test(String(subject ?? ""));
+const isChatgptExport = (m) => isExportMail(m) && !exportStarted(m.subject);
+const isChatgptExportPending = (m) => isExportMail(m) && exportStarted(m.subject);
 
 // Summary kept in the vault. `now` in ms.
 export function summarize(messages, now = Date.now()) {
@@ -89,10 +94,12 @@ export function summarize(messages, now = Date.now()) {
     .sort((a, b) => b.at - a.at).slice(0, LIMITS.important)
     .map((m) => ({ id: m.id, name: m.from.name, subject: m.subject, at: m.at }));
   const exp = messages.filter(isChatgptExport).sort((a, b) => b.at - a.at)[0];
+  const pending = messages.filter(isChatgptExportPending).sort((a, b) => b.at - a.at)[0];
   return {
     senders: [...senders.values()].sort((a, b) => b.count - a.count).slice(0, LIMITS.senders),
     important,
     chatgptExport: exp ? { id: exp.id, subject: exp.subject, at: exp.at } : null,
+    chatgptExportPending: pending && (!exp || pending.at > exp.at) ? { id: pending.id, at: pending.at } : null,
     total: messages.length,
   };
 }

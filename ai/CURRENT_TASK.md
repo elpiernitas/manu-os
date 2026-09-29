@@ -2,11 +2,11 @@
 
 Status: **REVIEW_PENDING**
 
-WEB-41 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
+WEB-42 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
 
 ## Tarea activa
 
-WEB-41 — Tu diario: memoria día a día y preguntas por fecha (`ai/HANDOFF.md`, «WEB-41»).
+WEB-42 — aviso falso de la exportación de ChatGPT (`ai/HANDOFF.md`, «WEB-42»).
 
 ## Autorización
 
@@ -47,6 +47,7 @@ WEB-41 — Tu diario: memoria día a día y preguntas por fecha (`ai/HANDOFF.md`
 
 ## Historial (cerrado)
 
+- **WEB-41** (Tu diario): CERRADA. Fusionada mediante el PR #49 (`8aa480a`).
 - **WEB-40** (chat, luz del día y Gmail): CERRADA. Fusionada mediante el PR #48 (`4bc7841`).
 - **WEB-39** (Refugio limpio): CERRADA. Fusionada mediante el PR #47 (`4572d06`).
 - **WEB-38** (Personas y cumpleaños): CERRADA. Fusionada mediante el PR #46 (`42bbc61`).

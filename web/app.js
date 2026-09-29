@@ -29,7 +29,7 @@ import { isSpotifyClientId, pkceValid, randomVerifier, challengeFor, authorizeUr
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "41";
+export const APP_VERSION = "42";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -1792,7 +1792,7 @@ const senderName = (email) => vault.mail?.senders?.find((s) => s.email === email
 function mailCards() {
   if (!googleOn("gmail") || !vault.mail) return "";
   return mailSuggestions(vault.mail, mailSeen()).map((s) => s.kind === "export"
-    ? `<section class="card ai-offer"><b>📦 Te ha llegado la exportación de ChatGPT</b><p class="muted small">Descárgala desde el correo cuanto antes (el enlace caduca) y pásasela a Claude para que la estudie contigo.</p><div class="btns"><a class="btn" href="${esc(messageUrl(s.id))}" target="_blank" rel="noopener">Abrir el correo</a><button class="btn ghost" data-act="mail-seen" data-k="${esc(s.key)}">Hecho</button></div></section>`
+    ? `<section class="card ai-offer"><b>📦 Te ha llegado la exportación de ChatGPT</b><p class="muted small">Descárgala desde el correo cuanto antes (el enlace caduca) e impórtala en Tú → Tu archivo.</p><div class="btns"><a class="btn" href="${esc(messageUrl(s.id))}" target="_blank" rel="noopener">Abrir el correo</a><button class="btn ghost" data-act="mail-seen" data-k="${esc(s.key)}">Hecho</button></div></section>`
     : `<section class="card ai-offer"><b>📬 Este mes te han llegado ${s.count} correos de ${esc(s.name)}</b><p class="muted small">¿Qué hago con ellos? También puedes decírmelo en el chat: «¿de quién más me llegan muchos correos?»</p><div class="btns">${s.canUnsub ? `<button class="btn" data-act="mail-do" data-kind="unsub" data-email="${esc(s.email)}">Darme de baja</button>` : ""}<button class="btn ghost" data-act="mail-do" data-kind="archive" data-email="${esc(s.email)}">Archivarlos</button><button class="btn ghost" data-act="mail-do" data-kind="trash" data-email="${esc(s.email)}">Papelera</button></div><button class="link small" data-act="mail-seen" data-k="${esc(s.key)}">No, déjalo</button></section>`).join("");
 }
 

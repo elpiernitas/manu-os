@@ -130,3 +130,7 @@ En WEB-33, un 403 de Gmail se convertía en una frase ambigua y el aviso decía 
 ### QAL-030 — Un visualViewport simulado debe leer su altura de forma perezosa
 
 En WEB-40, el simulador de teclado fijaba `height = innerHeight` antes de aplicarse el tamaño del dispositivo, y daba 1669 px en una pantalla de 664 px. Eso falseaba las comprobaciones de «estar al final». La altura simulada debe ser un getter (`h ?? innerHeight`). Además, cada recorrido nuevo debe fallar en la versión anterior antes de darlo por válido.
+
+### QAL-031 — Un correo de «ha empezado» no es el resultado
+
+En WEB-42, un detector por palabras («export», «data») tomó el aviso «Your data export has started» como la exportación ya lista. Si un servicio manda varios correos del mismo proceso (solicitado, en preparación, listo), el detector debe excluir los estados intermedios, y el test debe cubrir el correo intermedio real además del final.

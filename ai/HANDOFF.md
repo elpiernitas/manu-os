@@ -10,6 +10,30 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
+## WEB-42 — aviso falso de «Te ha llegado la exportación de ChatGPT»
+
+Manu (2026-09-29) vio la tarjeta «📦 Te ha llegado la exportación de ChatGPT» sin haber recibido la exportación.
+
+### Causa
+
+`isChatgptExport` aceptaba cualquier correo de `openai.com` con «export» o «data» en el asunto. OpenAI primero manda «ChatGPT - Your data export has started», y días después el correo con el enlace de descarga. Ese primer correo de su bandeja activaba la tarjeta. La causa se comprobó mirando los asuntos de sus correos de OpenAI; no se guardó nada suyo en el repositorio.
+
+### Cambios
+
+- `web/core/gmail.js`:
+  - `exportStarted` reconoce los avisos de «ha empezado» o «se está preparando» (started, preparing, requested…) y esos no cuentan;
+  - `summarize` devuelve además `chatgptExportPending`.
+- `web/core/converse.js`: el modo conversación sabe que la exportación está en preparación.
+- `web/app.js`:
+  - la tarjeta pide importar la exportación en Tú → Tu archivo;
+  - versión 42.
+
+NO_VERIFICADO: el asunto exacto del correo «lista para descargar» de OpenAI. Cualquier otro correo de exportación de `openai.com` que no diga que ha empezado se considera el definitivo.
+
+### Resultados
+
+- `npm test`: 130/130 PASS. Regresión en `web/tests/gmail.test.js`: con «has started» no sale la tarjeta; con «is ready» sí sale.
+
 ## WEB-41 — Tu diario: memoria día a día de lo que pasa por MANU
 
 Manu (2026-09-29) aceptó la «memoria de todo» (ADR-0016). Ya existían los 4 Atajos (alarma, recordatorio, agenda y «Apuntar en MANU») y el archivo de conversaciones (WEB-37). Faltaba recordar lo que hace cada día.
