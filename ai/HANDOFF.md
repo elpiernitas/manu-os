@@ -10,6 +10,51 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
+## WEB-51 — fechas, horas y miles en lo que dice Manu; ingresos, salud y ánimo desde el chat
+
+Segunda batería de frases, esta vez con fechas. Aparecieron errores de datos, no solo frases sin entender.
+
+### Errores encontrados (reproducidos antes de corregir)
+
+- «**ayer** gasté 20 en la cena» se guardaba con la fecha de **hoy**.
+- «gasté **1.200** en el alquiler» se guardaba como **1,20 €**: el punto de los miles se leía como decimal. En «cobré 1.450» pasaba lo mismo.
+- «recuérdame a las **5 y media** ir a por el niño» se guardaba como «y media ir a por el niño» a las **05:00**.
+- «qué tengo **el jueves**» y «qué tengo **esta semana**» contestaban con lo de hoy.
+- Tras contestar la agenda, la app **saltaba sola a Agenda** a los 0,9 s, mientras Manu leía la respuesta. Era un resto de cuando MANU no sabía contestar.
+- «cobré 200» no se entendía porque el `\b` de JavaScript no funciona después de «é».
+
+### Cambios
+
+- `web/core/assistant.js`:
+  - `amountCents` entiende los miles españoles («1.200», «1.234,56»); los decimales siguen igual («12,50», «45.90»). Lo mismo en `quickDetect`;
+  - `futureDay` reconoce «mañana», «pasado mañana», «hoy», «esta tarde / noche», el próximo día de la semana (el mismo día cuenta como la semana que viene), «el 12» y «el 12 de octubre». En «a las 9 de la mañana», «mañana» no se toma por el día siguiente;
+  - `timeIn` entiende «a las H», «y media», «y cuarto», «menos cuarto», «de la mañana / tarde / noche / madrugada». De 1 a 6 sin especificar se entiende por la tarde; el 7 se deja como se dice;
+  - en los recordatorios, el día y la hora pueden ir en cualquier parte («el viernes a las 10 …», «… mañana a las 8 de la mañana»). «Esta tarde» es a las 18:00, «esta noche» a las 21:00 y «por la mañana» a las 09:00. Si no es hoy ni mañana, se añade `day`;
+  - los gastos de otro día («ayer…», «… el lunes») llevan `day` (pasado, con `dayFromText` del diario);
+  - la agenda puede pedirse para un día concreto o para `week`. «Qué tengo que hacer hoy» sigue siendo la agenda;
+  - nuevos tipos:
+    - `income`: «cobré», «me han pagado la nómina», «ingresé…»;
+    - `health`: «dormí 7,5 horas», «peso 72,5», «8000 pasos»;
+    - `mood`: «hoy estoy bien», «me siento genial». Solo frases cortas sin pregunta: «estoy cansado desde el lunes, ¿por qué…?» sigue siendo conversación (lo detectó e2e41);
+  - «apunta que tengo que X» es una tarea;
+  - las respuestas dicen el día («en cena (el lunes 28 de septiembre)», «el viernes 2 de octubre a las 10:00»).
+- `web/app.js`:
+  - los gastos e ingresos de otro día se guardan a mediodía de ese día;
+  - los ingresos van a `vault.income`, la salud a `vault.health` (un valor por día) y el ánimo con `setMood`;
+  - los recordatorios con `day`;
+  - la agenda de un día o de la semana se contesta en el chat y ya no hay salto a Agenda;
+  - versión 51.
+
+### Resultados
+
+- `npm test`: 164/164 PASS (`assistant-dates.test.js` con 7 tests).
+- e2e51: 10/10 en el chat real.
+- Las 50 pruebas e2e en PASS.
+
+### NO_VERIFICADO
+
+- Otras formas de decir fechas («dentro de una semana», «el finde»). Si fallan, se añaden como test.
+
 ## WEB-50 — MANU entiende más frases sin IA
 
 Se probó `parse` con 25 formas habituales de decir lo mismo. No entendía:

@@ -34,7 +34,7 @@ import { isSpotifyClientId, pkceValid, randomVerifier, challengeFor, authorizeUr
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "50";
+export const APP_VERSION = "51";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -1488,13 +1488,19 @@ También puedes buscar en Tú → 🔎.` });
     converse(clean); return;
   }
   let action = null;
-  if (intent.kind === "expense") vault.spending.push(newEntry({ id: uid("s"), cents: intent.cents, merchant: intent.merchant, at }, vault.settings.categoryRules ?? {}));
+  // WEB-51: «ayer gasté…» goes on that day (at midday, the hour is unknown).
+  const onDay = (d) => (d ? new Date(`${d}T12:00:00`).toISOString() : at);
+  if (intent.kind === "expense") vault.spending.push(newEntry({ id: uid("s"), cents: intent.cents, merchant: intent.merchant, at: onDay(intent.day) }, vault.settings.categoryRules ?? {}));
+  if (intent.kind === "income") vault.income = [...(vault.income ?? []), { id: uid("n"), cents: intent.cents, concept: intent.concept ?? "Ingreso", at: onDay(intent.day), source: "MANU" }];
+  if (intent.kind === "health") { const t = localDay(); vault.health = [...vault.health.filter((x) => !(x.day === t && x.kind === intent.metric)), { day: t, kind: intent.metric, value: intent.value }]; }
+  if (intent.kind === "mood") vault.moods = setMood(vault.moods, localDay(), intent.value);
   if (intent.kind === "idea") vault.inbox.push(capture({ id: uid("c"), text: intent.text, at }));
   if (intent.kind === "task") vault.inbox.push({ ...capture({ id: uid("c"), text: intent.text.slice(0, 140), at }), status: "TASK" });
   if (intent.kind === "alarm") action = { label: `Poner en el iPhone · ${intent.time}`, href: shortcutUrl(SHORTCUT_ALARM, intent.time) };
   if (intent.kind === "reminder") {
     let when = new Date(now);
     if (intent.inMinutes) when = new Date(now.getTime() + intent.inMinutes * 60000); // WEB-50: «en 20 minutos»
+    else if (intent.day) { const [y, mo, d] = intent.day.split("-").map(Number); const [h, m] = intent.time.split(":").map(Number); when = new Date(y, mo - 1, d, h, m); } // WEB-51: «el viernes a las 10»
     else {
       if (intent.tomorrow) when.setDate(when.getDate() + 1);
       const [h, m] = intent.time.split(":").map(Number);
@@ -1505,7 +1511,7 @@ También puedes buscar en Tú → 🔎.` });
     vault.reminders.push(r);
     action = { label: "Añadir al iPhone", href: reminderIphoneUrl(r) };
   }
-  if (intent.kind === "agenda" && !(aiMode().on && aiReady() && navigator.onLine)) { setTimeout(() => go("agenda"), 900); }
+  // WEB-51: the agenda is answered in the chat itself (localAnswer); no more jumping to Agenda while Manu reads.
   if (intent.kind === "unknown" && aiReady() && navigator.onLine) {
     if (!mayGo(clean)) {
       vault.chat.push({ from: "me", text: clean, at }, { from: "manu", text: `${reply(intent, variant++)} (Parece privado: no te ofrezco enviarlo a la IA.)`, at });
@@ -1558,9 +1564,18 @@ function localAnswer(intent) {
     const top = Object.entries(m.byCategory).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([c, v]) => `${CATEGORIES[c] ?? c} ${euros(v)}`).join(", ");
     return `Llevas ${euros(m.total)} este mes.${vs} Lo que más: ${top}.`;
   }
+  if (intent.kind === "agenda" && intent.day === "week") { // WEB-51: «¿qué tengo esta semana?»
+    const lines = [];
+    for (let i = 0; i < 7; i++) {
+      const d = today(); d.setDate(d.getDate() + i); const k = dayKey(d);
+      const evs = eventsFor(k), rems = vault.reminders.filter((r) => !r.done && dayKey(new Date(r.at)) === k);
+      if (evs.length || rems.length) lines.push(`${i === 0 ? "Hoy" : i === 1 ? "Mañana" : cap(d.toLocaleDateString("es-ES", { weekday: "long", day: "numeric" }))}: ${[...evs.map((e) => `${e.time ?? "todo el día"} ${e.title}`), ...rems.map((r) => `🔔 ${hhmm(new Date(r.at))} ${r.text}`)].slice(0, 4).join(" · ")}`);
+    }
+    return lines.length ? lines.join("\n") : "Esta semana no tienes nada en la agenda ni recordatorios. 🌿";
+  }
   if (intent.kind === "agenda") {
-    const day = intent.day === "tomorrow" ? tomorrowKey() : localDay();
-    const word = intent.day === "tomorrow" ? "Mañana" : "Hoy";
+    const day = intent.day === "tomorrow" ? tomorrowKey() : intent.day === "today" ? localDay() : intent.day;
+    const word = intent.day === "tomorrow" ? "Mañana" : intent.day === "today" ? "Hoy" : cap(new Date(`${intent.day}T12:00:00`).toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" }));
     const evs = eventsFor(day);
     const rems = vault.reminders.filter((r) => !r.done && dayKey(new Date(r.at)) === day);
     if (!evs.length && !rems.length) return vault.calendar || googleOn("calendar") ? `${word} no tienes nada en el calendario ni recordatorios. 🌿` : `${word} no tienes recordatorios. Conecta Google en Tú para ver también tu calendario.`;
