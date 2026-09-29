@@ -2,11 +2,11 @@
 
 Status: **REVIEW_PENDING**
 
-WEB-40 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
+WEB-41 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
 
 ## Tarea activa
 
-WEB-40 — chat con teclado, luz del día según el amanecer y el atardecer reales, y errores reales de Gmail (`ai/HANDOFF.md`, «WEB-40»).
+WEB-41 — Tu diario: memoria día a día y preguntas por fecha (`ai/HANDOFF.md`, «WEB-41»).
 
 ## Autorización
 
@@ -47,6 +47,7 @@ WEB-40 — chat con teclado, luz del día según el amanecer y el atardecer real
 
 ## Historial (cerrado)
 
+- **WEB-40** (chat, luz del día y Gmail): CERRADA. Fusionada mediante el PR #48 (`4bc7841`).
 - **WEB-39** (Refugio limpio): CERRADA. Fusionada mediante el PR #47 (`4572d06`).
 - **WEB-38** (Personas y cumpleaños): CERRADA. Fusionada mediante el PR #46 (`42bbc61`).
 - **WEB-37** (conversaciones nuevas): CERRADA. Fusionada mediante el PR #45 (`46f5829`).
