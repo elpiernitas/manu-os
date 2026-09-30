@@ -32,6 +32,30 @@ Hoja de ruta, un PR por paso:
 
 Límites reales de una web en iPhone: no hay widgets, pantalla bloqueada ni control del Chromecast. Donde se pueda, se hará con Atajos.
 
+## WEB-60 — proyectos que se crean y se llenan solos, y exportación
+
+Manu quería que los proyectos se crearan solos, que lo que apunta se clasificara solo, que funcionaran como NotebookLM y poder exportar un proyecto a ChatGPT o a Claude.
+
+- Conexión con NotebookLM: no hay API pública para cuentas personales. La versión Enterprise es de Google Cloud y está NO_VERIFICADA. Se le explicó a Manu y se ofrece exportar en su lugar.
+- `core/autofile.js`:
+  - claves de cada proyecto, sacadas de su nombre y de sus palabras clave;
+  - `matchProject` elige el proyecto con más coincidencias; si hay empate, no clasifica;
+  - `autoFile` archiva una sola vez los apuntes del chat, las ideas, las tareas y las capturas guardadas, y marca cada una con `filed`; al crear un proyecto o cambiar sus palabras clave, recupera lo antiguo que encaja;
+  - sugerencia de proyectos con Gemini: solo títulos y apuntes que pasan `mayGo`, con respuesta JSON validada;
+  - exportación en Markdown (para NotebookLM) y en .zip con proyecto.md, capturas/ y LEEME.txt.
+- `core/zipwrite.js`: escritor de .zip sin compresión, con CRC32 comprobado contra el valor estándar.
+- En la app:
+  - «Que se creen solos» → «Proponer mis proyectos» → «Crear» o «Crear todos»;
+  - al crear un proyecto se le añaden sus 5 conversaciones de ChatGPT más afines, buscadas en local;
+  - «Se llena solo»: palabras clave y «Traer mis conversaciones de ChatGPT sobre esto»;
+  - las fuentes añadidas solas llevan la etiqueta «auto»;
+  - «Llévatelo a otra IA»: usa la hoja de compartir si existe y, si no, descarga el archivo.
+- Evidencia:
+  - `npm test`: 185 en verde.
+  - e2e60 en Chromium con emulación de iPhone 14 y Gemini simulado: 12/12.
+  - Batería e2e en verde; en e2e48 se actualizó la expectativa porque ahora una idea que encaja se archiva sola; XSS en verde.
+- NO_VERIFICADO: en iPhone real, compartir el .zip con ChatGPT o Claude desde la hoja de compartir.
+
 ## WEB-59 — bandeja de capturas («soltar» y «ordenar»)
 
 Manu hace muchísimas capturas y luego no las ordena. Quiere pasarlas todas, que se agrupen, que le pregunte una sola vez y quedarse solo con el texto.
