@@ -2,11 +2,11 @@
 
 Status: **REVIEW_PENDING**
 
-WEB-60 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
+WEB-61 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
 
 ## Tarea activa
 
-WEB-60 — proyectos que se crean y se llenan solos, y exportación (`ai/HANDOFF.md`, «WEB-60»).
+WEB-61 — buscar contactos y elegir cuál (`ai/HANDOFF.md`, «WEB-61»).
 
 ## Autorización
 
