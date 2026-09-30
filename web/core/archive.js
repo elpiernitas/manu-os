@@ -62,18 +62,127 @@ export function parseChatgpt(json) {
   return convs.sort((a, b) => (b.at ?? 0) - (a.at ?? 0));
 }
 
+// ---- WEB-56: streaming, for real exports (Manu's is 1,49 GB) ----
+// Nothing is loaded whole: the zip's central directory is read from its end,
+// only conversations*.json is inflated, piece by piece, and the JSON array is
+// split into one conversation at a time. Photos and audio in the zip are never read.
+const bytesOf = async (file, start, end) => new Uint8Array(await file.slice(start, end).arrayBuffer());
+
+// Entries of a zip (ZIP64 too): [{ name, method, compSize, size, local }]
+export async function zipEntries(file) {
+  const size = file.size;
+  const tailStart = Math.max(0, size - 65557 - 20);
+  const tail = await bytesOf(file, tailStart, size);
+  const v = new DataView(tail.buffer, tail.byteOffset, tail.byteLength);
+  let e = -1;
+  for (let i = tail.length - 22; i >= 0; i--) if (v.getUint32(i, true) === 0x06054b50) { e = i; break; }
+  if (e < 0) throw new Error("No parece un .zip");
+  let count = v.getUint16(e + 10, true), cdSize = v.getUint32(e + 12, true), cdOff = v.getUint32(e + 16, true);
+  if (count === 0xffff || cdSize === 0xffffffff || cdOff === 0xffffffff) {
+    const loc = e - 20;
+    if (loc >= 0 && v.getUint32(loc, true) === 0x07064b50) {
+      const at = Number(v.getBigUint64(loc + 8, true));
+      const z = await bytesOf(file, at, at + 56), zv = new DataView(z.buffer, z.byteOffset, z.byteLength);
+      if (zv.getUint32(0, true) !== 0x06064b50) throw new Error("ZIP64 dañado");
+      count = Number(zv.getBigUint64(32, true)); cdSize = Number(zv.getBigUint64(40, true)); cdOff = Number(zv.getBigUint64(48, true));
+    }
+  }
+  const cd = await bytesOf(file, cdOff, cdOff + cdSize);
+  const cv = new DataView(cd.buffer, cd.byteOffset, cd.byteLength);
+  const out = [];
+  for (let p = 0, n = 0; n < count && p + 46 <= cd.length; n++) {
+    if (cv.getUint32(p, true) !== 0x02014b50) throw new Error("ZIP dañado");
+    const method = cv.getUint16(p + 10, true);
+    let compSize = cv.getUint32(p + 20, true), usize = cv.getUint32(p + 24, true), local = cv.getUint32(p + 42, true);
+    const nameLen = cv.getUint16(p + 28, true), extraLen = cv.getUint16(p + 30, true), commentLen = cv.getUint16(p + 32, true);
+    const name = new TextDecoder().decode(cd.subarray(p + 46, p + 46 + nameLen));
+    // ZIP64 extra field (0x0001): only the fields that were 0xFFFFFFFF, in this order.
+    for (let x = p + 46 + nameLen, end = x + extraLen; x + 4 <= end;) {
+      const id = cv.getUint16(x, true), len = cv.getUint16(x + 2, true);
+      if (id === 0x0001) {
+        let q = x + 4;
+        if (usize === 0xffffffff) { usize = Number(cv.getBigUint64(q, true)); q += 8; }
+        if (compSize === 0xffffffff) { compSize = Number(cv.getBigUint64(q, true)); q += 8; }
+        if (local === 0xffffffff) { local = Number(cv.getBigUint64(q, true)); }
+      }
+      x += 4 + len;
+    }
+    out.push({ name, method, compSize, size: usize, local });
+    p += 46 + nameLen + extraLen + commentLen;
+  }
+  return out;
+}
+
+// The bytes of one entry, as a stream (inflated if needed).
+// `tap` sees the raw (compressed) bytes as they are read, for progress.
+export async function entryStream(file, entry, tap = null) {
+  const lh = await bytesOf(file, entry.local, entry.local + 30);
+  const lv = new DataView(lh.buffer, lh.byteOffset, lh.byteLength);
+  if (lv.getUint32(0, true) !== 0x04034b50) throw new Error("ZIP dañado");
+  const start = entry.local + 30 + lv.getUint16(26, true) + lv.getUint16(28, true);
+  let raw = file.slice(start, start + entry.compSize).stream();
+  if (tap) raw = raw.pipeThrough(tap);
+  if (entry.method === 0) return raw;
+  if (entry.method === 8) return raw.pipeThrough(new DecompressionStream("deflate-raw"));
+  throw new Error(`ZIP con compresión no soportada (${entry.method})`);
+}
+
+// Splits a JSON array arriving as text chunks into its items, one at a time.
+export async function* jsonArrayItems(textStream) {
+  const reader = textStream.getReader();
+  let depth = 0, inStr = false, esc = false, started = false, parts = [];
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    let from = -1;
+    for (let i = 0; i < value.length; i++) {
+      const c = value.charCodeAt(i);
+      if (inStr) { if (esc) esc = false; else if (c === 92) esc = true; else if (c === 34) inStr = false; continue; }
+      if (c === 34) { inStr = true; continue; }
+      if (c === 91 || c === 123) { // [ {
+        if (!started) { if (c !== 91) throw new Error("No es un conversations.json de ChatGPT"); started = true; continue; }
+        if (depth === 0) from = i;
+        depth++;
+      } else if (c === 93 || c === 125) { // ] }
+        if (depth === 0) continue; // end of the top-level array
+        depth--;
+        if (depth === 0) { parts.push(value.slice(from === -1 ? 0 : from, i + 1)); yield JSON.parse(parts.join("")); parts = []; from = -1; }
+      }
+    }
+    if (depth > 0) parts.push(value.slice(from === -1 ? 0 : from));
+  }
+  if (!started) throw new Error("No es un conversations.json de ChatGPT");
+  if (depth !== 0) throw new Error("El archivo está incompleto (¿se cortó la descarga?)");
+}
+
 // Reads what Manu picked: the export .zip or conversations.json itself.
-export async function readChatgptExport(file) {
-  const buf = await file.arrayBuffer();
-  const head = new Uint8Array(buf.slice(0, 4));
-  let text;
+// With `onBatch`, conversations are handed over in batches (to save them as
+// they come) and only the count is kept; otherwise they are returned.
+export async function readChatgptExport(file, { onBatch = null, batch = 100, onProgress = null } = {}) {
+  const head = await bytesOf(file, 0, 4);
+  let sources;
   if (head[0] === 0x50 && head[1] === 0x4b) {
-    const files = await unzip(buf, (n) => /(^|\/)conversations\.json$/.test(n));
-    const entry = Object.values(files)[0];
-    if (!entry) throw new Error("El .zip no trae conversations.json");
-    text = new TextDecoder().decode(entry);
-  } else text = new TextDecoder().decode(new Uint8Array(buf));
-  return parseChatgpt(JSON.parse(text));
+    const entries = (await zipEntries(file)).filter((x) => /(^|\/)conversations(-\d+)?\.json$/i.test(x.name)).sort((a, b) => a.name.localeCompare(b.name));
+    if (!entries.length) throw new Error("El .zip no trae conversations.json");
+    sources = entries.map((x) => ({ total: x.compSize, open: (tap) => entryStream(file, x, tap) }));
+  } else sources = [{ total: file.size, open: async (tap) => file.stream().pipeThrough(tap) }];
+  const grand = sources.reduce((s, x) => s + x.total, 0) || 1;
+  let readBytes = 0, count = 0, pending = [];
+  const all = onBatch ? null : [];
+  const flush = async () => { if (!pending.length) return; const docs = pending; pending = []; if (onBatch) await onBatch(docs); else all.push(...docs); };
+  for (const src of sources) {
+    // count the bytes of the file as they are read, for a real percentage
+    const stream = await src.open(new TransformStream({ transform(chunk, ctl) { readBytes += chunk.byteLength; ctl.enqueue(chunk); } }));
+    for await (const conv of jsonArrayItems(stream.pipeThrough(new TextDecoderStream()))) {
+      const docs = parseChatgpt([conv]);
+      if (!docs.length) continue;
+      pending.push(docs[0]); count++;
+      if (pending.length >= batch) { await flush(); onProgress?.({ count, fraction: Math.min(1, readBytes / grand) }); }
+    }
+  }
+  await flush();
+  onProgress?.({ count, fraction: 1 });
+  return onBatch ? count : all.sort((a, b) => (b.at ?? 0) - (a.at ?? 0));
 }
 
 // ---- Search ----

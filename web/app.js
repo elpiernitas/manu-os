@@ -34,7 +34,7 @@ import { isSpotifyClientId, pkceValid, randomVerifier, challengeFor, authorizeUr
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "55";
+export const APP_VERSION = "56";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -922,8 +922,9 @@ const subpages = {
       <p class="subtitle">Tu memoria digital: lo que importes se queda solo en este iPhone. No va a GitHub, ni a las copias, ni a ninguna IA salvo que tú lo pidas.</p>
       <section class="card"><h2>📔 Tu diario</h2><p>${s?.diary ? `<b>${s.diary}</b> días con algo apuntado. MANU los rellena solo con tus gastos, tareas, ideas, recordatorios, agenda, ánimo, hábitos, comidas y salud.` : "MANU irá guardando aquí un resumen de cada día con lo que apuntes."}</p><p class="muted small">Pregúntale «¿qué hice ayer?», «¿cuánto gasté el martes?» o «¿qué pasó el 12?».</p></section>
       <section class="card"><h2>ChatGPT</h2>
-        ${s?.count ? `<p><b>${s.count}</b> conversaciones${s.manu ? ` (${s.count - s.manu} de ChatGPT y ${s.manu} con MANU)` : ""} · ${s.mine} mensajes tuyos · de ${esc(d(s.from))} a ${esc(d(s.to))}</p>` : '<p class="muted">Cuando te llegue el correo de ChatGPT, descarga el .zip y elígelo aquí (sin descomprimir). También vale el archivo conversations.json.</p>'}
-        <label class="btn ${s?.count ? "ghost" : ""} block" for="archiveFile" role="button" tabindex="0">${archive.busy ? "Importando…" : s?.count ? "Volver a importar" : "Elegir la exportación de ChatGPT"}</label><input id="archiveFile" type="file" accept=".zip,.json,application/zip,application/json" class="sr">
+        ${s?.count ? `<p><b>${(s.count).toLocaleString("es-ES")}</b> conversaciones${s.manu ? ` (${(s.count - s.manu).toLocaleString("es-ES")} de ChatGPT y ${(s.manu).toLocaleString("es-ES")} con MANU)` : ""} · ${(s.mine).toLocaleString("es-ES")} mensajes tuyos · de ${esc(d(s.from))} a ${esc(d(s.to))}</p>` : '<p class="muted">Cuando te llegue el correo de ChatGPT, descarga el .zip y elígelo aquí (sin descomprimir). También vale el archivo conversations.json.</p>'}
+        ${archive.busy ? '<p class="muted small">Deja MANU abierto y la pantalla encendida hasta que termine. Solo lee tus conversaciones: fotos y audios del .zip se quedan fuera.</p>' : ""}
+        <label class="btn ${s?.count ? "ghost" : ""} block" for="archiveFile" role="button" tabindex="0">${archive.busy ? esc(archive.busy) : s?.count ? "Volver a importar" : "Elegir la exportación de ChatGPT"}</label><input id="archiveFile" type="file" accept=".zip,.json,application/zip,application/json" class="sr">
         <p class="muted small">En ChatGPT: Ajustes → Controles de datos → Exportar datos. Llega un correo con el enlace.</p></section>
       ${s?.count || s?.diary ? `<section class="card"><h2>Pregúntale a tu archivo</h2>${aiReady() ? `<form id="archiveAsk" class="composer-inline"><label for="archiveAskQ" class="sr">Pregunta</label><input id="archiveAskQ" placeholder="¿Qué me recomendaron para Lisboa?" autocomplete="off"><button class="btn" type="submit">${archive.asking ? "Pensando…" : "Preguntar"}</button></form><p class="muted small">MANU busca aquí en tu iPhone y solo envía a Gemini los trozos que tienen que ver. Crisis, Refugio y contraseñas nunca salen${sensitiveAllowed() ? "" : "; salud, dinero y ánimo tampoco (Tú → IA)"}.</p>` : '<p class="muted">Activa la IA (Tú → IA) para preguntarle. Buscar funciona sin IA.</p>'}
         ${archive.answer ? `<div class="stack"><p class="muted small">«${esc(archive.answer.q)}»</p><div class="bubble manu"><span class="ai-tag">IA</span>${esc(archive.answer.text)}</div>${archive.answer.sources.length ? `<p class="muted small">Fuentes: ${archive.answer.sources.map((x) => `[${x.n}] ${esc(x.title)} (${esc(x.date)})`).join(" · ")}</p>` : ""}</div>` : ""}</section>
@@ -2527,13 +2528,24 @@ document.addEventListener("change", async (e) => {
   }
   if (e.target.id === "archiveFile" && e.target.files?.[0]) {
     const file = e.target.files[0]; e.target.value = "";
-    archive.busy = true; render();
+    if (archive.busy) { toast("Ya estoy importando; espera a que termine."); return; }
+    // WEB-56: real exports weigh GBs; they are streamed and saved in batches,
+    // so a failure halfway keeps what was already saved.
+    archive.busy = "Importando…"; render();
+    let saved = 0;
+    const label = () => document.querySelector('label[for="archiveFile"]');
     try {
-      const docs = await readChatgptExport(file);
-      await putDocs(docs);
-      archive.docs = null; await archiveDocs();
-      toast(`Importadas ${docs.length} conversaciones de ChatGPT`);
-    } catch (err) { toast(`No he podido importarlo: ${err.message}`); }
+      const n = await readChatgptExport(file, {
+        batch: 100,
+        onBatch: async (docs) => { await putDocs(docs); saved += docs.length; },
+        onProgress: ({ count, fraction }) => { archive.busy = `Importando… ${Math.floor(fraction * 100)} % · ${count.toLocaleString("es-ES")} conversaciones`; const l = label(); if (l) l.textContent = archive.busy; },
+      });
+      toast(`Importadas ${n.toLocaleString("es-ES")} conversaciones de ChatGPT`);
+    } catch (err) {
+      const full = err?.name === "QuotaExceededError" || /quota/i.test(String(err?.message));
+      toast(full ? `El iPhone no tiene más sitio para MANU. Se guardaron ${saved.toLocaleString("es-ES")} conversaciones.` : `No he podido importarlo${saved ? ` entero (se guardaron ${saved.toLocaleString("es-ES")})` : ""}: ${err.message}`);
+    }
+    archive.docs = null; await archiveDocs();
     archive.busy = false; render(); return;
   }
   if (e.target.id === "bankFile" && e.target.files?.[0]) {

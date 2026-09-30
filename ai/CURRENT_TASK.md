@@ -2,11 +2,11 @@
 
 Status: **REVIEW_PENDING**
 
-WEB-55 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
+WEB-56 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
 
 ## Tarea activa
 
-WEB-55 — la conversación normal no se toma por una orden (falsos positivos) (`ai/HANDOFF.md`, «WEB-55»).
+WEB-56 — importar exportaciones de ChatGPT de varios GB sin cargarlas en memoria (`ai/HANDOFF.md`, «WEB-56»).
 
 ## Autorización
 
@@ -23,6 +23,7 @@ WEB-55 — la conversación normal no se toma por una orden (falsos positivos) (
 - 2026-09-29: Manu pide hablar con MANU «como si fuera Gemini integrado, que lo sepa todo y lo maneje él». Se implementa como un modo que Manu activa, con las categorías sensibles solo si él las marca.
 - 2026-09-29: Manu acepta «todo»: la copia completa cifrada (WEB-44, con `backup-manager.js`) y después el borrador del chat, el tiempo y Gmail (WEB-45).
 - 2026-09-29: Manu pide seguir sin parar: probar, encontrar fallos, mejorar y publicar en ciclos. Cada ciclo es una tarea WEB-NN con su PR, dentro del alcance autorizado (sin servicios nuevos, costes ni permisos nuevos).
+- 2026-09-30: Manu recibe su exportación real de ChatGPT (1,49 GB) y pide dejarlo todo listo para subirla. El enlace de descarga exige su sesión de ChatGPT, así que la descarga la hace él. El archivo real no entra en el repositorio; las pruebas usan exportaciones inventadas.
 - 2026-09-29: **cambio de gobernanza decidido por Manu.** El orquestador (ChatGPT/Codex) ya no revisa automáticamente, porque frenaba el avance. Claude Code fusiona los PR web cuando `npm test` y los dos workflows remotos están en verde y no hay conflictos. Cuando haga falta una revisión, Claude Code prepara un prompt, Manu se lo pasa a ChatGPT y le devuelve la respuesta; los defectos se corrigen en un PR nuevo con su regresión. Los PR #7, #8 y #9 siguen en borrador o pausa.
 
 ## Alcance autorizado

@@ -10,6 +10,45 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
+## WEB-56 — importar una exportación de ChatGPT de 1,49 GB
+
+La exportación real de Manu pesa 1,49 GB. El importador anterior hacía `file.arrayBuffer()` del .zip entero y después `JSON.parse` del texto completo. Con ese tamaño, Safari en el iPhone cerraría la página casi con seguridad (NO_VERIFICADO en el dispositivo; el límite exacto de memoria de iOS no está documentado).
+
+### Cambios
+
+- `core/archive.js`:
+  - `zipEntries` lee solo el final del .zip (el índice), también en ZIP64.
+  - `entryStream` descomprime una sola entrada por trozos (`File.slice().stream()` + `DecompressionStream`).
+  - `jsonArrayItems` separa el array JSON conversación a conversación, respetando cadenas, escapes y trozos cortados en cualquier punto.
+  - Se leen `conversations.json` y `conversations-N.json`. Fotos, audios y `chat.html` no se leen.
+  - Un archivo incompleto da «¿se cortó la descarga?».
+- `app.js`:
+  - guarda en lotes de 100 mientras lee;
+  - muestra «Importando… N % · M conversaciones» y pide dejar MANU abierto;
+  - si falla a medias (o se llena el espacio), conserva lo guardado y lo dice;
+  - impide dos importaciones a la vez y formatea los recuentos con miles.
+
+### Evidencia
+
+- `node --test tests/*.test.js`: 170 en verde. Hay tests nuevos de:
+  - ZIP64 con entradas guardadas sin comprimir;
+  - `conversations-N.json` partidos;
+  - lotes de 100 con progreso creciente;
+  - el separador JSON con trozos de 1, 2, 3, 7 y 1000 caracteres;
+  - un archivo cortado.
+- Prueba en Chromium con emulación de iPhone 14 y un .zip inventado de 1,28 GB, creado con el `zipfile` de Python:
+  - contenido: 1,2 GB de binario sin comprimir y 200 MB de `conversations.json` con 15.000 conversaciones;
+  - resultado: importado en unos 30 s, con porcentaje visible;
+  - memoria: pico de JS de unos 203 MB (medido con CDP; no incluye la memoria fuera del heap);
+  - búsqueda: encuentra una conversación del centro del archivo.
+- Toda la batería e2e sigue en verde. En `e2e40b` se actualizó una expectativa que había quedado anticuada tras WEB-45: ahora se busca el botón «Ya está, reintentar».
+
+### Pendiente de comprobar en el iPhone (NO_VERIFICADO)
+
+- Tiempo y memoria reales con la exportación de Manu.
+- Cuota de IndexedDB de Safari para varios cientos de MB de texto.
+- Qué ocurre si iOS suspende la página al bloquear la pantalla a mitad de la importación. En ese caso lo guardado se conserva y basta con volver a importar, porque las conversaciones repetidas se sustituyen por id.
+
 ## WEB-55 — la conversación normal no se toma por una orden
 
 Después de ampliar lo que MANU entiende sin IA (WEB-50 a WEB-52), se comprobó el riesgo contrario: 32 frases de conversación normal pasaron por todos los detectores (parse, búsqueda, presupuestos, correo, resumen y diario).
