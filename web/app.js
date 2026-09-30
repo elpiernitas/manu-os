@@ -24,6 +24,7 @@ import { findExcerpts, askPayload, profileDigest, profilePayload, memoryContext 
 import { diaryDocs, dayLines, dayFromText, isDiaryQuestion, dayTitle } from "./core/diary.js";
 import { applyBuzon, buzonSummary } from "./core/buzon.js";
 import { briefing, briefingText, isBriefingQuestion, monthPace } from "./core/briefing.js";
+import { whatNow, whatNowText, isWhatNowQuestion } from "./core/now.js";
 import { budgetStatus, budgetLine, budgetCommand } from "./core/budget.js";
 import { findInVault, findCommand } from "./core/find.js";
 import { weatherEmoji, sceneFor, PARTICLES, SHAPES, MONEY_EMOJI, dayPhase, cityMinutes } from "./core/scene.js";
@@ -34,7 +35,7 @@ import { isSpotifyClientId, pkceValid, randomVerifier, challengeFor, authorizeUr
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "57";
+export const APP_VERSION = "58";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -318,6 +319,24 @@ function dayBriefing() {
     spending: vault.spending, inbox: vault.inbox, importantMail: googleOn("gmail") ? vault.mail?.important?.length ?? 0 : 0,
     budgetAlerts: budgetsNow().filter((b) => b.status !== "ok").slice(0, 2).map(budgetLine),
   });
+}
+// ---------- Ahora (WEB-58): una sola cosa, la siguiente ----------
+function nowPlan() {
+  return whatNow({
+    now: today(), mode: modeState(today(), undefined, vault.settings.override).mode,
+    events: eventsFor(localDay()), tomorrow: eventsFor(tomorrowKey()),
+    reminders: vault.reminders, tasks: tasks(vault.inbox), projects: vault.projects,
+    birthdays: upcomingBirthdays(vault.people, today(), 0), quiet: longTimeNoTalk(vault.people), moods: vault.moods,
+  });
+}
+const goAttrs = (go) => (!go ? "" : go.project ? `data-act="find-go" data-project="${esc(go.project)}"` : go.sub ? `data-sub-go="${esc(go.sub)}"` : `data-act="find-go" data-tab="${esc(go.tab)}"`);
+function nowCard() {
+  const r = nowPlan();
+  const main = r.main;
+  return `<section class="card now-card" aria-labelledby="nowTitle"><h2 id="nowTitle">👉 Ahora</h2>
+    <p class="now-main"><span aria-hidden="true">${main.e}</span> <b>${esc(main.t)}</b></p><p class="muted small">${esc(main.why)}</p>
+    ${main.go ? `<button class="btn ghost" ${goAttrs(main.go)}>Ir</button>` : ""}
+    ${r.more.length ? `<ul class="brief-list now-more">${r.more.map((m) => `<li><span aria-hidden="true">${m.e}</span><span>${esc(m.t)}</span></li>`).join("")}</ul>` : ""}</section>`;
 }
 function briefingCard() {
   const b = dayBriefing();
@@ -763,6 +782,7 @@ const screens = {
     const bdays = upcomingBirthdays(vault.people, today(), 7);
     return `<h1>${greeting()}, Manu</h1><p class="subtitle">${esc(longDate())} · <span class="chip">${esc(MODE_TITLES[m.mode])}</span></p>
       <div class="stack">
+      ${nowCard()}
       ${briefingCard()}
       ${nightCard()}
       ${weatherCard()}
@@ -1460,6 +1480,11 @@ function say(text) {
     else if (bc.kind === "remove") { const b = { ...(vault.settings.budgets ?? {}) }; delete b[bc.cat]; vault.settings.budgets = b; text = `Quitado el presupuesto de ${CATEGORIES[bc.cat]}.`; }
     else { const l = budgetsNow(); text = l.length ? l.map((b) => `${{ ok: "🟢", warn: "🟠", over: "🔴" }[b.status]} ${budgetLine(b)}`).join("\n") : "Aún no tienes presupuestos. Di «pon un presupuesto de 150 para comer» o ponlos en Dinero."; }
     vault.chat.push({ from: "me", text: clean, at }, { from: "manu", text, at });
+    persist(); render(); return;
+  }
+  // WEB-58: «¿qué hago ahora?» — one answer, not a list.
+  if (isWhatNowQuestion(clean)) {
+    vault.chat.push({ from: "me", text: clean, at }, { from: "manu", text: whatNowText(nowPlan()), at });
     persist(); render(); return;
   }
   // WEB-46: «¿cómo va mi día?», «resumen del día».
