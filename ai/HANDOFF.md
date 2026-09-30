@@ -32,6 +32,22 @@ Hoja de ruta, un PR por paso:
 
 Límites reales de una web en iPhone: no hay widgets, pantalla bloqueada ni control del Chromecast. Donde se pueda, se hará con Atajos.
 
+## WEB-62 — guardar el cumpleaños en Google Contactos
+
+Manu autoriza el permiso de escritura en sus contactos.
+
+- `SCOPE.contactsWrite` (`auth/contacts`) solo se pide al guardar un cumpleaños; la sincronización sigue siendo de solo lectura.
+- `setContactBirthday` lee el contacto para obtener su `etag` y después hace `PATCH …:updateContact?updatePersonFields=birthdays`, que solo cambia ese campo. Si Google ya tenía el año de ese mismo día, lo conserva. Valida el `resourceName` y la fecha.
+- Personas:
+  - la casilla «Guardarlo también en Google Contactos» solo aparece si el contacto elegido no tiene cumpleaños en Google;
+  - cada persona tiene el botón «📇 A Google Contactos».
+- CSS: `[hidden]` ahora siempre oculta. Antes `.check-row` (flex) lo anulaba (QAL-038).
+- Evidencia:
+  - `npm test`: 188 en verde.
+  - e2e62: 6/6 (pide el permiso nuevo, envía el PATCH exacto, actualiza la lista local y no ofrece la opción si ya tenía cumpleaños).
+  - Batería e2e en verde; overflow en verde.
+- NO_VERIFICADO: la pantalla de consentimiento de Google para `contacts` en el proyecto de Manu. Si su app de Google Cloud está en modo prueba, Google puede avisar de que no está verificada.
+
 ## WEB-61 — buscar «eva» y elegir cuál
 
 Manu quiere escribir «eva», ver todas las Evas de sus contactos, elegir una, ponerle el cumpleaños y que se añada al calendario. La sincronización de contactos (solo lectura), el cumpleaños y el evento anual en Google Calendar ya existían desde WEB-38. Faltaba la búsqueda: el `datalist` apenas se ve en iOS y no permite elegir entre varios contactos que se llaman igual.

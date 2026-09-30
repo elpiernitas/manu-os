@@ -158,3 +158,7 @@ En WEB-56, el importador hacía `file.arrayBuffer()` y `JSON.parse` del archivo 
 ### QAL-037 — Probar la clasificación con lo que guarda la ruta real
 
 En WEB-60, los tests unitarios de la autoclasificación pasaban con ideas en estado `IDEA`. Pero lo que Manu escribe en el chat («apunta idea: …») se guarda como `PENDING` y no se clasificaba. Solo lo detectó la prueba e2e que escribe en el chat. Cuando una función procesa datos del usuario, la prueba debe crear esos datos por la misma vía que él, no con un estado supuesto. Y el test unitario debe incluir cada estado real que exista.
+
+### QAL-038 — `hidden` no oculta si el CSS pone `display`
+
+En WEB-62, la casilla «Guardarlo también en Google Contactos» llevaba `hidden`, pero `.check-row { display: flex }` la seguía mostrando. El primer test la daba por visible y pasaba por casualidad; solo lo detectó el caso contrario (no debe verse). Hay una regla global `[hidden] { display: none !important; }`. Todo lo que se muestra u oculta se prueba en los dos estados.

@@ -9,6 +9,7 @@ export const SCOPE = {
   calendarList: "https://www.googleapis.com/auth/calendar.calendarlist.readonly",
   tasks: "https://www.googleapis.com/auth/tasks",
   contacts: "https://www.googleapis.com/auth/contacts.readonly",
+  contactsWrite: "https://www.googleapis.com/auth/contacts", // WEB-62: only to save a birthday, Manu's decision
   drive: "https://www.googleapis.com/auth/drive.appdata",
   gmail: "https://www.googleapis.com/auth/gmail.modify", // WEB-33, Manu's decision
 };
@@ -132,6 +133,24 @@ export async function contactBirthdays(token, fetchImpl) {
     return { items: json?.connections ?? [], nextPageToken: json?.nextPageToken };
   });
   return { people: birthdaysFrom({ connections: items }), contacts: contactsFrom({ connections: items }).slice(0, 3000), total: items.length, complete };
+}
+
+// WEB-62: writes a birthday into one Google contact (only that field). Reads
+// the contact first for its etag, as the People API requires; keeps a year
+// Google already had for the same day.
+export async function setContactBirthday(token, resourceName, birthday, fetchImpl) {
+  if (!/^people\/c?\d+$/.test(String(resourceName ?? ""))) throw new Error("Contacto no válido");
+  const m = /^(\d{2})-(\d{2})$/.exec(String(birthday ?? ""));
+  if (!m) throw new Error("Cumpleaños no válido");
+  const month = Number(m[1]), day = Number(m[2]);
+  const base = `https://people.googleapis.com/v1/${resourceName}`;
+  const current = await call(token, `${base}?personFields=birthdays`, {}, fetchImpl);
+  const had = (current?.birthdays ?? []).find((b) => b.date?.month === month && b.date?.day === day)?.date;
+  const date = { month, day, ...(had?.year ? { year: had.year } : {}) };
+  return call(token, `${base}:updateContact?updatePersonFields=birthdays`, {
+    method: "PATCH", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ etag: current?.etag, birthdays: [{ date }] }),
+  }, fetchImpl);
 }
 
 export function mergePeople(people, fromGoogle, makeId) {
