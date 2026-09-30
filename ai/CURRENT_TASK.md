@@ -2,11 +2,11 @@
 
 Status: **REVIEW_PENDING**
 
-WEB-67 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
+WEB-68 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
 
 ## Tarea activa
 
-WEB-67 — Tu nube: entrar con un código del correo, sin frase (`ai/HANDOFF.md`, «WEB-67»; enmienda de ADR-0017).
+WEB-68 — Tu nube: entrar con el enlace del correo, también en el iPhone (`ai/HANDOFF.md`, «WEB-68»).
 
 ## Autorización
 

@@ -40,7 +40,7 @@ import { isSpotifyClientId, pkceValid, randomVerifier, challengeFor, authorizeUr
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "67";
+export const APP_VERSION = "68";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -132,7 +132,7 @@ const nube = {
   patch(p) { this.state = { ...this.state, ...p }; },
   get session() { try { return JSON.parse(localStorage.getItem("manuos.nube.token") || "null"); } catch { return null; } },
   set session(v) { try { v ? localStorage.setItem("manuos.nube.token", JSON.stringify(v)) : localStorage.removeItem("manuos.nube.token"); } catch {} },
-  running: false, edits: 0, timer: null,
+  running: false, edits: 0, timer: null, handoff: null, lastRowExisting: false,
 };
 const NUBE_URL = "https://xqsexjpuhvmwkclpnvjo.supabase.co"; // Manu's project; also in the CSP
 // Supabase's *publishable* key: public by design (it ships in every web app
@@ -143,6 +143,7 @@ const nubeCfg = () => ({ url: NUBE_URL, key: NUBE_KEY });
 const nubeOn = () => Boolean(nube.session);
 // WEB-64 kept an encryption key here; removed on this version (and on «Borrar todo»).
 const dropNubeKey = () => new Promise((res) => { try { const d = indexedDB.deleteDatabase("manu-sync-key"); d.onsuccess = d.onerror = d.onblocked = () => res(); } catch { res(); } });
+const inIosBrowser = () => /iPhone|iPad/.test(navigator.userAgent) && !(navigator.standalone || globalThis.matchMedia?.("(display-mode: standalone)").matches);
 const deviceName = () => (/iPhone|iPad/.test(navigator.userAgent) ? "iPhone" : /Mac/.test(navigator.userAgent) ? "Mac" : "otro dispositivo");
 
 async function nubeSession() {
@@ -222,23 +223,32 @@ async function nubeAskCode(email) {
 // Step 2: the code opens the session; then, what is already in the cloud decides.
 async function nubeEnter(code) {
   const cfg = nubeCfg();
-  nube.session = await verifyCode(cfg, { email: nube.state.email, token: code });
+  const c = String(code ?? "").trim();
+  if (/^\d[\d\s]{5,12}$/.test(c)) nube.session = await verifyCode(cfg, { email: nube.state.email, token: c });
+  else if (/^[A-Za-z0-9_.-]{6,400}$/.test(c)) nube.session = await refreshSession(cfg, { refresh: c }).catch(() => { throw Object.assign(new Error("Ese código ya no vale: pide otro enlace."), { code: "badcode" }); });
+  else throw Object.assign(new Error("Pega el código tal cual te lo da el enlace."), { code: "badcode" });
+  await nubeAfterSignIn(cfg);
+  return nube.lastRowExisting ? "existing" : "new";
+}
+
+// After signing in: what is already in the cloud decides.
+async function nubeAfterSignIn(cfg = nubeCfg()) {
   const row = await remoteGet(cfg, nube.session);
   // An empty cloud, or the unreadable leftover of WEB-64, is not a conflict:
   // this device's data simply goes up over it.
   const replaceable = row && (isEnvelope(row.data) || isEmptyVault(row.data));
+  nube.lastRowExisting = Boolean(row && !replaceable);
   nube.patch({ lastRev: replaceable ? row.rev : null, dirty: Boolean(replaceable), conflict: null, error: null, codeSentAt: null });
-  return row && !replaceable ? "existing" : "new";
 }
 
 async function nubeMail(email) {
-  toast("Mandando el código…");
-  try { await nubeAskCode(email); render(); toast("Mira tu correo: te ha llegado un código"); $("nubeCode")?.focus(); }
+  toast("Mandando el correo…");
+  try { await nubeAskCode(email); render(); toast("Mira tu correo: te ha llegado un enlace"); }
   catch (err) { toast(err.code === "network" ? syncErrorText(err) : err.message); }
 }
 const nubeCodeAgain = () => nubeMail(nube.state.email ?? "");
 async function nubeCodeSubmit(code) {
-  toast("Comprobando el código…");
+  toast("Entrando…");
   try {
     const r = await nubeEnter(code);
     render();
@@ -1379,15 +1389,16 @@ const subpages = {
     }
     const sent = Boolean(st.codeSentAt && st.email);
     return `${backBar("Tu nube")}
-      <section class="card"><h2>iPhone y Mac con los mismos datos</h2><p class="muted small">Tu propio Supabase (gratis). Entras con un código que te llega al correo: nada que recordar.</p>${what}</section>
-      <section class="card"><h2>${sent ? "2. El código" : "1. Tu correo"}</h2>
-        ${sent ? `<p class="muted small">Te lo he mandado a <b>${esc(st.email)}</b>. Mira también en «Spam».</p>
+      <section class="card"><h2>iPhone y Mac con los mismos datos</h2><p class="muted small">Tu propio Supabase (gratis). Entras con un enlace que te llega al correo: nada que recordar.</p>${what}</section>
+      ${nube.handoff ? `<section class="card"><h2>📋 Tu código para MANU</h2><p class="muted small">Estás en Safari, no en la app. Copia este código, abre MANU desde tu pantalla de inicio y pégalo en Tú → Tu nube.</p><pre class="code">${esc(nube.handoff)}</pre><button class="btn block" data-act="nube-copy-handoff">Copiar código</button></section>` : ""}
+      <section class="card"><h2>${sent ? "2. Abre el correo" : "1. Tu correo"}</h2>
+        ${sent ? `<p class="muted small">Te he mandado un correo a <b>${esc(st.email)}</b> («Your sign-in link»; mira también en «Spam»).</p><ul class="muted small"><li><b>En el Mac:</b> ábrelo y pulsa «Sign in». Ya está.</li><li><b>En el iPhone:</b> ábrelo y pulsa «Sign in». Se abrirá Safari con un código: cópialo, vuelve aquí y pégalo abajo.</li></ul>
         <form id="nubeForm" class="stack">
-          <label class="muted small" for="nubeCode">Código del correo</label><input id="nubeCode" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="123456">
+          <label class="muted small" for="nubeCode">Código que te da el enlace</label><input id="nubeCode" autocomplete="one-time-code" autocapitalize="off" spellcheck="false" placeholder="Pega aquí el código">
           <div class="btns"><button class="btn" type="submit">Entrar</button><button class="btn ghost" type="button" data-act="nube-other">Otro correo</button><button class="link small" type="button" data-act="nube-code">Mandármelo otra vez</button></div>
         </form>` : `<form id="nubeMail" class="stack">
           <label class="muted small" for="nubeEmail">Correo</label><input id="nubeEmail" type="email" value="${esc(st.email ?? "")}" autocomplete="email">
-          <button class="btn" type="submit">Mandarme el código</button>
+          <button class="btn" type="submit">Mandarme el enlace</button>
         </form>`}</section>
       <details class="card"><summary class="muted small">Solo si falta la tabla en Supabase</summary><p class="muted small">SQL Editor → New query → pega esto → Run. Ya está hecha en tu proyecto.</p><pre class="code small">${esc(SUPABASE_SQL)}</pre><button class="btn ghost" type="button" data-act="nube-copy-sql">Copiar el SQL</button></details>`;
   },
@@ -2570,6 +2581,7 @@ document.addEventListener("click", async (e) => {
     case "sheet": openSheet(a.dataset.kind, true); break;
     case "close-day": closeDay(); break;
     case "nube-code": nubeCodeAgain(); break;
+    case "nube-copy-handoff": navigator.clipboard?.writeText(nube.handoff ?? "").then(() => toast("Copiado: ahora abre MANU desde tu pantalla de inicio y pégalo en Tu nube"), () => toast("Mantén pulsado el código para copiarlo")); break;
     case "nube-other": nube.patch({ codeSentAt: null }); render(); break;
     case "nube-copy-sql": navigator.clipboard?.writeText(SUPABASE_SQL).then(() => toast("SQL copiado: pégalo en Supabase → SQL Editor"), () => toast("No he podido copiarlo: ábrelo y cópialo a mano")); break;
     case "nube-sync": nubeSync({ manual: true }); break;
@@ -3396,13 +3408,14 @@ applyNubeLink();
   if (linked || /error_description=/.test(location.hash)) {
     history.replaceState(null, "", location.pathname + location.search);
     tab = "tu"; sub = "nube";
-    if (linked) {
+    if (linked && inIosBrowser()) {
+      // WEB-68: on the iPhone the email opens Safari, not the installed app
+      // (their storage is separate). Don't use the session here: show its
+      // refresh code so Manu pastes it into MANU. Kept only in memory.
+      nube.handoff = linked.refresh;
+    } else if (linked) {
       nube.session = linked;
-      remoteGet(nubeCfg(), linked).then((row) => {
-        const replaceable = row && (isEnvelope(row.data) || isEmptyVault(row.data));
-        nube.patch({ lastRev: replaceable ? row.rev : null, dirty: Boolean(replaceable), codeSentAt: null, error: null });
-        render(); nubeSync({ manual: true });
-      }).catch((err) => toast(syncErrorText(err)));
+      nubeAfterSignIn().then(() => { render(); nubeSync({ manual: true }); }).catch((err) => toast(syncErrorText(err)));
     } else setTimeout(() => toast("El enlace del correo ha caducado: pide un código nuevo"), 300);
   }
 }
