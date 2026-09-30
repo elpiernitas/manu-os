@@ -10,6 +10,27 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
+## WEB-57 — escribir o pegar el perfil a mano
+
+Manu subió su exportación real de ChatGPT al chat de Claude Code para que la estudiara entera. Pidió un perfil para MANU, un informe y mejoras.
+
+- El archivo se quedó fuera del repositorio, en el espacio temporal de la sesión. En el repositorio no hay ningún dato suyo.
+- Claude escribió el perfil (menos de 4.000 caracteres, sin salud, sexo, exparejas ni crisis) y un informe privado, y se los entregó a Manu directamente.
+
+Hasta ahora «Tu perfil» solo podía crearse con Gemini: sin IA activada, o con un perfil escrito fuera, no había forma de meterlo.
+
+### Cambios
+
+- Tu archivo → Tu perfil: botón «Escribirlo o pegarlo yo». Abre el mismo formulario que «Corregir».
+- El perfil escrito a mano muestra «Escrito por ti · fecha» y se guarda con fecha.
+- Sigue siendo una categoría sensible: solo va a Gemini si Manu la marca (converse.js).
+
+### Evidencia
+
+- `npm test`: 170 en verde.
+- e2e57 en Chromium con emulación de iPhone 14 comprueba cuatro cosas: se pega un perfil sin IA, se guarda completo, el chat responde con él a «¿qué sabes de mí?» y «Corregir» lo reabre.
+- Toda la batería e2e sigue en verde.
+
 ## WEB-56 — importar una exportación de ChatGPT de 1,49 GB
 
 La exportación real de Manu pesa 1,49 GB. El importador anterior hacía `file.arrayBuffer()` del .zip entero y después `JSON.parse` del texto completo. Con ese tamaño, Safari en el iPhone cerraría la página casi con seguridad (NO_VERIFICADO en el dispositivo; el límite exacto de memoria de iOS no está documentado).

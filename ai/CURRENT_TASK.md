@@ -2,11 +2,11 @@
 
 Status: **REVIEW_PENDING**
 
-WEB-56 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
+WEB-57 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
 
 ## Tarea activa
 
-WEB-56 — importar exportaciones de ChatGPT de varios GB sin cargarlas en memoria (`ai/HANDOFF.md`, «WEB-56»).
+WEB-57 — escribir o pegar el perfil a mano (`ai/HANDOFF.md`, «WEB-57»).
 
 ## Autorización
 
