@@ -52,9 +52,10 @@ const lowMood = (moods, now) => {
  * @param {Array} x.quiet       longTimeNoTalk(people, now, 30)
  * @param {Array} x.moods       vault.moods
  * @param {number} x.captures   screenshots waiting in the tray
+ * @param {object|null} x.closing  workClosing(...) when closingDue(...), else null
  * @returns {{ main: {e,t,why,go}, more: Array<{e,t,go}> }}
  */
-export function whatNow({ now = new Date(), mode = "AFTERNOON", events = [], tomorrow = [], reminders = [], tasks = [], projects = [], birthdays = [], quiet = [], moods = [], captures = 0 } = {}) {
+export function whatNow({ now = new Date(), mode = "AFTERNOON", events = [], tomorrow = [], reminders = [], tasks = [], projects = [], birthdays = [], quiet = [], moods = [], captures = 0, closing = null } = {}) {
   const out = [];
   const nowMs = now.getTime();
   const clock = hm(now);
@@ -72,6 +73,9 @@ export function whatNow({ now = new Date(), mode = "AFTERNOON", events = [], tom
     return { e, mins: Math.round((at.getTime() - nowMs) / 60000) };
   }).filter((x) => x.mins >= 0 && x.mins <= 90).sort((a, b) => a.mins - b.mins);
   if (soon.length) out.push({ e: "🗓️", t: `Prepárate: ${soon[0].e.title} a las ${soon[0].e.time}.`, why: soon[0].mins < 5 ? "Es ya." : `Queda${soon[0].mins === 1 ? "" : "n"} ${soon[0].mins} minuto${soon[0].mins === 1 ? "" : "s"}.`, go: { tab: "agenda" } });
+
+  // 2b. Work just ended (WEB-63): close the day before anything else.
+  if (closing) out.push({ e: "🏁", t: "Cierra la jornada.", why: closing.openCount ? `Dos minutos: repasa lo de hoy y deja ${closing.openCount === 1 ? "la tarea pendiente" : `las ${closing.openCount} pendientes`} para ${closing.label ?? "mañana"}. Luego, desconecta.` : "Dos minutos: repasa lo de hoy y desconecta.", go: null });
 
   // 3. Late night: sleep.
   const h = now.getHours();

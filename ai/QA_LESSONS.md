@@ -162,3 +162,7 @@ En WEB-60, los tests unitarios de la autoclasificación pasaban con ideas en est
 ### QAL-038 — `hidden` no oculta si el CSS pone `display`
 
 En WEB-62, la casilla «Guardarlo también en Google Contactos» llevaba `hidden`, pero `.check-row { display: flex }` la seguía mostrando. El primer test la daba por visible y pasaba por casualidad; solo lo detectó el caso contrario (no debe verse). Hay una regla global `[hidden] { display: none !important; }`. Todo lo que se muestra u oculta se prueba en los dos estados.
+
+### QAL-039 — Un error genérico oculta la causa
+
+En WEB-63, MANU respondió «La IA no ha respondido ahora» en el iPhone de Manu y no hubo forma de saber por qué. El mismo texto cubría un corte de red, Gemini saturado, un modelo retirado, filtros y una respuesta vacía por falta de tokens. Cada fallo de un servicio externo se clasifica por su causa (estado HTTP, `finishReason`, mensaje del servidor) y el usuario ve el motivo y qué hacer. Solo lo transitorio se reintenta, y una sola vez. Los tests simulan cada causa por separado.

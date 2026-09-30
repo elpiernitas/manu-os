@@ -121,21 +121,86 @@ export async function listModels(key, fetchImpl = fetch) {
 
 // Sends exactly `payload` (built with buildPayload and shown to Manu), only
 // after an explicit confirmation from the UI.
-export async function ask({ key, model, payload, confirmed }, fetchImpl = fetch) {
+export async function ask({ key, model, payload, confirmed }, fetchImpl = fetch, pause) {
   if (confirmed !== true) throw Object.assign(new Error("Falta tu confirmación"), { code: "unconfirmed" });
   const texts = (payload?.contents ?? []).flatMap((c) => c.parts.map((p) => p.text));
   if (!texts.every(mayGo)) throw Object.assign(new Error("sensible"), { code: "sensitive" });
-  const res = await fetchImpl(`${API}/models/${encodeURIComponent(model)}:generateContent`, {
-    method: "POST",
-    headers: { "x-goog-api-key": key, "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  if (res.status === 429) throw Object.assign(new Error("Límite gratuito de Gemini alcanzado por ahora"), { code: "quota" });
-  if (res.status === 400 || res.status === 403) throw Object.assign(new Error("La clave de Gemini no es válida"), { code: "key" });
-  if (!res.ok) throw new Error(`Gemini respondió ${res.status}`);
-  const text = replyText(await res.json());
-  if (!text) throw new Error("Gemini no ha respondido");
+  const { json, reason } = await generate({ key, model, payload }, fetchImpl, pause);
+  const text = replyText(json);
+  if (!text) throw emptyReply(reason);
   return text;
+}
+
+// ---------- One call to Gemini, with the failures told apart (WEB-63) ----------
+// Before, every failure ended in «La IA no ha respondido ahora» and nobody could
+// tell why. Now: one retry for a network blip or a 5xx (Gemini overloaded);
+// if the reply came back empty because the answer ran out of tokens (thinking
+// models spend part of them before writing), retry with more room.
+const fail = (code, message, extra = {}) => Object.assign(new Error(message), { code, ...extra });
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+export const RETRY_MS = 1500;
+const BLOCKED = /^(SAFETY|PROHIBITED_CONTENT|BLOCKLIST|SPII|RECITATION|OTHER)$/;
+
+async function errorDetail(res) {
+  try { const j = await res.json(); return String(j?.error?.message ?? "").slice(0, 200); } catch { return ""; }
+}
+
+export async function generate({ key, model, payload }, fetchImpl = fetch, pause = wait) {
+  let body = payload;
+  let retried = false;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    let res;
+    try {
+      res = await fetchImpl(`${API}/models/${encodeURIComponent(model)}:generateContent`, {
+        method: "POST",
+        headers: { "x-goog-api-key": key, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+    } catch {
+      if (!retried) { retried = true; await pause(RETRY_MS); continue; }
+      throw fail("network", "Sin conexión con Gemini");
+    }
+    if (res.status === 429) throw fail("quota", "Límite gratuito de Gemini alcanzado por ahora");
+    if (res.status === 400 || res.status === 403) {
+      const detail = await errorDetail(res);
+      if (res.status === 403 || /api[ _-]?key/i.test(detail)) throw fail("key", "La clave de Gemini no es válida");
+      throw fail("bad", `Gemini rechazó la petición: ${detail || "400"}`, { status: 400 });
+    }
+    if (res.status === 404) throw fail("model", `El modelo ${model} ya no está disponible`, { status: 404 });
+    if (res.status >= 500) {
+      if (!retried) { retried = true; await pause(RETRY_MS); continue; }
+      throw fail("busy", `Gemini respondió ${res.status}`, { status: res.status });
+    }
+    if (!res.ok) throw fail("http", `Gemini respondió ${res.status}`, { status: res.status });
+    const json = await res.json();
+    const reason = json?.promptFeedback?.blockReason ?? json?.candidates?.[0]?.finishReason ?? null;
+    const empty = !replyText(json) && !parseCalls(json).length;
+    const room = body.generationConfig?.maxOutputTokens ?? 0;
+    if (empty && reason === "MAX_TOKENS" && room > 0 && room < 8192) {
+      body = { ...body, generationConfig: { ...body.generationConfig, maxOutputTokens: Math.min(8192, room * 4) } };
+      continue;
+    }
+    return { json, reason };
+  }
+  throw fail("empty", "Gemini no ha respondido", { reason: "MAX_TOKENS" });
+}
+
+const emptyReply = (reason) => (reason && BLOCKED.test(reason) ? fail("blocked", "Gemini ha bloqueado la respuesta", { reason }) : fail("empty", "Gemini no ha respondido", { reason }));
+
+// What Manu reads when the AI fails: the real reason, and what to do.
+export function aiErrorText(err) {
+  switch (err?.code) {
+    case "quota": return "Hoy ya no queda IA gratuita. Sigo sin IA.";
+    case "key": return "La clave de Gemini no funciona. Revísala en Tú → IA.";
+    case "sensitive": return "Algo de la conversación parece privado y no lo envío.";
+    case "unconfirmed": return "No lo envío sin tu permiso.";
+    case "network": return "No llego a Gemini: parece que no hay conexión. Prueba otra vez cuando tengas red.";
+    case "busy": return `Gemini está saturado ahora mismo (error ${err.status}). Lo he intentado dos veces; prueba en un minuto.`;
+    case "model": return "El modelo de Gemini que usaba ya no existe. Entra en Tú → IA y vuelve a pegar la clave: elijo otro.";
+    case "blocked": return "Gemini ha bloqueado la respuesta por sus filtros. Prueba a decirlo de otra forma.";
+    case "empty": return `Gemini ha devuelto una respuesta vacía${err.reason ? ` (${err.reason})` : ""}. Prueba otra vez.`;
+    default: return `La IA no ha respondido: ${String(err?.message ?? "error desconocido").slice(0, 160)}.`;
+  }
 }
 
 // ---------- Actions Gemini can PROPOSE (Manu confirms each one in the app) ----------
@@ -200,22 +265,14 @@ export function issueUrl({ titulo, descripcion }, version = "") {
 // Same privacy gates as ask(): explicit consent (per request or Manu's global opt-in) and no sensitive text.
 // `permit(text)` decides what may go; by default nothing sensitive. The
 // conversation mode passes the categories Manu allowed (secrets never).
-export async function askWithActions({ key, model, payload, confirmed, permit = mayGo }, fetchImpl = fetch) {
+export async function askWithActions({ key, model, payload, confirmed, permit = mayGo }, fetchImpl = fetch, pause) {
   if (confirmed !== true) throw Object.assign(new Error("Falta tu confirmación"), { code: "unconfirmed" });
   const texts = (payload?.contents ?? []).flatMap((c) => c.parts.map((p) => p.text)).filter((t) => typeof t === "string");
   if (!texts.every((t) => permit(t))) throw Object.assign(new Error("sensible"), { code: "sensitive" });
-  const res = await fetchImpl(`${API}/models/${encodeURIComponent(model)}:generateContent`, {
-    method: "POST",
-    headers: { "x-goog-api-key": key, "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  if (res.status === 429) throw Object.assign(new Error("Límite gratuito de Gemini alcanzado por ahora"), { code: "quota" });
-  if (res.status === 400 || res.status === 403) throw Object.assign(new Error("La clave de Gemini no es válida"), { code: "key" });
-  if (!res.ok) throw new Error(`Gemini respondió ${res.status}`);
-  const json = await res.json();
+  const { json, reason } = await generate({ key, model, payload }, fetchImpl, pause);
   const calls = parseCalls(json);
   const text = replyText(json);
-  if (!text && !calls.length) throw new Error("Gemini no ha respondido");
+  if (!text && !calls.length) throw emptyReply(reason);
   return { text, calls };
 }
 
