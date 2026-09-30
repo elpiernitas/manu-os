@@ -25,3 +25,24 @@ test("WEB-61: more words narrow it; accents and case ignored; already added is m
   assert.deepEqual(searchContacts(contacts, "  "), []);
   assert.equal(searchContacts(contacts, "e", [], 2).length, 2);
 });
+
+test("WEB-62: saving a birthday in Google Contacts reads the etag, then patches only birthdays", async () => {
+  const { setContactBirthday } = await import("../core/google.js");
+  const calls = [];
+  const fetchImpl = async (url, init = {}) => {
+    calls.push({ url, init });
+    const json = calls.length === 1 ? { resourceName: "people/c123", etag: "E1", birthdays: [{ date: { year: 2005, month: 10, day: 11 } }] } : { resourceName: "people/c123" };
+    return { ok: true, status: 200, json: async () => json };
+  };
+  await setContactBirthday("tok", "people/c123", "10-11", fetchImpl);
+  assert.match(calls[0].url, /people\/c123\?personFields=birthdays$/);
+  assert.match(calls[1].url, /people\/c123:updateContact\?updatePersonFields=birthdays$/);
+  assert.equal(calls[1].init.method, "PATCH");
+  assert.deepEqual(JSON.parse(calls[1].init.body), { etag: "E1", birthdays: [{ date: { month: 10, day: 11, year: 2005 } }] }); // same day: year kept
+  assert.equal(calls[1].init.headers.Authorization, "Bearer tok");
+  calls.length = 0;
+  await setContactBirthday("tok", "people/c123", "12-05", fetchImpl);
+  assert.deepEqual(JSON.parse(calls[1].init.body).birthdays, [{ date: { month: 12, day: 5 } }]);
+  await assert.rejects(setContactBirthday("tok", "../../x", "12-05", fetchImpl), /Contacto no válido/);
+  await assert.rejects(setContactBirthday("tok", "people/c1", "5 dic", fetchImpl), /Cumpleaños no válido/);
+});

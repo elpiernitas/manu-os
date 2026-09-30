@@ -13,7 +13,7 @@ import { CITIES, proposeAlarm, shouldAskTomorrow, shortcutUrl, guessCity } from 
 import { birthdayEventBody, isClientId, listEvents, createEvent, newEventBody, monthGrid, listCalendars, mergeDays } from "./core/gcal.js";
 import { detectRecurring, upcomingRecurring, spendingPattern, monthStats, monthlySeries } from "./core/insights.js";
 import { fetchSnapshot, summarize as mailSummary, mailSuggestions, findSender, mailOrder, idsFrom, archive as mailArchive, unarchive as mailUnarchive, trash as mailTrash, untrash as mailUntrash, ensureLabel, addLabel, removeLabel, messageUrl } from "./core/gmail.js";
-import { SCOPE, runServices, planTaskSync, listOpenTasks, insertTask, completeTask, contactBirthdays, mergePeople, saveBackup, loadBackup } from "./core/google.js";
+import { SCOPE, runServices, planTaskSync, listOpenTasks, insertTask, completeTask, contactBirthdays, setContactBirthday, mergePeople, saveBackup, loadBackup } from "./core/google.js";
 import { detectLink, linkInfo, PROVIDER_NAME } from "./core/links.js";
 import { allowedToSend, buildContext, buildConversationPayload, CONTEXT_CATEGORIES, BASIC_CONTEXT, FULL_CONTEXT, AUTO_SAFE } from "./core/converse.js";
 import { newProject, addSource, buildProjectPayload, citations, PRESETS } from "./core/projects.js";
@@ -38,7 +38,7 @@ import { isSpotifyClientId, pkceValid, randomVerifier, challengeFor, authorizeUr
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "61";
+export const APP_VERSION = "62";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -1120,7 +1120,7 @@ const subpages = {
       ${quiet.length ? `<section class="card"><h2>Hace tiempo que no hablas con</h2>${quiet.map((p) => `<div class="row"><span class="grow">${esc(p.name)}</span><button class="link small" data-act="talked" data-id="${esc(p.id)}">Hablé hoy</button></div>`).join("")}</section>` : ""}
       ${sectionTitle("Todas")}
       <div class="list">${vault.people.length ? vault.people.map((p) => { const d = daysUntilBirthday(p.birthday); return `<details><summary class="item"><span class="ico purple">${esc(p.name.slice(0, 1).toUpperCase())}</span><span class="grow"><span>${esc(p.name)}</span><br><span class="muted small">${d !== null ? `${d === 1 ? "Cumple mañana" : `Cumple en ${d} días`}` : "Sin cumpleaños"}${p.lastContact ? ` · última vez ${new Date(p.lastContact).toLocaleDateString("es-ES", { day: "numeric", month: "short" })}` : ""}</span></span></summary>
-        <div class="inner">${p.notes ? `<p>${esc(p.notes)}</p>` : '<p class="muted small">Sin notas.</p>'}<div class="btns">${p.birthday && !p.calendarEventId && googleOn("calendar") ? `<button class="btn ghost" data-act="person-cal" data-id="${esc(p.id)}">🎂 Al calendario</button>` : ""}${whatsappUrl(p.phone, "") ? `<a class="btn ghost" href="${esc(whatsappUrl(p.phone, `¡Hola, ${p.name.split(" ")[0]}!`))}" target="_blank" rel="noopener">WhatsApp</a>` : ""}<button class="btn ghost" data-act="talked" data-id="${esc(p.id)}">Hablé hoy</button><button class="btn danger" data-act="del" data-list="people" data-id="${esc(p.id)}">Quitar</button></div></div></details>`; }).join("") : '<p class="muted item">Aún no hay nadie.</p>'}</div>
+        <div class="inner">${p.notes ? `<p>${esc(p.notes)}</p>` : '<p class="muted small">Sin notas.</p>'}<div class="btns">${p.birthday && !p.calendarEventId && googleOn("calendar") ? `<button class="btn ghost" data-act="person-cal" data-id="${esc(p.id)}">🎂 Al calendario</button>` : ""}${p.birthday && p.googleId && vault.contacts?.some((c) => c.googleId === p.googleId && !c.birthday) ? `<button class="btn ghost" data-act="person-gcontact" data-id="${esc(p.id)}">📇 A Google Contactos</button>` : ""}${whatsappUrl(p.phone, "") ? `<a class="btn ghost" href="${esc(whatsappUrl(p.phone, `¡Hola, ${p.name.split(" ")[0]}!`))}" target="_blank" rel="noopener">WhatsApp</a>` : ""}<button class="btn ghost" data-act="talked" data-id="${esc(p.id)}">Hablé hoy</button><button class="btn danger" data-act="del" data-list="people" data-id="${esc(p.id)}">Quitar</button></div></div></details>`; }).join("") : '<p class="muted item">Aún no hay nadie.</p>'}</div>
       <form class="card" id="addPerson"><h2>Añadir persona</h2>
         <label for="pName" class="muted small">Nombre${vault.contacts?.length ? ` (busca entre tus ${vault.contacts.length} contactos)` : ""}</label><input id="pName" maxlength="60" required autocomplete="off" placeholder="${vault.contacts?.length ? "Escribe «eva» y elige" : ""}">
         <div id="pMatches" class="contact-matches" aria-live="polite"></div>
@@ -1128,6 +1128,7 @@ const subpages = {
         <label class="muted small" for="pBDay">Cumpleaños (el año no hace falta)</label>
         <div class="bday"><select id="pBDay" aria-label="Día"><option value="">Día</option>${Array.from({ length: 31 }, (_, i) => `<option value="${String(i + 1).padStart(2, "0")}">${i + 1}</option>`).join("")}</select><select id="pBMonth" aria-label="Mes"><option value="">Mes</option>${["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"].map((m, i) => `<option value="${String(i + 1).padStart(2, "0")}">${m}</option>`).join("")}</select></div>
         ${googleOn("calendar") ? '<label class="check-row"><input type="checkbox" id="pCal" checked> Ponerlo en Google Calendar (cada año)</label><p class="muted small" id="pCalNote"></p>' : ""}
+        ${isClientId(gClientId()) ? '<label class="check-row" id="pGoogleRow" hidden><input type="checkbox" id="pGoogle" checked> Guardarlo también en Google Contactos</label>' : ""}
         <label for="pPhone" class="muted small">Móvil (opcional, para felicitar por WhatsApp; se queda en este móvil)</label><input id="pPhone" inputmode="tel" maxlength="20">
         <label for="pNotes" class="muted small">Detalles (gustos, regalos, planes)</label><textarea id="pNotes" rows="2" maxlength="300"></textarea>
         <button class="btn" type="submit">Guardar</button></form>`;
@@ -2158,6 +2159,18 @@ function importBuzon(text) {
 }
 
 // ---------- Personas (WEB-38) ----------
+// WEB-62: the birthday also goes into that Google contact (asks for the
+// contacts write permission the first time).
+async function saveBirthdayToGoogle(id) {
+  const p = vault.people.find((x) => x.id === id);
+  if (!p?.birthday || !p.googleId) return;
+  try {
+    const token = await googleToken(SCOPE.contactsWrite);
+    await setContactBirthday(token, p.googleId, p.birthday);
+    vault.contacts = (vault.contacts ?? []).map((c) => (c.googleId === p.googleId ? { ...c, birthday: p.birthday } : c));
+    persist(); render(); toast(`Cumpleaños de ${p.name} guardado en Google Contactos`);
+  } catch (err) { toast(`No he podido guardarlo en Google Contactos: ${err.message}`); }
+}
 async function addBirthdayToCalendar(id) {
   const p = vault.people.find((x) => x.id === id);
   if (!p?.birthday || p.calendarEventId) return;
@@ -2177,6 +2190,7 @@ function renderContactMatches(q) {
   box.innerHTML = list.length ? list.map((c) => `<button type="button" class="contact-row" data-act="pick-contact" data-gid="${esc(c.googleId)}"><span class="ico purple" aria-hidden="true">${esc(c.name.slice(0, 1).toUpperCase())}</span><span class="grow"><span>${esc(c.name)}</span><br><span class="muted small">${c.added ? "Ya está en Personas" : c.birthday ? `Cumple el ${Number(c.birthday.slice(3))}/${Number(c.birthday.slice(0, 2))}` : "Sin cumpleaños en Google"}</span></span></button>`).join("") : (q.trim().length >= 2 && vault.contacts?.length ? '<p class="muted small">Ningún contacto con ese nombre. Se guardará tal cual lo escribas.</p>' : "");
 }
 function fillFromContact(c) {
+  const gRow = $("pGoogleRow"); if (gRow) gRow.hidden = Boolean(c.birthday); // WEB-62: only when Google lacks it
   if (c.birthday && !$("pBDay").value && !$("pBMonth").value) { const [m, d] = c.birthday.split("-"); $("pBMonth").value = m; $("pBDay").value = d; }
   if (c.phone && !$("pPhone").value) $("pPhone").value = c.phone;
   const cal = $("pCal"), note = $("pCalNote");
@@ -2375,6 +2389,7 @@ document.addEventListener("click", async (e) => {
     case "chat-new": startNewChat(); toast("Conversación nueva. La anterior queda en Tu archivo."); break;
     case "profile-make": makeProfile(); break;
     case "cap-read": readCaptures(); break;
+    case "person-gcontact": saveBirthdayToGoogle(a.dataset.id); break;
     case "proj-suggest": suggestProjects(); break;
     case "proj-sug-close": projAuto.suggestions = null; render(); break;
     case "proj-sug-add": case "proj-sug-all": {
@@ -2623,9 +2638,11 @@ document.addEventListener("submit", async (e) => {
     pickedContact = null;
     const person = { id: uid("p"), name: name.slice(0, 60), birthday, phone: $("pPhone").value.trim().slice(0, 20) || null, notes: $("pNotes").value.trim().slice(0, 300) || null, lastContact: null, ...(contact ? { googleId: contact.googleId } : {}) };
     const toCalendar = birthday && $("pCal")?.checked;
+    const toGoogle = birthday && contact && !contact.birthday && $("pGoogleRow") && !$("pGoogleRow").hidden && $("pGoogle")?.checked;
     vault.people.push(person);
     persist(); render(); toast("Persona guardada");
     if (toCalendar) addBirthdayToCalendar(person.id);
+    if (toGoogle) saveBirthdayToGoogle(person.id);
     return;
   }
   if (f === "findForm") {

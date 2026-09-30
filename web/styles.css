@@ -720,3 +720,6 @@ body.kb .chat-down { bottom: auto; top: calc(var(--kb-bottom, 100dvh) - 124px); 
 .contact-matches { display: grid; gap: .25rem; margin: .35rem 0 .2rem; max-height: 22rem; overflow-y: auto; }
 .contact-row { display: flex; align-items: center; gap: .6rem; width: 100%; min-height: 44px; padding: .4rem .5rem; border-radius: 12px; background: var(--surface-2, rgba(255,255,255,.05)); color: inherit; text-align: left; border: 0; font: inherit; }
 .contact-row .grow { min-width: 0; overflow-wrap: anywhere; }
+
+/* WEB-62: hidden always wins over display rules (.check-row is flex) */
+[hidden] { display: none !important; }
