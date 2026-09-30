@@ -33,13 +33,14 @@ import { budgetStatus, budgetLine, budgetCommand } from "./core/budget.js";
 import { findInVault, findCommand } from "./core/find.js";
 import { weatherEmoji, sceneFor, PARTICLES, SHAPES, MONEY_EMOJI, dayPhase, cityMinutes } from "./core/scene.js";
 import { buildImagePayload, buildLinkPayload, isGeminiKey, mayGo, setSensitiveOk, sensitiveAllowed, pickModel, listModels, buildActionPayload, askWithActions, issueUrl, aiErrorText } from "./core/ai.js";
-import { encryptBackup, decryptBackup, passphraseProblem, isEnvelope } from "./core/crypto.js";
+import { encryptBackup, decryptBackup, passphraseProblem, isEnvelope, newSalt, deriveSyncKey, sealWithKey, openWithKey, PBKDF2_ITERATIONS } from "./core/crypto.js";
+import { SUPABASE_SQL, configProblem, cleanConfig, parseSyncLink, signUp, signIn, refreshSession, needsRefresh, remoteHead, remoteGet, remotePut, decide, isEmptyVault, syncErrorText } from "./core/sync.js";
 import { exportFullBackup, downloadBlob, readBackupFile, restoreFullBackup, FORMAT as FULL_FORMAT } from "./core/backup-manager.js";
 import { isSpotifyClientId, pkceValid, randomVerifier, challengeFor, authorizeUrl, exchangeCode, refreshTokens, listDevices, findSpeaker, transferTo, DEFAULT_SPEAKER } from "./core/spotify.js";
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "63";
+export const APP_VERSION = "64";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -116,6 +117,168 @@ function persist() {
   fileNewItems();
   if (vault.chat.length > 200) vault.chat = vault.chat.slice(-200);
   if (!store.save(vault)) toast("No he podido guardar en este dispositivo.");
+  nubeChanged();
+}
+
+// ---------- Tu nube (WEB-64): the vault, encrypted, in Manu's Supabase ----------
+// Device state in «manuos.nube»; the session in «manuos.nube.token» (a secret:
+// never in backups); the key, non-extractable, in its own IndexedDB outside
+// the «manuos-*» names so backups skip it. The phrase and password are never kept.
+const nube = {
+  get state() { try { return JSON.parse(localStorage.getItem("manuos.nube") || "null") ?? {}; } catch { return {}; } },
+  set state(v) { try { localStorage.setItem("manuos.nube", JSON.stringify(v)); } catch {} },
+  patch(p) { this.state = { ...this.state, ...p }; },
+  get session() { try { return JSON.parse(localStorage.getItem("manuos.nube.token") || "null"); } catch { return null; } },
+  set session(v) { try { v ? localStorage.setItem("manuos.nube.token", JSON.stringify(v)) : localStorage.removeItem("manuos.nube.token"); } catch {} },
+  key: null, running: false, edits: 0, timer: null,
+};
+const nubeCfg = () => { const s = nube.state; return s.url && s.key ? { url: s.url, key: s.key } : null; };
+const nubeOn = () => Boolean(nubeCfg() && nube.session && nube.state.salt);
+const KEY_DB = "manu-sync-key";
+const NUBE_URL = "https://xqsexjpuhvmwkclpnvjo.supabase.co"; // Manu's project; also in the CSP
+function keyDb() {
+  return new Promise((res, rej) => { const r = indexedDB.open(KEY_DB, 1); r.onupgradeneeded = () => r.result.createObjectStore("k"); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+}
+async function keyOp(mode, fn) {
+  const db = await keyDb();
+  try { return await new Promise((res, rej) => { const t = db.transaction("k", mode); const r = fn(t.objectStore("k")); t.oncomplete = () => res(r?.result); t.onerror = () => rej(t.error); }); } finally { db.close(); }
+}
+const saveNubeKey = (k) => keyOp("readwrite", (s) => s.put(k, "vault"));
+const loadNubeKey = async () => { try { return (await keyOp("readonly", (s) => s.get("vault"))) ?? null; } catch { return null; } };
+const dropNubeKey = () => new Promise((res) => { const d = indexedDB.deleteDatabase(KEY_DB); d.onsuccess = d.onerror = d.onblocked = () => res(); });
+const deviceName = () => (/iPhone|iPad/.test(navigator.userAgent) ? "iPhone" : /Mac/.test(navigator.userAgent) ? "Mac" : "otro dispositivo");
+
+async function nubeSession() {
+  let s = nube.session;
+  if (!s) throw Object.assign(new Error("Sin sesión"), { code: "expired" });
+  if (needsRefresh(s)) {
+    try { s = await refreshSession(nubeCfg(), s); nube.session = s; } catch (err) { if (err.code === "expired") nube.session = null; throw err; }
+  }
+  return s;
+}
+
+function nubeChanged() {
+  if (!nubeOn() || restoring) return;
+  nube.edits++;
+  if (!nube.state.dirty) nube.patch({ dirty: true });
+  clearTimeout(nube.timer);
+  nube.timer = setTimeout(() => nubeSync(), 4000);
+}
+
+async function nubePush(baseRev) {
+  const s = await nubeSession();
+  const st = nube.state;
+  const edits = nube.edits;
+  const data = await sealWithKey(vault, nube.key, { salt: st.salt, iterations: st.iterations });
+  const rev = await remotePut(nubeCfg(), s, { data, baseRev, device: deviceName() });
+  nube.patch({ lastRev: rev, lastAt: new Date().toISOString(), conflict: null, error: null, ...(edits === nube.edits ? { dirty: false } : {}) });
+}
+
+async function nubePull(row = null) {
+  const s = await nubeSession();
+  row = row ?? await remoteGet(nubeCfg(), s);
+  if (!row) return;
+  const data = await openWithKey(row.data, nube.key);
+  const v = validateVault(data);
+  if (!v.ok) throw new Error(`Los datos de la nube no son válidos: ${v.reason}`);
+  restoring = true; // nothing in memory may overwrite what just arrived
+  clearTimeout(nube.timer);
+  store.save(v.vault);
+  nube.patch({ lastRev: row.rev, lastAt: new Date().toISOString(), dirty: false, conflict: null, error: null });
+  toast(`Datos del ${row.device ?? "otro dispositivo"} cargados`);
+  setTimeout(() => location.reload(), 600);
+}
+
+async function nubeSync({ manual = false } = {}) {
+  if (!nubeOn() || nube.running || restoring) return;
+  nube.key = nube.key ?? await loadNubeKey();
+  if (!nube.key) { nube.patch({ error: "Falta tu frase en este dispositivo: vuelve a entrar." }); return; }
+  nube.running = true;
+  if (tab === "tu" && sub === "nube") render();
+  try {
+    const st = nube.state;
+    const head = await remoteHead(nubeCfg(), await nubeSession());
+    const what = decide({ lastRev: st.lastRev ?? null, dirty: Boolean(st.dirty), remote: head, localEmpty: isEmptyVault(vault) });
+    if (what === "push") await nubePush(head?.rev ?? null);
+    else if (what === "pull") await nubePull();
+    else if (what === "conflict") { nube.patch({ conflict: { rev: head?.rev ?? null, device: head?.device ?? null, at: head?.updated_at ?? null } }); if (manual || tab === "tu") render(); toast(syncErrorText({ code: "conflict" })); }
+    else nube.patch({ lastAt: new Date().toISOString(), error: null });
+    if (manual) toast(what === "conflict" ? "Elige con qué datos te quedas" : "Sincronizado");
+  } catch (err) {
+    if (err.code === "conflict") nube.patch({ conflict: { rev: null } });
+    nube.patch({ error: syncErrorText(err) });
+    if (manual || err.code !== "network") toast(syncErrorText(err));
+  } finally {
+    nube.running = false;
+    if (tab === "tu" && sub === "nube") render();
+  }
+}
+
+// First time on a device: log in, derive the key and check it against what
+// is already in the cloud, if anything.
+async function nubeConnect({ url, key, email, password, phrase, phrase2, create }) {
+  const cfg = cleanConfig({ url, key });
+  const problem = configProblem(cfg);
+  if (problem) throw new Error(problem);
+  // The CSP (index.html) only lets MANU talk to this project.
+  if (cfg.url !== NUBE_URL) throw new Error(`MANU solo puede conectarse a tu proyecto (${NUBE_URL.replace("https://", "")}). Si has creado otro, hay que cambiarlo en la app.`);
+  const pp = passphraseProblem(phrase);
+  if (pp) throw new Error(pp);
+  nube.patch({ url: cfg.url, key: cfg.key, email });
+  if (create) {
+    const r = await signUp(cfg, { email, password });
+    if (r.confirm) return "confirm";
+    nube.session = r.session;
+  } else nube.session = await signIn(cfg, { email, password });
+  const row = await remoteGet(cfg, nube.session);
+  let salt, iterations;
+  if (row) {
+    ({ salt, iterations } = row.data?.kdf ?? {});
+    const k = await deriveSyncKey(phrase, salt, iterations);
+    await openWithKey(row.data, k); // wrong phrase → throws «phrase»
+    nube.key = k;
+  } else {
+    if (phrase !== phrase2) throw new Error("Las dos frases no coinciden.");
+    salt = newSalt(); iterations = PBKDF2_ITERATIONS;
+    nube.key = await deriveSyncKey(phrase, salt, iterations);
+  }
+  await saveNubeKey(nube.key);
+  nube.patch({ salt, iterations, lastRev: null, dirty: false, conflict: null, error: null });
+  return row ? "existing" : "new";
+}
+
+async function nubeLeave() {
+  clearTimeout(nube.timer);
+  nube.session = null; nube.key = null;
+  await dropNubeKey();
+  const { url, key } = nube.state;
+  nube.state = { url, key };
+}
+
+async function nubeSubmit(create) {
+  const v = (id) => $(id)?.value ?? "";
+  const btns = document.querySelectorAll("#nubeForm button"); btns.forEach((b) => { b.disabled = true; });
+  toast(create ? "Creando tu cuenta…" : "Entrando y comprobando tu frase…");
+  try {
+    const r = await nubeConnect({ url: v("nubeUrl"), key: v("nubeKey"), email: v("nubeEmail").trim(), password: v("nubePass"), phrase: v("nubePhrase"), phrase2: v("nubePhrase2"), create });
+    if (r === "confirm") { toast("Te ha llegado un correo de Supabase: ábrelo, confirma y luego pulsa «Entrar»."); return; }
+    render();
+    toast(r === "existing" ? "Conectado: traigo tus datos…" : "Conectado: subo tus datos cifrados…");
+    await nubeSync({ manual: true });
+  } catch (err) {
+    toast(["network", "expired", "table", "phrase", "conflict"].includes(err.code) ? syncErrorText(err) : err.message);
+  } finally { btns.forEach((b) => { b.disabled = false; }); }
+}
+
+async function nubeResolve(which) {
+  nube.key = nube.key ?? await loadNubeKey();
+  try {
+    if (which === "remote") { nube.patch({ dirty: false }); await nubePull(); return; }
+    const head = await remoteHead(nubeCfg(), await nubeSession());
+    await nubePush(head?.rev ?? null);
+    toast("Hecho: la nube tiene ahora lo de este dispositivo");
+  } catch (err) { toast(syncErrorText(err)); }
+  render();
 }
 
 // WEB-60: ideas, tasks and kept screenshots go to their project by themselves.
@@ -1030,6 +1193,7 @@ const screens = {
         ${item("ia", "bolt", "purple", "IA (Gemini)", aiReady() ? `Activada · ${aiStore.model}` : "Chat con IA opcional")}
         ${item("atajos", "bolt", "orange", "Atajos del iPhone", shortcutsPending() ? `${shortcutsPending()} pendientes de crear` : "Todos creados")}
         ${item("avisos", "bell", "red", "Avisos", "Notificaciones de MANU")}
+        ${item("nube", "box", "blue", "Tu nube", nubeOn() ? (nube.state.conflict ? "Elige con qué datos te quedas" : nube.state.error ? "Revisar" : `Sincronizada${nube.state.lastAt ? ` · ${new Date(nube.state.lastAt).toLocaleString("es-ES", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}` : ""}`) : "iPhone y Mac con los mismos datos, cifrados")}
         ${item("datos", "box", "gray", "Tus datos", "Copia, restaurar y borrar")}
       </div>
       <p class="muted small">MANU OS web · versión ${APP_VERSION} · datos solo en este dispositivo</p>`;
@@ -1214,6 +1378,39 @@ const subpages = {
           <label for="spSpeaker" class="muted small">Nombre del altavoz</label><input id="spSpeaker" value="${esc(vault.settings.spotifySpeaker || DEFAULT_SPEAKER)}" maxlength="40">
           <label for="spId" class="muted small">Client ID de otra app de Spotify (vacío = la tuya, «MANU OS»)</label><input id="spId" value="${esc(id)}" autocomplete="off" spellcheck="false" placeholder="${DEFAULT_SPOTIFY_CLIENT_ID}">
           <button class="btn ghost" type="submit">Guardar</button></form></details>`;
+  },
+  nube() {
+    const st = nube.state;
+    const when = (iso) => new Date(iso).toLocaleString("es-ES", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+    const what = '<p class="muted small">Se sincroniza todo lo de MANU: tareas, ideas, agenda, dinero, personas, proyectos, perfil y ajustes. <b>Aún no</b> «Tu archivo» (ChatGPT) ni las fotos: cada dispositivo guarda los suyos.</p>';
+    if (nubeOn()) {
+      return `${backBar("Tu nube")}
+        ${st.conflict ? `<section class="card"><h2>⚠️ Hay dos versiones</h2><p class="muted small">Este dispositivo tiene cambios sin subir y ${esc(st.conflict.device ?? "el otro dispositivo")} ha subido otros${st.conflict.at ? ` (${esc(when(st.conflict.at))})` : ""}. Elige con cuál te quedas: la otra se pierde.</p>
+          <div class="btns"><button class="btn" data-act="nube-keep-local">Quedarme con este</button><button class="btn ghost" data-act="nube-keep-remote">Traer la de la nube</button></div></section>` : ""}
+        <section class="card"><h2>Estado</h2>
+          <p>${nube.running ? "Sincronizando…" : st.error ? esc(st.error) : st.dirty ? "Cambios pendientes de subir." : st.lastRev ? "Todo sincronizado." : "Aún sin sincronizar."}</p>
+          <p class="muted small">Cuenta: ${esc(st.email ?? "")}${st.lastAt ? ` · última vez ${esc(when(st.lastAt))}` : ""}${st.lastRev ? ` · versión ${esc(st.lastRev)}` : ""}</p>
+          <div class="btns"><button class="btn" data-act="nube-sync">Sincronizar ahora</button><button class="btn ghost" data-act="nube-leave">Desconectar este dispositivo</button></div></section>
+        <section class="card"><h2>Cómo funciona</h2>${what}<ul class="muted small"><li>Se cifra en este dispositivo con tu frase antes de salir: Supabase solo guarda datos ilegibles.</li><li>Al cambiar algo, se sube en unos segundos. Al abrir MANU, se trae lo último del otro dispositivo.</li><li>Tu frase y tu contraseña no se guardan en ningún sitio. Si olvidas la frase, lo de la nube no se puede recuperar (lo de cada dispositivo sigue ahí).</li></ul></section>`;
+    }
+    return `${backBar("Tu nube")}
+      <section class="card"><h2>iPhone y Mac con los mismos datos</h2><p class="muted small">Tu propio Supabase (gratis). Todo va cifrado con una frase que solo sabes tú.</p>${what}</section>
+      <section class="card"><h2>1. Tu proyecto</h2>
+        <p class="muted small">Si abriste el enlace que te pasé, ya está relleno.</p>
+        <form id="nubeForm" class="stack">
+          <label class="muted small" for="nubeUrl">Project URL</label><input id="nubeUrl" value="${esc(st.url ?? "")}" autocomplete="off" spellcheck="false" placeholder="https://xxxx.supabase.co" inputmode="url">
+          <label class="muted small" for="nubeKey">Clave publishable (nunca la secreta)</label><input id="nubeKey" value="${esc(st.key ?? "")}" autocomplete="off" spellcheck="false" placeholder="sb_publishable_…">
+          <h2>2. La tabla (una sola vez)</h2>
+          <p class="muted small">En Supabase: SQL Editor → New query → pega esto → Run. Solo la primera vez, desde un dispositivo.</p>
+          <details><summary>Ver el SQL</summary><pre class="code small">${esc(SUPABASE_SQL)}</pre></details>
+          <button class="btn ghost" type="button" data-act="nube-copy-sql">Copiar el SQL</button>
+          <h2>3. Tu cuenta y tu frase</h2>
+          <label class="muted small" for="nubeEmail">Correo</label><input id="nubeEmail" type="email" value="${esc(st.email ?? "")}" autocomplete="username">
+          <label class="muted small" for="nubePass">Contraseña de la cuenta (8+)</label><input id="nubePass" type="password" autocomplete="current-password">
+          <label class="muted small" for="nubePhrase">Frase de cifrado (10+ caracteres). Distinta de la contraseña. Si la olvidas, lo de la nube no se recupera.</label><input id="nubePhrase" type="password" autocomplete="off">
+          <label class="muted small" for="nubePhrase2">Repite la frase (solo la primera vez)</label><input id="nubePhrase2" type="password" autocomplete="off">
+          <div class="btns"><button class="btn" type="submit">Entrar</button><button class="btn ghost" type="button" data-act="nube-signup">Crear cuenta</button></div>
+        </form></section>`;
   },
   ia() {
     const key = aiStore.key;
@@ -2393,6 +2590,12 @@ document.addEventListener("click", async (e) => {
     case "rem-done": vault.reminders = vault.reminders.map((r) => (r.id === id ? { ...r, done: !r.done } : r)); persist(); render(); break;
     case "sheet": openSheet(a.dataset.kind, true); break;
     case "close-day": closeDay(); break;
+    case "nube-signup": nubeSubmit(true); break;
+    case "nube-copy-sql": navigator.clipboard?.writeText(SUPABASE_SQL).then(() => toast("SQL copiado: pégalo en Supabase → SQL Editor"), () => toast("No he podido copiarlo: ábrelo y cópialo a mano")); break;
+    case "nube-sync": nubeSync({ manual: true }); break;
+    case "nube-leave": if (confirm("¿Desconectar este dispositivo de tu nube? Tus datos se quedan aquí y en la nube.")) nubeLeave().then(() => { render(); toast("Desconectado"); }); break;
+    case "nube-keep-local": nubeResolve("local"); break;
+    case "nube-keep-remote": if (confirm("Se sustituyen los datos de este dispositivo por los de la nube. ¿Seguro?")) nubeResolve("remote"); break;
     case "chat-image-remove": chatImage = null; render(); break;
     case "proj-open": openProject = a.dataset.id; projSourceKind = "note"; render({ focus: true, enter: "page" }); scrollTo(0, 0); break;
     case "proj-back": openProject = null; render({ focus: true, enter: "tab" }); scrollTo(0, 0); break;
@@ -2533,7 +2736,7 @@ document.addEventListener("click", async (e) => {
     case "backup-later": vault.settings.backupSnooze = new Date(Date.now() + 3 * 86400000).toISOString(); persist(); render(); break;
     case "wipe": confirmWipe = true; render(); break;
     case "wipe-no": confirmWipe = false; render(); break;
-    case "wipe-yes": { let ss = null, ls = null; try { ss = sessionStorage; ls = localStorage; } catch {} wipeDeviceKeys([ls, ss]); clearImages(); clearArchive(); archive.docs = null; archive.stats = null; imageCache.clear(); gcal.tokens = {}; vault = emptyVault(); confirmWipe = false; persist(); render(); toast("Datos borrados de este dispositivo"); break; }
+    case "wipe-yes": { let ss = null, ls = null; try { ss = sessionStorage; ls = localStorage; } catch {} wipeDeviceKeys([ls, ss]); clearTimeout(nube.timer); nube.key = null; dropNubeKey(); clearImages(); clearArchive(); archive.docs = null; archive.stats = null; imageCache.clear(); gcal.tokens = {}; vault = emptyVault(); confirmWipe = false; persist(); render(); toast("Datos borrados de este dispositivo"); break; }
   }
 });
 
@@ -2556,6 +2759,7 @@ const num = (v) => { const n = Number(String(v).replace(",", ".")); return v !==
 document.addEventListener("submit", async (e) => {
   e.preventDefault();
   const f = e.target.id;
+  if (f === "nubeForm") { nubeSubmit(false); return; }
   if (f === "projKeys") {
     const p = currentProject(); if (!p) return;
     updateProject(p.id, (x) => ({ ...x, keywords: parseKeywords($("projKeysIn").value) }));
@@ -3183,7 +3387,20 @@ if (launch.say || launch.events) {
   if (launch.events) { vault.agenda = { day: localDay(), events: launch.events, importedAt: new Date().toISOString() }; persist(); tab = "agenda"; }
   if (launch.say) { tab = "manu"; say(launch.say); }
 }
+// «…/manu-os/#nube=<url>|<key>»: fills «Tu nube» (also if MANU was already open).
+function applyNubeLink() {
+  if (!location.hash.startsWith("#nube=")) return false;
+  const link = parseSyncLink(location.hash);
+  history.replaceState(null, "", location.pathname + location.search);
+  if (link) { nube.patch(link); tab = "tu"; sub = "nube"; setTimeout(() => toast("Proyecto de tu nube rellenado"), 300); }
+  else setTimeout(() => toast("Ese enlace de tu nube no es válido"), 300);
+  return true;
+}
+applyNubeLink();
+window.addEventListener("hashchange", () => { if (applyNubeLink()) render(); });
 render({ enter: "page" });
+nubeSync();
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") nubeSync(); });
 refreshWeather();
 if (isClientId(gClientId()) && GOOGLE_FEATURES.some(([k]) => googleOn(k))) loadGis().catch(() => {});
 checkReminders();

@@ -32,6 +32,32 @@ Hoja de ruta, un PR por paso:
 
 Límites reales de una web en iPhone: no hay widgets, pantalla bloqueada ni control del Chromecast. Donde se pueda, se hará con Atajos.
 
+## WEB-64 — Tu nube (Supabase, cifrado) — ADR-0017
+
+Manu crea su proyecto Supabase gratuito y pide tener lo mismo en el iPhone y en el Mac.
+
+- `core/sync.js`: REST puro, sin SDK.
+  - Validación de la configuración, que rechaza las claves secretas.
+  - Enlace de alta `#nube=<url>|<key>`.
+  - Login con correo y contraseña, y refresco de sesión.
+  - `remoteHead`, `remoteGet` y `remotePut` con `rev` optimista (`PATCH …&rev=eq.N`).
+  - `decide()` elige entre push, pull, conflicto o nada.
+  - El SQL de la tabla y las políticas RLS está en `SUPABASE_SQL`.
+- `core/crypto.js`: `deriveSyncKey`, `sealWithKey` y `openWithKey`, con el mismo sobre que las copias.
+- App, en Tú → Tu nube:
+  - formulario, SQL copiable y estado;
+  - tarjeta de conflicto («Quedarme con este» o «Traer la de la nube»);
+  - subida 4 s después de cada cambio, y comprobación al abrir y al volver a la app.
+  - La CSP solo permite el host del proyecto de Manu, que también está en `NUBE_URL`.
+- Evidencia:
+  - `npm test`: 203 en verde.
+  - e2e64: 14/14 con dos dispositivos contra un Supabase simulado. Cubre el enlace, la primera subida cifrada, que no se guardan la contraseña ni la frase, el Mac recibe, el Mac sube, el iPhone recibe, la frase incorrecta se rechaza y el conflicto pregunta y se resuelve.
+- Comprobado contra el Supabase real, solo con lecturas públicas:
+  - la clave `sb_publishable_` funciona como `apikey` (`/auth/v1/settings` responde 200);
+  - `mailer_autoconfirm: false`: hay que confirmar el correo, como prevé el código;
+  - sin la tabla, `/rest/v1/manu_sync` responde 404, que la app muestra como «falta crear la tabla».
+- NO_VERIFICADO: el login, la RLS y la subida real. Requieren que Manu cree la tabla y su cuenta.
+
 ## WEB-63 — cierre de jornada y fallos de la IA explicados
 
 Manu pide el cierre de jornada de las 13:00. También manda una captura en la que MANU contesta «La IA no ha respondido ahora» a «mañana qué tengo pendiente?».
