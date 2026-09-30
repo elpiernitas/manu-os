@@ -32,6 +32,21 @@ Hoja de ruta, un PR por paso:
 
 Límites reales de una web en iPhone: no hay widgets, pantalla bloqueada ni control del Chromecast. Donde se pueda, se hará con Atajos.
 
+## WEB-66 — las versiones nuevas llegan solas
+
+En el Chrome del Mac, Manu seguía viendo la versión 64 aunque en la web ya estaba la 65. Ni recargando ni dando de baja el service worker se arreglaba. La causa es que GitHub Pages envía `cache-control: max-age=600`: el `fetch` del SW («red primero») y el `cache.addAll` de la instalación usaban la caché HTTP del navegador. Así una versión nueva podía guardar los archivos anteriores.
+
+- `sw.js`:
+  - la instalación usa `Request(u, { cache: "reload" })`;
+  - el `fetch` usa `{ cache: "no-cache" }`, que siempre pregunta al servidor (un 304 barato si no hay cambios).
+- `app.js`:
+  - el SW se registra con `updateViaCache: "none"`;
+  - al volver a la app se llama a `reg.update()`;
+  - cuando hay un SW nuevo (`controllerchange`), la app se recarga sola si Manu no está escribiendo ni tiene una hoja abierta. Si lo está, avisa y se aplica al volver.
+- Evidencia:
+  - e2e66: 3/3. Sirve la 66, publica la 67 en el servidor y, al volver a la app, aparece la 67 sin cerrarla. Con el código anterior la misma prueba falla.
+  - `npm test`: 203 en verde.
+
 ## WEB-65 — Tu nube: la misma sal en todos los dispositivos
 
 Primera prueba real de Manu, en Chrome del Mac: crea la cuenta, confirma el correo y entra. Ese MANU estaba vacío, así que no subió nada, y la app decía «Sincronizado» y luego «Aún sin sincronizar».

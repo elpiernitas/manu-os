@@ -1,5 +1,5 @@
 // Offline shell: every file of the app is cached; data never leaves the device.
-const VERSION = "manuos-v65";
+const VERSION = "manuos-v66";
 const SHELL = [
   "./", "index.html", "styles.css", "app.js", "manifest.webmanifest",
   "core/text.js", "core/money.js", "core/modes.js", "core/assistant.js",
@@ -8,7 +8,9 @@ const SHELL = [
 ];
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(VERSION).then((cache) => cache.addAll(SHELL)).then(() => self.skipWaiting()));
+  // «reload»: skip the browser's HTTP cache (GitHub Pages says max-age=600),
+  // or a new version could store the previous files (WEB-66).
+  event.waitUntil(caches.open(VERSION).then((cache) => cache.addAll(SHELL.map((u) => new Request(u, { cache: "reload" })))).then(() => self.skipWaiting()));
 });
 
 self.addEventListener("activate", (event) => {
@@ -23,7 +25,9 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET" || new URL(event.request.url).origin !== self.location.origin) return;
   event.respondWith(
-    fetch(event.request)
+    // «no-cache»: always ask the server (a cheap 304 if nothing changed), so
+    // a new version arrives at once instead of up to 10 minutes later (WEB-66).
+    fetch(event.request, { cache: "no-cache" })
       .then((response) => {
         const copy = response.clone();
         if (response.ok) caches.open(VERSION).then((cache) => cache.put(event.request, copy));
