@@ -174,3 +174,7 @@ En WEB-64, la prueba de dos dispositivos siempre conectaba primero el que tenía
 ### QAL-041 — Un service worker «red primero» también pasa por la caché HTTP
 
 En WEB-66, el SW pedía a la red, pero `fetch(request)` y `cache.addAll` usan la caché HTTP del navegador. Como GitHub Pages envía `max-age=600`, una versión recién publicada podía tardar 10 minutos en verse, o guardarse con archivos viejos. En un SW, las peticiones de la app llevan `cache: "no-cache"`, la instalación lleva `cache: "reload"` y el registro, `updateViaCache: "none"`. La prueba de actualización cambia los archivos en un servidor real y comprueba la versión que ve la página ya abierta.
+
+### QAL-042 — Un import puede tapar una función del navegador
+
+En WEB-69, `app.js` importaba `confirm` de `core/inbox.js`. Cualquier `confirm("¿Seguro?")` llamaba a esa función en vez de abrir el diálogo, y fallaba. Los botones con confirmación de WEB-64 no se probaron pulsándolos, así que nadie lo vio. Cada botón con diálogo se prueba pulsándolo, aceptando y cancelando. En `app.js` los diálogos van como `window.confirm`, `window.prompt` y `window.alert`, y una prueba lint lo vigila.

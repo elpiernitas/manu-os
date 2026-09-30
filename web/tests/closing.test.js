@@ -84,6 +84,14 @@ test("WEB-63: an empty reply cut by MAX_TOKENS is retried with more room", async
   assert.equal(f.calls[1].generationConfig.maxOutputTokens, 2400);
 });
 
+test("WEB-69: a JSON answer cut by MAX_TOKENS is retried with more room", async () => {
+  const jsonPayload = { contents: [{ role: "user", parts: [{ text: "x" }] }], generationConfig: { maxOutputTokens: 800, responseMimeType: "application/json" } };
+  const f = seq(reply(200, { candidates: [{ content: { parts: [{ text: '[{"nombre":"Fies' }] }, finishReason: "MAX_TOKENS" }] }), okText('[{"nombre":"Fiestas"}]'));
+  const r = await askWithActions({ key: "k", model: "m", payload: jsonPayload, confirmed: true }, f, noPause);
+  assert.equal(r.text, '[{"nombre":"Fiestas"}]');
+  assert.equal(f.calls[1].generationConfig.maxOutputTokens, 3200);
+});
+
 test("WEB-63: bad key, bad request, retired model and filters are told apart", async () => {
   await assert.rejects(generate({ key: "k", model: "m", payload }, seq(reply(400, { error: { message: "API key not valid. Please pass a valid API key." } })), noPause), (e) => e.code === "key");
   await assert.rejects(generate({ key: "k", model: "m", payload }, seq(reply(400, { error: { message: "Invalid JSON payload" } })), noPause), (e) => e.code === "bad" && /Invalid JSON/.test(e.message));

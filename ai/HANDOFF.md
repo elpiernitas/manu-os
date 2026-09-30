@@ -32,6 +32,24 @@ Hoja de ruta, un PR por paso:
 
 Límites reales de una web en iPhone: no hay widgets, pantalla bloqueada ni control del Chromecast. Donde se pueda, se hará con Atajos.
 
+## WEB-69 — confirmar antes de tirar correos; propuestas de proyectos; `window.confirm`
+
+En el iPhone real de Manu:
+1. Apareció «A la papelera 32 correos de GAME» sin que él quisiera. Lo más probable es que, al pulsar «Hecho» en la tarjeta de la exportación de ChatGPT (se lo habíamos indicado), la tarjeta de GAME subiera a ocupar su sitio y su botón «Papelera» quedara bajo el dedo. La causa exacta es NO_VERIFICADA. Se puede deshacer desde el chat y Gmail guarda la papelera 30 días.
+2. «Proponer mis proyectos» dijo «No he visto proyectos claros», aunque tiene 849 conversaciones.
+
+- Las tarjetas y Tú → Correo piden confirmación antes de «Papelera» y «Archivar».
+- **Defecto real encontrado al probarlo:** `app.js` importa `confirm` de `core/inbox.js`, que tapa el `confirm()` del navegador. Por eso «Desconectar este dispositivo» y «Traer la de la nube» (WEB-64) fallaban con «Unknown kind undefined». Ahora todo usa `window.confirm`, y `tests/app-lint.test.js` impide volver a escribir `confirm("…")` a secas.
+- Propuestas:
+  - `maxOutputTokens` pasa de 800 a 2048;
+  - una respuesta JSON cortada por `MAX_TOKENS` se reintenta con más margen (`generate`);
+  - `parseSuggestions` acepta la lista envuelta (`{"proyectos": [...]}`) y devuelve `null` si no puede leerla, con un mensaje distinto a «no hay proyectos».
+- Evidencia:
+  - `npm test`: 205 en verde.
+  - e2e33: la tarjeta pregunta, y con «Cancelar» no toca nada.
+  - e2e67: 24/24, dos veces, con «Traer la de la nube» y «Desconectar».
+  - La prueba lint falla con el código anterior.
+
 ## WEB-68 — Tu nube: el enlace del correo, también en el iPhone
 
 Sin un SMTP propio, Supabase no deja editar las plantillas: el correo «Magic link or OTP» solo trae un enlace, no `{{ .Token }}`. Lo comprobó Cowork en el panel y no cambió nada. Manu no quiere configurar SMTP.

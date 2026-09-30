@@ -176,7 +176,9 @@ export async function generate({ key, model, payload }, fetchImpl = fetch, pause
     const reason = json?.promptFeedback?.blockReason ?? json?.candidates?.[0]?.finishReason ?? null;
     const empty = !replyText(json) && !parseCalls(json).length;
     const room = body.generationConfig?.maxOutputTokens ?? 0;
-    if (empty && reason === "MAX_TOKENS" && room > 0 && room < 8192) {
+    // WEB-69: a JSON answer cut in the middle is as useless as an empty one.
+    const cut = empty || body.generationConfig?.responseMimeType === "application/json";
+    if (cut && reason === "MAX_TOKENS" && room > 0 && room < 8192) {
       body = { ...body, generationConfig: { ...body.generationConfig, maxOutputTokens: Math.min(8192, room * 4) } };
       continue;
     }
