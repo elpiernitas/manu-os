@@ -2,11 +2,11 @@
 
 Status: **REVIEW_PENDING**
 
-WEB-65 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
+WEB-66 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
 
 ## Tarea activa
 
-WEB-65 — Tu nube: la misma sal para todos los dispositivos (`ai/HANDOFF.md`, «WEB-65»).
+WEB-66 — las versiones nuevas llegan solas (`ai/HANDOFF.md`, «WEB-66»).
 
 ## Autorización
 

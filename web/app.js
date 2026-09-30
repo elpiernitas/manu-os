@@ -40,7 +40,7 @@ import { isSpotifyClientId, pkceValid, randomVerifier, challengeFor, authorizeUr
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "65";
+export const APP_VERSION = "66";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -3376,8 +3376,20 @@ addEventListener("online", () => refreshWeather());
 if (loaded.warning) { $("banner").textContent = loaded.warning; $("banner").hidden = false; }
 if ("serviceWorker" in navigator) {
   const hadController = Boolean(navigator.serviceWorker.controller);
-  navigator.serviceWorker.addEventListener("controllerchange", () => { if (hadController) toast("MANU se ha actualizado"); });
-  navigator.serviceWorker.register("sw.js").catch(() => {});
+  // WEB-66: a new version reloads by itself, unless Manu is typing or has
+  // something open; then it waits until he comes back to MANU.
+  let pendingReload = false;
+  const reloadIfIdle = () => {
+    if (!pendingReload || restoring) return;
+    if (sheet || document.activeElement?.matches("input, textarea, select")) { toast("MANU se ha actualizado: se aplicará al volver"); return; }
+    location.reload();
+  };
+  navigator.serviceWorker.addEventListener("controllerchange", () => { if (hadController) { pendingReload = true; reloadIfIdle(); } });
+  navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).then((reg) => {
+    // The installed app on the iPhone can stay open for days: look for a new
+    // version every time Manu comes back to it.
+    document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") { reg.update().catch(() => {}); reloadIfIdle(); } });
+  }).catch(() => {});
 }
 
 // Spotify redirect back (Authorization Code with PKCE).

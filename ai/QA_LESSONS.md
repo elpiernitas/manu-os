@@ -170,3 +170,7 @@ En WEB-63, MANU respondió «La IA no ha respondido ahora» en el iPhone de Manu
 ### QAL-040 — Probar el orden en que se conectan los dispositivos
 
 En WEB-64, la prueba de dos dispositivos siempre conectaba primero el que tenía datos. En la vida real, Manu conectó primero el Mac vacío, y así cada dispositivo habría acabado con su propia sal: la misma frase, pero claves distintas. Cuando varios dispositivos comparten algo derivado (claves, identificadores, esquemas), el primero que se conecta debe fijarlo en el servidor aunque no tenga datos. Las pruebas cubren los dos órdenes y el caso de un dispositivo vacío.
+
+### QAL-041 — Un service worker «red primero» también pasa por la caché HTTP
+
+En WEB-66, el SW pedía a la red, pero `fetch(request)` y `cache.addAll` usan la caché HTTP del navegador. Como GitHub Pages envía `max-age=600`, una versión recién publicada podía tardar 10 minutos en verse, o guardarse con archivos viejos. En un SW, las peticiones de la app llevan `cache: "no-cache"`, la instalación lleva `cache: "reload"` y el registro, `updateViaCache: "none"`. La prueba de actualización cambia los archivos en un servidor real y comprueba la versión que ve la página ya abierta.
