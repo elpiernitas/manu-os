@@ -25,20 +25,21 @@ import { diaryDocs, dayLines, dayFromText, isDiaryQuestion, dayTitle } from "./c
 import { applyBuzon, buzonSummary } from "./core/buzon.js";
 import { briefing, briefingText, isBriefingQuestion, monthPace } from "./core/briefing.js";
 import { whatNow, whatNowText, isWhatNowQuestion } from "./core/now.js";
+import { closingDue, workClosing, closingText, isClosingQuestion, nextWorkDay } from "./core/closing.js";
 import { searchContacts } from "./core/contacts.js";
 import { autoFile, projectKeys, parseKeywords, buildSuggestPayload, parseSuggestions, projectMarkdown, projectZip, projectFileName } from "./core/autofile.js";
 import { newCapture, toReview, pendingCaptures, groupCaptures, buildCapturesPayload, parseCapturesReply, applyReading, keepCapture, dropCapture, trimCaptures, BATCH } from "./core/captures.js";
 import { budgetStatus, budgetLine, budgetCommand } from "./core/budget.js";
 import { findInVault, findCommand } from "./core/find.js";
 import { weatherEmoji, sceneFor, PARTICLES, SHAPES, MONEY_EMOJI, dayPhase, cityMinutes } from "./core/scene.js";
-import { buildImagePayload, buildLinkPayload, isGeminiKey, mayGo, setSensitiveOk, sensitiveAllowed, pickModel, listModels, buildActionPayload, askWithActions, issueUrl } from "./core/ai.js";
+import { buildImagePayload, buildLinkPayload, isGeminiKey, mayGo, setSensitiveOk, sensitiveAllowed, pickModel, listModels, buildActionPayload, askWithActions, issueUrl, aiErrorText } from "./core/ai.js";
 import { encryptBackup, decryptBackup, passphraseProblem, isEnvelope } from "./core/crypto.js";
 import { exportFullBackup, downloadBlob, readBackupFile, restoreFullBackup, FORMAT as FULL_FORMAT } from "./core/backup-manager.js";
 import { isSpotifyClientId, pkceValid, randomVerifier, challengeFor, authorizeUrl, exchangeCode, refreshTokens, listDevices, findSpeaker, transferTo, DEFAULT_SPEAKER } from "./core/spotify.js";
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "62";
+export const APP_VERSION = "63";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -334,9 +335,27 @@ function dayBriefing() {
     budgetAlerts: budgetsNow().filter((b) => b.status !== "ok").slice(0, 2).map(budgetLine),
   });
 }
+// ---------- Cierre de jornada (WEB-63) ----------
+const dayClosing = () => workClosing({ now: today(), inbox: vault.inbox, tomorrow: eventsFor(nextWorkDay(today()).key), reminders: vault.reminders });
+const overrideOn = () => Boolean(vault.settings.override && today() < new Date(vault.settings.override.until));
+const closingNow = () => (!overrideOn() && closingDue(today(), { closedDay: vault.settings.closedDay ?? null }) ? dayClosing() : null);
+function closingCard() {
+  const c = closingNow();
+  if (!c) return "";
+  return `<section class="card brief closing" aria-labelledby="closeTitle"><h2 id="closeTitle">🏁 Cierre de jornada</h2>
+    <ul class="brief-list">${c.lines.map((l) => `<li><span aria-hidden="true">${l.e}</span><span>${esc(l.t)}</span></li>`).join("")}</ul>
+    <div class="btns"><button class="btn" data-act="close-day">Jornada cerrada</button><button class="btn ghost" data-act="sheet" data-kind="TASK">Apuntar para ${esc(c.label)}</button></div></section>`;
+}
+function closeDay() {
+  const label = dayClosing().label;
+  vault.settings.closedDay = localDay();
+  persist(); render();
+  toast(`Hecho. Desconecta hasta ${label}.`);
+}
+
 // ---------- Ahora (WEB-58): una sola cosa, la siguiente ----------
 function nowPlan() {
-  return whatNow({
+  return whatNow({ closing: closingNow(),
     now: today(), mode: modeState(today(), undefined, vault.settings.override).mode,
     events: eventsFor(localDay()), tomorrow: eventsFor(tomorrowKey()),
     reminders: vault.reminders, tasks: tasks(vault.inbox), projects: vault.projects,
@@ -877,6 +896,7 @@ const screens = {
     return `<h1>${greeting()}, Manu</h1><p class="subtitle">${esc(longDate())} · <span class="chip">${esc(MODE_TITLES[m.mode])}</span></p>
       <div class="stack">
       ${nowCard()}
+      ${closingCard()}
       ${briefingCard()}
       ${nightCard()}
       ${weatherCard()}
@@ -1601,6 +1621,12 @@ function say(text) {
     vault.chat.push({ from: "me", text: clean, at }, { from: "manu", text: whatNowText(nowPlan()), at });
     persist(); render(); return;
   }
+  // WEB-63: «cierra la jornada», «he terminado de currar».
+  if (isClosingQuestion(clean)) {
+    vault.chat.push({ from: "me", text: clean, at }, { from: "manu", text: closingText(dayClosing()), at });
+    if (closingDue(today(), { closedDay: vault.settings.closedDay ?? null })) vault.settings.closedDay = localDay();
+    persist(); render(); return;
+  }
   // WEB-46: «¿cómo va mi día?», «resumen del día».
   if (isBriefingQuestion(normalise(clean))) {
     vault.chat.push({ from: "me", text: clean, at }, { from: "manu", text: briefingText(dayBriefing()), at });
@@ -1720,6 +1746,18 @@ function shownPayload(p) {
   return `${JSON.stringify(rest, null, 1)}\n+ lista fija de ${tools[0].functionDeclarations.length} acciones que puede proponer`;
 }
 
+// WEB-63: if Google retired the model chosen when the key was pasted, pick
+// the current one and try once more instead of failing.
+async function freshModel(call) {
+  try { return await call(); } catch (err) {
+    if (err.code !== "model") throw err;
+    const model = pickModel(await listModels(aiStore.key));
+    if (!model || model === aiStore.model) throw err;
+    aiStore.model = model;
+    return call();
+  }
+}
+
 async function activateGemini(key) {
   aiStore.key = key;
   try {
@@ -1832,7 +1870,7 @@ async function converse(message) {
   vault.chat.push(answer);
   persist(); render();
   try {
-    const { text, calls } = await askWithActions({ key: aiStore.key, model: aiStore.model, payload, confirmed: true, permit: (t) => allowedToSend(t, sensitiveAllowed() ? FULL_CONTEXT : mode.context).ok });
+    const { text, calls } = await freshModel(() => askWithActions({ key: aiStore.key, model: aiStore.model, payload, confirmed: true, permit: (t) => allowedToSend(t, sensitiveAllowed() ? FULL_CONTEXT : mode.context).ok }));
     answer.text = text || (calls.length ? "Hecho:" : "…");
     if (calls.length) {
       answer.calls = calls.map((c) => ({ ...c, state: null }));
@@ -1840,7 +1878,7 @@ async function converse(message) {
     }
   } catch (err) {
     answer.ai = false;
-    answer.text = err.code === "quota" ? "Hoy ya no queda IA gratuita. Sigo sin IA." : err.code === "key" ? "La clave de Gemini no funciona. Revísala en Tú → IA." : err.code === "sensitive" ? "Algo de la conversación parece privado y no lo envío." : "La IA no ha respondido ahora.";
+    answer.text = aiErrorText(err);
   }
   persist(); if (tab === "manu") render();
 }
@@ -1865,12 +1903,12 @@ async function askAi(proposalId, { auto = false } = {}) {
   vault.chat.push(answer);
   persist(); render();
   try {
-    const { text, calls } = await askWithActions({ key: aiStore.key, model: aiStore.model, payload: proposalPayload(bubble.proposal), confirmed: consent });
+    const { text, calls } = await freshModel(() => askWithActions({ key: aiStore.key, model: aiStore.model, payload: proposalPayload(bubble.proposal), confirmed: consent }));
     answer.text = text || (calls.length === 1 ? "Te propongo esto:" : "Te propongo esto (confirma lo que quieras):");
     if (calls.length) answer.calls = calls.map((c) => ({ ...c, state: null }));
   } catch (err) {
     answer.ai = false;
-    answer.text = err.code === "quota" ? "Hoy ya no queda IA gratuita. Sigo sin IA." : err.code === "key" ? "La clave de Gemini no funciona. Revísala en Tú → IA." : err.code === "sensitive" ? "Eso parece privado: no lo envío." : err.code === "unconfirmed" ? "No lo envío sin tu permiso." : "La IA no ha respondido ahora.";
+    answer.text = err.code === "sensitive" ? "Eso parece privado: no lo envío." : aiErrorText(err);
   }
   persist();
   if (tab === "manu") render();
@@ -2354,6 +2392,7 @@ document.addEventListener("click", async (e) => {
     case "toggle": updateItem(id, toggleDone); break;
     case "rem-done": vault.reminders = vault.reminders.map((r) => (r.id === id ? { ...r, done: !r.done } : r)); persist(); render(); break;
     case "sheet": openSheet(a.dataset.kind, true); break;
+    case "close-day": closeDay(); break;
     case "chat-image-remove": chatImage = null; render(); break;
     case "proj-open": openProject = a.dataset.id; projSourceKind = "note"; render({ focus: true, enter: "page" }); scrollTo(0, 0); break;
     case "proj-back": openProject = null; render({ focus: true, enter: "tab" }); scrollTo(0, 0); break;

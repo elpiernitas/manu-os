@@ -32,6 +32,26 @@ Hoja de ruta, un PR por paso:
 
 Límites reales de una web en iPhone: no hay widgets, pantalla bloqueada ni control del Chromecast. Donde se pueda, se hará con Atajos.
 
+## WEB-63 — cierre de jornada y fallos de la IA explicados
+
+Manu pide el cierre de jornada de las 13:00. También manda una captura en la que MANU contesta «La IA no ha respondido ahora» a «mañana qué tengo pendiente?».
+
+- Cierre de jornada (`core/closing.js`):
+  - `closingDue` es cierto los días laborables entre `workEnd` (13:00) y dos horas después, si no se ha cerrado ya ese día (`settings.closedDay`). No aplica con un modo elegido a mano.
+  - `workClosing` reúne lo terminado hoy (`doneAt`), las tres tareas abiertas más antiguas y lo primero del siguiente día laborable (evento o recordatorio). El viernes apunta al lunes.
+  - En Hoy aparece la tarjeta «🏁 Cierre de jornada» con «Jornada cerrada» y «Apuntar para mañana». «Ahora» la pone primero, después de lo vencido y de lo que empieza en 90 minutos.
+  - En el chat, «cierra la jornada» o «he terminado de currar» responden sin IA.
+- Fallos de la IA (`core/ai.js`, `generate`):
+  - Antes, cualquier fallo terminaba en el mismo mensaje. Ahora hay un reintento ante un corte de red o un 5xx.
+  - Si la respuesta llega vacía por `MAX_TOKENS` (los modelos que «piensan» gastan tokens antes de escribir), se reintenta con más margen. La conversación pasa de 600 a 1024 tokens.
+  - Se distinguen clave mala, petición rechazada (con el motivo de Google), modelo retirado (404), filtros (`SAFETY` o `blockReason`) y respuesta vacía. `aiErrorText` dice a Manu el motivo real.
+  - Con un 404, `freshModel` elige el modelo actual de su cuenta y reintenta una vez.
+- Causa del fallo de la captura: NO_VERIFICADO. El mensaje antiguo no guardaba el motivo, así que no se puede saber cuál fue. Las causas más probables están cubiertas; si vuelve a pasar, el mensaje nuevo dirá cuál es.
+- Evidencia:
+  - `npm test`: 196 en verde.
+  - e2e63: 10/10 (tarjeta, cierre guardado, frase en el chat sin IA, 503 reintentado, dos 503 explicados, 404 con cambio de modelo).
+  - Batería e2e: ver el PR.
+
 ## WEB-62 — guardar el cumpleaños en Google Contactos
 
 Manu autoriza el permiso de escritura en sus contactos.

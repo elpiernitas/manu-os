@@ -79,7 +79,7 @@ export function buildConversationPayload({ message, history = [], contextText = 
     systemInstruction: { parts: [{ text: conversationSystem(contextText, now, autoActions) }] },
     contents: [...turns, { role: "user", parts: [{ text: String(message).slice(0, 2000) }] }],
     tools: TOOLS,
-    generationConfig: { maxOutputTokens: 600, temperature: 0.6 },
+    generationConfig: { maxOutputTokens: 1024, temperature: 0.6 }, // room for thinking models (WEB-63)
   };
 }
 
