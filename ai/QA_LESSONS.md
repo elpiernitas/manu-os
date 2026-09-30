@@ -154,3 +154,7 @@ En WEB-53, una URL larga en una rejilla `1fr` o en un título ensanchaba la pág
 ### QAL-036 — Un archivo del usuario no se lee entero en memoria
 
 En WEB-56, el importador hacía `file.arrayBuffer()` y `JSON.parse` del archivo completo. Con una exportación real de 1,49 GB, eso cerraría Safari en el iPhone. Los archivos que el usuario elige (exportaciones, copias, extractos) se leen por trozos: `File.slice()` o `stream()`, se descomprime en flujo y se guarda por lotes. Los tests usan `File` reales y trozos cortados en cualquier punto. La prueba e2e usa un archivo sintético del tamaño real, generado por una herramienta distinta de la que lo lee.
+
+### QAL-037 — Probar la clasificación con lo que guarda la ruta real
+
+En WEB-60, los tests unitarios de la autoclasificación pasaban con ideas en estado `IDEA`. Pero lo que Manu escribe en el chat («apunta idea: …») se guarda como `PENDING` y no se clasificaba. Solo lo detectó la prueba e2e que escribe en el chat. Cuando una función procesa datos del usuario, la prueba debe crear esos datos por la misma vía que él, no con un estado supuesto. Y el test unitario debe incluir cada estado real que exista.

@@ -25,6 +25,7 @@ import { diaryDocs, dayLines, dayFromText, isDiaryQuestion, dayTitle } from "./c
 import { applyBuzon, buzonSummary } from "./core/buzon.js";
 import { briefing, briefingText, isBriefingQuestion, monthPace } from "./core/briefing.js";
 import { whatNow, whatNowText, isWhatNowQuestion } from "./core/now.js";
+import { autoFile, projectKeys, parseKeywords, buildSuggestPayload, parseSuggestions, projectMarkdown, projectZip, projectFileName } from "./core/autofile.js";
 import { newCapture, toReview, pendingCaptures, groupCaptures, buildCapturesPayload, parseCapturesReply, applyReading, keepCapture, dropCapture, trimCaptures, BATCH } from "./core/captures.js";
 import { budgetStatus, budgetLine, budgetCommand } from "./core/budget.js";
 import { findInVault, findCommand } from "./core/find.js";
@@ -36,7 +37,7 @@ import { isSpotifyClientId, pkceValid, randomVerifier, challengeFor, authorizeUr
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "59";
+export const APP_VERSION = "60";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -110,8 +111,18 @@ const hhmm = (d) => `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinu
 let restoring = false; // WEB-44: while a full copy is restored, nothing in memory may overwrite it
 function persist() {
   if (restoring) return;
+  fileNewItems();
   if (vault.chat.length > 200) vault.chat = vault.chat.slice(-200);
   if (!store.save(vault)) toast("No he podido guardar en este dispositivo.");
+}
+
+// WEB-60: ideas, tasks and kept screenshots go to their project by themselves.
+function fileNewItems(onlyProject = null) {
+  if (!(vault.projects ?? []).length) return [];
+  const r = autoFile(vault, { onlyProject, uid: () => uid("src") });
+  vault.projects = r.projects; vault.inbox = r.inbox; vault.captures = r.captures;
+  if (r.filed.length && !onlyProject) setTimeout(() => toast(r.filed.length === 1 ? `Guardado también en «${r.filed[0].project}»` : `${r.filed.length} cosas guardadas en sus proyectos`), 50);
+  return r.filed;
 }
 
 function toast(msg) {
@@ -513,6 +524,81 @@ async function finishSpotifyAuth(params) {
   } catch { toast("Spotify no ha dado permiso"); }
 }
 
+// ---------- Projects that create and fill themselves (WEB-60) ----------
+const projAuto = { suggestions: null, busy: false };
+function suggestCard() {
+  const s = projAuto.suggestions;
+  if (s?.length) return `<section class="card"><h2>✨ Tus proyectos en marcha</h2><p class="muted small">Sacados de tus conversaciones y apuntes. Al crearlos, MANU les mete tus conversaciones de ChatGPT sobre el tema y, a partir de ahí, todo lo que apuntes que tenga que ver.</p>
+    ${s.map((x, i) => `<div class="row"><span aria-hidden="true">${esc(x.emoji)}</span><div class="grow"><b>${esc(x.name)}</b><div class="muted small">${esc(x.keywords.join(", "))}</div></div><button class="btn ghost" data-act="proj-sug-add" data-i="${i}">Crear</button></div>`).join("")}
+    <div class="btns"><button class="btn" data-act="proj-sug-all">Crear todos</button><button class="link small" data-act="proj-sug-close">Ahora no</button></div></section>`;
+  if (!aiReady() || !(archive.stats?.count || vault.inbox.length)) return "";
+  return `<section class="card"><h2>✨ Que se creen solos</h2><p class="muted small">MANU mira de qué has hablado últimamente y te propone tus proyectos. Se envían a Gemini solo los títulos de tus conversaciones y tus apuntes (sin nada privado).</p><button class="btn block" data-act="proj-suggest">${projAuto.busy ? "Pensando…" : "Proponer mis proyectos"}</button></section>`;
+}
+
+async function suggestProjects() {
+  if (projAuto.busy) return;
+  projAuto.busy = true; render();
+  try {
+    const docs = (await archiveDocs()).filter((d) => d.source === "chatgpt").sort((a, b) => (b.at ?? 0) - (a.at ?? 0));
+    const payload = buildSuggestPayload({ titles: docs.slice(0, 150).map((d) => d.title), notes: vault.inbox.slice(-60).map((i) => i.text) });
+    const { text } = await askWithActions({ key: aiStore.key, model: aiStore.model, payload, confirmed: true });
+    projAuto.suggestions = parseSuggestions(text, vault.projects ?? []);
+    if (!projAuto.suggestions.length) toast("No he visto proyectos claros. Crea uno a mano.");
+  } catch (err) { toast(err.code === "quota" ? "Hoy ya no queda IA gratuita." : `No he podido: ${err.message}`); }
+  projAuto.busy = false; render();
+}
+
+// Brings his ChatGPT conversations about the project in as sources (top 5).
+async function seedFromArchive(p) {
+  const docs = (await archiveDocs()).filter((d) => d.source === "chatgpt");
+  if (!docs.length) return 0;
+  const hits = new Map();
+  for (const k of projectKeys(p)) for (const r of archiveSearch(docs, k, { limit: 12 })) hits.set(r.doc.id, { doc: r.doc, n: (hits.get(r.doc.id)?.n ?? 0) + 1 });
+  const have = new Set(p.sources.map((s) => s.from));
+  const top = [...hits.values()].filter((h) => !have.has(`archive:${h.doc.id}`)).sort((a, b) => b.n - a.n || (b.doc.at ?? 0) - (a.doc.at ?? 0)).slice(0, 5);
+  let added = 0;
+  vault.projects = vault.projects.map((x) => {
+    if (x.id !== p.id) return x;
+    let y = x;
+    for (const { doc } of top) {
+      try {
+        y = addSource(y, { id: uid("src"), kind: "note", title: `ChatGPT: ${doc.title}`, text: doc.messages.map((m) => `${m.role === "me" ? "Manu" : "ChatGPT"}: ${m.text}`).join("\n\n"), at: new Date(doc.at ?? Date.now()).toISOString() });
+        Object.assign(y.sources[y.sources.length - 1], { from: `archive:${doc.id}`, auto: true });
+        added++;
+      } catch { break; }
+    }
+    return y;
+  });
+  return added;
+}
+
+async function createProject({ name, emoji, keywords = [] }) {
+  const p = { ...newProject({ id: uid("p"), name, emoji }), keywords };
+  vault.projects = [...(vault.projects ?? []), p];
+  const filed = fileNewItems(p.id);
+  const seeded = await seedFromArchive(p);
+  persist();
+  return { p, n: filed.length + seeded };
+}
+
+// .zip (ChatGPT, Claude) or .md (NotebookLM): the share sheet if the phone has it.
+async function exportProject(p, kind) {
+  let file;
+  if (kind === "zip") {
+    const images = {};
+    for (const s of p.sources) if (s.imageId) { try { images[s.imageId] = imageCache.get(s.imageId) ?? await getImage(s.imageId); } catch {} }
+    const z = projectZip(p, images);
+    file = new File([z.bytes], z.name, { type: "application/zip" });
+  } else file = new File([projectMarkdown(p)], projectFileName(p, "md"), { type: "text/markdown" });
+  try {
+    if (navigator.canShare?.({ files: [file] })) { await navigator.share({ files: [file], title: p.name }); return; }
+  } catch (err) { if (err?.name === "AbortError") return; }
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(file); a.download = file.name;
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+}
+
 // ---------- Projects (WEB-25, like NotebookLM) ----------
 const currentProject = () => (vault.projects ?? []).find((x) => x.id === openProject) ?? null;
 function updateProject(id, fn) {
@@ -538,11 +624,16 @@ function projectPage(p) {
       ${(p.chat ?? []).length ? `<div class="proj-chat">${p.chat.map((m) => `<div class="bubble ${m.from}">${m.from === "manu" && m.ai ? '<span class="ai-tag">IA</span>' : ""}${esc(m.text)}${m.cites?.length ? `<div class="cites">${m.cites.map((n) => { const src = p.sources[n - 1]; return src ? `<button class="chip" data-act="proj-src-view" data-id="${esc(src.id)}" data-n="${n}">[${n}] ${esc(src.title.slice(0, 28))}</button>` : ""; }).join("")}</div>` : ""}${m.excluded?.length ? `<p class="muted small">No envié las fuentes ${m.excluded.map((n) => `[${n}]`).join(", ")} por parecer privadas.</p>` : ""}</div>`).join("")}</div>` : ""}
     </section>
     ${sectionTitle(`Fuentes (${p.sources.length})`)}
-    <section class="card">${p.sources.length ? p.sources.map((src, i) => `<div class="row"><span class="src-n">${i + 1}</span><span aria-hidden="true">${SOURCE_ICON[src.kind]}</span>${src.imageId ? `<button class="thumb" data-act="img-view" data-img-id="${esc(src.imageId)}" aria-label="Ver captura"><img data-img="${esc(src.imageId)}" alt=""></button>` : ""}<div class="grow"><div>${esc(src.title)}</div>${src.text && src.kind !== "note" ? `<div class="muted small">${esc(src.text.slice(0, 90))}${src.text.length > 90 ? "…" : ""}</div>` : src.kind === "note" ? `<div class="muted small">${src.text.length} caracteres</div>` : ""}</div>${src.url ? `<a class="link small" href="${esc(src.url)}" target="_blank" rel="noopener">Abrir</a>` : ""}<button class="link small" data-act="proj-del-source" data-id="${esc(src.id)}" aria-label="Quitar fuente">✕</button></div>`).join("") : '<p class="muted">Añade notas, capturas o vídeos. Luego pregunta y MANU te contesta solo con eso.</p>'}</section>
+    <section class="card">${p.sources.length ? p.sources.map((src, i) => `<div class="row"><span class="src-n">${i + 1}</span><span aria-hidden="true">${SOURCE_ICON[src.kind]}</span>${src.imageId ? `<button class="thumb" data-act="img-view" data-img-id="${esc(src.imageId)}" aria-label="Ver captura"><img data-img="${esc(src.imageId)}" alt=""></button>` : ""}<div class="grow"><div>${esc(src.title)}${src.auto ? ' <span class="chip small">auto</span>' : ""}</div>${src.text && src.kind !== "note" ? `<div class="muted small">${esc(src.text.slice(0, 90))}${src.text.length > 90 ? "…" : ""}</div>` : src.kind === "note" ? `<div class="muted small">${src.text.length} caracteres</div>` : ""}</div>${src.url ? `<a class="link small" href="${esc(src.url)}" target="_blank" rel="noopener">Abrir</a>` : ""}<button class="link small" data-act="proj-del-source" data-id="${esc(src.id)}" aria-label="Quitar fuente">✕</button></div>`).join("") : '<p class="muted">Añade notas, capturas o vídeos. Luego pregunta y MANU te contesta solo con eso.</p>'}</section>
     <section class="card"><h2>Añadir fuente</h2>
       <div class="segmented three" role="group" aria-label="Tipo de fuente">${kinds.map(([k, l]) => `<button type="button" data-act="proj-kind" data-kind="${k}" aria-pressed="${k === projSourceKind}">${l}</button>`).join("")}</div>
       <form id="projSource" class="stack">${form}</form>
     </section>
+    <section class="card"><h2>Se llena solo</h2><p class="muted small">Lo que apuntes, las ideas y las capturas que guardes con estas palabras entran aquí sin que hagas nada.</p>
+      <form id="projKeys" class="composer-inline"><label for="projKeysIn" class="sr">Palabras clave</label><input id="projKeysIn" maxlength="400" value="${esc((p.keywords ?? []).join(", "))}" placeholder="prao, cimadevilla, fiesta"><button class="btn" type="submit">Guardar</button></form>
+      <button class="btn ghost block" data-act="proj-seed">${projAuto.busy === p.id ? "Buscando…" : "🔎 Traer mis conversaciones de ChatGPT sobre esto"}</button></section>
+    <section class="card"><h2>Llévatelo a otra IA</h2><p class="muted small">Todo el proyecto (notas, enlaces, capturas y lo que habéis hablado) en un archivo para ChatGPT, Claude o NotebookLM.</p>
+      <div class="btns"><button class="btn" data-act="proj-export" data-kind="zip">📦 .zip para ChatGPT o Claude</button><button class="btn ghost" data-act="proj-export" data-kind="md">📄 Texto para NotebookLM</button></div></section>
     <button class="link small danger-link" data-act="proj-delete">Borrar este proyecto</button>
     </div>`;
 }
@@ -880,6 +971,7 @@ const screens = {
     return `<h1>Proyectos</h1><p class="subtitle">Cuadernos con tus fuentes: MANU responde solo con lo que metas en cada uno.</p>
       <div class="stack">
       ${list.length ? `<div class="proj-grid">${list.map((x) => `<button class="proj-card" data-act="proj-open" data-id="${esc(x.id)}"><span class="proj-e" aria-hidden="true">${esc(x.emoji)}</span><b>${esc(x.name)}</b><span class="muted small">${x.sources.length} fuente${x.sources.length === 1 ? "" : "s"}</span></button>`).join("")}</div>` : '<section class="card"><p class="muted">Aún no tienes proyectos. Crea uno para un viaje, un estudio, una reforma, recetas… y mete notas, capturas y vídeos.</p></section>'}
+      ${suggestCard()}
       <section class="card"><h2>Nuevo proyecto</h2><form id="projForm" class="proj-new"><label for="projEmoji" class="sr">Emoji</label><input id="projEmoji" maxlength="4" value="📁" aria-label="Emoji"><label for="projName" class="sr">Nombre</label><input id="projName" maxlength="60" placeholder="Viaje a Lisboa" required><button class="btn" type="submit">Crear</button></form></section>
       </div>`;
   },
@@ -2258,6 +2350,16 @@ document.addEventListener("click", async (e) => {
     case "chat-new": startNewChat(); toast("Conversación nueva. La anterior queda en Tu archivo."); break;
     case "profile-make": makeProfile(); break;
     case "cap-read": readCaptures(); break;
+    case "proj-suggest": suggestProjects(); break;
+    case "proj-sug-close": projAuto.suggestions = null; render(); break;
+    case "proj-sug-add": case "proj-sug-all": {
+      const list = projAuto.suggestions ?? [];
+      const pick = a.dataset.act === "proj-sug-all" ? list : [list[Number(a.dataset.i)]].filter(Boolean);
+      (async () => { let n = 0; for (const s of pick) n += (await createProject(s)).n; projAuto.suggestions = list.filter((x) => !pick.includes(x)); if (!projAuto.suggestions.length) projAuto.suggestions = null; persist(); render(); toast(`${pick.length === 1 ? "Proyecto creado" : `${pick.length} proyectos creados`}${n ? `, con ${n} cosas tuyas dentro` : ""}`); })();
+      break;
+    }
+    case "proj-seed": { const p = currentProject(); if (!p) break; projAuto.busy = p.id; render(); seedFromArchive(p).then((n) => { projAuto.busy = false; persist(); render(); toast(n ? `Añadidas ${n} conversaciones` : "No encuentro conversaciones sobre esto. Añade palabras clave."); }); break; }
+    case "proj-export": { const p = currentProject(); if (p) exportProject(p, a.dataset.kind); break; }
     case "cap-do": { const c = vault.captures.find((x) => x.id === a.dataset.id); if (c?.call) { runCall({ ...c.call, state: null }); finishCapture(c.id, "keep"); } break; }
     case "cap-keep": finishCapture(a.dataset.id, "keep"); break;
     case "cap-drop": finishCapture(a.dataset.id, "drop"); break;
@@ -2375,10 +2477,18 @@ const num = (v) => { const n = Number(String(v).replace(",", ".")); return v !==
 document.addEventListener("submit", async (e) => {
   e.preventDefault();
   const f = e.target.id;
+  if (f === "projKeys") {
+    const p = currentProject(); if (!p) return;
+    updateProject(p.id, (x) => ({ ...x, keywords: parseKeywords($("projKeysIn").value) }));
+    const n = fileNewItems(p.id).length; persist(); render();
+    toast(n ? `Guardadas. He metido ${n} ${n === 1 ? "cosa" : "cosas"} que encajan.` : "Guardadas");
+    return;
+  }
   if (f === "projForm") {
     try {
-      const p = newProject({ id: uid("p"), name: $("projName").value, emoji: $("projEmoji").value || "📁" });
-      vault.projects = [...(vault.projects ?? []), p]; openProject = p.id; persist(); render({ focus: true, enter: "page" }); scrollTo(0, 0);
+      const { p, n } = await createProject({ name: $("projName").value, emoji: $("projEmoji").value || "📁" });
+      openProject = p.id; render({ focus: true, enter: "page" }); scrollTo(0, 0);
+      if (n) toast(`He metido ${n} ${n === 1 ? "cosa" : "cosas"} que ya tenías sobre esto`);
     } catch (err) { toast(err.message); }
     return;
   }
