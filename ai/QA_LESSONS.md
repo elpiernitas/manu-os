@@ -150,3 +150,7 @@ En WEB-51, `/cobr[eé]\b/` nunca coincidía con «cobré 200», porque para Java
 ### QAL-035 — Probar cada pantalla con una URL larga sin espacios
 
 En WEB-53, una URL larga en una rejilla `1fr` o en un título ensanchaba la página, el iPhone reducía el zoom y la barra de pestañas dejaba de responder. Las columnas que se estiran usan `minmax(0, 1fr)` o `min-width: 0`, y el texto del usuario lleva `overflow-wrap: anywhere`. Las auditorías visuales incluyen un texto largo sin espacios en todos los campos.
+
+### QAL-036 — Un archivo del usuario no se lee entero en memoria
+
+En WEB-56, el importador hacía `file.arrayBuffer()` y `JSON.parse` del archivo completo. Con una exportación real de 1,49 GB, eso cerraría Safari en el iPhone. Los archivos que el usuario elige (exportaciones, copias, extractos) se leen por trozos: `File.slice()` o `stream()`, se descomprime en flujo y se guarda por lotes. Los tests usan `File` reales y trozos cortados en cualquier punto. La prueba e2e usa un archivo sintético del tamaño real, generado por una herramienta distinta de la que lo lee.
