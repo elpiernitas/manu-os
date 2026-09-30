@@ -24,6 +24,8 @@ function* items(v) {
     for (const src of p.sources ?? []) yield { kind: "Fuente", icon: "📄", title: src.title, detail: `En «${p.name}»`, at: src.at ?? "", go: { project: p.id }, text: `${src.title} ${src.text ?? ""} ${src.url ?? ""}` };
   }
   for (const m of v.meals ?? []) yield { kind: "Comida", icon: "🍽️", title: m.text, detail: `Comida · ${m.day ?? ""}`, at: m.day ?? "", go: { sub: "comidas" }, text: m.text };
+  // WEB-59: what MANU read from screenshots Manu kept.
+  for (const c of v.captures ?? []) if (c.text && c.status !== "pending") yield { kind: "Captura", icon: "🖼️", title: c.text.slice(0, 90), detail: `Captura · ${c.topic ?? ""} · ${day(c.at)}`, at: c.at ?? "", go: { sub: "capturas" }, text: `${c.topic ?? ""} ${c.text}` };
   for (const c of v.chat ?? []) if (c.text) yield { kind: "Chat", icon: c.from === "me" ? "🗨️" : "💬", title: c.text.slice(0, 90), detail: `Chat de hoy · ${c.from === "me" ? "tú" : "MANU"}`, at: c.at ?? "", go: { tab: "manu" }, text: c.text };
 }
 

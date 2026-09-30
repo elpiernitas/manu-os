@@ -2,11 +2,11 @@
 
 Status: **REVIEW_PENDING**
 
-WEB-58 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
+WEB-59 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
 
 ## Tarea activa
 
-WEB-58 — «Ahora»: qué hacer a continuación (`ai/HANDOFF.md`, «WEB-58»).
+WEB-59 — bandeja de capturas (`ai/HANDOFF.md`, «WEB-59»).
 
 ## Autorización
 

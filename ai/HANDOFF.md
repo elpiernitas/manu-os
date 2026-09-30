@@ -32,6 +32,28 @@ Hoja de ruta, un PR por paso:
 
 Límites reales de una web en iPhone: no hay widgets, pantalla bloqueada ni control del Chromecast. Donde se pueda, se hará con Atajos.
 
+## WEB-59 — bandeja de capturas («soltar» y «ordenar»)
+
+Manu hace muchísimas capturas y luego no las ordena. Quiere pasarlas todas, que se agrupen, que le pregunte una sola vez y quedarse solo con el texto.
+
+- `core/captures.js` (puro):
+  - lee de 6 en 6 con Gemini y pide un array JSON: tema, texto, tipo y acción;
+  - las acciones pasan por el mismo validador que las del chat (`parseCalls`), y solo se admiten tarea, idea, recordatorio o gasto;
+  - agrupa por tema (sin tildes ni mayúsculas) en orden cronológico, con las no leídas aparte;
+  - «guardar» conserva el texto y borra la imagen; «descartar» borra todo;
+  - límite de 300: sobran primero los textos guardados más antiguos, nunca los pendientes.
+- En la app:
+  - Tú → «Bandeja de capturas» admite muchas imágenes a la vez desde Fotos, guardadas en IndexedDB.
+  - Botón «✨ Leer N capturas con Gemini». Deja claro que las imágenes van a Google y solo se envía cuando Manu lo pulsa.
+  - Para cada captura: la acción propuesta, «Guardar el texto» o «Descartar», y lo mismo por grupo.
+  - «Ahora» avisa por la tarde si hay capturas por revisar (nunca en horario de trabajo).
+  - «Busca …» encuentra el texto de las capturas guardadas.
+- Evidencia:
+  - `npm test`: 181 en verde (11 tests nuevos).
+  - e2e59 en Chromium con emulación de iPhone 14, con 7 capturas sintéticas y Gemini simulado: 14/14.
+  - Batería e2e en verde; XSS en verde.
+- NO_VERIFICADO: en iPhone real, que el selector de Fotos permita elegir varias y la fecha que da `lastModified`.
+
 ## WEB-58 — «Ahora»: qué hacer a continuación
 
 - `core/now.js`: `whatNow()` devuelve una sugerencia principal con su porqué y hasta dos alternativas. Orden de prioridad:

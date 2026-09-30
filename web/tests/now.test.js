@@ -57,3 +57,11 @@ test("WEB-58: the question, and phrases that are not it", () => {
   for (const q of ["¿Qué hago ahora?", "que hago", "y ahora qué", "q hago hoy", "me aburro", "estoy aburrido", "no sé qué hacer", "¿qué me toca?", "¿Qué es lo siguiente?"]) assert.ok(isWhatNowQuestion(q), q);
   for (const q of ["qué hago para sacarme el carnet", "qué hago de cena", "que hago con el pollo", "gasté 3 en pan", "hago la compra"]) assert.equal(isWhatNowQuestion(q), false, q);
 });
+
+test("WEB-59: screenshots waiting show up in the afternoon, never at work", () => {
+  const r = whatNow({ now: at(2026, 9, 30, 18), mode: "AFTERNOON", captures: 7 });
+  assert.equal(r.main.t, "Revisa tus 7 capturas.");
+  assert.deepEqual(r.main.go, { sub: "capturas" });
+  assert.equal(whatNow({ now: at(2026, 9, 30, 10), mode: "WORK", captures: 7 }).main.t.includes("capturas"), false);
+  assert.equal(whatNow({ now: at(2026, 9, 30, 11), mode: "WEEKEND", captures: 1 }).main.t.includes("captura"), false); // morning: not yet
+});

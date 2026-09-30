@@ -51,9 +51,10 @@ const lowMood = (moods, now) => {
  * @param {Array} x.birthdays   upcomingBirthdays(people, now, 0)
  * @param {Array} x.quiet       longTimeNoTalk(people, now, 30)
  * @param {Array} x.moods       vault.moods
+ * @param {number} x.captures   screenshots waiting in the tray
  * @returns {{ main: {e,t,why,go}, more: Array<{e,t,go}> }}
  */
-export function whatNow({ now = new Date(), mode = "AFTERNOON", events = [], tomorrow = [], reminders = [], tasks = [], projects = [], birthdays = [], quiet = [], moods = [] } = {}) {
+export function whatNow({ now = new Date(), mode = "AFTERNOON", events = [], tomorrow = [], reminders = [], tasks = [], projects = [], birthdays = [], quiet = [], moods = [], captures = 0 } = {}) {
   const out = [];
   const nowMs = now.getTime();
   const clock = hm(now);
@@ -93,6 +94,9 @@ export function whatNow({ now = new Date(), mode = "AFTERNOON", events = [], tom
 
   // 6. Birthdays today.
   for (const b of birthdays ?? []) if (b.days === 0) out.push({ e: "🎂", t: `Hoy cumple ${b.person.name}: escríbele.`, why: "Mejor por la mañana que a las 23:59.", go: { sub: "personas" } });
+
+  // 6b. Screenshots waiting (WEB-59): from the afternoon on, not at work.
+  if (captures > 0 && mode !== "WORK" && h >= 15) out.push({ e: "🖼️", t: `Revisa ${captures === 1 ? "tu captura" : `tus ${captures} capturas`}.`, why: "Cinco minutos: te las agrupo por tema y te quedas solo con lo que sirve.", go: { sub: "capturas" } });
 
   // 7. A project gone quiet (not during work).
   const stale = mode === "WORK" ? [] : staleProjects(projects, now);
