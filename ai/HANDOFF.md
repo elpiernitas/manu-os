@@ -10,6 +10,48 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
+## Visión de MANU OS (2026-09-30, a partir de las respuestas de Manu)
+
+Lo que Manu quería no era otra app que mantener ordenada. Las abandona cuando fallan, cuando tiene que organizarlas él o cuando son feas. Quería un J.A.R.V.I.S. con tres verbos:
+
+1. **Soltar.** Tirarle cualquier cosa sin pensar: capturas, audios, ideas, pagos, planes que aparecen en un chat. MANU la recoge.
+2. **Ordenar.** MANU lo clasifica solo y pregunta una sola vez, cuando está en casa.
+3. **Guiar.** Al abrir MANU, una sola cosa: lo siguiente. Además habla como su amigo («Chatty»), es sincero y se da cuenta cuando está de bajón.
+
+Éxito, en palabras de Manu: ya no olvida cosas, sabe siempre qué hacer después, lo tiene todo en un sitio, se siente menos saturado y termina más proyectos.
+
+Hoja de ruta, un PR por paso:
+
+- WEB-58 «Ahora» (guiar).
+- Bandeja de capturas vía Atajo (soltar y ordenar).
+- Proyectos dormidos e ideas nuevas comparadas con lo que ya hay.
+- Cierre de jornada a las 13:00.
+- Día de Oviedo.
+- Mañana con Atajo al parar la alarma (NO_VERIFICADO en iOS).
+- Modo bajón.
+
+Límites reales de una web en iPhone: no hay widgets, pantalla bloqueada ni control del Chromecast. Donde se pueda, se hará con Atajos.
+
+## WEB-58 — «Ahora»: qué hacer a continuación
+
+- `core/now.js`: `whatNow()` devuelve una sugerencia principal con su porqué y hasta dos alternativas. Orden de prioridad:
+  1. recordatorio vencido;
+  2. evento en menos de 90 minutos;
+  3. de madrugada, a dormir;
+  4. ánimo bajo (con sus distracciones);
+  5. en horario de trabajo, solo la tarea más antigua;
+  6. cumpleaños de hoy;
+  7. proyecto sin tocar en 14 días o más (paso de 10 minutos, o archivarlo);
+  8. persona con la que no habla desde hace 30 días;
+  9. cualquier tarea abierta.
+- Hoy empieza con la tarjeta «👉 Ahora» y su botón «Ir».
+- En el chat entiende «¿qué hago ahora?», «y ahora qué» o «me aburro». No confunde «qué hago para…».
+- `core/ai.js`: nueva constante `PERSONA`, que fija el tono que pidió Manu (amigo cercano, directo, con humor, sincero, nunca «bro»).
+- Evidencia:
+  - `npm test`: 175 en verde (5 tests nuevos).
+  - e2e58 en Chromium con emulación de iPhone 14: 7/7.
+  - Batería e2e en verde; en e2e46 se actualizó la expectativa: el resumen del día va ahora justo después de «Ahora».
+
 ## WEB-57 — escribir o pegar el perfil a mano
 
 Manu subió su exportación real de ChatGPT al chat de Claude Code para que la estudiara entera. Pidió un perfil para MANU, un informe y mejoras.

@@ -70,10 +70,14 @@ export function pickModel(json) {
   return sorted[0] ? name(sorted[0]).replace(/^models\//, "") : null;
 }
 
+// WEB-58: how Manu asked to be spoken to, in his own terms (his «Chatty»).
+export const PERSONA = "Habla como un amigo cercano: coloquial, directo y con humor, sin tono de empresa ni positividad forzada; nunca le llames «bro». Sé sincero y llévale la contraria si algo no le conviene. Entiende sus erratas sin corregirle. Si algo no está hecho o no lo sabes, dilo.";
+
 export function systemPrompt({ now = new Date(), city = null, tasks = [], events = [] } = {}) {
   const safe = (list) => list.filter(mayGo).slice(0, 10);
   return [
     "Eres MANU, el asistente personal de Manu, dentro de la app MANU OS. Hablas en español de España, cercano, honesto y breve (máximo 4 frases).",
+    PERSONA,
     "No inventes datos sobre Manu. Si no sabes algo, dilo. No des diagnósticos médicos ni consejos financieros. No digas que has hecho acciones: la app las hace aparte.",
     "Si Manu quiere apuntar algo, recuérdale las órdenes: «apunta …», «gasté … en …», «recuérdame … a las …», «pon una alarma a las …».",
     `Ahora: ${now.toLocaleString("es-ES", { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })}.`,
@@ -85,7 +89,7 @@ export function systemPrompt({ now = new Date(), city = null, tasks = [], events
 
 // Default payload: only the message and a fixed instruction. No history, no
 // tasks, no agenda (they are opt-in and shown to Manu before sending).
-export const BASE_SYSTEM = "Eres MANU, el asistente personal de Manu. Responde en español de España, cercano, honesto y breve (máximo 4 frases). No inventes datos sobre Manu. No des diagnósticos médicos ni consejos financieros.";
+export const BASE_SYSTEM = `Eres MANU, el asistente personal de Manu. Responde en español de España, cercano, honesto y breve (máximo 4 frases). ${PERSONA} No inventes datos sobre Manu. No des diagnósticos médicos ni consejos financieros.`;
 
 export function buildPayload(message, { history = null, system = BASE_SYSTEM } = {}) {
   return requestBody(message, history ?? [], system);

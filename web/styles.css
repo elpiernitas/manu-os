@@ -702,3 +702,9 @@ body.kb .chat-down { bottom: auto; top: calc(var(--kb-bottom, 100dvh) - 124px); 
 @keyframes cityInNext { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: none; } }
 @keyframes cityInPrev { from { opacity: 0; transform: translateX(-28px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .weather-head.slide-next, .weather-head.slide-prev, .weather-city.slide-next, .weather-city.slide-prev { animation: none; } }
+
+/* WEB-58: «Ahora» — the one next thing */
+.now-card { border-color: color-mix(in srgb, var(--accent, #246bfd) 45%, transparent); }
+.now-card .now-main { font-size: 1.08rem; margin: .2rem 0 .1rem; overflow-wrap: anywhere; }
+.now-card .btn { margin-top: .5rem; }
+.now-card .now-more { margin-top: .6rem; opacity: .85; }
