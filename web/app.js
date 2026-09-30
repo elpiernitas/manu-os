@@ -40,7 +40,7 @@ import { isSpotifyClientId, pkceValid, randomVerifier, challengeFor, authorizeUr
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "68";
+export const APP_VERSION = "69";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -726,8 +726,10 @@ async function suggestProjects() {
     const docs = (await archiveDocs()).filter((d) => d.source === "chatgpt").sort((a, b) => (b.at ?? 0) - (a.at ?? 0));
     const payload = buildSuggestPayload({ titles: docs.slice(0, 150).map((d) => d.title), notes: vault.inbox.slice(-60).map((i) => i.text) });
     const { text } = await askWithActions({ key: aiStore.key, model: aiStore.model, payload, confirmed: true });
-    projAuto.suggestions = parseSuggestions(text, vault.projects ?? []);
-    if (!projAuto.suggestions.length) toast("No he visto proyectos claros. Crea uno a mano.");
+    const got = parseSuggestions(text, vault.projects ?? []);
+    projAuto.suggestions = got ?? [];
+    if (got === null) toast("La IA ha contestado algo que no entiendo. Vuelve a probar.");
+    else if (!got.length) toast(docs.length ? "No he visto proyectos claros. Crea uno a mano." : "Aún no tengo de dónde sacarlos: importa tu ChatGPT en Tú → Tu archivo o apunta ideas.");
   } catch (err) { toast(err.code === "quota" ? "Hoy ya no queda IA gratuita." : `No he podido: ${err.message}`); }
   projAuto.busy = false; render();
 }
@@ -2592,9 +2594,9 @@ document.addEventListener("click", async (e) => {
     case "nube-other": nube.patch({ codeSentAt: null }); render(); break;
     case "nube-copy-sql": navigator.clipboard?.writeText(SUPABASE_SQL).then(() => toast("SQL copiado: pégalo en Supabase → SQL Editor"), () => toast("No he podido copiarlo: ábrelo y cópialo a mano")); break;
     case "nube-sync": nubeSync({ manual: true }); break;
-    case "nube-leave": if (confirm("¿Desconectar este dispositivo de tu nube? Tus datos se quedan aquí y en la nube.")) nubeLeave().then(() => { render(); toast("Desconectado"); }); break;
+    case "nube-leave": if (window.confirm("¿Desconectar este dispositivo de tu nube? Tus datos se quedan aquí y en la nube.")) nubeLeave().then(() => { render(); toast("Desconectado"); }); break;
     case "nube-keep-local": nubeResolve("local"); break;
-    case "nube-keep-remote": if (confirm("Se sustituyen los datos de este dispositivo por los de la nube. ¿Seguro?")) nubeResolve("remote"); break;
+    case "nube-keep-remote": if (window.confirm("Se sustituyen los datos de este dispositivo por los de la nube. ¿Seguro?")) nubeResolve("remote"); break;
     case "chat-image-remove": chatImage = null; render(); break;
     case "proj-open": openProject = a.dataset.id; projSourceKind = "note"; render({ focus: true, enter: "page" }); scrollTo(0, 0); break;
     case "proj-back": openProject = null; render({ focus: true, enter: "tab" }); scrollTo(0, 0); break;
@@ -2654,6 +2656,10 @@ document.addEventListener("click", async (e) => {
     case "mail-seen": markMailSeen(a.dataset.k); persist(); render(); break;
     case "mail-do": {
       const email = a.dataset.email, kind = a.dataset.kind;
+      // WEB-69: a card can move under the finger (another one disappears
+      // above it); trash and archive never go with a single tap.
+      const n = vault.mail?.senders?.find((x) => x.email === email)?.count;
+      if ((kind === "trash" || kind === "archive") && !window.confirm(`¿${kind === "trash" ? "Mandar a la papelera" : "Archivar"} ${n ? `los ${n} correos` : "los correos"} de ${senderName(email)}? Se puede deshacer desde el chat.`)) break;
       const label = kind === "label" ? (window.prompt("Nombre de la etiqueta", senderName(email)) ?? "").trim() : "";
       if (kind === "label" && !label) break;
       markMailSeen(`sender:${email}`);

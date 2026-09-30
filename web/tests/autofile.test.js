@@ -50,7 +50,9 @@ test("WEB-60: project suggestions — sensitive titles never go, reply validated
   const s = parseSuggestions(JSON.stringify([{ nombre: "Fiestas Gijón", emoji: "🎉", palabras: ["prao", "fiesta"] }, { nombre: "App de parejas", palabras: ["twocount"] }, { nombre: "fiestas gijon" }, { nombre: "" }]), [proj("x", "App de parejas")]);
   assert.deepEqual(s.map((x) => x.name), ["Fiestas Gijón"]);
   assert.deepEqual(s[0].keywords, ["prao", "fiesta"]);
-  assert.deepEqual(parseSuggestions("nope"), []);
+  assert.equal(parseSuggestions("nope"), null); // unreadable ≠ «no projects» (WEB-69)
+  assert.deepEqual(parseSuggestions("[]"), []);
+  assert.deepEqual(parseSuggestions(JSON.stringify({ proyectos: [{ nombre: "MANU OS", palabras: ["manu"] }] })).map((x) => x.name), ["MANU OS"]); // wrapped list
 });
 
 test("WEB-60: export — Markdown for NotebookLM and a real .zip with the screenshots", async () => {

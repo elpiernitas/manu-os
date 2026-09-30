@@ -70,14 +70,17 @@ export function buildSuggestPayload({ titles, notes }) {
   return {
     systemInstruction: { parts: [{ text: "Eres MANU. A partir de los títulos de conversaciones y apuntes recientes de Manu, detecta los proyectos personales o de trabajo que tiene EN MARCHA (no temas sueltos ni deberes ya pasados). Devuelve SOLO un array JSON de 3 a 8 objetos {\"nombre\": 2-4 palabras, \"emoji\": un emoji, \"palabras\": 3-8 palabras clave en minúscula que aparezcan en sus títulos}." }] },
     contents: [{ role: "user", parts: [{ text: list }] }],
-    generationConfig: { maxOutputTokens: 800, temperature: 0.3, responseMimeType: "application/json" },
+    generationConfig: { maxOutputTokens: 2048, temperature: 0.3, responseMimeType: "application/json" }, // room for thinking models (WEB-69)
   };
 }
 
 export function parseSuggestions(text, existing = []) {
   let data;
-  try { data = JSON.parse(String(text ?? "").replace(/^```(?:json)?\s*|\s*```$/g, "")); } catch { return []; }
-  if (!Array.isArray(data)) return [];
+  // WEB-69: null = the answer could not be read (not «no projects»).
+  try { data = JSON.parse(String(text ?? "").replace(/^```(?:json)?\s*|\s*```$/g, "")); } catch { return null; }
+  // Models sometimes wrap the list: {"proyectos": [...]}.
+  if (data && !Array.isArray(data) && typeof data === "object") data = Object.values(data).find(Array.isArray) ?? null;
+  if (!Array.isArray(data)) return null;
   const have = new Set(existing.map((p) => normalise(p.name)));
   const out = [];
   for (const r of data) {
