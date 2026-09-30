@@ -27,7 +27,7 @@ test("WEB-64: the setup link fills URL and key, and nothing else", () => {
 
 test("WEB-64: what to do on each situation", () => {
   assert.equal(decide({ remote: null, localEmpty: false }), "push"); // first device
-  assert.equal(decide({ remote: null, localEmpty: true }), "none");
+  assert.equal(decide({ remote: null, localEmpty: true }), "push"); // even empty: fixes the account's salt
   assert.equal(decide({ lastRev: null, remote: { rev: 4 }, localEmpty: true }), "pull"); // new, empty device
   assert.equal(decide({ lastRev: null, remote: { rev: 4 }, localEmpty: false }), "conflict"); // both have data: ask
   assert.equal(decide({ lastRev: 4, dirty: false, remote: { rev: 4 } }), "none");

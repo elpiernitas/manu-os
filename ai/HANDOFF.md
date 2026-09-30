@@ -32,6 +32,20 @@ Hoja de ruta, un PR por paso:
 
 Límites reales de una web en iPhone: no hay widgets, pantalla bloqueada ni control del Chromecast. Donde se pueda, se hará con Atajos.
 
+## WEB-65 — Tu nube: la misma sal en todos los dispositivos
+
+Primera prueba real de Manu, en Chrome del Mac: crea la cuenta, confirma el correo y entra. Ese MANU estaba vacío, así que no subió nada, y la app decía «Sincronizado» y luego «Aún sin sincronizar».
+
+Al analizarlo apareció un defecto real. Si el dispositivo vacío se conecta primero, guarda su propia sal y no sube nada. Cuando el segundo dispositivo se conecta, crea otra sal y sube con ella. El primero no podría abrir esos datos, aunque la frase sea la misma.
+
+- `decide()`: si no hay nada en la nube, siempre se sube, aunque el vault esté vacío. El primer dispositivo fija la sal de la cuenta.
+- `nubeConnect`: si lo que hay en la nube está vacío, lo de este dispositivo sube encima sin preguntar (`lastRev` = fila y `dirty`).
+- Red de seguridad en `nubePull`: si la sal de la nube no es la de este dispositivo, se borra la clave local y se pide la frase otra vez. `nubeConnect` usa entonces la sal de la nube.
+- Textos: con la nube vacía ya no dice «Sincronizado» sin haber subido nada.
+- Evidencia:
+  - `npm test`: 203 en verde.
+  - e2e64: 19/19, tres veces. Incluye que el dispositivo vacío va primero, el iPhone sube encima con la misma sal, el primero recibe los datos después, y la sal distinta pide la frase y luego sincroniza.
+
 ## WEB-64 — Tu nube (Supabase, cifrado) — ADR-0017
 
 Manu crea su proyecto Supabase gratuito y pide tener lo mismo en el iPhone y en el Mac.

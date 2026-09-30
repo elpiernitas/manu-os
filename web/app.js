@@ -40,7 +40,7 @@ import { isSpotifyClientId, pkceValid, randomVerifier, challengeFor, authorizeUr
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "64";
+export const APP_VERSION = "65";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -178,6 +178,15 @@ async function nubePull(row = null) {
   const s = await nubeSession();
   row = row ?? await remoteGet(nubeCfg(), s);
   if (!row) return;
+  if (row.data?.kdf?.salt !== nube.state.salt) {
+    // Another device set up the cloud with its own salt: same phrase, other
+    // key. Ask for the phrase again; nubeConnect then uses the cloud's salt.
+    nube.key = null; await dropNubeKey();
+    nube.patch({ salt: null, error: "Otro dispositivo ya ha subido tus datos: escribe tu frase otra vez para abrirlos." });
+    toast("Escribe tu frase otra vez para abrir los datos del otro dispositivo");
+    render();
+    return;
+  }
   const data = await openWithKey(row.data, nube.key);
   const v = validateVault(data);
   if (!v.ok) throw new Error(`Los datos de la nube no son válidos: ${v.reason}`);
@@ -203,7 +212,7 @@ async function nubeSync({ manual = false } = {}) {
     else if (what === "pull") await nubePull();
     else if (what === "conflict") { nube.patch({ conflict: { rev: head?.rev ?? null, device: head?.device ?? null, at: head?.updated_at ?? null } }); if (manual || tab === "tu") render(); toast(syncErrorText({ code: "conflict" })); }
     else nube.patch({ lastAt: new Date().toISOString(), error: null });
-    if (manual) toast(what === "conflict" ? "Elige con qué datos te quedas" : "Sincronizado");
+    if (manual) toast(what === "conflict" ? "Elige con qué datos te quedas" : what === "none" && !head ? "Conectado: aún no hay nada que subir" : "Sincronizado");
   } catch (err) {
     if (err.code === "conflict") nube.patch({ conflict: { rev: null } });
     nube.patch({ error: syncErrorText(err) });
@@ -231,11 +240,11 @@ async function nubeConnect({ url, key, email, password, phrase, phrase2, create 
     nube.session = r.session;
   } else nube.session = await signIn(cfg, { email, password });
   const row = await remoteGet(cfg, nube.session);
-  let salt, iterations;
+  let salt, iterations, remoteEmpty = false;
   if (row) {
     ({ salt, iterations } = row.data?.kdf ?? {});
     const k = await deriveSyncKey(phrase, salt, iterations);
-    await openWithKey(row.data, k); // wrong phrase → throws «phrase»
+    remoteEmpty = isEmptyVault(await openWithKey(row.data, k)); // wrong phrase → throws «phrase»
     nube.key = k;
   } else {
     if (phrase !== phrase2) throw new Error("Las dos frases no coinciden.");
@@ -243,8 +252,10 @@ async function nubeConnect({ url, key, email, password, phrase, phrase2, create 
     nube.key = await deriveSyncKey(phrase, salt, iterations);
   }
   await saveNubeKey(nube.key);
-  nube.patch({ salt, iterations, lastRev: null, dirty: false, conflict: null, error: null });
-  return row ? "existing" : "new";
+  // An empty cloud (another device connected with nothing yet) is not a
+  // conflict: this device's data simply goes up over it.
+  nube.patch({ salt, iterations, lastRev: remoteEmpty ? row.rev : null, dirty: remoteEmpty, conflict: null, error: null });
+  return row && !remoteEmpty ? "existing" : "new";
 }
 
 async function nubeLeave() {
@@ -1388,7 +1399,7 @@ const subpages = {
         ${st.conflict ? `<section class="card"><h2>⚠️ Hay dos versiones</h2><p class="muted small">Este dispositivo tiene cambios sin subir y ${esc(st.conflict.device ?? "el otro dispositivo")} ha subido otros${st.conflict.at ? ` (${esc(when(st.conflict.at))})` : ""}. Elige con cuál te quedas: la otra se pierde.</p>
           <div class="btns"><button class="btn" data-act="nube-keep-local">Quedarme con este</button><button class="btn ghost" data-act="nube-keep-remote">Traer la de la nube</button></div></section>` : ""}
         <section class="card"><h2>Estado</h2>
-          <p>${nube.running ? "Sincronizando…" : st.error ? esc(st.error) : st.dirty ? "Cambios pendientes de subir." : st.lastRev ? "Todo sincronizado." : "Aún sin sincronizar."}</p>
+          <p>${nube.running ? "Sincronizando…" : st.error ? esc(st.error) : st.dirty ? "Cambios pendientes de subir." : st.lastRev ? "Todo sincronizado." : "Conectado. Aún no hay nada en la nube ni nada que subir desde aquí: en cuanto apuntes algo, o conectes el dispositivo que tiene tus datos, se sincroniza."}</p>
           <p class="muted small">Cuenta: ${esc(st.email ?? "")}${st.lastAt ? ` · última vez ${esc(when(st.lastAt))}` : ""}${st.lastRev ? ` · versión ${esc(st.lastRev)}` : ""}</p>
           <div class="btns"><button class="btn" data-act="nube-sync">Sincronizar ahora</button><button class="btn ghost" data-act="nube-leave">Desconectar este dispositivo</button></div></section>
         <section class="card"><h2>Cómo funciona</h2>${what}<ul class="muted small"><li>Se cifra en este dispositivo con tu frase antes de salir: Supabase solo guarda datos ilegibles.</li><li>Al cambiar algo, se sube en unos segundos. Al abrir MANU, se trae lo último del otro dispositivo.</li><li>Tu frase y tu contraseña no se guardan en ningún sitio. Si olvidas la frase, lo de la nube no se puede recuperar (lo de cada dispositivo sigue ahí).</li></ul></section>`;
