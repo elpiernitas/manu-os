@@ -39,3 +39,12 @@ test("WEB-48: chat orders that ask to find something", () => {
   assert.equal(findCommand("buscar una solución"), "una solucion");
   assert.equal(findCommand("gasté 3 en pan"), null);
 });
+
+test("WEB-59: kept screenshot texts are searchable, unread ones are not", () => {
+  const v = { captures: [{ id: "c1", status: "kept", topic: "Viaje Oporto", text: "Airbnb en Ribeira, 240 €", at: "2026-09-30T10:00:00Z" }, { id: "c2", status: "pending", text: "", at: "2026-09-30T10:00:00Z" }] };
+  const r = findInVault(v, "ribeira");
+  assert.equal(r.length, 1);
+  assert.equal(r[0].kind, "Captura");
+  assert.deepEqual(r[0].go, { sub: "capturas" });
+  assert.equal(findInVault(v, "oporto").length, 1);
+});

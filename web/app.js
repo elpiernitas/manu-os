@@ -17,7 +17,7 @@ import { SCOPE, runServices, planTaskSync, listOpenTasks, insertTask, completeTa
 import { detectLink, linkInfo, PROVIDER_NAME } from "./core/links.js";
 import { allowedToSend, buildContext, buildConversationPayload, CONTEXT_CATEGORIES, BASIC_CONTEXT, FULL_CONTEXT, AUTO_SAFE } from "./core/converse.js";
 import { newProject, addSource, buildProjectPayload, citations, PRESETS } from "./core/projects.js";
-import { putImage, getImage, clearImages } from "./core/imagestore.js";
+import { putImage, getImage, deleteImage, clearImages } from "./core/imagestore.js";
 import { readChatgptExport, search as archiveSearch, stats as archiveStats, chatToDoc, staleChat } from "./core/archive.js";
 import { putDocs, allDocs, clearArchive } from "./core/archivestore.js";
 import { findExcerpts, askPayload, profileDigest, profilePayload, memoryContext } from "./core/recall.js";
@@ -25,6 +25,7 @@ import { diaryDocs, dayLines, dayFromText, isDiaryQuestion, dayTitle } from "./c
 import { applyBuzon, buzonSummary } from "./core/buzon.js";
 import { briefing, briefingText, isBriefingQuestion, monthPace } from "./core/briefing.js";
 import { whatNow, whatNowText, isWhatNowQuestion } from "./core/now.js";
+import { newCapture, toReview, pendingCaptures, groupCaptures, buildCapturesPayload, parseCapturesReply, applyReading, keepCapture, dropCapture, trimCaptures, BATCH } from "./core/captures.js";
 import { budgetStatus, budgetLine, budgetCommand } from "./core/budget.js";
 import { findInVault, findCommand } from "./core/find.js";
 import { weatherEmoji, sceneFor, PARTICLES, SHAPES, MONEY_EMOJI, dayPhase, cityMinutes } from "./core/scene.js";
@@ -35,7 +36,7 @@ import { isSpotifyClientId, pkceValid, randomVerifier, challengeFor, authorizeUr
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "58";
+export const APP_VERSION = "59";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -160,6 +161,7 @@ const I = {
   bell: svg('<path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 20a2 2 0 0 0 4 0"/>'),
   bolt: svg('<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>'),
   mail: svg('<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>'),
+  shots: svg('<rect x="7" y="3" width="12" height="16" rx="2"/><path d="M4 7v12a2 2 0 002 2h9"/><path d="M10 14l2.5-3 2 2.5 1.5-1.5 2 2"/>'),
   box: svg('<path d="M3 7l9-4 9 4v10l-9 4-9-4z"/><path d="M3 7l9 4 9-4M12 11v10"/>'),
   alarm: svg('<circle cx="12" cy="13" r="7"/><path d="M12 9v4l2.5 2M4 4l3 2.5M20 4l-3 2.5"/>'),
 };
@@ -326,7 +328,7 @@ function nowPlan() {
     now: today(), mode: modeState(today(), undefined, vault.settings.override).mode,
     events: eventsFor(localDay()), tomorrow: eventsFor(tomorrowKey()),
     reminders: vault.reminders, tasks: tasks(vault.inbox), projects: vault.projects,
-    birthdays: upcomingBirthdays(vault.people, today(), 0), quiet: longTimeNoTalk(vault.people), moods: vault.moods,
+    birthdays: upcomingBirthdays(vault.people, today(), 0), quiet: longTimeNoTalk(vault.people), moods: vault.moods, captures: toReview(vault.captures).length,
   });
 }
 const goAttrs = (go) => (!go ? "" : go.project ? `data-act="find-go" data-project="${esc(go.project)}"` : go.sub ? `data-sub-go="${esc(go.sub)}"` : `data-act="find-go" data-tab="${esc(go.tab)}"`);
@@ -898,6 +900,7 @@ const screens = {
         ${mood === 1 ? '<button class="btn ghost" data-act="refuge">Abrir el Refugio</button>' : ""}</section>
       ${sectionTitle("Tu vida")}
       <div class="list">
+        ${item("capturas", "shots", "blue", "Bandeja de capturas", toReview(vault.captures).length ? `${toReview(vault.captures).length} por revisar` : "Suelta aquí tus capturas y MANU las ordena")}
         ${item("habitos", "repeat", "green", "Hábitos", vault.habits.length ? `${habitsDone} de ${vault.habits.length} hechos hoy` : "Crea tu primer hábito")}
         ${item("salud", "pulse", "red", "Salud", hs.sleep !== null || hs.steps !== null ? [hs.sleep !== null ? `${dec(hs.sleep)} h de sueño` : null, hs.steps !== null ? `${Math.round(hs.steps)} pasos` : null].filter(Boolean).join(" · ") + " (media semanal)" : "Sueño, pasos y peso")}
         ${item("comidas", "fork", "orange", "Comidas", `${vault.meals.filter((m) => m.day === t).length} apuntadas hoy`)}
@@ -937,6 +940,22 @@ const profileForm = (text) => `<form id="profileForm" class="stack"><label for="
 const backBar = (title) => `<button class="link" data-act="back">${I.back} Tú</button><h1>${title}</h1>`;
 
 const subpages = {
+  // WEB-59: drop all the screenshots, MANU reads, groups and proposes; Manu keeps the text.
+  capturas() {
+    const list = vault.captures ?? [];
+    const pend = pendingCaptures(list).length;
+    const groups = groupCaptures(list);
+    const kept = list.filter((c) => c.status === "kept").length;
+    const itemRow = (c) => `<div class="cap-item">${c.imageId ? `<button class="thumb" data-act="img-view" data-img-id="${esc(c.imageId)}" aria-label="Ver captura"><img data-img="${esc(c.imageId)}" alt=""></button>` : ""}<div class="grow">${c.status === "pending" ? `<span class="muted small">${esc(new Date(c.at).toLocaleString("es-ES", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }))} · sin leer</span>` : `<p class="small">${esc(c.text || "No he visto nada útil.")}</p>`}
+      <div class="btns">${c.call ? `<button class="btn" data-act="cap-do" data-id="${esc(c.id)}">${esc(callLabel(c.call))}</button>` : ""}${c.status === "read" ? `<button class="btn ghost" data-act="cap-keep" data-id="${esc(c.id)}">Guardar el texto</button>` : ""}<button class="link small danger-link" data-act="cap-drop" data-id="${esc(c.id)}">Descartar</button></div></div></div>`;
+    return `${backBar("Capturas")}
+      <p class="subtitle">Suéltalas todas aquí. MANU las lee, las agrupa por tema y te propone qué hacer. Te quedas con el texto y la imagen se borra.</p>
+      <section class="card"><label class="btn block" for="capFiles" role="button" tabindex="0">${caps.busy ? esc(caps.busy) : "🖼️ Añadir capturas"}</label><input id="capFiles" type="file" accept="image/*" multiple class="sr">
+        <p class="muted small">En Fotos puedes seleccionar muchas de golpe. Se guardan solo en este iPhone.</p>
+        ${pend ? (aiReady() ? `<button class="btn ghost block" data-act="cap-read">${caps.reading ? esc(caps.reading) : `✨ Leer ${pend === 1 ? "1 captura" : `${pend} capturas`} con Gemini`}</button><p class="muted small">Las imágenes se envían a Google para leerlas (de ${BATCH} en ${BATCH}). Si alguna es privada, descártala antes.</p>` : '<p class="muted small">Para que MANU las lea, activa la IA en Tú → IA. Mientras, se quedan aquí guardadas.</p>') : ""}</section>
+      ${groups.length ? groups.map((g) => `<section class="card cap-group"><h2>${esc(g.topic)} <span class="muted small">· ${g.items.length}</span></h2>${g.items.map(itemRow).join("")}${g.key !== "__pending" && g.items.length > 1 ? `<div class="btns"><button class="btn ghost" data-act="cap-keep-group" data-key="${esc(g.key)}">Guardar todo el texto</button><button class="link small danger-link" data-act="cap-drop-group" data-key="${esc(g.key)}">Descartar todas</button></div>` : ""}</section>`).join("") : '<section class="card"><p class="muted">Nada por revisar. 🙌</p></section>'}
+      ${kept ? `<p class="muted small">${kept} ${kept === 1 ? "captura guardada" : "capturas guardadas"} como texto. Las encuentras con «busca …».</p>` : ""}`;
+  },
   archivo() {
     const s = archive.stats;
     const d = (t) => (t ? new Date(t).toLocaleDateString("es-ES", { month: "short", year: "numeric" }) : "?");
@@ -1391,7 +1410,7 @@ function render({ focus = false, enter = null } = {}) {
   $("screen").querySelectorAll(".week-bars i[data-h], .ie-bars i[data-h]").forEach((el) => { el.style.height = `${Math.max(Number(el.dataset.h) ? 2 : 0, Number(el.dataset.h))}%`; });
   $("screen").querySelectorAll("[data-c]").forEach((el) => { if (/^#[0-9a-f]{6}$/i.test(el.dataset.c)) el.style.setProperty("--ev", el.dataset.c); });
   hydrateImages($("screen"));
-  $("topTitle").textContent = sub ? { habitos: "Hábitos", salud: "Salud", comidas: "Comidas", personas: "Personas", tiempo: "Tiempo", avisos: "Avisos", datos: "Tus datos", gcal: "Google", correo: "Correo", archivo: "Tu archivo", ia: "IA", spotify: "Spotify", atajos: "Atajos" }[sub] : TABS.find(([id]) => id === tab)[1];
+  $("topTitle").textContent = sub ? { habitos: "Hábitos", salud: "Salud", comidas: "Comidas", personas: "Personas", tiempo: "Tiempo", avisos: "Avisos", datos: "Tus datos", gcal: "Google", correo: "Correo", archivo: "Tu archivo", capturas: "Capturas", ia: "IA", spotify: "Spotify", atajos: "Atajos" }[sub] : TABS.find(([id]) => id === tab)[1];
   const sheetKey = sheet ? sheet.kind : null;
   if (sheetKey !== renderedSheetKind || !sheet) {
     const wasOpen = Boolean($("sheetBg"));
@@ -1869,6 +1888,42 @@ async function shareToAi(from = null) {
   persist(); if (tab === "manu") render();
 }
 
+// WEB-59: keep the text (image deleted) or drop the capture.
+function finishCapture(id, how, batch = false) {
+  const c = vault.captures.find((x) => x.id === id);
+  if (!c) return;
+  if (c.imageId) { deleteImage(c.imageId).catch(() => {}); imageCache.delete(c.imageId); }
+  vault.captures = how === "keep" ? keepCapture(vault.captures, id) : dropCapture(vault.captures, id);
+  if (!batch) { persist(); render(); }
+}
+
+// WEB-59: read the pending captures with Gemini, a few at a time. Only on
+// Manu's tap; the button says the images go to Google.
+async function readCaptures() {
+  if (caps.reading || !aiReady()) return;
+  const pend = pendingCaptures(vault.captures);
+  let done = 0, failed = null;
+  for (let i = 0; i < pend.length; i += BATCH) {
+    const chunk = pend.slice(i, i + BATCH);
+    caps.reading = `Leyendo ${Math.min(i + BATCH, pend.length)} de ${pend.length}…`; render();
+    try {
+      const items = [];
+      for (const c of chunk) { const d = await getImage(c.imageId); if (d && /^data:image\/jpeg;base64,/.test(d)) items.push({ id: c.id, base64: d.split(",")[1], at: c.at }); }
+      if (!items.length) continue;
+      const { text } = await askWithActions({ key: aiStore.key, model: aiStore.model, payload: buildCapturesPayload(items, today()), confirmed: true });
+      const readings = parseCapturesReply(text, items.map((x) => x.id));
+      vault.captures = applyReading(vault.captures, readings);
+      done += Object.keys(readings).length;
+      persist();
+    } catch (err) {
+      failed = err.code === "quota" ? "Hoy ya no queda IA gratuita; sigue mañana." : err.code === "key" ? "La clave de Gemini no funciona. Revísala en Tú → IA." : `No he podido leerlas: ${err.message}`;
+      break;
+    }
+  }
+  caps.reading = null; persist(); render();
+  toast(failed ?? (done ? `Leídas ${done}. Revísalas por tema.` : "No he sacado nada de esas capturas."));
+}
+
 function runCall(c, { quiet = false } = {}) {
   if (!c || c.state) return;
   c.state = "done";
@@ -1909,6 +1964,7 @@ function runCall(c, { quiet = false } = {}) {
 }
 
 // ---------- Tu archivo (WEB-34) ----------
+const caps = { busy: false, reading: null };
 const archive = { docs: null, stats: null, results: null, query: "", busy: false, answer: null, asking: false, profiling: false, editProfile: false };
 
 // «Pregúntale a tu archivo» (WEB-35): search here, send only the fragments.
@@ -2201,6 +2257,11 @@ document.addEventListener("click", async (e) => {
     case "person-cal": addBirthdayToCalendar(a.dataset.id); break;
     case "chat-new": startNewChat(); toast("Conversación nueva. La anterior queda en Tu archivo."); break;
     case "profile-make": makeProfile(); break;
+    case "cap-read": readCaptures(); break;
+    case "cap-do": { const c = vault.captures.find((x) => x.id === a.dataset.id); if (c?.call) { runCall({ ...c.call, state: null }); finishCapture(c.id, "keep"); } break; }
+    case "cap-keep": finishCapture(a.dataset.id, "keep"); break;
+    case "cap-drop": finishCapture(a.dataset.id, "drop"); break;
+    case "cap-keep-group": case "cap-drop-group": { const g = groupCaptures(vault.captures).find((x) => x.key === a.dataset.key); if (g && (a.dataset.act === "cap-keep-group" || window.confirm(`¿Descartar ${g.items.length} capturas?`))) for (const c of g.items) finishCapture(c.id, a.dataset.act === "cap-keep-group" ? "keep" : "drop", true); persist(); render(); break; }
     case "profile-edit": archive.editProfile = true; render(); break;
     case "profile-cancel": archive.editProfile = false; render(); break;
     case "profile-delete": if (window.confirm("¿Borrar tu perfil?")) { delete vault.profile; persist(); render(); toast("Perfil borrado"); } break;
@@ -2551,6 +2612,25 @@ document.addEventListener("change", async (e) => {
     const file = e.target.files[0]; e.target.value = "";
     if (file.size > 5_000_000) { toast("Ese archivo es demasiado grande para ser el buzón."); return; }
     try { importBuzon(await file.text()); } catch { toast("No he podido leer el buzón."); }
+    return;
+  }
+  if (e.target.id === "capFiles" && e.target.files?.length) {
+    const files = [...e.target.files]; e.target.value = "";
+    let added = 0;
+    for (const [i, file] of files.entries()) {
+      caps.busy = `Guardando ${i + 1} de ${files.length}…`; render();
+      try {
+        const data = await compressImage(file);
+        const imageId = uid("img");
+        await putImage(imageId, data); imageCache.set(imageId, data);
+        const at = file.lastModified ? new Date(file.lastModified).toISOString() : new Date().toISOString();
+        vault.captures.push(newCapture({ id: uid("cap"), imageId, at }));
+        added++;
+      } catch { /* one unreadable image does not stop the rest */ }
+    }
+    vault.captures = trimCaptures(vault.captures);
+    caps.busy = false; persist(); render();
+    toast(added === files.length ? `${added} ${added === 1 ? "captura guardada" : "capturas guardadas"}` : `Guardadas ${added} de ${files.length}; alguna no se pudo abrir`);
     return;
   }
   if (e.target.id === "archiveFile" && e.target.files?.[0]) {
