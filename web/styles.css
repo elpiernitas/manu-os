@@ -723,3 +723,6 @@ body.kb .chat-down { bottom: auto; top: calc(var(--kb-bottom, 100dvh) - 124px); 
 
 /* WEB-62: hidden always wins over display rules (.check-row is flex) */
 [hidden] { display: none !important; }
+
+/* WEB-64: the SQL for «Tu nube» */
+pre.code { white-space: pre-wrap; word-break: break-word; overflow-wrap: anywhere; background: var(--surface-2, rgba(255,255,255,.06)); padding: 10px 12px; border-radius: 10px; max-width: 100%; overflow-x: auto; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
