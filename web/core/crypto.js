@@ -77,39 +77,6 @@ export function isEnvelope(x) {
   return envelopeProblem(x) === null;
 }
 
-// ---------- Sync (WEB-64): the same envelope, with a key derived once ----------
-// PBKDF2 with 600 000 rounds takes about a second on an iPhone: fine for a
-// backup, not for every change. For sync the key is derived once from Manu's
-// phrase and a salt that stays fixed for his account, kept as a
-// non-extractable CryptoKey, and each upload uses a fresh IV.
-export const newSalt = () => b64(globalThis.crypto.getRandomValues(new Uint8Array(16)));
-export async function deriveSyncKey(passphrase, salt, iterations = PBKDF2_ITERATIONS) {
-  const problem = passphraseProblem(passphrase);
-  if (problem) throw new Error(problem);
-  if (b64Length(salt) !== 16) throw new Error("Sal no válida");
-  if (!Number.isInteger(iterations) || iterations < MIN_ITERATIONS || iterations > MAX_ITERATIONS) throw new Error("Iteraciones fuera de rango");
-  return deriveKey(passphrase, unb64(salt), iterations);
-}
-export async function sealWithKey(data, key, { salt, iterations = PBKDF2_ITERATIONS }) {
-  const iv = globalThis.crypto.getRandomValues(new Uint8Array(12));
-  const header = { format: BACKUP_FORMAT, v: BACKUP_VERSION, kdf: { name: "PBKDF2", hash: "SHA-256", iterations, salt }, cipher: { name: "AES-GCM", iv: b64(iv) } };
-  const aad = new TextEncoder().encode(JSON.stringify(header));
-  const ct = await subtle().encrypt({ name: "AES-GCM", iv, additionalData: aad }, key, new TextEncoder().encode(JSON.stringify(data)));
-  return { ...header, ct: b64(ct) };
-}
-export async function openWithKey(envelope, key) {
-  const problem = envelopeProblem(envelope);
-  if (problem) throw new Error(`Datos no válidos: ${problem}`);
-  const { format, v, kdf, cipher } = envelope;
-  const aad = new TextEncoder().encode(JSON.stringify({ format, v, kdf, cipher }));
-  try {
-    const pt = await subtle().decrypt({ name: "AES-GCM", iv: unb64(cipher.iv), additionalData: aad }, key, unb64(envelope.ct));
-    return JSON.parse(new TextDecoder().decode(pt));
-  } catch {
-    throw Object.assign(new Error("Frase incorrecta o datos dañados"), { code: "phrase" });
-  }
-}
-
 export async function decryptBackup(envelope, passphrase) {
   const problem = envelopeProblem(envelope);
   if (problem) throw new Error(`Copia no válida: ${problem}`);

@@ -1,4 +1,4 @@
-# ADR-0017 — Tu nube: sincronización cifrada con Supabase
+# ADR-0017 — Tu nube: sincronización con Supabase
 
 Status: **ACCEPTED** (decisión de Manu, 2026-09-30: «todo lo que sea gratis te doy permiso para hacerlo tú libremente». Manu crea él mismo el proyecto Supabase gratuito `manu-os`, en la región West EU)
 Date: **2026-09-30**
@@ -28,3 +28,20 @@ MANU guarda todo en el dispositivo (ADR-0012). Manu quiere tener lo mismo en el 
 - Si Manu cambia de proyecto, hay que cambiar la CSP y `NUBE_URL`.
 - Mientras la tabla no esté creada (el SQL está en Tú → Tu nube), la app lo dice.
 - Recomendación a Manu: después de crear su cuenta, desactivar en Supabase «Allow new users to sign up».
+
+## Enmienda (2026-09-30, WEB-67) — código por correo y sin frase
+
+En la primera prueba real, la frase del iPhone no coincidió con la del Mac. Manu pidió algo más fácil: «dime el código que te llega al correo». Se le presentaron tres opciones:
+- código por correo y emparejamiento con cifrado;
+- código por correo **sin cifrar**;
+- dejarlo como estaba.
+
+**Manu eligió «Solo código por correo, sin cifrar».**
+
+Cambia lo siguiente:
+- **Acceso:** código de un solo uso por correo (`/auth/v1/otp` con `create_user: false` y `/auth/v1/verify`). No hay contraseña. Si la plantilla aún manda un enlace, la app acepta la sesión que llega en el fragmento de la URL.
+- **Sin cifrado de extremo a extremo:** el vault va tal cual en la fila `manu_sync`, protegido por RLS (solo su usuario) y por su sesión. Supabase, como empresa, técnicamente puede leerlo; la pantalla Tu nube lo dice.
+- **Clave publishable en el código** (`NUBE_KEY`): es pública por diseño y la usan todas las webs con Supabase. Lo que protege es la RLS. La clave secreta sigue fuera, y `configProblem` la rechaza.
+- **Migración:** la fila cifrada de WEB-64 (un vault vacío del Mac) no se puede leer, así que los datos de un dispositivo la sustituyen. La base IndexedDB `manu-sync-key` se borra.
+
+Siguen igual: RLS por usuario, `rev` con aviso de conflicto, CSP limitada al host de Manu, sesión en `manuos.nube.token` fuera de las copias, y que Tu archivo y las fotos se quedan en cada dispositivo.
