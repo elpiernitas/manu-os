@@ -32,6 +32,28 @@ Hoja de ruta, un PR por paso:
 
 Límites reales de una web en iPhone: no hay widgets, pantalla bloqueada ni control del Chromecast. Donde se pueda, se hará con Atajos.
 
+## WEB-67 — Tu nube: código por correo, sin frase (enmienda de ADR-0017)
+
+En el iPhone, la frase no coincidió con la que se usó en el Mac. Manu pidió «dime el código que te llega al correo» y eligió **código por correo sin cifrar**.
+
+- `core/sync.js`:
+  - `sendCode` (`/auth/v1/otp`, `create_user: false`);
+  - `verifyCode` (tipo `email`, y `magiclink` como alternativa; mensaje neutro «incorrecto o caducado»);
+  - `parseAuthHash` para el enlace del correo;
+  - se quitan la contraseña y el alta.
+- `core/crypto.js` vuelve a su estado anterior a WEB-64.
+- `app.js`:
+  - la URL y la clave publishable van en el código, así que no hay nada que pegar;
+  - pantalla: correo → código → Entrar;
+  - el vault sube sin cifrar;
+  - la fila cifrada de WEB-64, o una vacía, se sustituye sin preguntar;
+  - un dispositivo con el estado de WEB-64 sigue conectado y trae los datos;
+  - se borra la antigua base `manu-sync-key`.
+- Requisito en Supabase: la plantilla «Magic Link» debe mostrar `{{ .Token }}` para que llegue un código. Si no, llega un enlace, que en el Mac también funciona.
+- Evidencia:
+  - `npm test`: 203 en verde.
+  - e2e67: 16/16. Cubre que no hay nada que pegar, la sustitución de la fila de WEB-64, el Mac antiguo que trae los datos, la sincronización Mac ↔ iPhone, el código incorrecto y el correcto, el conflicto, el aviso de «sin cifrar» y el enlace del correo.
+
 ## WEB-66 — las versiones nuevas llegan solas
 
 En el Chrome del Mac, Manu seguía viendo la versión 64 aunque en la web ya estaba la 65. Ni recargando ni dando de baja el service worker se arreglaba. La causa es que GitHub Pages envía `cache-control: max-age=600`: el `fetch` del SW («red primero») y el `cache.addAll` de la instalación usaban la caché HTTP del navegador. Así una versión nueva podía guardar los archivos anteriores.
