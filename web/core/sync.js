@@ -140,7 +140,9 @@ export async function remotePut(cfg, s, { data, baseRev, device }, fetchImpl = f
  * @returns {"none"|"push"|"pull"|"conflict"}
  */
 export function decide({ lastRev = null, dirty = false, remote = null, localEmpty = false }) {
-  if (!remote) return localEmpty ? "none" : "push";
+  // Nothing in the cloud: upload, even an empty vault, so the first device
+  // fixes the account's salt and every other device derives the same key.
+  if (!remote) return "push";
   if (lastRev === null) return localEmpty ? "pull" : "conflict";
   if (remote.rev === lastRev) return dirty ? "push" : "none";
   if (remote.rev > lastRev) return dirty ? "conflict" : "pull";

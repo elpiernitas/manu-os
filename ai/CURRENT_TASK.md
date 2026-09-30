@@ -2,11 +2,11 @@
 
 Status: **REVIEW_PENDING**
 
-WEB-64 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
+WEB-65 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
 
 ## Tarea activa
 
-WEB-64 — Tu nube: sincronización cifrada con Supabase (`ai/HANDOFF.md`, «WEB-64»; ADR-0017).
+WEB-65 — Tu nube: la misma sal para todos los dispositivos (`ai/HANDOFF.md`, «WEB-65»).
 
 ## Autorización
 

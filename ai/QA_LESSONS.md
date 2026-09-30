@@ -166,3 +166,7 @@ En WEB-62, la casilla «Guardarlo también en Google Contactos» llevaba `hidden
 ### QAL-039 — Un error genérico oculta la causa
 
 En WEB-63, MANU respondió «La IA no ha respondido ahora» en el iPhone de Manu y no hubo forma de saber por qué. El mismo texto cubría un corte de red, Gemini saturado, un modelo retirado, filtros y una respuesta vacía por falta de tokens. Cada fallo de un servicio externo se clasifica por su causa (estado HTTP, `finishReason`, mensaje del servidor) y el usuario ve el motivo y qué hacer. Solo lo transitorio se reintenta, y una sola vez. Los tests simulan cada causa por separado.
+
+### QAL-040 — Probar el orden en que se conectan los dispositivos
+
+En WEB-64, la prueba de dos dispositivos siempre conectaba primero el que tenía datos. En la vida real, Manu conectó primero el Mac vacío, y así cada dispositivo habría acabado con su propia sal: la misma frase, pero claves distintas. Cuando varios dispositivos comparten algo derivado (claves, identificadores, esquemas), el primero que se conecta debe fijarlo en el servidor aunque no tenga datos. Las pruebas cubren los dos órdenes y el caso de un dispositivo vacío.
