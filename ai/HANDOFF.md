@@ -32,6 +32,24 @@ Hoja de ruta, un PR por paso:
 
 Límites reales de una web en iPhone: no hay widgets, pantalla bloqueada ni control del Chromecast. Donde se pueda, se hará con Atajos.
 
+## WEB-68 — Tu nube: el enlace del correo, también en el iPhone
+
+Sin un SMTP propio, Supabase no deja editar las plantillas: el correo «Magic link or OTP» solo trae un enlace, no `{{ .Token }}`. Lo comprobó Cowork en el panel y no cambió nada. Manu no quiere configurar SMTP.
+
+- En el Mac, el enlace abre MANU en Chrome con la sesión en el fragmento; `parseAuthHash` ya lo resolvía.
+- En el iPhone, el enlace abre Safari, no la app instalada, y su almacenamiento es distinto. Por eso, si `inIosBrowser()`, la sesión no se usa en Safari:
+  - se muestra la tarjeta «📋 Tu código para MANU» con el refresh token y un botón para copiarlo;
+  - el token solo vive en memoria;
+  - no se usa en Safari para no rotarlo.
+- En la app, el campo «Código que te da el enlace» acepta ese código (con `refreshSession`) o un OTP numérico, por si algún día hay SMTP.
+- Los textos pasan a hablar de enlace y explican los pasos en el Mac y en el iPhone.
+- Estado real del iPhone de Manu: tenía la sesión de WEB-65 sin `lastRev`, datos propios y en la nube el paquete cifrado vacío del Mac, así que salía «Elige con qué datos te quedas». Ahora, si un dispositivo que nunca sincronizó encuentra en la nube algo vacío o el paquete de WEB-64, sube sin preguntar.
+- El pie de Tú dice «sincronizado con tu nube» cuando la nube está conectada.
+- Evidencia:
+  - `npm test`: 203 en verde.
+  - e2e67: 22/22, dos veces. Incluye que Safari enseña el código sin iniciar sesión, que la app instalada (`navigator.standalone`) lo acepta pegado y trae los datos, y el caso exacto del iPhone de Manu (sube sin conflicto).
+- NO_VERIFICADO: el formato real del refresh token de este Supabase (se aceptan 6 a 400 caracteres de `[A-Za-z0-9_.-]`) y el flujo en un iPhone real.
+
 ## WEB-67 — Tu nube: código por correo, sin frase (enmienda de ADR-0017)
 
 En el iPhone, la frase no coincidió con la que se usó en el Mac. Manu pidió «dime el código que te llega al correo» y eligió **código por correo sin cifrar**.
