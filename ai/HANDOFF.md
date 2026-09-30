@@ -32,6 +32,19 @@ Hoja de ruta, un PR por paso:
 
 Límites reales de una web en iPhone: no hay widgets, pantalla bloqueada ni control del Chromecast. Donde se pueda, se hará con Atajos.
 
+## WEB-61 — buscar «eva» y elegir cuál
+
+Manu quiere escribir «eva», ver todas las Evas de sus contactos, elegir una, ponerle el cumpleaños y que se añada al calendario. La sincronización de contactos (solo lectura), el cumpleaños y el evento anual en Google Calendar ya existían desde WEB-38. Faltaba la búsqueda: el `datalist` apenas se ve en iOS y no permite elegir entre varios contactos que se llaman igual.
+
+- `core/contacts.js`: `searchContacts` busca en cualquier palabra del nombre, sin tildes. Varias palabras acotan la búsqueda. Primero salen los nombres que empiezan por lo escrito y luego el resto de A a Z. Marca los que ya están en Personas.
+- Personas: una lista de resultados mientras se escribe. Al elegir uno se rellenan el nombre, el cumpleaños y el móvil de Google y se vincula ese contacto concreto (`googleId`). No se puede añadir dos veces el mismo contacto. Hay un botón «Actualizar mis contactos de Google».
+- No se escribe nada en Google Contactos: haría falta un permiso de escritura que no está pedido.
+- Evidencia:
+  - `npm test`: 187 en verde.
+  - e2e61 en Chromium con emulación de iPhone 14: 10/10.
+  - e2e38 adaptado a la lista nueva: 11/11, con el evento anual en Calendar.
+  - Batería e2e completa en verde.
+
 ## WEB-60 — proyectos que se crean y se llenan solos, y exportación
 
 Manu quería que los proyectos se crearan solos, que lo que apunta se clasificara solo, que funcionaran como NotebookLM y poder exportar un proyecto a ChatGPT o a Claude.
