@@ -197,7 +197,14 @@ async function nubeSync({ manual = false } = {}) {
     const st = nube.state;
     const head = await remoteHead(nubeCfg(), await nubeSession());
     const what = decide({ lastRev: st.lastRev ?? null, dirty: Boolean(st.dirty), remote: head, localEmpty: isEmptyVault(vault) });
-    if (what === "push") await nubePush(head?.rev ?? null);
+    // WEB-68: a device that never synced finds something in the cloud. If it
+    // is empty or the unreadable WEB-64 packet, it is not a real conflict.
+    let replace = false;
+    if (what === "conflict" && (st.lastRev ?? null) === null && head) {
+      const row = await remoteGet(nubeCfg(), await nubeSession());
+      replace = Boolean(row && (isEnvelope(row.data) || isEmptyVault(row.data)));
+    }
+    if (what === "push" || replace) await nubePush(head?.rev ?? null);
     else if (what === "pull") await nubePull();
     else if (what === "conflict") { nube.patch({ conflict: { rev: head?.rev ?? null, device: head?.device ?? null, at: head?.updated_at ?? null } }); if (manual || tab === "tu") render(); toast(syncErrorText({ code: "conflict" })); }
     else nube.patch({ lastAt: new Date().toISOString(), error: null });
@@ -1190,7 +1197,7 @@ const screens = {
         ${item("nube", "box", "blue", "Tu nube", nubeOn() ? (nube.state.conflict ? "Elige con qué datos te quedas" : nube.state.error ? "Revisar" : `Sincronizada${nube.state.lastAt ? ` · ${new Date(nube.state.lastAt).toLocaleString("es-ES", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}` : ""}`) : "iPhone y Mac con los mismos datos, cifrados")}
         ${item("datos", "box", "gray", "Tus datos", "Copia, restaurar y borrar")}
       </div>
-      <p class="muted small">MANU OS web · versión ${APP_VERSION} · datos solo en este dispositivo</p>`;
+      <p class="muted small">MANU OS web · versión ${APP_VERSION} · ${nubeOn() ? "sincronizado con tu nube" : "datos solo en este dispositivo"}</p>`;
   },
 };
 

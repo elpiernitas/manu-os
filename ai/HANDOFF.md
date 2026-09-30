@@ -43,9 +43,11 @@ Sin un SMTP propio, Supabase no deja editar las plantillas: el correo «Magic li
   - no se usa en Safari para no rotarlo.
 - En la app, el campo «Código que te da el enlace» acepta ese código (con `refreshSession`) o un OTP numérico, por si algún día hay SMTP.
 - Los textos pasan a hablar de enlace y explican los pasos en el Mac y en el iPhone.
+- Estado real del iPhone de Manu: tenía la sesión de WEB-65 sin `lastRev`, datos propios y en la nube el paquete cifrado vacío del Mac, así que salía «Elige con qué datos te quedas». Ahora, si un dispositivo que nunca sincronizó encuentra en la nube algo vacío o el paquete de WEB-64, sube sin preguntar.
+- El pie de Tú dice «sincronizado con tu nube» cuando la nube está conectada.
 - Evidencia:
   - `npm test`: 203 en verde.
-  - e2e67: 20/20, tres veces. Incluye que Safari enseña el código sin iniciar sesión, y que la app instalada (`navigator.standalone`) lo acepta pegado y trae los datos.
+  - e2e67: 22/22, dos veces. Incluye que Safari enseña el código sin iniciar sesión, que la app instalada (`navigator.standalone`) lo acepta pegado y trae los datos, y el caso exacto del iPhone de Manu (sube sin conflicto).
 - NO_VERIFICADO: el formato real del refresh token de este Supabase (se aceptan 6 a 400 caracteres de `[A-Za-z0-9_.-]`) y el flujo en un iPhone real.
 
 ## WEB-67 — Tu nube: código por correo, sin frase (enmienda de ADR-0017)
