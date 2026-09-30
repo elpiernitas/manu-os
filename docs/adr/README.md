@@ -27,4 +27,4 @@ Estados permitidos:
 - [ADR-0014 — Spotify en el altavoz «baño» y MANU como centro de accesos](0014-spotify-and-app-hub.md) — complementa ADR-0012 y ADR-0013
 - [ADR-0015 — Gmail con acceso de modificación](0015-gmail-full-access.md) — complementa ADR-0013
 - [ADR-0016 — Tu archivo y conectores de vida](0016-life-archive-and-connectors.md) — complementa ADR-0013 y ADR-0015
-- [ADR-0017 — Tu nube: sincronización cifrada con Supabase](0017-encrypted-sync-supabase.md) — complementa ADR-0012 y ADR-0013
+- [ADR-0017 — Tu nube: sincronización con Supabase (enmienda WEB-67: código por correo, sin cifrar)](0017-encrypted-sync-supabase.md) — complementa ADR-0012 y ADR-0013

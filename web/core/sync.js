@@ -1,6 +1,7 @@
-// Tu nube (WEB-64): the vault synced between Manu's iPhone and Mac through
-// his own free Supabase project. Everything is encrypted on the device with a
-// phrase only he knows (core/crypto.js): Supabase stores an unreadable blob.
+// Tu nube (WEB-64, WEB-67): the vault synced between Manu's iPhone and Mac
+// through his own free Supabase project. He signs in with a code sent to his
+// email; the row is protected by RLS (only his user). By his choice there is
+// no encryption phrase (ADR-0017).
 // Plain REST (Auth + PostgREST), no SDK, so the CSP stays «script-src 'self'».
 //
 // Table (created once by Manu, see SUPABASE_SQL): one row per user and kind,
@@ -62,32 +63,48 @@ async function call(fetchImpl, url, init) {
 }
 const authHeaders = (cfg) => ({ apikey: cfg.key, "Content-Type": "application/json" });
 
-// ---------- Auth (email + password) ----------
+// ---------- Session ----------
 const session = (j, now) => ({ access: j.access_token, refresh: j.refresh_token, exp: now + (Number(j.expires_in) || 3600) * 1000, userId: j.user?.id ?? null, email: j.user?.email ?? null });
-
-export async function signUp(cfg, { email, password }, fetchImpl = fetch) {
-  if (String(password ?? "").length < 8) throw fail("weak", "La contraseña debe tener al menos 8 caracteres.");
-  const res = await call(fetchImpl, `${cfg.url}/auth/v1/signup`, { method: "POST", headers: authHeaders(cfg), body: JSON.stringify({ email, password }) });
-  if (!res.ok) { const d = await detail(res); throw fail(res.status === 422 || /registered|exists/i.test(d) ? "exists" : "auth", d || `Error ${res.status}`, { status: res.status }); }
-  const j = await res.json();
-  return j.access_token ? { confirm: false, session: session(j, Date.now()) } : { confirm: true };
-}
-
-export async function signIn(cfg, { email, password }, fetchImpl = fetch, now = Date.now()) {
-  const res = await call(fetchImpl, `${cfg.url}/auth/v1/token?grant_type=password`, { method: "POST", headers: authHeaders(cfg), body: JSON.stringify({ email, password }) });
-  if (!res.ok) {
-    const d = await detail(res);
-    if (/confirm/i.test(d)) throw fail("unconfirmed", "Aún no has confirmado tu correo: abre el enlace que te ha mandado Supabase.");
-    throw fail("login", res.status === 400 ? "Correo o contraseña incorrectos." : d || `Error ${res.status}`, { status: res.status });
-  }
-  return session(await res.json(), now);
-}
 
 export async function refreshSession(cfg, s, fetchImpl = fetch, now = Date.now()) {
   const res = await call(fetchImpl, `${cfg.url}/auth/v1/token?grant_type=refresh_token`, { method: "POST", headers: authHeaders(cfg), body: JSON.stringify({ refresh_token: s.refresh }) });
   if (!res.ok) throw fail("expired", "Tu sesión ha caducado: vuelve a entrar.", { status: res.status });
   return session(await res.json(), now);
 }
+// ---------- Auth with a code by email (WEB-67) ----------
+// No password to remember: Supabase emails a code (the «Magic Link» template
+// must show {{ .Token }}). create_user:false — only Manu's existing account.
+export async function sendCode(cfg, email, fetchImpl = fetch) {
+  const res = await call(fetchImpl, `${cfg.url}/auth/v1/otp`, { method: "POST", headers: authHeaders(cfg), body: JSON.stringify({ email, create_user: false }) });
+  if (res.ok) return true;
+  const d = await detail(res);
+  if (res.status === 429) throw fail("rate", "Has pedido muchos códigos seguidos: espera un poco (Supabase limita los correos gratis).", { status: 429 });
+  if (/signup|not allowed|not found/i.test(d)) throw fail("nouser", "Ese correo no tiene cuenta en tu nube.", { status: res.status });
+  throw fail("auth", d || `Error ${res.status}`, { status: res.status });
+}
+
+export async function verifyCode(cfg, { email, token }, fetchImpl = fetch, now = Date.now()) {
+  const code = String(token ?? "").replace(/\s+/g, "");
+  if (!/^\d{6,10}$/.test(code)) throw fail("badcode", "El código son solo números (6 u 8 cifras).");
+  let first = null;
+  // «email» is the current type; «magiclink» is accepted by older versions.
+  for (const type of ["email", "magiclink"]) {
+    const res = await call(fetchImpl, `${cfg.url}/auth/v1/verify`, { method: "POST", headers: authHeaders(cfg), body: JSON.stringify({ type, email, token: code }) });
+    if (res.ok) { const j = await res.json(); if (j.access_token) return session(j, now); }
+    else first = first ?? { status: res.status, d: await detail(res) };
+  }
+  // Supabase says «expired or invalid» for both: don't guess which.
+  throw fail("badcode", "Código incorrecto o caducado: revísalo o pide otro.", { status: first?.status });
+}
+
+// If the email brings a link instead of a code, Supabase sends Manu back to
+// the app with the session in the fragment: «#access_token=…&refresh_token=…».
+export function parseAuthHash(hash, now = Date.now()) {
+  const p = new URLSearchParams(String(hash ?? "").replace(/^#/, ""));
+  if (!p.get("access_token") || !p.get("refresh_token")) return null;
+  return session({ access_token: p.get("access_token"), refresh_token: p.get("refresh_token"), expires_in: p.get("expires_in") }, now);
+}
+
 export const needsRefresh = (s, now = Date.now()) => !s?.access || s.exp - now < 60000;
 
 // ---------- Rows ----------
@@ -161,7 +178,6 @@ export function syncErrorText(err) {
     case "network": return "Sin conexión: lo subo cuando vuelva la red.";
     case "expired": return "Tu sesión en la nube ha caducado: entra otra vez en Tú → Tu nube.";
     case "table": return "Falta crear la tabla en Supabase: mira el paso 2 en Tú → Tu nube.";
-    case "phrase": return "La frase de cifrado no coincide con la de tus datos en la nube.";
     case "conflict": return "Hay cambios en este dispositivo y en el otro: elige con cuál te quedas en Tú → Tu nube.";
     default: return `No he podido sincronizar: ${String(err?.message ?? "error").slice(0, 160)}`;
   }

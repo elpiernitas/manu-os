@@ -2,11 +2,11 @@
 
 Status: **REVIEW_PENDING**
 
-WEB-66 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
+WEB-67 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
 
 ## Tarea activa
 
-WEB-66 — las versiones nuevas llegan solas (`ai/HANDOFF.md`, «WEB-66»).
+WEB-67 — Tu nube: entrar con un código del correo, sin frase (`ai/HANDOFF.md`, «WEB-67»; enmienda de ADR-0017).
 
 ## Autorización
 
@@ -28,6 +28,7 @@ WEB-66 — las versiones nuevas llegan solas (`ai/HANDOFF.md`, «WEB-66»).
 - 2026-09-30: tras el estudio de su exportación de ChatGPT, Manu pide «imagina lo que se me pasaba por la mente con MANU OS y hazlo realidad». La visión y la hoja de ruta están en `ai/HANDOFF.md` («WEB-58»).
 - 2026-09-30: Manu pide el cierre de jornada de las 13:00 y que se compruebe por qué MANU respondió «La IA no ha respondido ahora».
 - 2026-09-30: Manu crea su proyecto Supabase gratuito (`manu-os`, West EU) y pasa la URL y la clave publishable para sincronizar iPhone y Mac (ADR-0017). La clave secreta y la contraseña de la base de datos no se comparten.
+- 2026-09-30: Manu elige «Solo código por correo, sin cifrar» para Tu nube, después de que la frase no coincidiera entre el Mac y el iPhone (enmienda de ADR-0017).
 - 2026-09-29: **cambio de gobernanza decidido por Manu.** El orquestador (ChatGPT/Codex) ya no revisa automáticamente, porque frenaba el avance. Claude Code fusiona los PR web cuando `npm test` y los dos workflows remotos están en verde y no hay conflictos. Cuando haga falta una revisión, Claude Code prepara un prompt, Manu se lo pasa a ChatGPT y le devuelve la respuesta; los defectos se corrigen en un PR nuevo con su regresión. Los PR #7, #8 y #9 siguen en borrador o pausa.
 
 ## Alcance autorizado

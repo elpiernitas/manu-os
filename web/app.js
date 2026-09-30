@@ -33,14 +33,14 @@ import { budgetStatus, budgetLine, budgetCommand } from "./core/budget.js";
 import { findInVault, findCommand } from "./core/find.js";
 import { weatherEmoji, sceneFor, PARTICLES, SHAPES, MONEY_EMOJI, dayPhase, cityMinutes } from "./core/scene.js";
 import { buildImagePayload, buildLinkPayload, isGeminiKey, mayGo, setSensitiveOk, sensitiveAllowed, pickModel, listModels, buildActionPayload, askWithActions, issueUrl, aiErrorText } from "./core/ai.js";
-import { encryptBackup, decryptBackup, passphraseProblem, isEnvelope, newSalt, deriveSyncKey, sealWithKey, openWithKey, PBKDF2_ITERATIONS } from "./core/crypto.js";
-import { SUPABASE_SQL, configProblem, cleanConfig, parseSyncLink, signUp, signIn, refreshSession, needsRefresh, remoteHead, remoteGet, remotePut, decide, isEmptyVault, syncErrorText } from "./core/sync.js";
+import { encryptBackup, decryptBackup, passphraseProblem, isEnvelope } from "./core/crypto.js";
+import { SUPABASE_SQL, parseSyncLink, parseAuthHash, sendCode, verifyCode, refreshSession, needsRefresh, remoteHead, remoteGet, remotePut, decide, isEmptyVault, syncErrorText } from "./core/sync.js";
 import { exportFullBackup, downloadBlob, readBackupFile, restoreFullBackup, FORMAT as FULL_FORMAT } from "./core/backup-manager.js";
 import { isSpotifyClientId, pkceValid, randomVerifier, challengeFor, authorizeUrl, exchangeCode, refreshTokens, listDevices, findSpeaker, transferTo, DEFAULT_SPEAKER } from "./core/spotify.js";
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "66";
+export const APP_VERSION = "67";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -120,32 +120,29 @@ function persist() {
   nubeChanged();
 }
 
-// ---------- Tu nube (WEB-64): the vault, encrypted, in Manu's Supabase ----------
+// ---------- Tu nube (WEB-64, WEB-67): the vault in Manu's Supabase ----------
+// WEB-67 (Manu's choice, ADR-0017): he signs in with a code sent to his email
+// and there is no encryption phrase to remember. The row is protected by his
+// account (RLS): only his user can read it; Supabase itself technically could.
 // Device state in «manuos.nube»; the session in «manuos.nube.token» (a secret:
-// never in backups); the key, non-extractable, in its own IndexedDB outside
-// the «manuos-*» names so backups skip it. The phrase and password are never kept.
+// never in backups). No password is ever kept.
 const nube = {
   get state() { try { return JSON.parse(localStorage.getItem("manuos.nube") || "null") ?? {}; } catch { return {}; } },
   set state(v) { try { localStorage.setItem("manuos.nube", JSON.stringify(v)); } catch {} },
   patch(p) { this.state = { ...this.state, ...p }; },
   get session() { try { return JSON.parse(localStorage.getItem("manuos.nube.token") || "null"); } catch { return null; } },
   set session(v) { try { v ? localStorage.setItem("manuos.nube.token", JSON.stringify(v)) : localStorage.removeItem("manuos.nube.token"); } catch {} },
-  key: null, running: false, edits: 0, timer: null,
+  running: false, edits: 0, timer: null,
 };
-const nubeCfg = () => { const s = nube.state; return s.url && s.key ? { url: s.url, key: s.key } : null; };
-const nubeOn = () => Boolean(nubeCfg() && nube.session && nube.state.salt);
-const KEY_DB = "manu-sync-key";
 const NUBE_URL = "https://xqsexjpuhvmwkclpnvjo.supabase.co"; // Manu's project; also in the CSP
-function keyDb() {
-  return new Promise((res, rej) => { const r = indexedDB.open(KEY_DB, 1); r.onupgradeneeded = () => r.result.createObjectStore("k"); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
-}
-async function keyOp(mode, fn) {
-  const db = await keyDb();
-  try { return await new Promise((res, rej) => { const t = db.transaction("k", mode); const r = fn(t.objectStore("k")); t.oncomplete = () => res(r?.result); t.onerror = () => rej(t.error); }); } finally { db.close(); }
-}
-const saveNubeKey = (k) => keyOp("readwrite", (s) => s.put(k, "vault"));
-const loadNubeKey = async () => { try { return (await keyOp("readonly", (s) => s.get("vault"))) ?? null; } catch { return null; } };
-const dropNubeKey = () => new Promise((res) => { const d = indexedDB.deleteDatabase(KEY_DB); d.onsuccess = d.onerror = d.onblocked = () => res(); });
+// Supabase's *publishable* key: public by design (it ships in every web app
+// that uses Supabase); what protects the data is RLS and Manu's session. The
+// secret key never goes here (configProblem refuses it).
+const NUBE_KEY = "sb_publishable_sfml3vmi8c7Un7kTi4xjkg_Ioj1eAwQ";
+const nubeCfg = () => ({ url: NUBE_URL, key: NUBE_KEY });
+const nubeOn = () => Boolean(nube.session);
+// WEB-64 kept an encryption key here; removed on this version (and on «Borrar todo»).
+const dropNubeKey = () => new Promise((res) => { try { const d = indexedDB.deleteDatabase("manu-sync-key"); d.onsuccess = d.onerror = d.onblocked = () => res(); } catch { res(); } });
 const deviceName = () => (/iPhone|iPad/.test(navigator.userAgent) ? "iPhone" : /Mac/.test(navigator.userAgent) ? "Mac" : "otro dispositivo");
 
 async function nubeSession() {
@@ -167,10 +164,8 @@ function nubeChanged() {
 
 async function nubePush(baseRev) {
   const s = await nubeSession();
-  const st = nube.state;
   const edits = nube.edits;
-  const data = await sealWithKey(vault, nube.key, { salt: st.salt, iterations: st.iterations });
-  const rev = await remotePut(nubeCfg(), s, { data, baseRev, device: deviceName() });
+  const rev = await remotePut(nubeCfg(), s, { data: vault, baseRev, device: deviceName() });
   nube.patch({ lastRev: rev, lastAt: new Date().toISOString(), conflict: null, error: null, ...(edits === nube.edits ? { dirty: false } : {}) });
 }
 
@@ -178,17 +173,12 @@ async function nubePull(row = null) {
   const s = await nubeSession();
   row = row ?? await remoteGet(nubeCfg(), s);
   if (!row) return;
-  if (row.data?.kdf?.salt !== nube.state.salt) {
-    // Another device set up the cloud with its own salt: same phrase, other
-    // key. Ask for the phrase again; nubeConnect then uses the cloud's salt.
-    nube.key = null; await dropNubeKey();
-    nube.patch({ salt: null, error: "Otro dispositivo ya ha subido tus datos: escribe tu frase otra vez para abrirlos." });
-    toast("Escribe tu frase otra vez para abrir los datos del otro dispositivo");
-    render();
-    return;
+  if (isEnvelope(row.data)) {
+    // Left by WEB-64 (encrypted, phrase no longer used): it can't be read,
+    // so this device's data replaces it.
+    nube.patch({ dirty: true }); await nubePush(row.rev); return;
   }
-  const data = await openWithKey(row.data, nube.key);
-  const v = validateVault(data);
+  const v = validateVault(row.data);
   if (!v.ok) throw new Error(`Los datos de la nube no son válidos: ${v.reason}`);
   restoring = true; // nothing in memory may overwrite what just arrived
   clearTimeout(nube.timer);
@@ -200,8 +190,6 @@ async function nubePull(row = null) {
 
 async function nubeSync({ manual = false } = {}) {
   if (!nubeOn() || nube.running || restoring) return;
-  nube.key = nube.key ?? await loadNubeKey();
-  if (!nube.key) { nube.patch({ error: "Falta tu frase en este dispositivo: vuelve a entrar." }); return; }
   nube.running = true;
   if (tab === "tu" && sub === "nube") render();
   try {
@@ -212,7 +200,7 @@ async function nubeSync({ manual = false } = {}) {
     else if (what === "pull") await nubePull();
     else if (what === "conflict") { nube.patch({ conflict: { rev: head?.rev ?? null, device: head?.device ?? null, at: head?.updated_at ?? null } }); if (manual || tab === "tu") render(); toast(syncErrorText({ code: "conflict" })); }
     else nube.patch({ lastAt: new Date().toISOString(), error: null });
-    if (manual) toast(what === "conflict" ? "Elige con qué datos te quedas" : what === "none" && !head ? "Conectado: aún no hay nada que subir" : "Sincronizado");
+    if (manual) toast(what === "conflict" ? "Elige con qué datos te quedas" : "Sincronizado");
   } catch (err) {
     if (err.code === "conflict") nube.patch({ conflict: { rev: null } });
     nube.patch({ error: syncErrorText(err) });
@@ -223,66 +211,51 @@ async function nubeSync({ manual = false } = {}) {
   }
 }
 
-// First time on a device: log in, derive the key and check it against what
-// is already in the cloud, if anything.
-async function nubeConnect({ url, key, email, password, phrase, phrase2, create }) {
-  const cfg = cleanConfig({ url, key });
-  const problem = configProblem(cfg);
-  if (problem) throw new Error(problem);
-  // The CSP (index.html) only lets MANU talk to this project.
-  if (cfg.url !== NUBE_URL) throw new Error(`MANU solo puede conectarse a tu proyecto (${NUBE_URL.replace("https://", "")}). Si has creado otro, hay que cambiarlo en la app.`);
-  const pp = passphraseProblem(phrase);
-  if (pp) throw new Error(pp);
-  nube.patch({ url: cfg.url, key: cfg.key, email });
-  if (create) {
-    const r = await signUp(cfg, { email, password });
-    if (r.confirm) return "confirm";
-    nube.session = r.session;
-  } else nube.session = await signIn(cfg, { email, password });
+// Step 1: the code goes to Manu's email.
+async function nubeAskCode(email) {
+  const cfg = nubeCfg();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error("Escribe tu correo.");
+  await sendCode(cfg, email);
+  nube.patch({ email, codeSentAt: new Date().toISOString() });
+}
+
+// Step 2: the code opens the session; then, what is already in the cloud decides.
+async function nubeEnter(code) {
+  const cfg = nubeCfg();
+  nube.session = await verifyCode(cfg, { email: nube.state.email, token: code });
   const row = await remoteGet(cfg, nube.session);
-  let salt, iterations, remoteEmpty = false;
-  if (row) {
-    ({ salt, iterations } = row.data?.kdf ?? {});
-    const k = await deriveSyncKey(phrase, salt, iterations);
-    remoteEmpty = isEmptyVault(await openWithKey(row.data, k)); // wrong phrase → throws «phrase»
-    nube.key = k;
-  } else {
-    if (phrase !== phrase2) throw new Error("Las dos frases no coinciden.");
-    salt = newSalt(); iterations = PBKDF2_ITERATIONS;
-    nube.key = await deriveSyncKey(phrase, salt, iterations);
-  }
-  await saveNubeKey(nube.key);
-  // An empty cloud (another device connected with nothing yet) is not a
-  // conflict: this device's data simply goes up over it.
-  nube.patch({ salt, iterations, lastRev: remoteEmpty ? row.rev : null, dirty: remoteEmpty, conflict: null, error: null });
-  return row && !remoteEmpty ? "existing" : "new";
+  // An empty cloud, or the unreadable leftover of WEB-64, is not a conflict:
+  // this device's data simply goes up over it.
+  const replaceable = row && (isEnvelope(row.data) || isEmptyVault(row.data));
+  nube.patch({ lastRev: replaceable ? row.rev : null, dirty: Boolean(replaceable), conflict: null, error: null, codeSentAt: null });
+  return row && !replaceable ? "existing" : "new";
+}
+
+async function nubeMail(email) {
+  toast("Mandando el código…");
+  try { await nubeAskCode(email); render(); toast("Mira tu correo: te ha llegado un código"); $("nubeCode")?.focus(); }
+  catch (err) { toast(err.code === "network" ? syncErrorText(err) : err.message); }
+}
+const nubeCodeAgain = () => nubeMail(nube.state.email ?? "");
+async function nubeCodeSubmit(code) {
+  toast("Comprobando el código…");
+  try {
+    const r = await nubeEnter(code);
+    render();
+    toast(r === "existing" ? "Dentro: traigo tus datos…" : "Dentro: subo tus datos…");
+    await nubeSync({ manual: true });
+  } catch (err) { toast(["network", "expired", "table", "conflict"].includes(err.code) ? syncErrorText(err) : err.message); }
 }
 
 async function nubeLeave() {
   clearTimeout(nube.timer);
-  nube.session = null; nube.key = null;
+  nube.session = null;
   await dropNubeKey();
-  const { url, key } = nube.state;
-  nube.state = { url, key };
-}
-
-async function nubeSubmit(create) {
-  const v = (id) => $(id)?.value ?? "";
-  const btns = document.querySelectorAll("#nubeForm button"); btns.forEach((b) => { b.disabled = true; });
-  toast(create ? "Creando tu cuenta…" : "Entrando y comprobando tu frase…");
-  try {
-    const r = await nubeConnect({ url: v("nubeUrl"), key: v("nubeKey"), email: v("nubeEmail").trim(), password: v("nubePass"), phrase: v("nubePhrase"), phrase2: v("nubePhrase2"), create });
-    if (r === "confirm") { toast("Te ha llegado un correo de Supabase: ábrelo, confirma y luego pulsa «Entrar»."); return; }
-    render();
-    toast(r === "existing" ? "Conectado: traigo tus datos…" : "Conectado: subo tus datos cifrados…");
-    await nubeSync({ manual: true });
-  } catch (err) {
-    toast(["network", "expired", "table", "phrase", "conflict"].includes(err.code) ? syncErrorText(err) : err.message);
-  } finally { btns.forEach((b) => { b.disabled = false; }); }
+  const { email } = nube.state;
+  nube.state = { email };
 }
 
 async function nubeResolve(which) {
-  nube.key = nube.key ?? await loadNubeKey();
   try {
     if (which === "remote") { nube.patch({ dirty: false }); await nubePull(); return; }
     const head = await remoteHead(nubeCfg(), await nubeSession());
@@ -1402,26 +1375,21 @@ const subpages = {
           <p>${nube.running ? "Sincronizando…" : st.error ? esc(st.error) : st.dirty ? "Cambios pendientes de subir." : st.lastRev ? "Todo sincronizado." : "Conectado. Aún no hay nada en la nube ni nada que subir desde aquí: en cuanto apuntes algo, o conectes el dispositivo que tiene tus datos, se sincroniza."}</p>
           <p class="muted small">Cuenta: ${esc(st.email ?? "")}${st.lastAt ? ` · última vez ${esc(when(st.lastAt))}` : ""}${st.lastRev ? ` · versión ${esc(st.lastRev)}` : ""}</p>
           <div class="btns"><button class="btn" data-act="nube-sync">Sincronizar ahora</button><button class="btn ghost" data-act="nube-leave">Desconectar este dispositivo</button></div></section>
-        <section class="card"><h2>Cómo funciona</h2>${what}<ul class="muted small"><li>Se cifra en este dispositivo con tu frase antes de salir: Supabase solo guarda datos ilegibles.</li><li>Al cambiar algo, se sube en unos segundos. Al abrir MANU, se trae lo último del otro dispositivo.</li><li>Tu frase y tu contraseña no se guardan en ningún sitio. Si olvidas la frase, lo de la nube no se puede recuperar (lo de cada dispositivo sigue ahí).</li></ul></section>`;
+        <section class="card"><h2>Cómo funciona</h2>${what}<ul class="muted small"><li>Solo tu cuenta puede leer tus datos en la nube. No van cifrados con una frase (lo elegiste así para no tener nada que recordar): Supabase, como empresa, técnicamente podría verlos.</li><li>Al cambiar algo, se sube en unos segundos. Al abrir MANU, se trae lo último del otro dispositivo.</li><li>Para entrar en otro dispositivo, te llega un código al correo.</li></ul></section>`;
     }
+    const sent = Boolean(st.codeSentAt && st.email);
     return `${backBar("Tu nube")}
-      <section class="card"><h2>iPhone y Mac con los mismos datos</h2><p class="muted small">Tu propio Supabase (gratis). Todo va cifrado con una frase que solo sabes tú.</p>${what}</section>
-      <section class="card"><h2>1. Tu proyecto</h2>
-        <p class="muted small">Si abriste el enlace que te pasé, ya está relleno.</p>
+      <section class="card"><h2>iPhone y Mac con los mismos datos</h2><p class="muted small">Tu propio Supabase (gratis). Entras con un código que te llega al correo: nada que recordar.</p>${what}</section>
+      <section class="card"><h2>${sent ? "2. El código" : "1. Tu correo"}</h2>
+        ${sent ? `<p class="muted small">Te lo he mandado a <b>${esc(st.email)}</b>. Mira también en «Spam».</p>
         <form id="nubeForm" class="stack">
-          <label class="muted small" for="nubeUrl">Project URL</label><input id="nubeUrl" value="${esc(st.url ?? "")}" autocomplete="off" spellcheck="false" placeholder="https://xxxx.supabase.co" inputmode="url">
-          <label class="muted small" for="nubeKey">Clave publishable (nunca la secreta)</label><input id="nubeKey" value="${esc(st.key ?? "")}" autocomplete="off" spellcheck="false" placeholder="sb_publishable_…">
-          <h2>2. La tabla (una sola vez)</h2>
-          <p class="muted small">En Supabase: SQL Editor → New query → pega esto → Run. Solo la primera vez, desde un dispositivo.</p>
-          <details><summary>Ver el SQL</summary><pre class="code small">${esc(SUPABASE_SQL)}</pre></details>
-          <button class="btn ghost" type="button" data-act="nube-copy-sql">Copiar el SQL</button>
-          <h2>3. Tu cuenta y tu frase</h2>
-          <label class="muted small" for="nubeEmail">Correo</label><input id="nubeEmail" type="email" value="${esc(st.email ?? "")}" autocomplete="username">
-          <label class="muted small" for="nubePass">Contraseña de la cuenta (8+)</label><input id="nubePass" type="password" autocomplete="current-password">
-          <label class="muted small" for="nubePhrase">Frase de cifrado (10+ caracteres). Distinta de la contraseña. Si la olvidas, lo de la nube no se recupera.</label><input id="nubePhrase" type="password" autocomplete="off">
-          <label class="muted small" for="nubePhrase2">Repite la frase (solo la primera vez)</label><input id="nubePhrase2" type="password" autocomplete="off">
-          <div class="btns"><button class="btn" type="submit">Entrar</button><button class="btn ghost" type="button" data-act="nube-signup">Crear cuenta</button></div>
-        </form></section>`;
+          <label class="muted small" for="nubeCode">Código del correo</label><input id="nubeCode" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="123456">
+          <div class="btns"><button class="btn" type="submit">Entrar</button><button class="btn ghost" type="button" data-act="nube-other">Otro correo</button><button class="link small" type="button" data-act="nube-code">Mandármelo otra vez</button></div>
+        </form>` : `<form id="nubeMail" class="stack">
+          <label class="muted small" for="nubeEmail">Correo</label><input id="nubeEmail" type="email" value="${esc(st.email ?? "")}" autocomplete="email">
+          <button class="btn" type="submit">Mandarme el código</button>
+        </form>`}</section>
+      <details class="card"><summary class="muted small">Solo si falta la tabla en Supabase</summary><p class="muted small">SQL Editor → New query → pega esto → Run. Ya está hecha en tu proyecto.</p><pre class="code small">${esc(SUPABASE_SQL)}</pre><button class="btn ghost" type="button" data-act="nube-copy-sql">Copiar el SQL</button></details>`;
   },
   ia() {
     const key = aiStore.key;
@@ -2601,7 +2569,8 @@ document.addEventListener("click", async (e) => {
     case "rem-done": vault.reminders = vault.reminders.map((r) => (r.id === id ? { ...r, done: !r.done } : r)); persist(); render(); break;
     case "sheet": openSheet(a.dataset.kind, true); break;
     case "close-day": closeDay(); break;
-    case "nube-signup": nubeSubmit(true); break;
+    case "nube-code": nubeCodeAgain(); break;
+    case "nube-other": nube.patch({ codeSentAt: null }); render(); break;
     case "nube-copy-sql": navigator.clipboard?.writeText(SUPABASE_SQL).then(() => toast("SQL copiado: pégalo en Supabase → SQL Editor"), () => toast("No he podido copiarlo: ábrelo y cópialo a mano")); break;
     case "nube-sync": nubeSync({ manual: true }); break;
     case "nube-leave": if (confirm("¿Desconectar este dispositivo de tu nube? Tus datos se quedan aquí y en la nube.")) nubeLeave().then(() => { render(); toast("Desconectado"); }); break;
@@ -2747,7 +2716,7 @@ document.addEventListener("click", async (e) => {
     case "backup-later": vault.settings.backupSnooze = new Date(Date.now() + 3 * 86400000).toISOString(); persist(); render(); break;
     case "wipe": confirmWipe = true; render(); break;
     case "wipe-no": confirmWipe = false; render(); break;
-    case "wipe-yes": { let ss = null, ls = null; try { ss = sessionStorage; ls = localStorage; } catch {} wipeDeviceKeys([ls, ss]); clearTimeout(nube.timer); nube.key = null; dropNubeKey(); clearImages(); clearArchive(); archive.docs = null; archive.stats = null; imageCache.clear(); gcal.tokens = {}; vault = emptyVault(); confirmWipe = false; persist(); render(); toast("Datos borrados de este dispositivo"); break; }
+    case "wipe-yes": { let ss = null, ls = null; try { ss = sessionStorage; ls = localStorage; } catch {} wipeDeviceKeys([ls, ss]); clearTimeout(nube.timer); dropNubeKey(); clearImages(); clearArchive(); archive.docs = null; archive.stats = null; imageCache.clear(); gcal.tokens = {}; vault = emptyVault(); confirmWipe = false; persist(); render(); toast("Datos borrados de este dispositivo"); break; }
   }
 });
 
@@ -2770,7 +2739,8 @@ const num = (v) => { const n = Number(String(v).replace(",", ".")); return v !==
 document.addEventListener("submit", async (e) => {
   e.preventDefault();
   const f = e.target.id;
-  if (f === "nubeForm") { nubeSubmit(false); return; }
+  if (f === "nubeMail") { nubeMail($("nubeEmail").value.trim()); return; }
+  if (f === "nubeForm") { nubeCodeSubmit($("nubeCode").value); return; }
   if (f === "projKeys") {
     const p = currentProject(); if (!p) return;
     updateProject(p.id, (x) => ({ ...x, keywords: parseKeywords($("projKeysIn").value) }));
@@ -3415,11 +3385,27 @@ function applyNubeLink() {
   if (!location.hash.startsWith("#nube=")) return false;
   const link = parseSyncLink(location.hash);
   history.replaceState(null, "", location.pathname + location.search);
-  if (link) { nube.patch(link); tab = "tu"; sub = "nube"; setTimeout(() => toast("Proyecto de tu nube rellenado"), 300); }
-  else setTimeout(() => toast("Ese enlace de tu nube no es válido"), 300);
+  // WEB-67: the project is built in; the old link just opens «Tu nube».
+  if (link) { tab = "tu"; sub = "nube"; }
   return true;
 }
 applyNubeLink();
+// WEB-67: the email's link (if the template sends a link, not a code).
+{
+  const linked = parseAuthHash(location.hash);
+  if (linked || /error_description=/.test(location.hash)) {
+    history.replaceState(null, "", location.pathname + location.search);
+    tab = "tu"; sub = "nube";
+    if (linked) {
+      nube.session = linked;
+      remoteGet(nubeCfg(), linked).then((row) => {
+        const replaceable = row && (isEnvelope(row.data) || isEmptyVault(row.data));
+        nube.patch({ lastRev: replaceable ? row.rev : null, dirty: Boolean(replaceable), codeSentAt: null, error: null });
+        render(); nubeSync({ manual: true });
+      }).catch((err) => toast(syncErrorText(err)));
+    } else setTimeout(() => toast("El enlace del correo ha caducado: pide un código nuevo"), 300);
+  }
+}
 window.addEventListener("hashchange", () => { if (applyNubeLink()) render(); });
 render({ enter: "page" });
 nubeSync();
