@@ -25,6 +25,7 @@ import { diaryDocs, dayLines, dayFromText, isDiaryQuestion, dayTitle } from "./c
 import { applyBuzon, buzonSummary } from "./core/buzon.js";
 import { briefing, briefingText, isBriefingQuestion, monthPace } from "./core/briefing.js";
 import { whatNow, whatNowText, isWhatNowQuestion } from "./core/now.js";
+import { gentleMode, gentlePlan, isGentleQuestion } from "./core/lowmode.js";
 import { closingDue, workClosing, closingText, isClosingQuestion, nextWorkDay } from "./core/closing.js";
 import { searchContacts } from "./core/contacts.js";
 import { autoFile, projectKeys, parseKeywords, buildSuggestPayload, parseSuggestions, projectMarkdown, projectZip, projectFileName } from "./core/autofile.js";
@@ -40,7 +41,7 @@ import { isSpotifyClientId, pkceValid, randomVerifier, challengeFor, authorizeUr
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "69";
+export const APP_VERSION = "70";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -497,7 +498,24 @@ function dayBriefing() {
     reminders: vault.reminders, tasks: tasks(vault.inbox), birthdays: upcomingBirthdays(vault.people, today(), 1),
     spending: vault.spending, inbox: vault.inbox, importantMail: googleOn("gmail") ? vault.mail?.important?.length ?? 0 : 0,
     budgetAlerts: budgetsNow().filter((b) => b.status !== "ok").slice(0, 2).map(budgetLine),
+    gentle: gentleNow().on,
   });
+}
+// ---------- Modo bajón (WEB-70) ----------
+const gentleNow = () => gentleMode(vault.moods, today(), { pausedDay: vault.settings.gentlePaused ?? null });
+// People he talks to most recently: the first is offered by name.
+const trustedPeople = () => [...(vault.people ?? [])].filter((p) => p.lastContact).sort((a, b) => String(b.lastContact).localeCompare(String(a.lastContact))).slice(0, 3);
+function gentleData() {
+  const g = gentleNow();
+  // The lift itself is in «Ahora» (whatNow); the card does not repeat it.
+  return { g, plan: gentlePlan(g, { trusted: trustedPeople() }) };
+}
+function gentleCard() {
+  const { g, plan } = gentleData();
+  if (!plan) return "";
+  return `<section class="card brief gentle" aria-labelledby="gentleTitle"><h2 id="gentleTitle">${esc(plan.title)}</h2><p class="muted small">${esc(plan.why)}</p>
+    <ul class="brief-list">${plan.lines.map((l) => `<li><span aria-hidden="true">${l.e}</span><span>${esc(l.t)}</span></li>`).join("")}</ul>
+    <div class="btns"><button class="btn" data-act="refuge">Hablarlo con MANU</button>${g.level === "heavy" && trustedPeople()[0] ? `<button class="btn ghost" data-sub-go="personas">Escribir a ${esc(trustedPeople()[0].name)}</button>` : ""}<button class="link small" data-act="gentle-pause">Hoy estoy bien, quítalo</button></div></section>`;
 }
 // ---------- Cierre de jornada (WEB-63) ----------
 const dayClosing = () => workClosing({ now: today(), inbox: vault.inbox, tomorrow: eventsFor(nextWorkDay(today()).key), reminders: vault.reminders });
@@ -519,7 +537,7 @@ function closeDay() {
 
 // ---------- Ahora (WEB-58): una sola cosa, la siguiente ----------
 function nowPlan() {
-  return whatNow({ closing: closingNow(),
+  return whatNow({ closing: closingNow(), gentle: gentleNow().on,
     now: today(), mode: modeState(today(), undefined, vault.settings.override).mode,
     events: eventsFor(localDay()), tomorrow: eventsFor(tomorrowKey()),
     reminders: vault.reminders, tasks: tasks(vault.inbox), projects: vault.projects,
@@ -1061,6 +1079,7 @@ const screens = {
     const bdays = upcomingBirthdays(vault.people, today(), 7);
     return `<h1>${greeting()}, Manu</h1><p class="subtitle">${esc(longDate())} · <span class="chip">${esc(MODE_TITLES[m.mode])}</span></p>
       <div class="stack">
+      ${gentleCard()}
       ${nowCard()}
       ${closingCard()}
       ${briefingCard()}
@@ -1815,6 +1834,14 @@ function say(text) {
   // WEB-58: «¿qué hago ahora?» — one answer, not a list.
   if (isWhatNowQuestion(clean)) {
     vault.chat.push({ from: "me", text: clean, at }, { from: "manu", text: whatNowText(nowPlan()), at });
+    persist(); render(); return;
+  }
+  // WEB-70: «modo bajón», «vamos suave».
+  if (isGentleQuestion(clean)) {
+    const { plan } = gentleData();
+    const text = plan ? [plan.title, plan.why, ...plan.lines.map((l) => `${l.e} ${l.t}`), "", "Si quieres hablarlo, dime «estoy de bajón» y abro el Refugio."].join("\n")
+      : "Ahora no te veo de bajón. Si lo estás, márcalo en Tú → «¿Cómo estás hoy?» (😣 o 😕) y MANU irá suave contigo.";
+    vault.chat.push({ from: "me", text: clean, at }, { from: "manu", text, at });
     persist(); render(); return;
   }
   // WEB-63: «cierra la jornada», «he terminado de currar».
@@ -2589,6 +2616,7 @@ document.addEventListener("click", async (e) => {
     case "rem-done": vault.reminders = vault.reminders.map((r) => (r.id === id ? { ...r, done: !r.done } : r)); persist(); render(); break;
     case "sheet": openSheet(a.dataset.kind, true); break;
     case "close-day": closeDay(); break;
+    case "gentle-pause": vault.settings.gentlePaused = localDay(); persist(); render(); toast("Vale. Me alegro 💙"); break;
     case "nube-code": nubeCodeAgain(); break;
     case "nube-copy-handoff": navigator.clipboard?.writeText(nube.handoff ?? "").then(() => toast("Copiado: ahora abre MANU desde tu pantalla de inicio y pégalo en Tu nube"), () => toast("Mantén pulsado el código para copiarlo")); break;
     case "nube-other": nube.patch({ codeSentAt: null }); render(); break;

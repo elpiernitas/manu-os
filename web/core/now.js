@@ -53,9 +53,10 @@ const lowMood = (moods, now) => {
  * @param {Array} x.moods       vault.moods
  * @param {number} x.captures   screenshots waiting in the tray
  * @param {object|null} x.closing  workClosing(...) when closingDue(...), else null
+ * @param {boolean} x.gentle    modo bajón (WEB-70): no stale projects, softer tasks
  * @returns {{ main: {e,t,why,go}, more: Array<{e,t,go}> }}
  */
-export function whatNow({ now = new Date(), mode = "AFTERNOON", events = [], tomorrow = [], reminders = [], tasks = [], projects = [], birthdays = [], quiet = [], moods = [], captures = 0, closing = null } = {}) {
+export function whatNow({ now = new Date(), mode = "AFTERNOON", events = [], tomorrow = [], reminders = [], tasks = [], projects = [], birthdays = [], quiet = [], moods = [], captures = 0, closing = null, gentle = false } = {}) {
   const out = [];
   const nowMs = now.getTime();
   const clock = hm(now);
@@ -103,7 +104,7 @@ export function whatNow({ now = new Date(), mode = "AFTERNOON", events = [], tom
   if (captures > 0 && mode !== "WORK" && h >= 15) out.push({ e: "🖼️", t: `Revisa ${captures === 1 ? "tu captura" : `tus ${captures} capturas`}.`, why: "Cinco minutos: te las agrupo por tema y te quedas solo con lo que sirve.", go: { sub: "capturas" } });
 
   // 7. A project gone quiet (not during work).
-  const stale = mode === "WORK" ? [] : staleProjects(projects, now);
+  const stale = mode === "WORK" || gentle ? [] : staleProjects(projects, now);
   if (stale.length) out.push({ e: stale[0].project.emoji ?? "📁", t: `Diez minutos para «${stale[0].project.name}».`, why: `Llevas ${stale[0].days} días sin tocarlo. Ábrelo y apunta el siguiente paso, solo eso. Si ya no te interesa, archívalo y quítatelo de la cabeza.`, go: { project: stale[0].project.id } });
 
   // 8. Someone he hasn't talked to in a while.
@@ -114,7 +115,9 @@ export function whatNow({ now = new Date(), mode = "AFTERNOON", events = [], tom
   }
 
   // 9. Any open task.
-  if (firstTask && mode !== "WORK") out.push({ e: "✅", t: `Quítate de encima: ${firstTask.text}.`, why: `Tienes ${tasks.length === 1 ? "solo esta tarea" : `${tasks.length} tareas abiertas`}; empieza por la más antigua.`, go: { tab: "agenda" } });
+  if (firstTask && mode !== "WORK") out.push(gentle
+    ? { e: "🌱", t: `Si te apetece, solo una: ${firstTask.text}.`, why: "Y si no, mañana. Hoy no pasa nada por no hacerla.", go: { tab: "agenda" } }
+    : { e: "✅", t: `Quítate de encima: ${firstTask.text}.`, why: `Tienes ${tasks.length === 1 ? "solo esta tarea" : `${tasks.length} tareas abiertas`}; empieza por la más antigua.`, go: { tab: "agenda" } });
 
   // 10. Nothing pending.
   if (!out.length) {

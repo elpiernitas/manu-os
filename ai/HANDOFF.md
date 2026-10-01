@@ -28,9 +28,28 @@ Hoja de ruta, un PR por paso:
 - Cierre de jornada a las 13:00.
 - Día de Oviedo.
 - Mañana con Atajo al parar la alarma (NO_VERIFICADO en iOS).
-- Modo bajón.
+- Modo bajón (WEB-70).
 
 Límites reales de una web en iPhone: no hay widgets, pantalla bloqueada ni control del Chromecast. Donde se pueda, se hará con Atajos.
+
+## WEB-70 — modo bajón
+
+Es el último punto de «Guiar»: MANU se da cuenta cuando Manu está de bajón y baja el ritmo sola.
+
+- `core/lowmode.js`:
+  - `gentleMode`:
+    - **suave** si hoy o ayer marcó 😣 o 😕, o si lleva 3 o más días flojos esta semana;
+    - **fuerte** si lleva 4 o más días flojos, o 3 días seguidos en «Mal»;
+    - un ánimo bueno hoy lo apaga, y «Hoy estoy bien, quítalo» lo pausa solo ese día.
+  - `gentlePlan`: no meter prisa y, solo en modo fuerte, escribir a alguien con quien habla a menudo (por su nombre).
+  - `isGentleQuestion`: «modo bajón» y «vamos suave».
+- `whatNow({gentle})`: sin proyectos parados, y la tarea pasa a «Si te apetece, solo una: …».
+- `briefing({gentle})`: sin presupuestos ni el ritmo de gasto del mes.
+- En Hoy, la tarjeta «💙 Hoy vamos suave» tiene los botones «Hablarlo con MANU» (Refugio), «Escribir a …» y «Hoy estoy bien, quítalo».
+- No diagnostica y no envía nada. El ánimo sigue en el dispositivo; la crisis sigue en el Refugio con el 112 y el 024.
+- Evidencia:
+  - `npm test`: 208 en verde.
+  - e2e70: 9/9.
 
 ## WEB-69 — confirmar antes de tirar correos; propuestas de proyectos; `window.confirm`
 
