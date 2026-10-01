@@ -1,6 +1,6 @@
 # CURRENT TASK
 
-Status: **REVIEW_PENDING**
+Status: **DONE**
 
 WEB-70 implementado por Claude Code. Se fusiona según la regla de fusión de `AGENTS.md`.
 
