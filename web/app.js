@@ -26,6 +26,7 @@ import { applyBuzon, buzonSummary } from "./core/buzon.js";
 import { briefing, briefingText, isBriefingQuestion, monthPace } from "./core/briefing.js";
 import { whatNow, whatNowText, isWhatNowQuestion, morningSpeech } from "./core/now.js";
 import { gentleMode, gentlePlan, isGentleQuestion } from "./core/lowmode.js";
+import { punch, editPunch, today as shiftToday, monthReport, reportRows, toCsv, dur, PAUSE_REASONS, clockState } from "./core/clock.js";
 import { closingDue, workClosing, closingText, isClosingQuestion, nextWorkDay } from "./core/closing.js";
 import { searchContacts } from "./core/contacts.js";
 import { autoFile, projectKeys, parseKeywords, buildSuggestPayload, parseSuggestions, projectMarkdown, projectZip, projectFileName } from "./core/autofile.js";
@@ -41,7 +42,7 @@ import { isSpotifyClientId, pkceValid, randomVerifier, challengeFor, authorizeUr
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "73";
+export const APP_VERSION = "74";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -315,6 +316,7 @@ const I = {
   tu: svg('<circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/>'),
   proyectos: svg('<path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11M9 8h6"/>'),
   plus: svg('<path d="M12 5v14M5 12h14"/>'),
+  clock: svg('<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6"/>'),
   check: svg('<path d="M5 12.5l4.5 4.5L19 7.5"/>', 'stroke-width="3"'),
   chev: svg('<path d="M9 6l6 6-6 6"/>'),
   back: svg('<path d="M15 6l-6 6 6 6"/>'),
@@ -514,6 +516,57 @@ function oviedoToday() {
   return oviedoTrip({ workStart: first?.time ?? vault.settings.workStart ?? "09:00" });
 }
 
+// ---------- Fichaje (WEB-74) ----------
+const clockTarget = () => Number(vault.settings.clockTarget) > 0 ? Number(vault.settings.clockTarget) : 240;
+const clockDay = (key = localDay()) => (vault.clock ?? []).find((d) => d.day === key) ?? { day: key, events: [] };
+const shiftNow = () => shiftToday(clockDay().events, { now: today(), targetMin: clockTarget() });
+let clockMonth = null; // "YYYY-MM" shown in Tú → Fichaje
+let clockEdit = null;  // day being corrected
+function doPunch(t, why = null) {
+  try {
+    vault.clock = punch(vault.clock, t, { at: today(), id: uid("ck"), why });
+    persist(); render();
+    const s = shiftNow();
+    toast({ in: "Dentro. ¡A por ello!", pause: `Pausa${why ? ` (${why.toLowerCase()})` : ""}: paro el reloj`, back: s.leaveAt ? `De vuelta. Puedes salir a las ${s.leaveAt}` : "De vuelta", out: s.extraMin ? `Salida. Hoy +${dur(s.extraMin)} para tu saldo` : s.leftMin ? `Salida. Hoy te faltan ${dur(s.leftMin)}` : "Salida. Jornada clavada" }[t]);
+  } catch (err) { toast(err.message); }
+}
+function clockCard() {
+  const s = shiftNow();
+  const wd = (today().getDay() + 6) % 7 < 5;
+  const h = today().getHours();
+  // Before clocking in, only on workdays and around work hours.
+  if (s.state === "off" && (!wd || h < 7 || h >= 14)) return "";
+  const line = s.state === "off" ? "Cuando fiches en RK, pulsa «Entro»."
+    : s.state === "working" ? (s.leftMin ? `Te quedan <b>${esc(dur(s.leftMin))}</b>: puedes salir a las <b>${esc(s.leaveAt)}</b>.` : `Jornada cumplida${s.extraMin ? ` y llevas <b>+${esc(dur(s.extraMin))}</b>` : ""}. Ya puedes salir.`)
+    : s.state === "paused" ? `En pausa desde hace un rato. Te quedan <b>${esc(dur(s.leftMin))}</b> de jornada.`
+    : s.extraMin ? `Hoy has hecho <b>+${esc(dur(s.extraMin))}</b> de más.` : s.leftMin ? `Hoy te faltaron <b>${esc(dur(s.leftMin))}</b>.` : "Jornada clavada.";
+  const btn = { in: `<button class="btn" data-act="punch" data-t="in">🟢 Entro</button>`, out: `<button class="btn ghost" data-act="punch" data-t="out">🚪 Salida</button>`, back: `<button class="btn" data-act="punch" data-t="back">🏢 Vuelvo a la oficina</button>` };
+  const actions = s.state === "working" ? `${btn.out}<div class="chips" role="group" aria-label="Pausa">${PAUSE_REASONS.map((r) => `<button class="chip" data-act="punch" data-t="pause" data-why="${esc(r)}">⏸ ${esc(r)}</button>`).join("")}</div>`
+    : s.state === "paused" ? btn.back : s.state === "done" ? `<button class="btn ghost" data-act="punch" data-t="in">Vuelvo a entrar</button>` : btn.in;
+  return `<section class="card clock" aria-labelledby="clockTitle"><div class="row"><h2 id="clockTitle" class="grow">⏱️ Fichaje</h2><button class="link small" data-sub-go="fichaje">Registro</button></div>
+    ${s.state === "off" ? "" : `<div class="clock-stats"><div><span class="muted small">Trabajado</span><b class="num">${esc(dur(s.workedMin))}</b></div><div><span class="muted small">Pausas</span><b class="num">${s.pauses} · ${esc(dur(s.pausedMin))}</b></div><div><span class="muted small">Entrada</span><b class="num">${s.firstIn ? esc(hhmm(new Date(s.firstIn))) : "—"}</b></div></div>`}
+    <p>${line}</p><div class="btns">${actions}</div></section>`;
+}
+async function downloadClock(month, kind) {
+  const r = monthReport(vault.clock, month, { targetMin: clockTarget(), now: today() });
+  const rows = reportRows(r);
+  let file;
+  if (kind === "xlsx") {
+    try {
+      const XLSX = await loadSheetJs();
+      const ws = XLSX.utils.aoa_to_sheet(rows);
+      ws["!cols"] = [{ wch: 11 }, { wch: 10 }, { wch: 8 }, { wch: 10 }, { wch: 7 }, { wch: 14 }, { wch: 12 }, { wch: 9 }, { wch: 12 }, { wch: 15 }, { wch: 17 }];
+      const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, `Fichaje ${month}`);
+      const bytes = XLSX.write(wb, { type: "array", bookType: "xlsx" });
+      file = new File([bytes], `fichaje-${month}.xlsx`, { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    } catch { toast("No he podido crear el Excel: te lo doy en CSV"); kind = "csv"; }
+  }
+  if (kind === "csv") file = new File([toCsv(rows)], `fichaje-${month}.csv`, { type: "text/csv" });
+  try { if (navigator.canShare?.({ files: [file] })) { await navigator.share({ files: [file], title: `Fichaje ${month}` }); return; } } catch (err) { if (err?.name === "AbortError") return; }
+  const a = document.createElement("a"); a.href = URL.createObjectURL(file); a.download = file.name;
+  document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+}
+
 // ---------- Modo bajón (WEB-70) ----------
 const gentleNow = () => gentleMode(vault.moods, today(), { pausedDay: vault.settings.gentlePaused ?? null });
 // People he talks to most recently: the first is offered by name.
@@ -550,7 +603,7 @@ function closeDay() {
 
 // ---------- Ahora (WEB-58): una sola cosa, la siguiente ----------
 function nowPlan() {
-  return whatNow({ closing: closingNow(), gentle: gentleNow().on, trip: oviedoToday(),
+  return whatNow({ closing: closingNow(), gentle: gentleNow().on, trip: oviedoToday(), shift: shiftNow(),
     now: today(), mode: modeState(today(), undefined, vault.settings.override).mode,
     events: eventsFor(localDay()), tomorrow: eventsFor(tomorrowKey()),
     reminders: vault.reminders, tasks: tasks(vault.inbox), projects: vault.projects,
@@ -1112,6 +1165,7 @@ const screens = {
       ${morningLaunch ? `<section class="card morning-hello"><h2>☀️ ${esc(greeting())}, Manu</h2><p class="muted small">Toca y te leo el día en voz alta.</p><div class="btns"><button class="btn" data-act="speak-day">🔊 Léemelo</button><button class="link small" data-act="morning-dismiss">Ahora no</button></div></section>` : ""}
       ${gentleCard()}
       ${nowCard()}
+      ${clockCard()}
       ${closingCard()}
       ${briefingCard()}
       ${nightCard()}
@@ -1230,6 +1284,7 @@ const screens = {
       ${sectionTitle("Tu vida")}
       <div class="list">
         ${item("capturas", "shots", "blue", "Bandeja de capturas", toReview(vault.captures).length ? `${toReview(vault.captures).length} por revisar` : "Suelta aquí tus capturas y MANU las ordena")}
+        ${item("fichaje", "clock", "blue", "Fichaje", (() => { const r = monthReport(vault.clock, localDay().slice(0, 7), { targetMin: clockTarget(), now: today() }); return r.days || r.openDays ? r.balance : "Entradas, pausas y lo que te debe RK"; })())}
         ${item("habitos", "repeat", "green", "Hábitos", vault.habits.length ? `${habitsDone} de ${vault.habits.length} hechos hoy` : "Crea tu primer hábito")}
         ${item("salud", "pulse", "red", "Salud", hs.sleep !== null || hs.steps !== null ? [hs.sleep !== null ? `${dec(hs.sleep)} h de sueño` : null, hs.steps !== null ? `${Math.round(hs.steps)} pasos` : null].filter(Boolean).join(" · ") + " (media semanal)" : "Sueño, pasos y peso")}
         ${item("comidas", "fork", "orange", "Comidas", `${vault.meals.filter((m) => m.day === t).length} apuntadas hoy`)}
@@ -1431,6 +1486,29 @@ const subpages = {
           <label for="spSpeaker" class="muted small">Nombre del altavoz</label><input id="spSpeaker" value="${esc(vault.settings.spotifySpeaker || DEFAULT_SPEAKER)}" maxlength="40">
           <label for="spId" class="muted small">Client ID de otra app de Spotify (vacío = la tuya, «MANU OS»)</label><input id="spId" value="${esc(id)}" autocomplete="off" spellcheck="false" placeholder="${DEFAULT_SPOTIFY_CLIENT_ID}">
           <button class="btn ghost" type="submit">Guardar</button></form></details>`;
+  },
+  fichaje() {
+    const month = clockMonth ?? localDay().slice(0, 7);
+    const r = monthReport(vault.clock, month, { targetMin: clockTarget(), now: today() });
+    const [y, m] = month.split("-").map(Number);
+    const title = new Date(y, m - 1, 1).toLocaleDateString("es-ES", { month: "long", year: "numeric" });
+    const isNow = month === localDay().slice(0, 7);
+    const evLabel = { in: "🟢 Entro", pause: "⏸ Pausa", back: "🏢 Vuelvo", out: "🚪 Salida" };
+    const dayRow = (x) => {
+      const rec = clockDay(x.day);
+      const open = clockEdit === x.day;
+      return `<div class="clock-day${x.open ? " open-day" : ""}"><button class="row clock-row" data-act="clock-edit" data-day="${esc(x.day)}" aria-expanded="${open}">
+        <span class="grow"><b>${esc(x.weekday.slice(0, 3))} ${Number(x.day.slice(8))}</b> <span class="muted small">${esc(x.in || "—")}–${esc(x.out || "¿salida?")}${x.pauses ? ` · ${x.pauses} pausa${x.pauses === 1 ? "" : "s"}` : ""}</span></span>
+        <span class="num">${esc(dur(x.workedMin))}</span><span class="num diff ${x.diffMin === null ? "" : x.diffMin >= 0 ? "pos" : "neg"}">${x.diffMin === null ? "abierto" : `${x.diffMin >= 0 ? "+" : "−"}${esc(dur(x.diffMin))}`}</span></button>
+        ${open ? `<div class="clock-events">${rec.events.map((e) => `<div class="row"><span class="grow">${evLabel[e.t]}${e.why ? ` <span class="muted small">${esc(e.why)}</span>` : ""}</span><label class="sr" for="ck-${esc(e.id)}">Hora</label><input type="time" id="ck-${esc(e.id)}" data-clock-day="${esc(x.day)}" data-clock-id="${esc(e.id)}" value="${esc(hhmm(new Date(e.at)))}"><button class="link small icon-btn" data-act="clock-del" data-day="${esc(x.day)}" data-id="${esc(e.id)}" aria-label="Borrar fichaje">✕</button></div>`).join("")}<p class="muted small">Cambia la hora si se te olvidó fichar a tiempo.</p></div>` : ""}</div>`;
+    };
+    return `${backBar("Fichaje")}
+      <section class="card balance"><p class="muted small">Saldo de ${esc(title)}</p><h2 class="balance-line ${r.balanceMin > 0 ? "pos" : r.balanceMin < 0 ? "neg" : ""}">${esc(r.balance)}</h2>
+        <p class="muted small">${r.days} ${r.days === 1 ? "día" : "días"} · trabajado ${esc(dur(r.workedMin))} de ${esc(dur(r.dueMin))}${r.openDays ? ` · <b>${r.openDays} sin salida</b> (no cuenta${r.openDays === 1 ? "" : "n"} hasta que lo corrijas)` : ""}. Jornada de ${esc(dur(clockTarget()))}; ${esc(dur(clockTarget()))} de más cuentan como 1 día.</p>
+        <div class="btns"><button class="btn" data-act="clock-dl" data-kind="xlsx">⬇️ Informe en Excel</button><button class="btn ghost" data-act="clock-dl" data-kind="csv">CSV</button></div></section>
+      <div class="row month-nav"><button class="link" data-act="clock-month" data-d="-1" aria-label="Mes anterior">‹ Anterior</button><b class="grow center">${esc(title)}</b>${isNow ? "<span></span>" : '<button class="link" data-act="clock-month" data-d="1" aria-label="Mes siguiente">Siguiente ›</button>'}</div>
+      <section class="card">${r.rows.length ? r.rows.slice().reverse().map(dayRow).join("") : '<p class="muted">Aún no hay fichajes este mes. Usa la tarjeta «⏱️ Fichaje» de Hoy.</p>'}</section>
+      <section class="card"><h2>Tu jornada</h2><form class="row" id="clockTargetForm"><label for="clockTarget" class="grow">Horas por día</label><input id="clockTarget" type="time" value="${esc(`${String(Math.floor(clockTarget() / 60)).padStart(2, "0")}:${String(clockTarget() % 60).padStart(2, "0")}`)}"></form><p class="muted small">Con ella se calcula a qué hora puedes salir y cuánto te debe RK. Todo se queda en tus dispositivos (y en Tu nube si la usas).</p></section>`;
   },
   nube() {
     const st = nube.state;
@@ -2650,6 +2728,11 @@ document.addEventListener("click", async (e) => {
     case "rem-done": vault.reminders = vault.reminders.map((r) => (r.id === id ? { ...r, done: !r.done } : r)); persist(); render(); break;
     case "sheet": openSheet(a.dataset.kind, true); break;
     case "close-day": closeDay(); break;
+    case "punch": doPunch(a.dataset.t, a.dataset.why || null); break;
+    case "clock-month": { const [y, m] = (clockMonth ?? localDay().slice(0, 7)).split("-").map(Number); const d = new Date(y, m - 1 + Number(a.dataset.d), 1); clockMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; clockEdit = null; render(); break; }
+    case "clock-edit": clockEdit = clockEdit === a.dataset.day ? null : a.dataset.day; render(); break;
+    case "clock-del": if (window.confirm("¿Borrar este fichaje?")) { vault.clock = editPunch(vault.clock, a.dataset.day, a.dataset.id, { remove: true }); persist(); render(); } break;
+    case "clock-dl": downloadClock(clockMonth ?? localDay().slice(0, 7), a.dataset.kind); break;
     case "speak-day": speakDay(); break;
     case "morning-dismiss": morningLaunch = false; render(); break;
     case "gentle-pause": vault.settings.gentlePaused = localDay(); persist(); render(); toast("Vale. Me alegro 💙"); break;
@@ -2864,7 +2947,7 @@ document.addEventListener("submit", async (e) => {
     vault.settings.gcalClientId = id && id !== DEFAULT_GOOGLE_CLIENT_ID ? id : null; gcal.client = null; gcal.token = null;
     persist(); render(); toast(id ? "ID guardado" : "Google Calendar desconectado"); return;
   }
-  if (f === "workStartForm") return;
+  if (f === "workStartForm" || f === "clockTargetForm") return;
   if (f === "spotifyForm") {
     const id = $("spId").value.trim();
     if (id && !isSpotifyClientId(id)) { toast("Ese no parece un Client ID de Spotify"); return; }
@@ -3036,6 +3119,8 @@ document.addEventListener("change", async (e) => {
     catch (err) { toast(err.message); }
     return;
   }
+  if (e.target.dataset?.clockId && /^\d{2}:\d{2}$/.test(e.target.value)) { vault.clock = editPunch(vault.clock, e.target.dataset.clockDay, e.target.dataset.clockId, { time: e.target.value }); persist(); render(); toast("Hora corregida"); return; }
+  if (e.target.id === "clockTarget" && /^\d{2}:\d{2}$/.test(e.target.value)) { const [h, mi] = e.target.value.split(":").map(Number); if (h * 60 + mi >= 30) { vault.settings.clockTarget = h * 60 + mi; persist(); render(); toast(`Jornada: ${dur(h * 60 + mi)}`); } return; }
   if (e.target.id === "workStart" && /^\d{2}:\d{2}$/.test(e.target.value)) { vault.settings.workStart = e.target.value; persist(); toast(`Entrada: ${e.target.value}`); return; }
   if (e.target.dataset.cat) {
     catEditing = null;

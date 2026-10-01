@@ -55,9 +55,10 @@ const lowMood = (moods, now) => {
  * @param {object|null} x.closing  workClosing(...) when closingDue(...), else null
  * @param {boolean} x.gentle    modo bajón (WEB-70): no stale projects, softer tasks
  * @param {object|null} x.trip  oviedoTrip(...) on a day he works in Oviedo (WEB-71)
+ * @param {object|null} x.shift clock today(...) (WEB-74): when the day is done, clock out
  * @returns {{ main: {e,t,why,go}, more: Array<{e,t,go}> }}
  */
-export function whatNow({ now = new Date(), mode = "AFTERNOON", events = [], tomorrow = [], reminders = [], tasks = [], projects = [], birthdays = [], quiet = [], moods = [], captures = 0, closing = null, gentle = false, trip = null } = {}) {
+export function whatNow({ now = new Date(), mode = "AFTERNOON", events = [], tomorrow = [], reminders = [], tasks = [], projects = [], birthdays = [], quiet = [], moods = [], captures = 0, closing = null, gentle = false, trip = null, shift = null } = {}) {
   const out = [];
   const nowMs = now.getTime();
   const clock = hm(now);
@@ -84,6 +85,9 @@ export function whatNow({ now = new Date(), mode = "AFTERNOON", events = [], tom
     if (left >= 0 && left <= 90) out.unshift({ e: "🚌", t: `Sal a las ${trip.leave} hacia ${trip.to}.`, why: `${left < 5 ? "Es ya." : `Quedan ${left} minutos.`} Así llegas a las ${trip.arrive}, con margen antes de las ${trip.start}.`, go });
     else if (left < 0 && nowMs < toMs(trip.start)) out.unshift({ e: "🏃", t: `Vas justo: sal ya hacia ${trip.to}.`, why: `Tenías que salir a las ${trip.leave}. Entras a las ${trip.start}.`, go });
   }
+
+  // 2a'. Fichaje (WEB-74): the workday is done and he is still clocked in.
+  if (shift?.state === "working" && shift.leftMin === 0) out.unshift({ e: "🚪", t: "Ya puedes salir: ficha la salida.", why: shift.extraMin ? `Llevas ${shift.extraMin} min de más. En RK y aquí, para que cuente en tu saldo.` : "En RK y aquí, para que cuente en tu saldo.", go: null });
 
   // 2b. Work just ended (WEB-63): close the day before anything else.
   if (closing) out.push({ e: "🏁", t: "Cierra la jornada.", why: closing.openCount ? `Dos minutos: repasa lo de hoy y deja ${closing.openCount === 1 ? "la tarea pendiente" : `las ${closing.openCount} pendientes`} para ${closing.label ?? "mañana"}. Luego, desconecta.` : "Dos minutos: repasa lo de hoy y desconecta.", go: null });
