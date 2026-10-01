@@ -44,6 +44,33 @@ Siguientes ideas, sin compromiso:
 
 Límites reales de una web en iPhone: no hay widgets, pantalla bloqueada ni control del Chromecast. Donde se pueda, se hará con Atajos.
 
+## WEB-74 — fichaje
+
+Manu ficha en RK y quiere apuntarlo a la vez en MANU.
+
+- `core/clock.js` (puro):
+  - `vault.clock = [{ day, events: [{ id, t: in|pause|back|out, at, why? }] }]`, al minuto;
+  - estados off → working ⇄ paused → done, y solo se permiten las transiciones válidas;
+  - `today()` da lo trabajado, las pausas, lo que falta, lo que lleva de más y la hora de salida (solo mientras trabaja);
+  - `monthReport()` cuenta los días cerrados; los días sin salida se muestran pero no cuentan;
+  - `balanceText()`: «RK te debe X h Y min», en días de jornada a partir de una (4 h por defecto, ajustable);
+  - también `reportRows()`, `toCsv()` y `editPunch()` para corregir o borrar.
+- Hoy: la tarjeta «⏱️ Fichaje», debajo de «Ahora»:
+  - «Entro» → «Salida» y pausas (Café, Fumar, Recado, Otro) → «Vuelvo a la oficina»;
+  - muestra lo trabajado, las pausas, la entrada y «puedes salir a las 13:15»;
+  - antes de fichar, solo aparece los días laborables de 7:00 a 14:00.
+- «Ahora»: con la jornada cumplida, «Ya puedes salir: ficha la salida».
+- Tú → Fichaje:
+  - saldo del mes, navegación entre meses y días con su diferencia;
+  - tocar un día permite corregir horas o borrar fichajes;
+  - jornada configurable;
+  - «Informe en Excel» (.xlsx real con SheetJS, una fila por día y el saldo abajo) y CSV.
+- Sincroniza con Tu nube (va en el vault).
+- Evidencia:
+  - `npm test`: 219 en verde.
+  - e2e74: 13/13 (día completo con dos pausas, saldo, corrección y Excel leído de vuelta).
+  - Batería completa en verde. Ahora se ejecuta con `TZ=Europe/Madrid`: e2e9 fallaba de madrugada por la diferencia de zona horaria entre Node y la página.
+
 ## WEB-73 — auditoría completa
 
 El informe está en `docs/audits/2026-10-01-auditoria-web.md`. Defectos corregidos:

@@ -2,10 +2,10 @@
 // Everything stays on the device; nothing is sent anywhere.
 export const SCHEMA_VERSION = 1;
 
-const OPTIONAL_LISTS = ["reminders", "habits", "people", "meals", "health", "moods", "income", "projects", "places", "captures"];
+const OPTIONAL_LISTS = ["reminders", "habits", "people", "meals", "health", "moods", "income", "projects", "places", "captures", "clock"];
 
 export function emptyVault() {
-  return { schema: SCHEMA_VERSION, inbox: [], spending: [], chat: [], settings: {}, income: [], projects: [], reminders: [], habits: [], people: [], meals: [], health: [], moods: [], places: [], captures: [] };
+  return { schema: SCHEMA_VERSION, inbox: [], spending: [], chat: [], settings: {}, income: [], projects: [], reminders: [], habits: [], people: [], meals: [], health: [], moods: [], places: [], captures: [], clock: [] };
 }
 
 // Validates a vault read from storage or from a backup file.
@@ -46,6 +46,8 @@ export function validateVault(data) {
   // project must not break the whole Proyectos tab.
   vault.projects = vault.projects.filter((p) => p && typeof p.id === "string").map((p) => ({ ...p, name: String(p.name ?? "Proyecto"), emoji: p.emoji ?? "📁", sources: Array.isArray(p.sources) ? p.sources : [], chat: Array.isArray(p.chat) ? p.chat : [] }));
   vault.captures = vault.captures.filter((c) => c && typeof c.id === "string" && typeof c.status === "string");
+  // WEB-74: one record per day; a broken one is dropped, never the whole vault.
+  vault.clock = vault.clock.filter((d) => d && /^\d{4}-\d{2}-\d{2}$/.test(d.day) && Array.isArray(d.events)).map((d) => ({ ...d, events: d.events.filter((e) => e && ["in", "pause", "back", "out"].includes(e.t) && typeof e.at === "string") }));
   return { ok: true, vault };
 }
 

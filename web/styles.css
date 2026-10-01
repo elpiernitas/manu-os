@@ -731,3 +731,22 @@ pre.code { white-space: pre-wrap; word-break: break-word; overflow-wrap: anywher
 .icon-btn { min-width: 44px; justify-content: center; }
 .meter > i[data-level="warn"] { background: var(--orange, #ff9f0a); }
 .meter > i[data-level="full"] { background: var(--red, #ff453a); }
+
+/* WEB-74: fichaje */
+.clock-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 4px 0 8px; }
+.clock-stats > div { display: grid; gap: 2px; }
+.clock-stats b { font-size: 18px; }
+.card.clock .chips { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; }
+.card.clock .chip { min-height: 44px; }
+.balance-line { font-size: 22px; text-transform: none; letter-spacing: 0; color: var(--text); }
+.balance-line.pos { color: var(--green, #30d158); }
+.balance-line.neg { color: var(--orange, #ff9f0a); }
+.clock-row { width: 100%; border: 0; background: none; color: inherit; text-align: left; min-height: 44px; gap: 10px; cursor: pointer; }
+.clock-row .diff { min-width: 72px; text-align: right; }
+.clock-row .diff.pos { color: var(--green, #30d158); }
+.clock-row .diff.neg { color: var(--orange, #ff9f0a); }
+.open-day .clock-row .diff { color: var(--orange, #ff9f0a); }
+.clock-events { padding: 4px 0 8px 8px; border-left: 2px solid rgba(255,255,255,.08); }
+.clock-events input[type="time"] { width: 7.5em; }
+.month-nav { margin: 8px 0; }
+.center { text-align: center; text-transform: capitalize; }

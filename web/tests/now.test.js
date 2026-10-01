@@ -85,3 +85,10 @@ test("WEB-72: the morning read aloud: hello, the one thing and the day, no emoji
   const t = morningSpeech({ greeting: "Buenos días", now: { main: { t: "Sal a las 08:10 hacia Oviedo.", why: "Quedan 25 minutos." } }, brief: { lines: [{ e: "☔", t: "Llévate paraguas 🌂." }, { e: "🗓️", t: "Hoy tienes 09:00 Reunión." }] } });
   assert.equal(t, "Buenos días, Manu. Sal a las 08:10 hacia Oviedo. Quedan 25 minutos. Llévate paraguas. Hoy tienes 09:00 Reunión.");
 });
+
+test("WEB-74: when the workday is done and he is still in, «Ahora» says clock out", () => {
+  const r = whatNow({ now: at(2026, 10, 7, 13, 5), mode: "AFTERNOON", shift: { state: "working", leftMin: 0, extraMin: 5 } });
+  assert.equal(r.main.t, "Ya puedes salir: ficha la salida.");
+  assert.match(r.main.why, /5 min de más/);
+  assert.equal(whatNow({ now: at(2026, 10, 7, 12), mode: "WORK", shift: { state: "working", leftMin: 30 } }).main.t.includes("ficha la salida"), false);
+});
