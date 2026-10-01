@@ -54,9 +54,10 @@ const lowMood = (moods, now) => {
  * @param {number} x.captures   screenshots waiting in the tray
  * @param {object|null} x.closing  workClosing(...) when closingDue(...), else null
  * @param {boolean} x.gentle    modo bajón (WEB-70): no stale projects, softer tasks
+ * @param {object|null} x.trip  oviedoTrip(...) on a day he works in Oviedo (WEB-71)
  * @returns {{ main: {e,t,why,go}, more: Array<{e,t,go}> }}
  */
-export function whatNow({ now = new Date(), mode = "AFTERNOON", events = [], tomorrow = [], reminders = [], tasks = [], projects = [], birthdays = [], quiet = [], moods = [], captures = 0, closing = null, gentle = false } = {}) {
+export function whatNow({ now = new Date(), mode = "AFTERNOON", events = [], tomorrow = [], reminders = [], tasks = [], projects = [], birthdays = [], quiet = [], moods = [], captures = 0, closing = null, gentle = false, trip = null } = {}) {
   const out = [];
   const nowMs = now.getTime();
   const clock = hm(now);
@@ -74,6 +75,15 @@ export function whatNow({ now = new Date(), mode = "AFTERNOON", events = [], tom
     return { e, mins: Math.round((at.getTime() - nowMs) / 60000) };
   }).filter((x) => x.mins >= 0 && x.mins <= 90).sort((a, b) => a.mins - b.mins);
   if (soon.length) out.push({ e: "🗓️", t: `Prepárate: ${soon[0].e.title} a las ${soon[0].e.time}.`, why: soon[0].mins < 5 ? "Es ya." : `Queda${soon[0].mins === 1 ? "" : "n"} ${soon[0].mins} minuto${soon[0].mins === 1 ? "" : "s"}.`, go: { tab: "agenda" } });
+
+  // 2a. Día de Oviedo (WEB-71): leave on time; from 90 min before until work starts.
+  if (trip) {
+    const toMs = (hhmm) => { const [hh, mm] = hhmm.split(":").map(Number); const d = new Date(now); d.setHours(hh, mm, 0, 0); return d.getTime(); };
+    const left = Math.round((toMs(trip.leave) - nowMs) / 60000);
+    const go = { href: trip.href, label: "Cómo ir" };
+    if (left >= 0 && left <= 90) out.unshift({ e: "🚌", t: `Sal a las ${trip.leave} hacia ${trip.to}.`, why: `${left < 5 ? "Es ya." : `Quedan ${left} minutos.`} Así llegas a las ${trip.arrive}, con margen antes de las ${trip.start}.`, go });
+    else if (left < 0 && nowMs < toMs(trip.start)) out.unshift({ e: "🏃", t: `Vas justo: sal ya hacia ${trip.to}.`, why: `Tenías que salir a las ${trip.leave}. Entras a las ${trip.start}.`, go });
+  }
 
   // 2b. Work just ended (WEB-63): close the day before anything else.
   if (closing) out.push({ e: "🏁", t: "Cierra la jornada.", why: closing.openCount ? `Dos minutos: repasa lo de hoy y deja ${closing.openCount === 1 ? "la tarea pendiente" : `las ${closing.openCount} pendientes`} para ${closing.label ?? "mañana"}. Luego, desconecta.` : "Dos minutos: repasa lo de hoy y desconecta.", go: null });

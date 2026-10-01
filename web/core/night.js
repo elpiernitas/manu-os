@@ -38,6 +38,14 @@ export function proposeAlarm({ events = [], city = "GIJON", wantsBreakfast = tru
   };
 }
 
+// Día de Oviedo (WEB-71): when to leave home to arrive with margin.
+export function oviedoTrip({ workStart = "09:00", settings = MORNING } = {}) {
+  const start = toMin(workStart);
+  const arrive = start - settings.arriveEarly;
+  const leave = arrive - settings.travelToOviedo;
+  return { leave: toHHMM(leave), arrive: toHHMM(arrive), start: toHHMM(start), minutes: settings.travelToOviedo, to: "Oviedo", href: "https://www.google.com/maps/dir/?api=1&destination=Oviedo&travelmode=transit" };
+}
+
 // The question appears from 18:00 until going to bed, once per evening.
 export function shouldAskTomorrow(now, answeredFor, tomorrowKey) {
   return now.getHours() >= 18 && answeredFor !== tomorrowKey;

@@ -26,11 +26,28 @@ Hoja de ruta, un PR por paso:
 - Bandeja de capturas vía Atajo (soltar y ordenar).
 - Proyectos dormidos e ideas nuevas comparadas con lo que ya hay.
 - Cierre de jornada a las 13:00.
-- Día de Oviedo.
+- Día de Oviedo (WEB-71).
 - Mañana con Atajo al parar la alarma (NO_VERIFICADO en iOS).
 - Modo bajón (WEB-70).
 
 Límites reales de una web en iPhone: no hay widgets, pantalla bloqueada ni control del Chromecast. Donde se pueda, se hará con Atajos.
+
+## WEB-71 — día de Oviedo
+
+Ya existía la pregunta nocturna «¿Mañana trabajas en Oviedo?», con la alarma que cuenta el viaje y el tiempo de Oviedo ese día. Faltaba lo de la mañana:
+
+- `oviedoTrip({ workStart })` en `core/night.js`:
+  - hora de salida = entrada − 10 min de margen − 40 min de viaje (`MORNING`);
+  - enlace a Google Maps en transporte público.
+- `whatNow({ trip })` pone el viaje lo primero:
+  - de 90 minutos antes hasta la hora de salida: «Sal a las 08:10 hacia Oviedo»;
+  - después, y hasta la hora de entrada: «Vas justo: sal ya».
+  - Tiene el botón «Cómo ir».
+- La hora de entrada sale del primer evento con hora de su Google Calendar ese día, o de `workStart` (09:00).
+- Evidencia:
+  - `npm test`: 209 en verde.
+  - e2e71: 8/8 (pregunta de la noche → por la mañana, «sal a las 08:10» → tarde, «sal ya» → un día en Gijón sin viaje).
+- NO_VERIFICADO: los 40 minutos de viaje son una estimación configurable, no un horario real de ALSA o Renfe.
 
 ## WEB-70 — modo bajón
 

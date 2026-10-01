@@ -65,3 +65,17 @@ test("WEB-59: screenshots waiting show up in the afternoon, never at work", () =
   assert.equal(whatNow({ now: at(2026, 9, 30, 10), mode: "WORK", captures: 7 }).main.t.includes("capturas"), false);
   assert.equal(whatNow({ now: at(2026, 9, 30, 11), mode: "WEEKEND", captures: 1 }).main.t.includes("captura"), false); // morning: not yet
 });
+
+import { oviedoTrip } from "../core/night.js";
+test("WEB-71: on an Oviedo day, «Ahora» says when to leave, first of all", () => {
+  const trip = oviedoTrip({ workStart: "09:00" });
+  assert.deepEqual([trip.leave, trip.arrive], ["08:10", "08:50"]);
+  const r = whatNow({ now: at(2026, 10, 7, 7, 40), mode: "MORNING", trip, reminders: [{ text: "x", at: iso(2026, 10, 7, 7, 30) }] });
+  assert.equal(r.main.t, "Sal a las 08:10 hacia Oviedo.");
+  assert.match(r.main.why, /Quedan 30 minutos/);
+  assert.match(r.main.go.href, /destination=Oviedo/);
+  assert.equal(whatNow({ now: at(2026, 10, 7, 8, 20), mode: "MORNING", trip }).main.t, "Vas justo: sal ya hacia Oviedo.");
+  assert.equal(whatNow({ now: at(2026, 10, 7, 6, 0), mode: "MORNING", trip }).main.t.includes("Oviedo"), false); // too early
+  assert.equal(whatNow({ now: at(2026, 10, 7, 9, 30), mode: "WORK", trip }).main.t.includes("Oviedo"), false); // already there
+  assert.equal(oviedoTrip({ workStart: "10:30" }).leave, "09:40");
+});

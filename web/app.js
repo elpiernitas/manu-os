@@ -9,7 +9,7 @@ import { notificationStatus, isInstalled, enableNotifications, testNotification 
 import { launchParams, parseEvents, nextEvent, localDay } from "./core/intake.js";
 import { fetchForecast, searchCities, advice, WEATHER_TTL_MS } from "./core/weather.js";
 import { importStatement, importStatementRows, classifiedFromRows, dropCrossSource } from "./core/bank.js";
-import { CITIES, proposeAlarm, shouldAskTomorrow, shortcutUrl, guessCity } from "./core/night.js";
+import { CITIES, oviedoTrip, proposeAlarm, shouldAskTomorrow, shortcutUrl, guessCity } from "./core/night.js";
 import { birthdayEventBody, isClientId, listEvents, createEvent, newEventBody, monthGrid, listCalendars, mergeDays } from "./core/gcal.js";
 import { detectRecurring, upcomingRecurring, spendingPattern, monthStats, monthlySeries } from "./core/insights.js";
 import { fetchSnapshot, summarize as mailSummary, mailSuggestions, findSender, mailOrder, idsFrom, archive as mailArchive, unarchive as mailUnarchive, trash as mailTrash, untrash as mailUntrash, ensureLabel, addLabel, removeLabel, messageUrl } from "./core/gmail.js";
@@ -41,7 +41,7 @@ import { isSpotifyClientId, pkceValid, randomVerifier, challengeFor, authorizeUr
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "70";
+export const APP_VERSION = "71";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -501,6 +501,16 @@ function dayBriefing() {
     gentle: gentleNow().on,
   });
 }
+// ---------- Día de Oviedo (WEB-71) ----------
+// He answered «Sí, en Oviedo» last night: when to leave, from his first timed
+// event today (Google Calendar) or his usual start.
+function oviedoToday() {
+  const t = vault.settings.tomorrow;
+  if (!(t && t.day === localDay() && t.work && t.city === "OVIEDO")) return null;
+  const first = eventsFor(localDay()).filter((e) => e.time && !String(e.title ?? "").startsWith("🎂")).sort((a, b) => a.time.localeCompare(b.time))[0];
+  return oviedoTrip({ workStart: first?.time ?? vault.settings.workStart ?? "09:00" });
+}
+
 // ---------- Modo bajón (WEB-70) ----------
 const gentleNow = () => gentleMode(vault.moods, today(), { pausedDay: vault.settings.gentlePaused ?? null });
 // People he talks to most recently: the first is offered by name.
@@ -537,20 +547,21 @@ function closeDay() {
 
 // ---------- Ahora (WEB-58): una sola cosa, la siguiente ----------
 function nowPlan() {
-  return whatNow({ closing: closingNow(), gentle: gentleNow().on,
+  return whatNow({ closing: closingNow(), gentle: gentleNow().on, trip: oviedoToday(),
     now: today(), mode: modeState(today(), undefined, vault.settings.override).mode,
     events: eventsFor(localDay()), tomorrow: eventsFor(tomorrowKey()),
     reminders: vault.reminders, tasks: tasks(vault.inbox), projects: vault.projects,
     birthdays: upcomingBirthdays(vault.people, today(), 0), quiet: longTimeNoTalk(vault.people), moods: vault.moods, captures: toReview(vault.captures).length,
   });
 }
+const goButton = (go) => (!go ? "" : go.href ? `<a class="btn ghost" href="${esc(go.href)}" target="_blank" rel="noopener">${esc(go.label ?? "Abrir")}</a>` : `<button class="btn ghost" ${goAttrs(go)}>Ir</button>`);
 const goAttrs = (go) => (!go ? "" : go.project ? `data-act="find-go" data-project="${esc(go.project)}"` : go.sub ? `data-sub-go="${esc(go.sub)}"` : `data-act="find-go" data-tab="${esc(go.tab)}"`);
 function nowCard() {
   const r = nowPlan();
   const main = r.main;
   return `<section class="card now-card" aria-labelledby="nowTitle"><h2 id="nowTitle">👉 Ahora</h2>
     <p class="now-main"><span aria-hidden="true">${main.e}</span> <b>${esc(main.t)}</b></p><p class="muted small">${esc(main.why)}</p>
-    ${main.go ? `<button class="btn ghost" ${goAttrs(main.go)}>Ir</button>` : ""}
+    ${goButton(main.go)}
     ${r.more.length ? `<ul class="brief-list now-more">${r.more.map((m) => `<li><span aria-hidden="true">${m.e}</span><span>${esc(m.t)}</span></li>`).join("")}</ul>` : ""}</section>`;
 }
 function briefingCard() {
