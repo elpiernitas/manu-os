@@ -9,7 +9,7 @@ import { notificationStatus, isInstalled, enableNotifications, testNotification 
 import { launchParams, parseEvents, nextEvent, localDay } from "./core/intake.js";
 import { fetchForecast, searchCities, advice, WEATHER_TTL_MS } from "./core/weather.js";
 import { importStatement, importStatementRows, classifiedFromRows, dropCrossSource } from "./core/bank.js";
-import { CITIES, proposeAlarm, shouldAskTomorrow, shortcutUrl, guessCity } from "./core/night.js";
+import { CITIES, oviedoTrip, proposeAlarm, shouldAskTomorrow, shortcutUrl, guessCity } from "./core/night.js";
 import { birthdayEventBody, isClientId, listEvents, createEvent, newEventBody, monthGrid, listCalendars, mergeDays } from "./core/gcal.js";
 import { detectRecurring, upcomingRecurring, spendingPattern, monthStats, monthlySeries } from "./core/insights.js";
 import { fetchSnapshot, summarize as mailSummary, mailSuggestions, findSender, mailOrder, idsFrom, archive as mailArchive, unarchive as mailUnarchive, trash as mailTrash, untrash as mailUntrash, ensureLabel, addLabel, removeLabel, messageUrl } from "./core/gmail.js";
@@ -24,7 +24,8 @@ import { findExcerpts, askPayload, profileDigest, profilePayload, memoryContext 
 import { diaryDocs, dayLines, dayFromText, isDiaryQuestion, dayTitle } from "./core/diary.js";
 import { applyBuzon, buzonSummary } from "./core/buzon.js";
 import { briefing, briefingText, isBriefingQuestion, monthPace } from "./core/briefing.js";
-import { whatNow, whatNowText, isWhatNowQuestion } from "./core/now.js";
+import { whatNow, whatNowText, isWhatNowQuestion, morningSpeech } from "./core/now.js";
+import { gentleMode, gentlePlan, isGentleQuestion } from "./core/lowmode.js";
 import { closingDue, workClosing, closingText, isClosingQuestion, nextWorkDay } from "./core/closing.js";
 import { searchContacts } from "./core/contacts.js";
 import { autoFile, projectKeys, parseKeywords, buildSuggestPayload, parseSuggestions, projectMarkdown, projectZip, projectFileName } from "./core/autofile.js";
@@ -40,7 +41,7 @@ import { isSpotifyClientId, pkceValid, randomVerifier, challengeFor, authorizeUr
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "69";
+export const APP_VERSION = "72";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -56,6 +57,7 @@ const loaded = store.load();
 let vault = loaded.vault;
 let tab = sessionStorage.getItem("manuos.tab") || "hoy";
 let sub = null; // Tú subpage
+let morningLaunch = false; // WEB-72: opened by the morning Shortcut
 let refuge = null; // Refugio lives only in memory
 let sheet = null; // quick add: { kind }
 let confirmWipe = false;
@@ -497,7 +499,34 @@ function dayBriefing() {
     reminders: vault.reminders, tasks: tasks(vault.inbox), birthdays: upcomingBirthdays(vault.people, today(), 1),
     spending: vault.spending, inbox: vault.inbox, importantMail: googleOn("gmail") ? vault.mail?.important?.length ?? 0 : 0,
     budgetAlerts: budgetsNow().filter((b) => b.status !== "ok").slice(0, 2).map(budgetLine),
+    gentle: gentleNow().on,
   });
+}
+// ---------- Día de Oviedo (WEB-71) ----------
+// He answered «Sí, en Oviedo» last night: when to leave, from his first timed
+// event today (Google Calendar) or his usual start.
+function oviedoToday() {
+  const t = vault.settings.tomorrow;
+  if (!(t && t.day === localDay() && t.work && t.city === "OVIEDO")) return null;
+  const first = eventsFor(localDay()).filter((e) => e.time && !String(e.title ?? "").startsWith("🎂")).sort((a, b) => a.time.localeCompare(b.time))[0];
+  return oviedoTrip({ workStart: first?.time ?? vault.settings.workStart ?? "09:00" });
+}
+
+// ---------- Modo bajón (WEB-70) ----------
+const gentleNow = () => gentleMode(vault.moods, today(), { pausedDay: vault.settings.gentlePaused ?? null });
+// People he talks to most recently: the first is offered by name.
+const trustedPeople = () => [...(vault.people ?? [])].filter((p) => p.lastContact).sort((a, b) => String(b.lastContact).localeCompare(String(a.lastContact))).slice(0, 3);
+function gentleData() {
+  const g = gentleNow();
+  // The lift itself is in «Ahora» (whatNow); the card does not repeat it.
+  return { g, plan: gentlePlan(g, { trusted: trustedPeople() }) };
+}
+function gentleCard() {
+  const { g, plan } = gentleData();
+  if (!plan) return "";
+  return `<section class="card brief gentle" aria-labelledby="gentleTitle"><h2 id="gentleTitle">${esc(plan.title)}</h2><p class="muted small">${esc(plan.why)}</p>
+    <ul class="brief-list">${plan.lines.map((l) => `<li><span aria-hidden="true">${l.e}</span><span>${esc(l.t)}</span></li>`).join("")}</ul>
+    <div class="btns"><button class="btn" data-act="refuge">Hablarlo con MANU</button>${g.level === "heavy" && trustedPeople()[0] ? `<button class="btn ghost" data-sub-go="personas">Escribir a ${esc(trustedPeople()[0].name)}</button>` : ""}<button class="link small" data-act="gentle-pause">Hoy estoy bien, quítalo</button></div></section>`;
 }
 // ---------- Cierre de jornada (WEB-63) ----------
 const dayClosing = () => workClosing({ now: today(), inbox: vault.inbox, tomorrow: eventsFor(nextWorkDay(today()).key), reminders: vault.reminders });
@@ -519,26 +548,38 @@ function closeDay() {
 
 // ---------- Ahora (WEB-58): una sola cosa, la siguiente ----------
 function nowPlan() {
-  return whatNow({ closing: closingNow(),
+  return whatNow({ closing: closingNow(), gentle: gentleNow().on, trip: oviedoToday(),
     now: today(), mode: modeState(today(), undefined, vault.settings.override).mode,
     events: eventsFor(localDay()), tomorrow: eventsFor(tomorrowKey()),
     reminders: vault.reminders, tasks: tasks(vault.inbox), projects: vault.projects,
     birthdays: upcomingBirthdays(vault.people, today(), 0), quiet: longTimeNoTalk(vault.people), moods: vault.moods, captures: toReview(vault.captures).length,
   });
 }
+const goButton = (go) => (!go ? "" : go.href ? `<a class="btn ghost" href="${esc(go.href)}" target="_blank" rel="noopener">${esc(go.label ?? "Abrir")}</a>` : `<button class="btn ghost" ${goAttrs(go)}>Ir</button>`);
 const goAttrs = (go) => (!go ? "" : go.project ? `data-act="find-go" data-project="${esc(go.project)}"` : go.sub ? `data-sub-go="${esc(go.sub)}"` : `data-act="find-go" data-tab="${esc(go.tab)}"`);
 function nowCard() {
   const r = nowPlan();
   const main = r.main;
   return `<section class="card now-card" aria-labelledby="nowTitle"><h2 id="nowTitle">👉 Ahora</h2>
     <p class="now-main"><span aria-hidden="true">${main.e}</span> <b>${esc(main.t)}</b></p><p class="muted small">${esc(main.why)}</p>
-    ${main.go ? `<button class="btn ghost" ${goAttrs(main.go)}>Ir</button>` : ""}
+    ${goButton(main.go)}
     ${r.more.length ? `<ul class="brief-list now-more">${r.more.map((m) => `<li><span aria-hidden="true">${m.e}</span><span>${esc(m.t)}</span></li>`).join("")}</ul>` : ""}</section>`;
 }
 function briefingCard() {
   const b = dayBriefing();
   if (!b.lines.length) return "";
-  return `<section class="card brief${b.evening ? " evening" : ""}"><h2>${b.evening ? "🌙" : "☀️"} ${esc(b.title)}</h2><ul class="brief-list">${b.lines.map((l) => `<li><span aria-hidden="true">${l.e}</span><span>${esc(l.t)}</span></li>`).join("")}</ul></section>`;
+  return `<section class="card brief${b.evening ? " evening" : ""}"><div class="row"><h2 class="grow">${b.evening ? "🌙" : "☀️"} ${esc(b.title)}</h2>${"speechSynthesis" in globalThis ? '<button class="link small" data-act="speak-day" aria-label="Leérmelo en voz alta">🔊 Léemelo</button>' : ""}</div><ul class="brief-list">${b.lines.map((l) => `<li><span aria-hidden="true">${l.e}</span><span>${esc(l.t)}</span></li>`).join("")}</ul></section>`;
+}
+// WEB-72: MANU reads the morning aloud (needs a tap: iOS only speaks after one).
+function speakDay() {
+  const synth = globalThis.speechSynthesis;
+  if (!synth) { toast("Este navegador no puede leer en voz alta"); return; }
+  synth.cancel();
+  const u = new SpeechSynthesisUtterance(morningSpeech({ greeting: greeting(), now: nowPlan(), brief: dayBriefing() }));
+  u.lang = "es-ES"; u.rate = 1.02;
+  const v = synth.getVoices?.().find((x) => /^es[-_]ES/i.test(x.lang));
+  if (v) u.voice = v;
+  synth.speak(u);
 }
 
 function weatherCard() {
@@ -615,6 +656,11 @@ const SHORTCUTS = [
     "<b>«Obtener elemento de la lista»</b> → primer elemento (el texto).",
     "<b>«Obtener elemento de la lista»</b> → último elemento → <b>«Obtener fechas de»</b>.",
     "<b>«Añadir nuevo recordatorio»</b> con el texto y la alerta en esa fecha."] },
+  { id: "manana", name: "MANU Buenos días", purpose: "que MANU se abra con tu día al parar la alarma", test: `${SITE}?manana=1`, steps: [
+    "Atajos → <b>Automatización</b> → <b>+</b> → <b>«Alarma»</b> → <b>«Se detiene»</b> (elige tu alarma de diario) y <b>«Ejecutar inmediatamente»</b>.",
+    `Acción <b>«Abrir URL»</b>: <code>${esc(SITE)}?manana=1</code>`,
+    "Al parar la alarma, MANU se abre con «Buenos días» y el botón «🔊 Léemelo» (iOS solo deja hablar tras un toque).",
+    "Aviso: puede abrirse en Safari en vez de en el icono de MANU (NO_VERIFICADO). Si pasa, en Safari funciona igual pero sin tus datos: dímelo y lo cambiamos."] },
   { id: "agenda", name: "MANU Agenda", purpose: "traer tus eventos de hoy (si no usas Google)", test: null, steps: [
     "Nuevo atajo llamado <b>MANU Agenda</b>.",
     "<b>«Buscar eventos del calendario»</b> con fecha de inicio hoy.",
@@ -1061,6 +1107,8 @@ const screens = {
     const bdays = upcomingBirthdays(vault.people, today(), 7);
     return `<h1>${greeting()}, Manu</h1><p class="subtitle">${esc(longDate())} · <span class="chip">${esc(MODE_TITLES[m.mode])}</span></p>
       <div class="stack">
+      ${morningLaunch ? `<section class="card morning-hello"><h2>☀️ ${esc(greeting())}, Manu</h2><p class="muted small">Toca y te leo el día en voz alta.</p><div class="btns"><button class="btn" data-act="speak-day">🔊 Léemelo</button><button class="link small" data-act="morning-dismiss">Ahora no</button></div></section>` : ""}
+      ${gentleCard()}
       ${nowCard()}
       ${closingCard()}
       ${briefingCard()}
@@ -1815,6 +1863,14 @@ function say(text) {
   // WEB-58: «¿qué hago ahora?» — one answer, not a list.
   if (isWhatNowQuestion(clean)) {
     vault.chat.push({ from: "me", text: clean, at }, { from: "manu", text: whatNowText(nowPlan()), at });
+    persist(); render(); return;
+  }
+  // WEB-70: «modo bajón», «vamos suave».
+  if (isGentleQuestion(clean)) {
+    const { plan } = gentleData();
+    const text = plan ? [plan.title, plan.why, ...plan.lines.map((l) => `${l.e} ${l.t}`), "", "Si quieres hablarlo, dime «estoy de bajón» y abro el Refugio."].join("\n")
+      : "Ahora no te veo de bajón. Si lo estás, márcalo en Tú → «¿Cómo estás hoy?» (😣 o 😕) y MANU irá suave contigo.";
+    vault.chat.push({ from: "me", text: clean, at }, { from: "manu", text, at });
     persist(); render(); return;
   }
   // WEB-63: «cierra la jornada», «he terminado de currar».
@@ -2589,6 +2645,9 @@ document.addEventListener("click", async (e) => {
     case "rem-done": vault.reminders = vault.reminders.map((r) => (r.id === id ? { ...r, done: !r.done } : r)); persist(); render(); break;
     case "sheet": openSheet(a.dataset.kind, true); break;
     case "close-day": closeDay(); break;
+    case "speak-day": speakDay(); break;
+    case "morning-dismiss": morningLaunch = false; render(); break;
+    case "gentle-pause": vault.settings.gentlePaused = localDay(); persist(); render(); toast("Vale. Me alegro 💙"); break;
     case "nube-code": nubeCodeAgain(); break;
     case "nube-copy-handoff": navigator.clipboard?.writeText(nube.handoff ?? "").then(() => toast("Copiado: ahora abre MANU desde tu pantalla de inicio y pégalo en Tu nube"), () => toast("Mantén pulsado el código para copiarlo")); break;
     case "nube-other": nube.patch({ codeSentAt: null }); render(); break;
@@ -3400,6 +3459,7 @@ if (returned.has("code") && returned.has("state")) {
 }
 
 const launch = launchParams(location.search);
+if (launch.morning) { history.replaceState(null, "", location.pathname); tab = "hoy"; morningLaunch = true; }
 if (launch.say || launch.events) {
   history.replaceState(null, "", location.pathname);
   if (launch.events) { vault.agenda = { day: localDay(), events: launch.events, importedAt: new Date().toISOString() }; persist(); tab = "agenda"; }

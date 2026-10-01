@@ -53,9 +53,11 @@ const lowMood = (moods, now) => {
  * @param {Array} x.moods       vault.moods
  * @param {number} x.captures   screenshots waiting in the tray
  * @param {object|null} x.closing  workClosing(...) when closingDue(...), else null
+ * @param {boolean} x.gentle    modo bajón (WEB-70): no stale projects, softer tasks
+ * @param {object|null} x.trip  oviedoTrip(...) on a day he works in Oviedo (WEB-71)
  * @returns {{ main: {e,t,why,go}, more: Array<{e,t,go}> }}
  */
-export function whatNow({ now = new Date(), mode = "AFTERNOON", events = [], tomorrow = [], reminders = [], tasks = [], projects = [], birthdays = [], quiet = [], moods = [], captures = 0, closing = null } = {}) {
+export function whatNow({ now = new Date(), mode = "AFTERNOON", events = [], tomorrow = [], reminders = [], tasks = [], projects = [], birthdays = [], quiet = [], moods = [], captures = 0, closing = null, gentle = false, trip = null } = {}) {
   const out = [];
   const nowMs = now.getTime();
   const clock = hm(now);
@@ -73,6 +75,15 @@ export function whatNow({ now = new Date(), mode = "AFTERNOON", events = [], tom
     return { e, mins: Math.round((at.getTime() - nowMs) / 60000) };
   }).filter((x) => x.mins >= 0 && x.mins <= 90).sort((a, b) => a.mins - b.mins);
   if (soon.length) out.push({ e: "🗓️", t: `Prepárate: ${soon[0].e.title} a las ${soon[0].e.time}.`, why: soon[0].mins < 5 ? "Es ya." : `Queda${soon[0].mins === 1 ? "" : "n"} ${soon[0].mins} minuto${soon[0].mins === 1 ? "" : "s"}.`, go: { tab: "agenda" } });
+
+  // 2a. Día de Oviedo (WEB-71): leave on time; from 90 min before until work starts.
+  if (trip) {
+    const toMs = (hhmm) => { const [hh, mm] = hhmm.split(":").map(Number); const d = new Date(now); d.setHours(hh, mm, 0, 0); return d.getTime(); };
+    const left = Math.round((toMs(trip.leave) - nowMs) / 60000);
+    const go = { href: trip.href, label: "Cómo ir" };
+    if (left >= 0 && left <= 90) out.unshift({ e: "🚌", t: `Sal a las ${trip.leave} hacia ${trip.to}.`, why: `${left < 5 ? "Es ya." : `Quedan ${left} minutos.`} Así llegas a las ${trip.arrive}, con margen antes de las ${trip.start}.`, go });
+    else if (left < 0 && nowMs < toMs(trip.start)) out.unshift({ e: "🏃", t: `Vas justo: sal ya hacia ${trip.to}.`, why: `Tenías que salir a las ${trip.leave}. Entras a las ${trip.start}.`, go });
+  }
 
   // 2b. Work just ended (WEB-63): close the day before anything else.
   if (closing) out.push({ e: "🏁", t: "Cierra la jornada.", why: closing.openCount ? `Dos minutos: repasa lo de hoy y deja ${closing.openCount === 1 ? "la tarea pendiente" : `las ${closing.openCount} pendientes`} para ${closing.label ?? "mañana"}. Luego, desconecta.` : "Dos minutos: repasa lo de hoy y desconecta.", go: null });
@@ -103,7 +114,7 @@ export function whatNow({ now = new Date(), mode = "AFTERNOON", events = [], tom
   if (captures > 0 && mode !== "WORK" && h >= 15) out.push({ e: "🖼️", t: `Revisa ${captures === 1 ? "tu captura" : `tus ${captures} capturas`}.`, why: "Cinco minutos: te las agrupo por tema y te quedas solo con lo que sirve.", go: { sub: "capturas" } });
 
   // 7. A project gone quiet (not during work).
-  const stale = mode === "WORK" ? [] : staleProjects(projects, now);
+  const stale = mode === "WORK" || gentle ? [] : staleProjects(projects, now);
   if (stale.length) out.push({ e: stale[0].project.emoji ?? "📁", t: `Diez minutos para «${stale[0].project.name}».`, why: `Llevas ${stale[0].days} días sin tocarlo. Ábrelo y apunta el siguiente paso, solo eso. Si ya no te interesa, archívalo y quítatelo de la cabeza.`, go: { project: stale[0].project.id } });
 
   // 8. Someone he hasn't talked to in a while.
@@ -114,7 +125,9 @@ export function whatNow({ now = new Date(), mode = "AFTERNOON", events = [], tom
   }
 
   // 9. Any open task.
-  if (firstTask && mode !== "WORK") out.push({ e: "✅", t: `Quítate de encima: ${firstTask.text}.`, why: `Tienes ${tasks.length === 1 ? "solo esta tarea" : `${tasks.length} tareas abiertas`}; empieza por la más antigua.`, go: { tab: "agenda" } });
+  if (firstTask && mode !== "WORK") out.push(gentle
+    ? { e: "🌱", t: `Si te apetece, solo una: ${firstTask.text}.`, why: "Y si no, mañana. Hoy no pasa nada por no hacerla.", go: { tab: "agenda" } }
+    : { e: "✅", t: `Quítate de encima: ${firstTask.text}.`, why: `Tienes ${tasks.length === 1 ? "solo esta tarea" : `${tasks.length} tareas abiertas`}; empieza por la más antigua.`, go: { tab: "agenda" } });
 
   // 10. Nothing pending.
   if (!out.length) {
@@ -136,4 +149,13 @@ export function isWhatNowQuestion(text) {
     || /^(y )?ahora que( hago)?$/.test(t)
     || /^(estoy aburrid[oa]|me aburro|no se que hacer)( ahora| hoy)?$/.test(t)
     || /^que es lo siguiente$/.test(t);
+}
+
+// WEB-72: what MANU reads aloud in the morning: hello, the one thing, the day.
+export function morningSpeech({ greeting = "Buenos días", now: r = null, brief = null } = {}) {
+  const clean = (t) => String(t ?? "").replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/gu, "").replace(/\s+/g, " ").replace(/\s+([.,;:!?])/g, "$1").trim();
+  const parts = [`${greeting}, Manu.`];
+  if (r?.main) parts.push(clean(r.main.t), clean(r.main.why));
+  for (const l of (brief?.lines ?? []).slice(0, 4)) parts.push(clean(l.t));
+  return parts.filter(Boolean).join(" ");
 }

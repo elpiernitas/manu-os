@@ -26,11 +26,57 @@ Hoja de ruta, un PR por paso:
 - Bandeja de capturas vía Atajo (soltar y ordenar).
 - Proyectos dormidos e ideas nuevas comparadas con lo que ya hay.
 - Cierre de jornada a las 13:00.
-- Día de Oviedo.
-- Mañana con Atajo al parar la alarma (NO_VERIFICADO en iOS).
-- Modo bajón.
+- Día de Oviedo (WEB-71).
+- Mañana con Atajo al parar la alarma (WEB-72; NO_VERIFICADO en iOS).
+- Modo bajón (WEB-70).
 
 Límites reales de una web en iPhone: no hay widgets, pantalla bloqueada ni control del Chromecast. Donde se pueda, se hará con Atajos.
+
+## WEB-72 — la mañana con un Atajo al parar la alarma
+
+- El Atajo «MANU Buenos días» se configura en Tú → Atajos: Automatización «Alarma → Se detiene» → «Abrir URL» `…/manu-os/?manana=1`.
+- `launchParams` lee `manana=1`. MANU abre Hoy con la tarjeta «☀️ Buenos días, Manu» y los botones «🔊 Léemelo» y «Ahora no». La tarjeta del resumen del día también tiene «🔊 Léemelo».
+- `morningSpeech` arma el texto: saludo, lo de «Ahora» con su motivo (por ejemplo, la salida a Oviedo) y hasta 4 líneas del día, sin emojis. Se lee con `speechSynthesis` en `es-ES`. iOS solo deja hablar después de un toque, por eso es un botón y no automático.
+- Evidencia:
+  - `npm test`: 210 en verde.
+  - e2e72: 6/6, con `speechSynthesis` simulado.
+- NO_VERIFICADO en el iPhone real: si «Abrir URL» abre el icono de MANU o Safari, y qué voz española hay.
+
+## WEB-71 — día de Oviedo
+
+Ya existía la pregunta nocturna «¿Mañana trabajas en Oviedo?», con la alarma que cuenta el viaje y el tiempo de Oviedo ese día. Faltaba lo de la mañana:
+
+- `oviedoTrip({ workStart })` en `core/night.js`:
+  - hora de salida = entrada − 10 min de margen − 40 min de viaje (`MORNING`);
+  - enlace a Google Maps en transporte público.
+- `whatNow({ trip })` pone el viaje lo primero:
+  - de 90 minutos antes hasta la hora de salida: «Sal a las 08:10 hacia Oviedo»;
+  - después, y hasta la hora de entrada: «Vas justo: sal ya».
+  - Tiene el botón «Cómo ir».
+- La hora de entrada sale del primer evento con hora de su Google Calendar ese día, o de `workStart` (09:00).
+- Evidencia:
+  - `npm test`: 209 en verde.
+  - e2e71: 8/8 (pregunta de la noche → por la mañana, «sal a las 08:10» → tarde, «sal ya» → un día en Gijón sin viaje).
+- NO_VERIFICADO: los 40 minutos de viaje son una estimación configurable, no un horario real de ALSA o Renfe.
+
+## WEB-70 — modo bajón
+
+Es el último punto de «Guiar»: MANU se da cuenta cuando Manu está de bajón y baja el ritmo sola.
+
+- `core/lowmode.js`:
+  - `gentleMode`:
+    - **suave** si hoy o ayer marcó 😣 o 😕, o si lleva 3 o más días flojos esta semana;
+    - **fuerte** si lleva 4 o más días flojos, o 3 días seguidos en «Mal»;
+    - un ánimo bueno hoy lo apaga, y «Hoy estoy bien, quítalo» lo pausa solo ese día.
+  - `gentlePlan`: no meter prisa y, solo en modo fuerte, escribir a alguien con quien habla a menudo (por su nombre).
+  - `isGentleQuestion`: «modo bajón» y «vamos suave».
+- `whatNow({gentle})`: sin proyectos parados, y la tarea pasa a «Si te apetece, solo una: …».
+- `briefing({gentle})`: sin presupuestos ni el ritmo de gasto del mes.
+- En Hoy, la tarjeta «💙 Hoy vamos suave» tiene los botones «Hablarlo con MANU» (Refugio), «Escribir a …» y «Hoy estoy bien, quítalo».
+- No diagnostica y no envía nada. El ánimo sigue en el dispositivo; la crisis sigue en el Refugio con el 112 y el 024.
+- Evidencia:
+  - `npm test`: 208 en verde.
+  - e2e70: 9/9.
 
 ## WEB-69 — confirmar antes de tirar correos; propuestas de proyectos; `window.confirm`
 
