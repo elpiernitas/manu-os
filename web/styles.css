@@ -727,3 +727,7 @@ body.kb .chat-down { bottom: auto; top: calc(var(--kb-bottom, 100dvh) - 124px); 
 /* WEB-64: the SQL for «Tu nube» */
 pre.code { white-space: pre-wrap; word-break: break-word; overflow-wrap: anywhere; background: var(--surface-2, rgba(255,255,255,.06)); padding: 10px 12px; border-radius: 10px; max-width: 100%; overflow-x: auto; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .card.gentle { border-color: rgba(77,141,255,.35); }
+/* Audit 2026-10: icon-only buttons get a 44×44 target (Apple HIG). */
+.icon-btn { min-width: 44px; justify-content: center; }
+.meter > i[data-level="warn"] { background: var(--orange, #ff9f0a); }
+.meter > i[data-level="full"] { background: var(--red, #ff453a); }

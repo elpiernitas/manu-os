@@ -39,3 +39,15 @@ export async function linkInfo(link, fetchImpl = fetch) {
   if (!res.ok) throw new Error(`${PROVIDER_NAME[link.provider]} no ha dado la información (${res.status})`);
   return parseOembed(await res.json());
 }
+
+// Audit 2026-10: every link built from data (a project source, a chat bubble,
+// an unsubscribe header, a restored or synced vault) goes through here. Only
+// schemes MANU really opens; anything else («javascript:», «data:»…) → "#".
+const SAFE_SCHEMES = /^(https?:|mailto:|tel:|whatsapp:|shortcuts:|spotify:)/i;
+export function safeHref(u) {
+  const s = String(u ?? "").trim();
+  if (!s) return "#";
+  if (SAFE_SCHEMES.test(s)) return s;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(s) || s.startsWith("//")) return "#"; // any other scheme, or protocol-relative
+  return s; // relative («?manana=1», «./»)
+}

@@ -96,3 +96,19 @@ export function wipeDeviceKeys(storages) {
   }
   return removed;
 }
+
+// Audit 2026-10: how full the device storage is. Safari keeps about 5 MB per
+// site for localStorage (NO_VERIFICADO exact figure; it varies by version).
+export const STORAGE_BUDGET = 5 * 1024 * 1024;
+export function storageUse(storage, prefix = "manuos.") {
+  let chars = 0;
+  try {
+    for (let i = 0; i < storage.length; i++) {
+      const k = storage.key(i);
+      if (k?.startsWith(prefix)) chars += k.length + (storage.getItem(k)?.length ?? 0);
+    }
+  } catch { return null; }
+  // localStorage counts UTF-16 code units: 2 bytes each.
+  const bytes = chars * 2;
+  return { bytes, ratio: bytes / STORAGE_BUDGET, level: bytes / STORAGE_BUDGET >= 0.85 ? "full" : bytes / STORAGE_BUDGET >= 0.6 ? "warn" : "ok" };
+}

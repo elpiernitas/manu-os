@@ -44,6 +44,19 @@ Siguientes ideas, sin compromiso:
 
 Límites reales de una web en iPhone: no hay widgets, pantalla bloqueada ni control del Chromecast. Donde se pueda, se hará con Atajos.
 
+## WEB-73 — auditoría completa
+
+El informe está en `docs/audits/2026-10-01-auditoria-web.md`. Defectos corregidos:
+1. Enlaces `javascript:` desde datos: `safeHref`.
+2. Dos pestañas que se pisaban: evento `storage`.
+3. Vault dañado que podía vaciar la nube: se baja la copia de la nube en vez de subir.
+4. Una sincronización que recargaba la página y perdía lo escrito: se cambia el vault en memoria.
+5. No había medidor de espacio.
+6. Capturas de pruebas y `tests/` publicados: se borran y se excluyen.
+7. Botón «✕» pequeño: `.icon-btn`.
+
+Evidencia: `npm test` 212, batería en verde, XSS 0 hallazgos, e2e-audit 7/7 (falla con el código anterior).
+
 ## WEB-72 — la mañana con un Atajo al parar la alarma
 
 - El Atajo «MANU Buenos días» se configura en Tú → Atajos: Automatización «Alarma → Se detiene» → «Abrir URL» `…/manu-os/?manana=1`.

@@ -49,8 +49,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
+      # Audit 2026-10: publish only the app, not its tests or package.json.
+      - name: Build site
+        run: |
+          cp -R web _site
+          rm -rf _site/tests _site/package.json _site/node_modules
+          test -f _site/index.html && test -f _site/sw.js && test ! -e _site/tests
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: web
+          path: _site
       - id: deployment
         uses: actions/deploy-pages@v4
