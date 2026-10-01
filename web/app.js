@@ -4,7 +4,7 @@ import { CATEGORIES, CATEGORY_EMOJI, euros, newEntry, learnCategory, summary, to
 import { MODE_TITLES, modeState } from "./core/modes.js";
 import { capture, confirm, markUnclassified, pending, tasks, ideas, toggleDone } from "./core/inbox.js";
 import { initialRefuge, refugeReply } from "./core/refuge.js";
-import { LocalStore, emptyVault, validateVault, wipeDeviceKeys } from "./core/storage.js";
+import { LocalStore, emptyVault, validateVault, wipeDeviceKeys, storageUse } from "./core/storage.js";
 import { notificationStatus, isInstalled, enableNotifications, testNotification } from "./core/notify.js";
 import { launchParams, parseEvents, nextEvent, localDay } from "./core/intake.js";
 import { fetchForecast, searchCities, advice, WEATHER_TTL_MS } from "./core/weather.js";
@@ -14,7 +14,7 @@ import { birthdayEventBody, isClientId, listEvents, createEvent, newEventBody, m
 import { detectRecurring, upcomingRecurring, spendingPattern, monthStats, monthlySeries } from "./core/insights.js";
 import { fetchSnapshot, summarize as mailSummary, mailSuggestions, findSender, mailOrder, idsFrom, archive as mailArchive, unarchive as mailUnarchive, trash as mailTrash, untrash as mailUntrash, ensureLabel, addLabel, removeLabel, messageUrl } from "./core/gmail.js";
 import { SCOPE, runServices, planTaskSync, listOpenTasks, insertTask, completeTask, contactBirthdays, setContactBirthday, mergePeople, saveBackup, loadBackup } from "./core/google.js";
-import { detectLink, linkInfo, PROVIDER_NAME } from "./core/links.js";
+import { detectLink, linkInfo, PROVIDER_NAME, safeHref } from "./core/links.js";
 import { allowedToSend, buildContext, buildConversationPayload, CONTEXT_CATEGORIES, BASIC_CONTEXT, FULL_CONTEXT, AUTO_SAFE } from "./core/converse.js";
 import { newProject, addSource, buildProjectPayload, citations, PRESETS } from "./core/projects.js";
 import { putImage, getImage, deleteImage, clearImages } from "./core/imagestore.js";
@@ -41,7 +41,7 @@ import { isSpotifyClientId, pkceValid, randomVerifier, challengeFor, authorizeUr
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "72";
+export const APP_VERSION = "73";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -183,12 +183,14 @@ async function nubePull(row = null) {
   }
   const v = validateVault(row.data);
   if (!v.ok) throw new Error(`Los datos de la nube no son válidos: ${v.reason}`);
-  restoring = true; // nothing in memory may overwrite what just arrived
+  // Audit 2026-10: swap the vault in memory instead of reloading the page, so
+  // whatever Manu is typing (quick-add sheet, chat) is not lost.
   clearTimeout(nube.timer);
-  store.save(v.vault);
+  vault = v.vault;
+  store.save(vault);
   nube.patch({ lastRev: row.rev, lastAt: new Date().toISOString(), dirty: false, conflict: null, error: null });
   toast(`Datos del ${row.device ?? "otro dispositivo"} cargados`);
-  setTimeout(() => location.reload(), 600);
+  if (!sheet && !document.activeElement?.matches("input, textarea, select")) render();
 }
 
 async function nubeSync({ manual = false } = {}) {
@@ -555,7 +557,7 @@ function nowPlan() {
     birthdays: upcomingBirthdays(vault.people, today(), 0), quiet: longTimeNoTalk(vault.people), moods: vault.moods, captures: toReview(vault.captures).length,
   });
 }
-const goButton = (go) => (!go ? "" : go.href ? `<a class="btn ghost" href="${esc(go.href)}" target="_blank" rel="noopener">${esc(go.label ?? "Abrir")}</a>` : `<button class="btn ghost" ${goAttrs(go)}>Ir</button>`);
+const goButton = (go) => (!go ? "" : go.href ? `<a class="btn ghost" href="${esc(safeHref(go.href))}" target="_blank" rel="noopener">${esc(go.label ?? "Abrir")}</a>` : `<button class="btn ghost" ${goAttrs(go)}>Ir</button>`);
 const goAttrs = (go) => (!go ? "" : go.project ? `data-act="find-go" data-project="${esc(go.project)}"` : go.sub ? `data-sub-go="${esc(go.sub)}"` : `data-act="find-go" data-tab="${esc(go.tab)}"`);
 function nowCard() {
   const r = nowPlan();
@@ -702,7 +704,7 @@ function hubCard(mode) {
   const speaker = s.spotifySpeaker || DEFAULT_SPEAKER;
   return `<section class="card"><h2>Accesos</h2>
     ${mode !== "WORK" ? `<button class="btn block" data-act="music">Música en el ${esc(speaker)}</button>` : ""}
-    <div class="apps">${apps.map((a) => `<a class="app-link" href="${esc(a.url)}" target="_blank" rel="noopener"><span class="ico ${a.color}">${esc(a.label.slice(0, 1))}</span><span class="small">${esc(a.label)}</span></a>`).join("")}</div></section>`;
+    <div class="apps">${apps.map((a) => `<a class="app-link" href="${esc(safeHref(a.url))}" target="_blank" rel="noopener"><span class="ico ${a.color}">${esc(a.label.slice(0, 1))}</span><span class="small">${esc(a.label)}</span></a>`).join("")}</div></section>`;
 }
 
 async function spotifyToken() {
@@ -856,7 +858,7 @@ function projectPage(p) {
       ${(p.chat ?? []).length ? `<div class="proj-chat">${p.chat.map((m) => `<div class="bubble ${m.from}">${m.from === "manu" && m.ai ? '<span class="ai-tag">IA</span>' : ""}${esc(m.text)}${m.cites?.length ? `<div class="cites">${m.cites.map((n) => { const src = p.sources[n - 1]; return src ? `<button class="chip" data-act="proj-src-view" data-id="${esc(src.id)}" data-n="${n}">[${n}] ${esc(src.title.slice(0, 28))}</button>` : ""; }).join("")}</div>` : ""}${m.excluded?.length ? `<p class="muted small">No envié las fuentes ${m.excluded.map((n) => `[${n}]`).join(", ")} por parecer privadas.</p>` : ""}</div>`).join("")}</div>` : ""}
     </section>
     ${sectionTitle(`Fuentes (${p.sources.length})`)}
-    <section class="card">${p.sources.length ? p.sources.map((src, i) => `<div class="row"><span class="src-n">${i + 1}</span><span aria-hidden="true">${SOURCE_ICON[src.kind]}</span>${src.imageId ? `<button class="thumb" data-act="img-view" data-img-id="${esc(src.imageId)}" aria-label="Ver captura"><img data-img="${esc(src.imageId)}" alt=""></button>` : ""}<div class="grow"><div>${esc(src.title)}${src.auto ? ' <span class="chip small">auto</span>' : ""}</div>${src.text && src.kind !== "note" ? `<div class="muted small">${esc(src.text.slice(0, 90))}${src.text.length > 90 ? "…" : ""}</div>` : src.kind === "note" ? `<div class="muted small">${src.text.length} caracteres</div>` : ""}</div>${src.url ? `<a class="link small" href="${esc(src.url)}" target="_blank" rel="noopener">Abrir</a>` : ""}<button class="link small" data-act="proj-del-source" data-id="${esc(src.id)}" aria-label="Quitar fuente">✕</button></div>`).join("") : '<p class="muted">Añade notas, capturas o vídeos. Luego pregunta y MANU te contesta solo con eso.</p>'}</section>
+    <section class="card">${p.sources.length ? p.sources.map((src, i) => `<div class="row"><span class="src-n">${i + 1}</span><span aria-hidden="true">${SOURCE_ICON[src.kind]}</span>${src.imageId ? `<button class="thumb" data-act="img-view" data-img-id="${esc(src.imageId)}" aria-label="Ver captura"><img data-img="${esc(src.imageId)}" alt=""></button>` : ""}<div class="grow"><div>${esc(src.title)}${src.auto ? ' <span class="chip small">auto</span>' : ""}</div>${src.text && src.kind !== "note" ? `<div class="muted small">${esc(src.text.slice(0, 90))}${src.text.length > 90 ? "…" : ""}</div>` : src.kind === "note" ? `<div class="muted small">${src.text.length} caracteres</div>` : ""}</div>${src.url ? `<a class="link small" href="${esc(safeHref(src.url))}" target="_blank" rel="noopener">Abrir</a>` : ""}<button class="link small icon-btn" data-act="proj-del-source" data-id="${esc(src.id)}" aria-label="Quitar fuente">✕</button></div>`).join("") : '<p class="muted">Añade notas, capturas o vídeos. Luego pregunta y MANU te contesta solo con eso.</p>'}</section>
     <section class="card"><h2>Añadir fuente</h2>
       <div class="segmented three" role="group" aria-label="Tipo de fuente">${kinds.map(([k, l]) => `<button type="button" data-act="proj-kind" data-kind="${k}" aria-pressed="${k === projSourceKind}">${l}</button>`).join("")}</div>
       <form id="projSource" class="stack">${form}</form>
@@ -1082,7 +1084,7 @@ function nightCard() {
 
 // ---------- Shared bits ----------
 // Attachments of an item: its screenshot (tap to see it big) and its link.
-const attach = (x) => `${x.imageId ? `<button class="thumb" data-act="img-view" data-img-id="${esc(x.imageId)}" aria-label="Ver captura"><img data-img="${esc(x.imageId)}" alt=""></button>` : ""}${x.url ? `<a class="link small" href="${esc(x.url)}" target="_blank" rel="noopener">Abrir</a>` : ""}`;
+const attach = (x) => `${x.imageId ? `<button class="thumb" data-act="img-view" data-img-id="${esc(x.imageId)}" aria-label="Ver captura"><img data-img="${esc(x.imageId)}" alt=""></button>` : ""}${x.url ? `<a class="link small" href="${esc(safeHref(x.url))}" target="_blank" rel="noopener">Abrir</a>` : ""}`;
 const taskRow = (t) => `<div class="row"><button class="check" data-act="toggle" data-id="${esc(t.id)}" aria-pressed="${Boolean(t.done)}" aria-label="${t.done ? "Reabrir" : "Completar"}: ${esc(t.text)}">${I.check}</button><span class="grow ${t.done ? "done-text" : ""}">${esc(t.text)}</span>${attach(t)}</div>`;
 const reminderAt = (r) => { const d = new Date(r.at); return `${d.toDateString() === today().toDateString() ? "Hoy" : d.toLocaleDateString("es-ES", { weekday: "short", day: "numeric" })} ${hhmm(d)}`; };
 const reminderIphoneUrl = (r) => { const d = new Date(r.at); return shortcutUrl(SHORTCUT_REMINDER, `${r.text} | ${dayKey(d)} ${hhmm(d)}`); };
@@ -1123,7 +1125,7 @@ const screens = {
           <button class="btn" data-act="task" data-id="${esc(c.id)}">Tarea</button><button class="btn ghost" data-act="idea" data-id="${esc(c.id)}">Idea</button><button class="btn ghost" data-act="forget" data-id="${esc(c.id)}">No recuerdo</button></div></div>`).join("")}</section>` : ""}
       ${hubCard(m.mode)}
       <section class="card"><div class="row"><h2>Tareas</h2>${addLink("TASK")}</div>${open.length ? open.slice(0, 5).map(taskRow).join("") + (open.length > 5 ? `<p class="muted small">Y ${open.length - 5} más en Agenda.</p>` : "") : '<p class="muted">Nada pendiente. Toca «Añadir» o díselo a MANU.</p>'}</section>
-      ${bdays.length ? `<section class="card"><h2>${I.people} Cumpleaños</h2>${bdays.map((b) => { const wa = b.days === 0 ? whatsappUrl(b.person.phone, `¡Feliz cumpleaños, ${b.person.name.split(" ")[0]}! 🎉`) : null; return `<div class="row"><span class="grow">${esc(b.person.name)}</span>${wa ? `<a class="btn" href="${esc(wa)}" target="_blank" rel="noopener">Felicitar por WhatsApp</a>` : `<span class="muted">${b.days === 0 ? "¡Hoy!" : b.days === 1 ? "Mañana" : (b.days === 1 ? "Mañana" : `En ${b.days} días`)}</span>`}</div>`; }).join("")}</section>` : ""}
+      ${bdays.length ? `<section class="card"><h2>${I.people} Cumpleaños</h2>${bdays.map((b) => { const wa = b.days === 0 ? whatsappUrl(b.person.phone, `¡Feliz cumpleaños, ${b.person.name.split(" ")[0]}! 🎉`) : null; return `<div class="row"><span class="grow">${esc(b.person.name)}</span>${wa ? `<a class="btn" href="${esc(safeHref(wa))}" target="_blank" rel="noopener">Felicitar por WhatsApp</a>` : `<span class="muted">${b.days === 0 ? "¡Hoy!" : b.days === 1 ? "Mañana" : (b.days === 1 ? "Mañana" : `En ${b.days} días`)}</span>`}</div>`; }).join("")}</section>` : ""}
       <section class="card"><div class="row"><h2>Este mes</h2><button class="link small" data-tab="dinero">Ver dinero</button></div><div class="big-money">${euros(month.total)}</div></section>
       </div>`;
   },
@@ -1162,7 +1164,7 @@ const screens = {
       ${refuge ? "" : mailCards()}
       ${chips ? `<div class="suggest" aria-label="Sugerencias">${chips.map((s) => `<button data-say="${esc(s)}">${esc(s)}</button>`).join("")}</div>` : `<div class="quick-cards" aria-label="Sugerencias">${cards.map(([e, label, how, text]) => `<button class="qcard" ${how === "say" ? `data-say="${esc(text)}"` : `data-fill="${esc(text)}"`}><span class="qe" aria-hidden="true">${e}</span><span>${esc(label)}</span></button>`).join("")}</div>`}
       ${vault.chat.length && !refuge ? `<div class="chat-tools"><button class="link small" data-act="chat-new">＋ Nueva conversación</button></div>` : ""}
-      <div class="chat" id="chat" aria-live="polite">${(refuge ? refuge.messages : history).map((b) => `<div class="bubble ${b.from}${b.safety ? " safety" : ""}">${b.ai ? '<span class="ai-tag">IA</span>' : ""}${b.imageId ? `<img class="chat-img" data-img="${esc(b.imageId)}" alt="Captura">` : ""}${esc(b.text)}${b.url ? ` <a class="link small" href="${esc(b.url)}" target="_blank" rel="noopener">Abrir</a>` : ""}${b.proposal ? `${b.proposal.state ? "" : `<p class="small proposal-what">Se enviará a Google solo tu frase: <b>«${esc(b.proposal.message)}»</b>, con las instrucciones fijas de MANU. Nada de tus datos.</p>`}<details><summary class="muted small">${b.proposal.state ? "Ver lo enviado" : "Ver detalles técnicos"}</summary><pre class="payload">${esc(shownPayload(b.proposal))}</pre></details>${b.proposal.state ? `<p class="muted small">${b.proposal.state === "sent" ? (b.proposal.auto ? "Enviado a Gemini sin preguntar (lo activaste en Tú → IA)." : "Enviado a Gemini.") : "No enviado."}</p>` : `<div class="btns"><button class="btn" data-act="ai-send" data-id="${esc(b.proposal.id)}">Enviar a Gemini</button><button class="btn ghost" data-act="ai-cancel" data-id="${esc(b.proposal.id)}">No</button></div><div class="btns"><button class="link small" data-act="ask-elsewhere" data-app="chatgpt" data-id="${esc(b.proposal.id)}">Preguntar en ChatGPT</button><button class="link small" data-act="ask-elsewhere" data-app="claude" data-id="${esc(b.proposal.id)}">Preguntar en Claude</button></div>`}` : ""}${b.action ? `<div class="btns"><a class="btn" href="${esc(b.action.href)}">${esc(b.action.label)}</a></div>` : ""}${(b.calls ?? []).map((c, i) => callCard(b, c, i)).join("")}${b.mailUndo ? `<div class="btns"><button class="link small" data-act="mail-undo" data-at="${esc(b.at)}">Deshacer</button></div>` : ""}</div>`).join("")}</div>
+      <div class="chat" id="chat" aria-live="polite">${(refuge ? refuge.messages : history).map((b) => `<div class="bubble ${b.from}${b.safety ? " safety" : ""}">${b.ai ? '<span class="ai-tag">IA</span>' : ""}${b.imageId ? `<img class="chat-img" data-img="${esc(b.imageId)}" alt="Captura">` : ""}${esc(b.text)}${b.url ? ` <a class="link small" href="${esc(safeHref(b.url))}" target="_blank" rel="noopener">Abrir</a>` : ""}${b.proposal ? `${b.proposal.state ? "" : `<p class="small proposal-what">Se enviará a Google solo tu frase: <b>«${esc(b.proposal.message)}»</b>, con las instrucciones fijas de MANU. Nada de tus datos.</p>`}<details><summary class="muted small">${b.proposal.state ? "Ver lo enviado" : "Ver detalles técnicos"}</summary><pre class="payload">${esc(shownPayload(b.proposal))}</pre></details>${b.proposal.state ? `<p class="muted small">${b.proposal.state === "sent" ? (b.proposal.auto ? "Enviado a Gemini sin preguntar (lo activaste en Tú → IA)." : "Enviado a Gemini.") : "No enviado."}</p>` : `<div class="btns"><button class="btn" data-act="ai-send" data-id="${esc(b.proposal.id)}">Enviar a Gemini</button><button class="btn ghost" data-act="ai-cancel" data-id="${esc(b.proposal.id)}">No</button></div><div class="btns"><button class="link small" data-act="ask-elsewhere" data-app="chatgpt" data-id="${esc(b.proposal.id)}">Preguntar en ChatGPT</button><button class="link small" data-act="ask-elsewhere" data-app="claude" data-id="${esc(b.proposal.id)}">Preguntar en Claude</button></div>`}` : ""}${b.action ? `<div class="btns"><a class="btn" href="${esc(safeHref(b.action.href))}">${esc(b.action.label)}</a></div>` : ""}${(b.calls ?? []).map((c, i) => callCard(b, c, i)).join("")}${b.mailUndo ? `<div class="btns"><button class="link small" data-act="mail-undo" data-at="${esc(b.at)}">Deshacer</button></div>` : ""}</div>`).join("")}</div>
       ${chatImage ? `<div class="chat-attach glass"><img src="${esc(chatImage)}" alt="Captura adjunta"><div class="grow small">${aiReady() ? "La captura se enviará a Google (Gemini) al pulsar «Enviar a Gemini». No uses capturas del banco o de salud si no quieres compartirlas." : '<button type="button" class="link small" data-act="gemini-guide">Activa la IA para que MANU lea la captura</button>'}</div><button type="button" class="qa-close" data-act="chat-image-remove" aria-label="Quitar captura">✕</button></div>` : ""}
       <form class="composer glass" id="composer">${refuge ? "" : '<label class="composer-attach" for="chatImage" role="button" tabindex="0" aria-label="Adjuntar captura">📎</label><input id="chatImage" type="file" accept="image/*" class="sr">'}<label for="msg" class="sr">Mensaje para MANU</label><input id="msg" autocomplete="off" enterkeyhint="send" placeholder="${refuge ? "Cuéntame" : chatImage ? "¿Qué quieres saber de la captura?" : "Escribe a MANU"}"><button class="btn" type="submit">${chatImage && aiReady() ? "Enviar a Gemini" : "Enviar"}</button></form>`;
   },
@@ -1410,7 +1412,7 @@ const subpages = {
     const created = SHORTCUTS.filter((x) => done[x.id]);
     const card = (x) => `<details class="card"${done[x.id] ? "" : " open"}><summary><b>${esc(x.name)}</b> · <span class="muted small">${esc(x.purpose)}</span></summary>
       <ol class="muted small">${x.steps.map((st) => `<li>${st}</li>`).join("")}</ol>
-      <div class="btns">${x.test ? `<a class="btn ghost" href="${esc(x.test)}">Probar</a>` : ""}${done[x.id] ? `<button class="btn ghost" data-act="shortcut-undo" data-id="${x.id}">Marcar como pendiente</button>` : `<button class="btn" data-act="shortcut-done" data-id="${x.id}">Ya lo tengo</button>`}</div></details>`;
+      <div class="btns">${x.test ? `<a class="btn ghost" href="${esc(safeHref(x.test))}">Probar</a>` : ""}${done[x.id] ? `<button class="btn ghost" data-act="shortcut-undo" data-id="${x.id}">Marcar como pendiente</button>` : `<button class="btn" data-act="shortcut-done" data-id="${x.id}">Ya lo tengo</button>`}</div></details>`;
     return `${backBar("Atajos")}
       <p class="muted small">Apple no deja que una web instale atajos por ti: cada uno se crea una vez en la app Atajos con el nombre exacto (unos 2 minutos). Pulsa «Probar» para comprobarlo y «Ya lo tengo» para quitarlo de pendientes. Los nombres de las acciones pueden variar según tu iOS.</p>
       ${buzonCard()}
@@ -1495,7 +1497,9 @@ const subpages = {
         <details><summary>Traer la agenda de hoy</summary><ol class="muted small"><li>«Buscar eventos del calendario» de hoy.</li><li>«Repetir con cada» → «Texto»: hora de inicio (HH:mm), espacio y título.</li><li>«Combinar texto» con saltos de línea → «Copiar al portapapeles».</li><li>Abre MANU → Agenda → Pegar eventos de hoy.</li></ol></details></section>`;
   },
   datos() {
+    const use = storageUse(globalThis.localStorage);
     return `${backBar("Tus datos")}
+      ${use ? `<section class="card"><h2>Espacio en este dispositivo</h2><div class="bar meter" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(use.ratio * 100)}" aria-label="Espacio usado"><i data-level="${use.level}" data-w="${Math.max(1, Math.min(100, Math.round(use.ratio * 100)))}"></i></div><p class="muted small">${(use.bytes / 1048576).toFixed(1).replace(".", ",")} MB de unos 5 MB.${use.level === "ok" ? " Vas sobrado." : " Haz una copia y borra lo que ya no necesites (capturas, conversaciones viejas)."} Las fotos y «Tu archivo» van aparte y no cuentan aquí.</p></section>` : ""}
       ${fullBackupCard()}
       <section class="card"><p class="muted small">Solo lo básico (sin imágenes, archivo ni diario), sin cifrar:</p>
         <div class="btns"><button class="btn ghost" data-act="export">Descargar copia básica</button></div>
@@ -2550,8 +2554,9 @@ function unsubscribe(email) {
   const u = vault.mail?.senders?.find((s) => s.email === email)?.unsub;
   if (!u) return false;
   // The sender's own page (the CSP keeps form-action 'none', so no silent POST).
-  if (u.http) window.open(u.http, "_blank", "noopener");
-  else location.href = u.mailto;
+  if (u.http && /^https:\/\//i.test(u.http)) window.open(u.http, "_blank", "noopener");
+  else if (u.mailto && /^mailto:/i.test(u.mailto)) location.href = u.mailto;
+  else return false;
   return true;
 }
 
@@ -3428,6 +3433,23 @@ addEventListener("scroll", () => $("topbar").classList.toggle("show", scrollY > 
 addEventListener("online", () => refreshWeather());
 
 if (loaded.warning) { $("banner").textContent = loaded.warning; $("banner").hidden = false; }
+// Audit 2026-10: if this device's data was damaged and set aside, never let the
+// empty vault overwrite the cloud: forget the last revision so the next sync
+// brings the cloud's copy down («pull») instead of pushing an empty one.
+if (loaded.warning && isEmptyVault(vault) && nube.session) nube.patch({ lastRev: null, dirty: false });
+
+// Audit 2026-10: MANU open in two tabs (easy on the Mac). Each tab keeps its
+// vault in memory, so a save in one would undo the other. When another tab
+// saves, this one takes its copy (unless a full restore is running).
+window.addEventListener("storage", (e) => {
+  if (e.key !== "manuos.vault" || !e.newValue || restoring) return;
+  try {
+    const r = validateVault(JSON.parse(e.newValue));
+    if (!r.ok) return;
+    vault = r.vault;
+    if (!sheet && !document.activeElement?.matches("input, textarea, select")) render();
+  } catch { /* a half-written value: the next event brings the full one */ }
+});
 if ("serviceWorker" in navigator) {
   const hadController = Boolean(navigator.serviceWorker.controller);
   // WEB-66: a new version reloads by itself, unless Manu is typing or has

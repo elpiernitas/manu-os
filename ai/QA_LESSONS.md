@@ -178,3 +178,11 @@ En WEB-66, el SW pedía a la red, pero `fetch(request)` y `cache.addAll` usan la
 ### QAL-042 — Un import puede tapar una función del navegador
 
 En WEB-69, `app.js` importaba `confirm` de `core/inbox.js`. Cualquier `confirm("¿Seguro?")` llamaba a esa función en vez de abrir el diálogo, y fallaba. Los botones con confirmación de WEB-64 no se probaron pulsándolos, así que nadie lo vio. Cada botón con diálogo se prueba pulsándolo, aceptando y cancelando. En `app.js` los diálogos van como `window.confirm`, `window.prompt` y `window.alert`, y una prueba lint lo vigila.
+
+### QAL-043 — Auditar con ataques reales y con dos copias de la app
+
+En la auditoría de WEB-73, la revisión línea a línea de las 867 inserciones de `app.js` no era viable. Lo que encontró los fallos fue:
+1. Rellenar **todos** los campos con código de ataque y recorrer **todas** las pantallas comprobando el DOM.
+2. Abrir la app **dos veces a la vez** (pestañas o dispositivos) y con datos dañados.
+
+Cada defecto se demuestra con una prueba que falla en el código anterior. Las capturas de las pruebas nunca se guardan dentro de `web/`, porque se publican.

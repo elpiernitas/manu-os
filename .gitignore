@@ -14,3 +14,7 @@ test-results/
 *.local
 .build/
 .swiftpm/
+
+# Audit 2026-10: test screenshots never go in the published app folder.
+web/*.png
+web/caps/
