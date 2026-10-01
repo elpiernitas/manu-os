@@ -30,6 +30,18 @@ Hoja de ruta, un PR por paso:
 - Mañana con Atajo al parar la alarma (WEB-72; NO_VERIFICADO en iOS).
 - Modo bajón (WEB-70).
 
+**Estado (2026-10-01): la hoja de ruta está completa.** Todo está fusionado y publicado (versión 72): Ahora (WEB-58), bandeja (WEB-59), proyectos automáticos (WEB-60), cierre de jornada (WEB-63), Tu nube (WEB-64 a WEB-68), modo bajón (WEB-70), Oviedo (WEB-71) y la mañana con Atajo (WEB-72).
+
+Quedan cosas NO_VERIFICADAS que solo puede comprobar Manu en su iPhone:
+- el Atajo de la alarma (¿abre el icono de MANU o Safari?);
+- la voz española de «Léemelo»;
+- el código pegado de Tu nube con el token real de Supabase;
+- las propuestas de proyectos con su cuenta de Gemini.
+
+Siguientes ideas, sin compromiso:
+- subir «Tu archivo» y las fotos a Supabase Storage;
+- ideas nuevas comparadas con los proyectos existentes (en parte ya lo cubre la autoclasificación).
+
 Límites reales de una web en iPhone: no hay widgets, pantalla bloqueada ni control del Chromecast. Donde se pueda, se hará con Atajos.
 
 ## WEB-72 — la mañana con un Atajo al parar la alarma
