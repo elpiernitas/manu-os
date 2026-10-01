@@ -27,10 +27,20 @@ Hoja de ruta, un PR por paso:
 - Proyectos dormidos e ideas nuevas comparadas con lo que ya hay.
 - Cierre de jornada a las 13:00.
 - Día de Oviedo (WEB-71).
-- Mañana con Atajo al parar la alarma (NO_VERIFICADO en iOS).
+- Mañana con Atajo al parar la alarma (WEB-72; NO_VERIFICADO en iOS).
 - Modo bajón (WEB-70).
 
 Límites reales de una web en iPhone: no hay widgets, pantalla bloqueada ni control del Chromecast. Donde se pueda, se hará con Atajos.
+
+## WEB-72 — la mañana con un Atajo al parar la alarma
+
+- El Atajo «MANU Buenos días» se configura en Tú → Atajos: Automatización «Alarma → Se detiene» → «Abrir URL» `…/manu-os/?manana=1`.
+- `launchParams` lee `manana=1`. MANU abre Hoy con la tarjeta «☀️ Buenos días, Manu» y los botones «🔊 Léemelo» y «Ahora no». La tarjeta del resumen del día también tiene «🔊 Léemelo».
+- `morningSpeech` arma el texto: saludo, lo de «Ahora» con su motivo (por ejemplo, la salida a Oviedo) y hasta 4 líneas del día, sin emojis. Se lee con `speechSynthesis` en `es-ES`. iOS solo deja hablar después de un toque, por eso es un botón y no automático.
+- Evidencia:
+  - `npm test`: 210 en verde.
+  - e2e72: 6/6, con `speechSynthesis` simulado.
+- NO_VERIFICADO en el iPhone real: si «Abrir URL» abre el icono de MANU o Safari, y qué voz española hay.
 
 ## WEB-71 — día de Oviedo
 

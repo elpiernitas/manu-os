@@ -79,3 +79,9 @@ test("WEB-71: on an Oviedo day, «Ahora» says when to leave, first of all", () 
   assert.equal(whatNow({ now: at(2026, 10, 7, 9, 30), mode: "WORK", trip }).main.t.includes("Oviedo"), false); // already there
   assert.equal(oviedoTrip({ workStart: "10:30" }).leave, "09:40");
 });
+
+import { morningSpeech } from "../core/now.js";
+test("WEB-72: the morning read aloud: hello, the one thing and the day, no emojis", () => {
+  const t = morningSpeech({ greeting: "Buenos días", now: { main: { t: "Sal a las 08:10 hacia Oviedo.", why: "Quedan 25 minutos." } }, brief: { lines: [{ e: "☔", t: "Llévate paraguas 🌂." }, { e: "🗓️", t: "Hoy tienes 09:00 Reunión." }] } });
+  assert.equal(t, "Buenos días, Manu. Sal a las 08:10 hacia Oviedo. Quedan 25 minutos. Llévate paraguas. Hoy tienes 09:00 Reunión.");
+});

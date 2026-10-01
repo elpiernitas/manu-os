@@ -26,8 +26,9 @@ test("external input is bounded and stripped of control characters", () => {
 });
 
 test("launch params: di and eventos", () => {
-  assert.deepEqual(launchParams("?di=gast%C3%A9%205%20en%20bar"), { say: "gasté 5 en bar", events: null });
-  assert.deepEqual(launchParams(""), { say: null, events: null });
+  assert.deepEqual(launchParams("?di=gast%C3%A9%205%20en%20bar"), { say: "gasté 5 en bar", events: null, morning: false });
+  assert.deepEqual(launchParams(""), { say: null, events: null, morning: false });
+  assert.equal(launchParams("?manana=1").morning, true); // WEB-72
   assert.deepEqual(launchParams("?eventos=").events, []);
   assert.equal(launchParams("?eventos=10%3A00%20Dentista").events[0].title, "Dentista");
 });

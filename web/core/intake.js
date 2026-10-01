@@ -30,7 +30,8 @@ export function launchParams(search) {
   const params = new URLSearchParams(search);
   const say = clip(params.get("di"), LIMITS.text) || null;
   const rawEvents = params.get("eventos");
-  return { say, events: rawEvents === null ? null : parseEvents(rawEvents) };
+  // WEB-72: «?manana=1» from the morning Shortcut (alarm stopped).
+  return { say, events: rawEvents === null ? null : parseEvents(rawEvents), morning: params.get("manana") === "1" };
 }
 
 export function localDay(date = new Date()) {

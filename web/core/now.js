@@ -150,3 +150,12 @@ export function isWhatNowQuestion(text) {
     || /^(estoy aburrid[oa]|me aburro|no se que hacer)( ahora| hoy)?$/.test(t)
     || /^que es lo siguiente$/.test(t);
 }
+
+// WEB-72: what MANU reads aloud in the morning: hello, the one thing, the day.
+export function morningSpeech({ greeting = "Buenos días", now: r = null, brief = null } = {}) {
+  const clean = (t) => String(t ?? "").replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/gu, "").replace(/\s+/g, " ").replace(/\s+([.,;:!?])/g, "$1").trim();
+  const parts = [`${greeting}, Manu.`];
+  if (r?.main) parts.push(clean(r.main.t), clean(r.main.why));
+  for (const l of (brief?.lines ?? []).slice(0, 4)) parts.push(clean(l.t));
+  return parts.filter(Boolean).join(" ");
+}

@@ -6,7 +6,7 @@ WEB-70 implementado por Claude Code. Se fusiona según la regla de fusión de `A
 
 ## Tarea activa
 
-WEB-70 y WEB-71 — modo bajón y día de Oviedo (`ai/HANDOFF.md`).
+WEB-70, WEB-71 y WEB-72 — modo bajón, día de Oviedo y mañana con Atajo (`ai/HANDOFF.md`).
 
 ## Autorización
 
