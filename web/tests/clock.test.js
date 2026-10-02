@@ -132,3 +132,20 @@ test("QA #6: a correction that leaves the day impossible is refused", async () =
   // sort by real time even with mixed offsets
   assert.ok(validSequence([{ t: "in", at: "2026-10-12T09:00:00+02:00" }, { t: "out", at: "2026-10-12T08:00:00Z" }]));
 });
+
+test("WEB-79: the month as a note and as a calendar", async () => {
+  const { monthNote, monthIcs } = await import("../core/clock.js");
+  const c = [...day(5, [["in", 8, 55], ["pause", 10, 0, "Café"], ["back", 10, 15], ["out", 13, 25]]), ...day(6, [["in", 9, 0]])];
+  const r = monthReport(c, "2026-10", { now: at(6, 12) });
+  const note = monthNote(r, "octubre de 2026");
+  assert.match(note, /^Fichaje · octubre de 2026/);
+  assert.match(note, /Lun 5: 08:55 – 13:25 · 4 h 15 min \(1 pausa, 15 min\) · \+15 min/);
+  assert.match(note, /Mar 6: 09:00 – sin salida/);
+  assert.match(note, /RK te debe 15 min\./);
+  const ics = monthIcs(c, "2026-10", { now: at(6, 12) });
+  assert.match(ics, /^BEGIN:VCALENDAR\r\n/);
+  assert.match(ics, /DTSTART:20261005T085500\r\nDTEND:20261005T132500/);
+  assert.match(ics, /SUMMARY:Trabajo 08:55–13:25 \(\+15 min\)/);
+  assert.equal((ics.match(/BEGIN:VEVENT/g) ?? []).length, 1); // the open day is left out
+  assert.ok(ics.endsWith("END:VCALENDAR\r\n"));
+});

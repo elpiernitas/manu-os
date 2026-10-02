@@ -9,7 +9,7 @@ const ids = (list) => list.map((x) => x.id);
 const calm = { moodToday: true }; // mood already marked, so only the 22:00 one is in play
 test("WEB-77: 22:00 Sunday–Thursday «¿Dónde trabajas mañana?» only if not answered", () => {
   assert.deepEqual(ids(dueNudges(calm, { now: at(7, 22, 0) })), ["manana"]);
-  assert.match(dueNudges(calm, { now: at(7, 22, 0) })[0].text, /Dónde trabajas mañana/);
+  assert.match(dueNudges(calm, { now: at(7, 22, 0) })[0].text, /Gijón, como siempre/);
   assert.deepEqual(ids(dueNudges(calm, { now: at(4, 22, 5) })), ["manana"]); // Sunday night
   assert.deepEqual(ids(dueNudges(calm, { now: at(9, 22, 0) })), []); // Friday: tomorrow is Saturday
   assert.deepEqual(ids(dueNudges(calm, { now: at(7, 21, 59) })).includes("manana"), false);

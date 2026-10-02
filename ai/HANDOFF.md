@@ -44,6 +44,27 @@ Siguientes ideas, sin compromiso:
 
 Límites reales de una web en iPhone: no hay widgets, pantalla bloqueada ni control del Chromecast. Donde se pueda, se hará con Atajos.
 
+## WEB-79 — ajustes del fichaje y de la pregunta de la noche
+
+Pedidos por Manu con capturas del iPhone real (v78, viernes 18:28).
+
+- «¿Mañana…?» solo se pregunta antes de un día laborable (`shouldAskTomorrow`). El viernes ya no pregunta por el sábado.
+- La respuesta habitual es Gijón:
+  - «¿Mañana en Gijón, como siempre?», con «Sí, en Gijón» como botón principal;
+  - si el calendario ve Oviedo, se invierte;
+  - el aviso de las 22:00 usa el mismo texto.
+- La tarjeta «⏱️ Fichaje» de Hoy desaparece:
+  - pasadas las 14:00 sin fichajes (ya era así);
+  - al pulsar «Salida». El día queda en Tú → Fichaje.
+- Tú → Fichaje:
+  - el saldo ya se veía en la fila de Tú;
+  - nuevo «📋 Copiar como nota»: una línea por día con entrada, salida, pausas y diferencia (`monthNote`);
+  - nuevo «📅 Calendario»: un `.ics` con un evento por día, de «Entro» a «Salida» (`monthIcs`).
+- Evidencia:
+  - `npm test`: 239 en verde.
+  - e2e79: 10/10.
+  - e2e74 adaptado a la tarjeta que desaparece.
+
 ## WEB-78 — ideas de la revisión externa: barra de comandos, dictado por Siri y avisos por ubicación
 
 - **Barra de comandos** (`core/commands.js`, puro):
