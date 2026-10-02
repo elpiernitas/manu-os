@@ -10,10 +10,11 @@
 //   sueño|2026-09-29|7,5
 //   peso|2026-09-29|72,4
 //   lugar|2026-09-29 17:40|Calle Ejemplo 1, Gijón
+//   nota|2026-09-29 17:40|gasté 15 en gasolina      (WEB-78: dictated to Siri)
 import { normalise } from "./text.js";
 
-export const LIMITS = { lines: 5000, seen: 5000, places: 1000, text: 120 };
-const KINDS = { gasto: "expense", compra: "expense", pago: "expense", pasos: "steps", sueno: "sleep", dormir: "sleep", peso: "weight", lugar: "place", ubicacion: "place" };
+export const LIMITS = { lines: 5000, seen: 5000, places: 1000, text: 120, note: 280 };
+const KINDS = { gasto: "expense", compra: "expense", pago: "expense", pasos: "steps", sueno: "sleep", dormir: "sleep", peso: "weight", lugar: "place", ubicacion: "place", nota: "note", apunte: "note", dictado: "note" };
 const pad = (n) => String(n).padStart(2, "0");
 const clip = (s, n) => String(s ?? "").replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, n);
 
@@ -67,6 +68,10 @@ export function parseLine(raw, now = new Date()) {
     const cents = amountCents(value);
     return cents ? { id, kind, at, cents, merchant: clip(rest.join(" "), LIMITS.text) || null } : { error: "importe no válido" };
   }
+  if (kind === "note") {
+    const text = clip([value, ...rest].join(" | "), LIMITS.note);
+    return text ? { id, kind, at, text } : { error: "nota vacía" };
+  }
   if (kind === "place") {
     const text = clip([value, ...rest].join(" "), LIMITS.text);
     return text ? { id, kind, at, text } : { error: "lugar vacío" };
@@ -82,7 +87,7 @@ const HEALTH = { steps: "STEPS", sleep: "SLEEP", weight: "WEIGHT" };
 // categorises an expense like any other (money.js). Pure: returns what changed.
 export function applyBuzon(text, vault, { now = new Date(), newEntry }) {
   const seen = new Set(vault.settings?.buzonSeen ?? []);
-  const out = { spending: [], health: [...(vault.health ?? [])], places: [...(vault.places ?? [])], seen: [], counts: { expense: 0, steps: 0, sleep: 0, weight: 0, place: 0 }, repeated: 0, errors: [] };
+  const out = { spending: [], health: [...(vault.health ?? [])], places: [...(vault.places ?? [])], seen: [], notes: [], counts: { expense: 0, steps: 0, sleep: 0, weight: 0, place: 0, note: 0 }, repeated: 0, errors: [] };
   const all = String(text ?? "").split(/\r?\n/);
   const skip = Math.max(0, all.length - LIMITS.lines); // the file only grows: the newest lines matter
   all.slice(skip).forEach((raw, j) => {
@@ -95,6 +100,7 @@ export function applyBuzon(text, vault, { now = new Date(), newEntry }) {
     out.counts[ev.kind]++;
     if (ev.kind === "expense") out.spending.push({ ...newEntry({ id: ev.id, cents: ev.cents, merchant: ev.merchant, at: ev.at.toISOString() }), source: "APPLEPAY" });
     else if (ev.kind === "place") out.places.push({ id: ev.id, at: ev.at.toISOString(), text: ev.text });
+    else if (ev.kind === "note") out.notes.push({ id: ev.id, at: ev.at.toISOString(), text: ev.text });
     else {
       const day = dayKey(ev.at), kind = HEALTH[ev.kind];
       out.health = out.health.filter((h) => !(h.day === day && h.kind === kind));
@@ -115,6 +121,7 @@ export function buzonSummary(r) {
   if (c.sleep) parts.push(`sueño de ${c.sleep} ${c.sleep === 1 ? "día" : "días"}`);
   if (c.weight) parts.push(`${c.weight} ${c.weight === 1 ? "peso" : "pesos"}`);
   if (c.place) parts.push(`${c.place} ${c.place === 1 ? "lugar" : "lugares"}`);
+  if (c.note) parts.push(`${c.note} ${c.note === 1 ? "nota dictada" : "notas dictadas"}`);
   const main = parts.length ? parts.join(", ").replace(/, ([^,]*)$/, " y $1") : "nada nuevo";
   return `${main}${r.repeated ? ` · ${r.repeated} ya estaban` : ""}${r.errors.length ? ` · ${r.errors.length} líneas no entendidas` : ""}`;
 }

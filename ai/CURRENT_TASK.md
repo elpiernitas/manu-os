@@ -6,7 +6,7 @@ WEB-70 implementado por Claude Code. Se fusiona según la regla de fusión de `A
 
 ## Tarea activa
 
-WEB-77 — más avisos (`ai/HANDOFF.md`, «WEB-77»).
+WEB-78 — ideas buenas de la revisión externa (`ai/HANDOFF.md`, «WEB-78»).
 
 ## Autorización
 
@@ -36,6 +36,7 @@ WEB-77 — más avisos (`ai/HANDOFF.md`, «WEB-77»).
 - 2026-10-02: Manu pasa las opiniones de Gemini y ChatGPT sobre MANU. Claude Code verifica cada punto y arregla los defectos confirmados (`docs/audits/2026-10-02-revision-externa.md`).
 - 2026-10-02: Manu decide no mudar MANU a otro origen. No publicará más webs en `elpiernitas.github.io`, donde solo están MANU y `save-slot-02`.
 - 2026-10-02: Manu pide más notificaciones, empezando por «entre semana a las 22:00, pregúntame dónde trabajo mañana».
+- 2026-10-02: Manu pide crear y probar todas las ideas buenas de la revisión externa. Lo pendiente de ChatGPT queda «si quieres».
 - 2026-09-29: **cambio de gobernanza decidido por Manu.** El orquestador (ChatGPT/Codex) ya no revisa automáticamente, porque frenaba el avance. Claude Code fusiona los PR web cuando `npm test` y los dos workflows remotos están en verde y no hay conflictos. Cuando haga falta una revisión, Claude Code prepara un prompt, Manu se lo pasa a ChatGPT y le devuelve la respuesta; los defectos se corrigen en un PR nuevo con su regresión. Los PR #7, #8 y #9 siguen en borrador o pausa.
 
 ## Alcance autorizado

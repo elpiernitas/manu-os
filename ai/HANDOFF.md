@@ -44,6 +44,33 @@ Siguientes ideas, sin compromiso:
 
 Límites reales de una web en iPhone: no hay widgets, pantalla bloqueada ni control del Chromecast. Donde se pueda, se hará con Atajos.
 
+## WEB-78 — ideas de la revisión externa: barra de comandos, dictado por Siri y avisos por ubicación
+
+- **Barra de comandos** (`core/commands.js`, puro):
+  - se abre con ⚡ en Hoy, con ⌘K / Ctrl+K o con «/» en el Mac;
+  - entiende el fichaje en palabras: «entro», «pausa café», «salgo a fumar», «vuelvo», «salida»;
+  - «ánimo bien», solo con la palabra «ánimo»: «estoy mal» sigue yendo a MANU y al Refugio;
+  - «hábito leer»;
+  - formas cortas: «/gasto 12 café», «/tarea …», «/idea …», «/recordar …»;
+  - pantallas por su nombre («fichaje», «tu nube», «excel» → Fichaje);
+  - lo demás va a MANU como si se escribiera en el chat;
+  - gastos, tareas, ideas y avisos se quedan en la pantalla con un toast; las preguntas abren el chat;
+  - las sugerencias cambian según el estado del fichaje.
+- **Dictado por Siri sin mirar**:
+  - el atajo «MANU Dictado» escribe `nota|fecha|texto` en el buzón;
+  - al importarlo, gastos, tareas e ideas se colocan solos con la hora en que se dictaron; lo demás queda en «Por clasificar»;
+  - lo repetido se salta.
+- **Atajo «MANU Llegada»**: al llegar y al salir del trabajo (automatización por ubicación de iOS), recuerda fichar. NO_VERIFICADO si iOS la ejecuta sin pedir confirmación.
+- Gemini: «JSON estructurado» ya estaba hecho (`responseMimeType` y llamadas a funciones).
+- Pendiente de ChatGPT, sin hacer (Manu: «si quieres»), porque son reestructuraciones grandes sin cambio visible:
+  - copia por bloques;
+  - partir `app.js`;
+  - Web Locks para varias pestañas.
+- Evidencia:
+  - `npm test`: 237 en verde.
+  - e2e78: 26/26 (iPhone y Mac con teclado, buzón con notas).
+  - Batería completa en verde.
+
 ## WEB-77 — más avisos
 
 Manu pide más notificaciones: «entre semana a las 22:00, que me pregunte dónde trabajo mañana».

@@ -755,3 +755,16 @@ pre.code { white-space: pre-wrap; word-break: break-word; overflow-wrap: anywher
 .nudge-row { align-items: center; gap: 12px; }
 .nudge-row input[type="time"] { width: auto; flex: none; max-width: 7.5rem; }
 .nudge-row input[type="time"]:disabled { opacity: .45; }
+
+/* WEB-78: barra de comandos */
+.cmdk-pill { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 48px; padding: 10px 16px; border-radius: 16px; border: 1px solid var(--line, rgba(255,255,255,.08)); color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.cmdk-pill .muted { font-size: .85em; }
+.cmdk-bg { position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,.6); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); display: flex; justify-content: center; align-items: flex-start; padding: max(10vh, env(safe-area-inset-top)) 16px 16px; }
+.cmdk-bg[hidden] { display: none; }
+.cmdk { width: min(560px, 100%); border-radius: 20px; padding: 12px; box-shadow: 0 20px 60px rgba(0,0,0,.5); background: var(--surface); border: 1px solid var(--glass-edge); }
+.cmdk input { width: 100%; font-size: 17px; min-height: 48px; }
+.cmdk-list { list-style: none; margin: 8px 0 0; padding: 0; max-height: 50vh; overflow-y: auto; }
+.cmdk-item { min-height: 44px; display: flex; align-items: center; padding: 8px 12px; border-radius: 12px; cursor: pointer; }
+.cmdk-item.on, .cmdk-item:hover { background: rgba(36,107,253,.22); }
+.cmdk-help { margin: 8px 4px 0; }
+@media (hover: none) { .cmdk-help { display: none; } }
