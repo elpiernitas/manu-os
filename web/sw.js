@@ -1,9 +1,9 @@
 // Offline shell: every file of the app is cached.
-const VERSION = "manuos-v76";
+const VERSION = "manuos-v77";
 const SHELL = [
   "./", "index.html", "styles.css", "app.js", "manifest.webmanifest",
   "core/text.js", "core/money.js", "core/modes.js", "core/assistant.js",
-  "core/inbox.js", "core/refuge.js", "core/storage.js", "core/notify.js", "core/intake.js", "core/weather.js", "core/bank.js", "core/night.js", "core/life.js", "core/gcal.js", "core/google.js", "core/ai.js", "core/crypto.js", "core/spotify.js", "core/hub.js", "core/insights.js", "core/converse.js", "core/imagestore.js", "core/links.js", "core/projects.js", "core/scene.js", "core/gmail.js", "core/archive.js", "core/archivestore.js", "core/recall.js", "core/diary.js", "core/buzon.js", "core/backup-manager.js", "core/briefing.js", "core/budget.js", "core/find.js", "core/now.js", "core/captures.js", "core/autofile.js", "core/zipwrite.js", "core/contacts.js", "core/closing.js", "core/lowmode.js", "core/clock.js", "core/sync.js",
+  "core/inbox.js", "core/refuge.js", "core/storage.js", "core/notify.js", "core/intake.js", "core/weather.js", "core/bank.js", "core/night.js", "core/life.js", "core/gcal.js", "core/google.js", "core/ai.js", "core/crypto.js", "core/spotify.js", "core/hub.js", "core/insights.js", "core/converse.js", "core/imagestore.js", "core/links.js", "core/projects.js", "core/scene.js", "core/gmail.js", "core/archive.js", "core/archivestore.js", "core/recall.js", "core/diary.js", "core/buzon.js", "core/backup-manager.js", "core/briefing.js", "core/budget.js", "core/find.js", "core/now.js", "core/captures.js", "core/autofile.js", "core/zipwrite.js", "core/contacts.js", "core/closing.js", "core/lowmode.js", "core/clock.js", "core/sync.js", "core/nudges.js",
   "icons/icon-180.png", "icons/icon-192.png", "icons/icon-512.png",
 ];
 
@@ -47,7 +47,12 @@ self.addEventListener("fetch", (event) => {
   );
 });
 
+// WEB-77: a tap opens MANU where the notice points («hoy», «tu/habitos»…).
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  event.waitUntil(self.clients.matchAll({ type: "window" }).then((list) => (list[0] ? list[0].focus() : self.clients.openWindow("./"))));
+  const go = /^[a-z]+(\/[a-z]+)?$/.test(event.notification.data?.go ?? "") ? event.notification.data.go : "hoy";
+  event.waitUntil(self.clients.matchAll({ type: "window" }).then((list) => {
+    if (list[0]) { list[0].postMessage({ go }); return list[0].focus(); }
+    return self.clients.openWindow(`./#ir=${go}`);
+  }));
 });

@@ -44,6 +44,35 @@ Siguientes ideas, sin compromiso:
 
 Límites reales de una web en iPhone: no hay widgets, pantalla bloqueada ni control del Chromecast. Donde se pueda, se hará con Atajos.
 
+## WEB-77 — más avisos
+
+Manu pide más notificaciones: «entre semana a las 22:00, que me pregunte dónde trabajo mañana».
+
+- `core/nudges.js` (puro):
+  - catálogo `NUDGES`, cada aviso con su hora, sus días y su condición;
+  - `dueNudges()` decide lo que toca ahora (ventana de 2 h) y `markSent()` recuerda lo ya mostrado.
+- Avisos (todos activados por defecto, cada uno con su interruptor y su hora en Tú → Avisos):
+
+  | Aviso | Cuándo | Solo si… |
+  |---|---|---|
+  | Buenos días | 8:00, laborables | hay agenda, recordatorios o cumpleaños hoy |
+  | ¿Fichaste ya? | entrada + 1 min | no ha fichado |
+  | Ficha al salir | entrada + jornada | sigue dentro |
+  | ¿Qué tal el día? | 21:00 | no ha marcado el ánimo |
+  | Hábitos | 21:30 | le queda alguno |
+  | ¿Dónde trabajas mañana? | 22:00, de domingo a jueves | no lo ha dicho |
+  | Copia | domingos, 20:00 | la última tiene más de 7 días |
+
+- Los textos no llevan nombres ni detalles, porque se ven en la pantalla bloqueada.
+- Lo ya avisado se guarda en `manuos.nudged`, en el dispositivo y no en el vault: así no cuenta como edición para Tu nube (QAL-044). La marca de fichaje `settings.clockNudged` deja de usarse.
+- Al tocar la notificación, MANU se abre donde toca: el SW manda `postMessage({go})` o abre `#ir=tu/habitos`, y la app solo acepta pestañas y subpáginas que existen.
+- Atajos: nueva automatización «MANU Noche» (22:00, de domingo a jueves). Como las de hora fija de iOS suenan siempre, solo se recomiendan la del fichaje y esta.
+- Evidencia:
+  - `npm test`: 231 en verde.
+  - e2e77: 16/16.
+  - e2e75 actualizado a la nueva marca.
+  - Batería completa en verde.
+
 ## WEB-76 — arreglos de la revisión externa (ChatGPT y Gemini)
 
 Detalle y veredictos en `docs/audits/2026-10-02-revision-externa.md`.
