@@ -6,7 +6,7 @@ WEB-70 implementado por Claude Code. Se fusiona según la regla de fusión de `A
 
 ## Tarea activa
 
-WEB-79 — ajustes del fichaje y de la pregunta de la noche (`ai/HANDOFF.md`, «WEB-79»).
+WEB-80 — Dinero: añadir, capturas del banco y gastos compartidos (`ai/HANDOFF.md`, «WEB-80»).
 
 ## Autorización
 

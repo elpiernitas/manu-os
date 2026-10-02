@@ -44,6 +44,33 @@ Siguientes ideas, sin compromiso:
 
 Límites reales de una web en iPhone: no hay widgets, pantalla bloqueada ni control del Chromecast. Donde se pueda, se hará con Atajos.
 
+## WEB-80 — Dinero: añadir, capturas del banco y gastos compartidos (tipo Tricount)
+
+- Dinero → **Añadir**:
+  - «➖ Gasto» abre la hoja de siempre;
+  - «➕ Ingreso» es un formulario corto (el tipo se deduce del concepto con `incomeKind`);
+  - «📸 Capturas del banco», hasta 6.
+- **Capturas del banco** (`core/bankshot.js`):
+  - Gemini lee los movimientos en JSON (`fecha`, `concepto`, `importe` con signo);
+  - si «Permitir datos sensibles» está apagado, MANU pide confirmación antes de enviar, porque las imágenes van a Google;
+  - Manu revisa la lista antes de guardar; lo que ya estaba (mismo día e importe) llega sin marcar;
+  - los repetidos entre capturas se juntan;
+  - las imágenes no se guardan.
+- **Gastos compartidos** (`core/split.js`):
+  - un gasto de bar, restaurante u ocio de 3 € o más en los últimos 7 días hace que Hoy y Dinero pregunten «¿Con quién estabas?»;
+  - las personas salen de Personas o de Google Contactos; al elegir un contacto se crea en Personas con su `googleId`;
+  - se reparte «A partes iguales» (los céntimos sueltos son de Manu) o «Cada uno lo suyo» (qué tomó y cuánto; lo que no se pone es de Manu);
+  - también hay «Pagué solo yo» y «No preguntar por estos N».
+- **🤝 Te deben** (Dinero):
+  - una línea por persona, por ejemplo «Ana te debe 4,50 € (Bar: 2 cañas)»;
+  - «Recordárselo» abre WhatsApp con el detalle, si la persona tiene teléfono;
+  - «Me ha pagado» lo salda, tras confirmar;
+  - en Personas, cada persona muestra «te debe X €».
+- **Contacto de Google**: la deuda queda unida a la persona de MANU que viene de ese contacto. No se escribe nada en Google Contactos.
+- Evidencia:
+  - `npm test`: 243 en verde.
+  - e2e80: 23/23, con Gemini simulado y sin datos reales.
+
 ## WEB-79 — ajustes del fichaje y de la pregunta de la noche
 
 Pedidos por Manu con capturas del iPhone real (v78, viernes 18:28).
