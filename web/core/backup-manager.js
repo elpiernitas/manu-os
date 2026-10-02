@@ -366,20 +366,27 @@ export async function restoreFullBackup(checked, { storage = globalThis.localSto
     // 3. localStorage al final (el vault es lo último que cambia).
     onProgress({ phase: "local" });
     for (const k of Object.keys(beforeLocal)) if (!(k in payload.localStorage)) storage.removeItem(k);
-    for (const [k, v] of Object.entries(payload.localStorage)) storage.setItem(k, v);
+    const incoming = Object.entries(payload.localStorage).sort(([a], [b]) => (a === "manuos.vault") - (b === "manuos.vault"));
+    for (const [k, v] of incoming) storage.setItem(k, v);
   } catch (err) {
     // 4. Deshacer: localStorage y las bases ya escritas vuelven a como estaban.
     onProgress({ phase: "rollback" });
-    // Cada paso por separado: que uno falle no impide deshacer los demás.
+    // Cada paso por separado: que uno falle no impide deshacer los demás. Los
+    // fallos se cuentan: nunca se afirma «como estaban» si no es verdad
+    // (QA ChatGPT 2026-10, #3). El vault se repone el último.
+    const failed = [];
     for (const name of written) {
       const b = beforeDbs.find((x) => x.name === name)?.snap;
-      try { if (b) await writeDb(idb, b); } catch { /* se informa del error original */ }
+      try { if (b) await writeDb(idb, b); } catch { failed.push(name); }
     }
     const extra = [];
-    for (let i = 0; i < storage.length; i++) { const k = storage.key(i); if (isBackedUpKey(k) && !(k in beforeLocal)) extra.push(k); }
-    for (const k of extra) { try { storage.removeItem(k); } catch { /* idem */ } }
-    for (const [k, v] of Object.entries(beforeLocal)) { try { storage.setItem(k, v); } catch { /* idem */ } }
-    throw Object.assign(new Error(`No se ha podido restaurar (${err?.message ?? err}). He dejado tus datos como estaban.`), { cause: err });
+    try { for (let i = 0; i < storage.length; i++) { const k = storage.key(i); if (isBackedUpKey(k) && !(k in beforeLocal)) extra.push(k); } } catch { failed.push("localStorage"); }
+    for (const k of extra) { try { storage.removeItem(k); } catch { failed.push(k); } }
+    const vaultLast = Object.entries(beforeLocal).sort(([a], [b]) => (a === "manuos.vault") - (b === "manuos.vault"));
+    for (const [k, v] of vaultLast) { try { storage.setItem(k, v); } catch { failed.push(k); } }
+    const why = err?.message ?? err;
+    if (failed.length) throw Object.assign(new Error(`No se ha podido restaurar (${why}) y tampoco he podido deshacerlo del todo (${failed.length} ${failed.length === 1 ? "parte" : "partes"}): tus datos pueden haber quedado a medias. No borres nada y vuelve a restaurar esta copia o la anterior.`), { cause: err, partial: failed });
+    throw Object.assign(new Error(`No se ha podido restaurar (${why}). He dejado tus datos como estaban.`), { cause: err });
   }
   onProgress({ phase: "done" });
   return { restored: checked.counts };

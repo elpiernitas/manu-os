@@ -44,6 +44,35 @@ Siguientes ideas, sin compromiso:
 
 Límites reales de una web en iPhone: no hay widgets, pantalla bloqueada ni control del Chromecast. Donde se pueda, se hará con Atajos.
 
+## WEB-76 — arreglos de la revisión externa (ChatGPT y Gemini)
+
+Detalle y veredictos en `docs/audits/2026-10-02-revision-externa.md`.
+
+- Tu nube:
+  - una edición hecha durante la descarga ya no se pierde: pasa a ser un conflicto (`userPrint`, que no cuenta las escrituras automáticas);
+  - si la descarga no cabe, no se toca nada y avisa.
+- Copia completa: si deshacer falla, lo dice; el vault se escribe el último.
+- Service worker:
+  - no guarda URLs con `?`; las páginas, con una clave fija;
+  - solo borra las cachés `manuos-*`;
+  - `index.html` solo para navegar.
+- Atajos: `#di=` y `#manana=1`, que no llegan al servidor (`?di=` sigue valiendo).
+- Fichaje:
+  - `editPunch()` rechaza los días imposibles;
+  - se ordena por hora real.
+- Subtítulo de Tu nube: decía «cifrados»; ya no lo están desde WEB-67.
+- Test que ata `APP_VERSION` a la caché del SW.
+- Pendiente:
+  - origen propio (decisión de Manu);
+  - copia por bloques;
+  - extraer controladores de `app.js`;
+  - Web Locks para varias pestañas.
+- Evidencia:
+  - `npm test`: 227 en verde.
+  - e2e76: 10/10. Con el `app.js` de v75 fallan 6: se reproduce el defecto.
+  - e2e76sw: 8/8.
+  - Batería completa en verde.
+
 ## WEB-75 — avisos del fichaje
 
 Manu pide un aviso a las 9:01, «¿fichaste ya?», si no ha fichado, y otro a las 13:00, «acuérdate de fichar al salir».

@@ -52,3 +52,9 @@ test("vault with a broken agenda is rejected; without agenda is fine", () => {
   assert.equal(validateVault(emptyVault()).ok, true);
   assert.equal(validateVault({ ...emptyVault(), agenda: { day: "2026-09-28", events: [] } }).ok, true);
 });
+
+test("QA #4: Shortcut data can come in the fragment (never sent to the server)", () => {
+  assert.deepEqual(launchParams("#di=gast%C3%A9%205%20en%20bar"), { say: "gasté 5 en bar", events: null, morning: false });
+  assert.equal(launchParams("#manana=1").morning, true);
+  assert.equal(launchParams("#access_token=x&refresh_token=y").say, null); // the Supabase link is not a launch
+});

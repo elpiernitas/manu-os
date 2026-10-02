@@ -1,5 +1,5 @@
-// Offline shell: every file of the app is cached; data never leaves the device.
-const VERSION = "manuos-v75";
+// Offline shell: every file of the app is cached.
+const VERSION = "manuos-v76";
 const SHELL = [
   "./", "index.html", "styles.css", "app.js", "manifest.webmanifest",
   "core/text.js", "core/money.js", "core/modes.js", "core/assistant.js",
@@ -16,24 +16,34 @@ self.addEventListener("install", (event) => {
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== VERSION).map((k) => caches.delete(k))))
+      // Only MANU's old caches: other apps on the same origin keep theirs (QA #7).
+      .then((keys) => Promise.all(keys.filter((k) => k.startsWith("manuos-") && k !== VERSION).map((k) => caches.delete(k))))
       .then(() => self.clients.claim()),
   );
 });
 
 // Network first so updates arrive; cache when offline.
+// QA ChatGPT 2026-10 (#4, #7):
+// - a URL with ?query (old Shortcut links ?di=…, Spotify's ?code=…) is never
+//   stored under its own URL: pages are kept under one fixed key, so dictated
+//   text or OAuth codes do not end up in Cache Storage;
+// - offline, only a page navigation falls back to index.html; a script, image
+//   or file that is missing fails as such instead of receiving HTML.
 self.addEventListener("fetch", (event) => {
-  if (event.request.method !== "GET" || new URL(event.request.url).origin !== self.location.origin) return;
+  const req = event.request;
+  const url = new URL(req.url);
+  if (req.method !== "GET" || url.origin !== self.location.origin) return;
+  const page = req.mode === "navigate";
+  const key = page ? "index.html" : url.search ? null : req;
   event.respondWith(
     // «no-cache»: always ask the server (a cheap 304 if nothing changed), so
     // a new version arrives at once instead of up to 10 minutes later (WEB-66).
-    fetch(event.request, { cache: "no-cache" })
+    fetch(req, { cache: "no-cache" })
       .then((response) => {
-        const copy = response.clone();
-        if (response.ok) caches.open(VERSION).then((cache) => cache.put(event.request, copy));
+        if (response.ok && key) { const copy = response.clone(); caches.open(VERSION).then((cache) => cache.put(key, copy)); }
         return response;
       })
-      .catch(() => caches.match(event.request).then((hit) => hit ?? caches.match("index.html"))),
+      .catch(() => (page ? caches.match("index.html") : key ? caches.match(key) : Promise.resolve(undefined)).then((hit) => hit ?? Response.error())),
   );
 });
 
