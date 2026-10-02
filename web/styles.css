@@ -750,3 +750,8 @@ pre.code { white-space: pre-wrap; word-break: break-word; overflow-wrap: anywher
 .clock-events input[type="time"] { width: 7.5em; }
 .month-nav { margin: 8px 0; }
 .center { text-align: center; text-transform: capitalize; }
+
+/* WEB-77: Tú → Avisos, one row per notice */
+.nudge-row { align-items: center; gap: 12px; }
+.nudge-row input[type="time"] { width: auto; flex: none; max-width: 7.5rem; }
+.nudge-row input[type="time"]:disabled { opacity: .45; }

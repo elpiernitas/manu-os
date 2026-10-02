@@ -40,9 +40,10 @@ import { SUPABASE_SQL, parseSyncLink, parseAuthHash, sendCode, verifyCode, refre
 import { exportFullBackup, downloadBlob, readBackupFile, restoreFullBackup, FORMAT as FULL_FORMAT } from "./core/backup-manager.js";
 import { isSpotifyClientId, pkceValid, randomVerifier, challengeFor, authorizeUrl, exchangeCode, refreshTokens, listDevices, findSpeaker, transferTo, DEFAULT_SPEAKER } from "./core/spotify.js";
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
+import { NUDGES, nudgePrefs, dueNudges, markSent } from "./core/nudges.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "76";
+export const APP_VERSION = "77";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -536,6 +537,7 @@ function oviedoToday() {
   return oviedoTrip({ workStart: first?.time ?? vault.settings.workStart ?? "09:00" });
 }
 
+const addMinutes = (hhmm, min) => { const [h, m] = String(hhmm).split(":").map(Number); const t = (((h * 60 + m + min) % 1440) + 1440) % 1440; return `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`; };
 // ---------- Fichaje (WEB-74) ----------
 const clockTarget = () => Number(vault.settings.clockTarget) > 0 ? Number(vault.settings.clockTarget) : 240;
 const clockDay = (key = localDay()) => (vault.clock ?? []).find((d) => d.day === key) ?? { day: key, events: [] };
@@ -741,6 +743,10 @@ const SHORTCUTS = [
     "Acción <b>«Mostrar notificación»</b>: <code>¿Fichaste ya? Si no, ficha en RK y pulsa «Entro» en MANU.</code>",
     "Otra automatización igual a las <b>13:00</b> con <code>Acuérdate de fichar al salir.</code>",
     "Ojo: estas dos suenan siempre, también si ya fichaste, porque el iPhone no puede mirar dentro de MANU. MANU, si está abierta, solo te avisa cuando hace falta (y a la salida te dice a qué hora puedes irte)."] },
+  { id: "noche", name: "MANU Noche", purpose: "a las 22:00, de domingo a jueves: ¿dónde trabajas mañana?", test: null, steps: [
+    "Atajos → <b>Automatización</b> → <b>+</b> → <b>«Hora del día»</b> <b>22:00</b>, <b>Semanalmente</b>: domingo, lunes, martes, miércoles y jueves, <b>«Ejecutar inmediatamente»</b>.",
+    "Acción <b>«Mostrar notificación»</b>: <code>¿Dónde trabajas mañana? Dímelo en MANU y te propongo la alarma.</code>",
+    "Suena siempre, también si ya lo dijiste (el iPhone no ve dentro de MANU). Contesta en MANU → Hoy: «Sí, en Oviedo», «En Gijón» o «No trabajo»."] },
   { id: "agenda", name: "MANU Agenda", purpose: "traer tus eventos de hoy (si no usas Google)", test: null, steps: [
     "Nuevo atajo llamado <b>MANU Agenda</b>.",
     "<b>«Buscar eventos del calendario»</b> con fecha de inicio hoy.",
@@ -1591,6 +1597,9 @@ const subpages = {
       <section class="card"><h2>${I.bell} Avisos de MANU</h2><p class="muted">${esc(status)}</p>
         <div class="btns">${n === "default" ? '<button class="btn" data-act="notify-on">Activar avisos</button>' : ""}${n === "granted" ? '<button class="btn ghost" data-act="notify-test">Probar un aviso</button>' : ""}</div>
         <p class="muted small">Los recordatorios avisan mientras MANU está abierta. Para que suenen siempre, mándalos al iPhone con los atajos de abajo.</p></section>
+      <section class="card"><h2>Qué te aviso</h2>
+        ${(() => { const prefs = nudgePrefs(vault.settings.nudges); return NUDGES.map((n) => `<div class="row nudge-row"><button class="check" data-act="nudge-toggle" data-id="${n.id}" aria-pressed="${prefs[n.id].on}" aria-label="${esc(n.label)}">${I.check}</button><div class="grow"><div>${esc(n.label)}</div><div class="muted small">${esc(n.hint)}</div></div>${n.time === null ? `<span class="muted small">${n.id === "ficharEntrada" ? esc(addMinutes(vault.settings.workStart ?? "09:00", 1)) : esc(addMinutes(vault.settings.workStart ?? "09:00", clockTarget()))}</span>` : `<label class="sr" for="nt-${n.id}">Hora de «${esc(n.label)}»</label><input id="nt-${n.id}" type="time" data-nudge-time="${n.id}" value="${esc(prefs[n.id].time)}"${prefs[n.id].on ? "" : " disabled"}>`}</div>`).join(""); })()}
+        <p class="muted small">Solo te avisa cuando hace falta (si ya has fichado, marcado el ánimo o dicho dónde trabajas, no). Con MANU cerrada en el iPhone, iOS no la deja avisar: para las de hora fija crea las automatizaciones de <button class="link small" data-sub-go="atajos">Atajos</button> («MANU Fichaje» y «MANU Noche»).</p></section>
       <section class="card"><h2>${I.bolt} Atajos</h2><p class="muted small">Los atajos del iPhone tienen ahora su propia sección.</p><button class="btn ghost" data-sub-go="atajos">Ir a Atajos</button></section>
       <section class="card" hidden><h2>${I.bolt} Atajos (se crean una vez)</h2>
         <p class="muted small">Crea estos atajos en la app Atajos con el nombre exacto. Los nombres de las acciones pueden variar según tu iOS. NO_VERIFICADO en tu iPhone.</p>
@@ -2901,6 +2910,13 @@ document.addEventListener("click", async (e) => {
     }
     case "tomorrow-reset": vault.settings.tomorrow = null; persist(); render(); break;
     case "notify-on": await enableNotifications(); render(); break;
+    case "nudge-toggle": {
+      const cur = nudgePrefs(vault.settings.nudges)[a.dataset.id];
+      if (!cur) break;
+      vault.settings.nudges = { ...(vault.settings.nudges ?? {}), [a.dataset.id]: { ...(vault.settings.nudges?.[a.dataset.id] ?? {}), on: !cur.on } };
+      persist(); render(); toast(cur.on ? "Aviso desactivado" : "Aviso activado");
+      break;
+    }
     case "notify-test": if (!(await testNotification())) toast("No se ha podido mostrar el aviso."); break;
     case "export": exportBackup(); break;
     case "show-all": showAll[a.dataset.k] = true; render(); break;
@@ -3146,6 +3162,11 @@ document.addEventListener("change", async (e) => {
   }
   if (e.target.dataset?.clockId && /^\d{2}:\d{2}$/.test(e.target.value)) { try { vault.clock = editPunch(vault.clock, e.target.dataset.clockDay, e.target.dataset.clockId, { time: e.target.value }); persist(); toast("Hora corregida"); } catch (err) { toast(err.message); } render(); return; }
   if (e.target.id === "clockTarget" && /^\d{2}:\d{2}$/.test(e.target.value)) { const [h, mi] = e.target.value.split(":").map(Number); if (h * 60 + mi >= 30) { vault.settings.clockTarget = h * 60 + mi; persist(); render(); toast(`Jornada: ${dur(h * 60 + mi)}`); } return; }
+  if (e.target.dataset?.nudgeTime && /^\d{2}:\d{2}$/.test(e.target.value) && NUDGES.some((n) => n.id === e.target.dataset.nudgeTime && n.time !== null)) {
+    const id = e.target.dataset.nudgeTime;
+    vault.settings.nudges = { ...(vault.settings.nudges ?? {}), [id]: { ...(vault.settings.nudges?.[id] ?? {}), time: e.target.value } };
+    persist(); toast(`Aviso a las ${e.target.value}`); return;
+  }
   if (e.target.id === "workStart" && /^\d{2}:\d{2}$/.test(e.target.value)) { vault.settings.workStart = e.target.value; persist(); toast(`Entrada: ${e.target.value}`); return; }
   if (e.target.dataset.cat) {
     catEditing = null;
@@ -3522,28 +3543,55 @@ function exportBackup() {
 }
 
 // Reminders while the app is open (for always-on alerts, the iOS Shortcut).
-async function notifyOrToast(body, tag) {
+async function notifyOrToast(body, tag, go = "hoy") {
   // Visible app: a toast is enough. In the background (Mac tab, iPhone just
-  // left): a system notification if he allowed them.
+  // left): a system notification if he allowed them; a tap takes him to `go`.
   if (document.visibilityState !== "visible" && notificationStatus() === "granted") {
-    try { const reg = await navigator.serviceWorker.ready; await reg.showNotification("MANU", { body, tag, icon: "icons/icon-192.png" }); return; } catch {}
+    try { const reg = await navigator.serviceWorker.ready; await reg.showNotification("MANU", { body, tag, icon: "icons/icon-192.png", data: { go } }); return; } catch {}
   }
   toast(`⏰ ${body}`);
 }
-// WEB-75: «¿Fichaste ya?» at 9:01 and «Acuérdate de fichar al salir» at 13:00,
-// only when they apply. Works while MANU is open; with it closed, the iPhone
-// automation in Atajos («MANU Fichaje») does it.
-async function checkClockNudge() {
+// WEB-77: what was already shown today, on this device only (not in the vault:
+// each device nudges on its own and it must not count as an edit for Tu nube).
+const nudgedStore = {
+  get() { try { return JSON.parse(localStorage.getItem("manuos.nudged") || "null"); } catch { return null; } },
+  set(v) { try { localStorage.setItem("manuos.nudged", JSON.stringify(v)); } catch {} },
+};
+function nudgeContext() {
+  const t = localDay();
+  const evs = eventsFor(t).filter((e) => !String(e.title ?? "").startsWith("🎂"));
+  const timed = evs.filter((e) => e.time).sort((a, b) => a.time.localeCompare(b.time));
+  return {
+    eventsToday: evs.length, firstAt: timed[0]?.time ?? null,
+    remindersToday: vault.reminders.filter((r) => !r.done && dayKey(new Date(r.at)) === t).length,
+    birthdaysToday: upcomingBirthdays(vault.people, today(), 0).length,
+    moodToday: vault.moods.some((m) => m.day === t),
+    habitsLeft: vault.habits.filter((h) => !(h.done ?? []).includes(t)).length,
+    tomorrowAnswered: vault.settings.tomorrow?.day === tomorrowKey(),
+    backupDays: vault.settings.lastFullBackup?.at ? daysSince(vault.settings.lastFullBackup.at) : null,
+  };
+}
+// WEB-75 + WEB-77: the nudges Manu turned on, only when they apply. They work
+// while MANU is open (or just left); with it closed, the iPhone automations in
+// Atajos do the ones at a fixed time.
+async function checkNudges() {
   const s = vault.settings;
-  const n = clockNudge(clockDay().events, { now: today(), workStart: s.workStart ?? "09:00", targetMin: clockTarget(), off: Boolean(s.tomorrow?.day === localDay() && s.tomorrow.work === false), sent: s.clockNudged ?? null });
-  if (!n) return;
+  const prefs = nudgePrefs(s.nudges);
   const day = localDay();
-  vault.settings.clockNudged = { ...(s.clockNudged?.day === day ? s.clockNudged : {}), day, [n.kind]: true };
-  persist();
-  await notifyOrToast(n.text, `manu-clock-${n.kind}`);
+  let sent = nudgedStore.get();
+  const list = dueNudges(nudgeContext(), { now: today(), prefs, sent });
+  const done = sent?.day === day ? sent.ids ?? [] : [];
+  const n = clockNudge(clockDay().events, { now: today(), workStart: s.workStart ?? "09:00", targetMin: clockTarget(), off: Boolean(s.tomorrow?.day === day && s.tomorrow.work === false), sent: { day, in: done.includes("ficharEntrada"), out: done.includes("ficharSalida") } });
+  const clockId = n && (n.kind === "in" ? "ficharEntrada" : "ficharSalida");
+  if (n && prefs[clockId].on) list.unshift({ id: clockId, text: n.text, go: "hoy" });
+  for (const x of list) {
+    sent = markSent(sent, day, x.id);
+    nudgedStore.set(sent);
+    await notifyOrToast(x.text, `manu-${x.id}`, x.go);
+  }
 }
 async function checkReminders() {
-  await checkClockNudge();
+  await checkNudges();
   const due = dueReminders(vault.reminders);
   if (!due.length) return;
   for (const r of due) {
@@ -3611,6 +3659,21 @@ if (returned.has("code") && returned.has("state")) {
   toast("Has cancelado la conexión con Spotify");
 }
 
+// WEB-77: where a tapped notification points: "hoy", "tu", "tu/habitos"…
+function goTo(where) {
+  const [t, sp] = String(where ?? "").split("/");
+  if (!TABS.some(([id]) => id === t)) return false;
+  tab = t; sub = sp && subpages[sp] ? sp : null;
+  return true;
+}
+navigator.serviceWorker?.addEventListener("message", (e) => { if (e.data?.go && goTo(e.data.go)) render(); });
+function applyIr() {
+  const ir = /^#ir=([a-z]+(?:\/[a-z]+)?)$/.exec(location.hash);
+  if (!ir) return false;
+  history.replaceState(null, "", location.pathname);
+  return goTo(ir[1]);
+}
+applyIr();
 // From a Shortcut: «#di=…» (or the old «?di=…»), «#eventos=…», «#manana=1».
 function applyLaunch() {
   const q = launchParams(location.search), h = launchParams(location.hash);
@@ -3650,7 +3713,7 @@ applyNubeLink();
     } else setTimeout(() => toast("El enlace del correo ha caducado: pide un código nuevo"), 300);
   }
 }
-window.addEventListener("hashchange", () => { if (applyNubeLink() || applyLaunch()) render(); });
+window.addEventListener("hashchange", () => { if (applyNubeLink() || applyLaunch() || applyIr()) render(); });
 render({ enter: "page" });
 nubeSync();
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") nubeSync(); });
