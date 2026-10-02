@@ -41,9 +41,10 @@ import { exportFullBackup, downloadBlob, readBackupFile, restoreFullBackup, FORM
 import { isSpotifyClientId, pkceValid, randomVerifier, challengeFor, authorizeUrl, exchangeCode, refreshTokens, listDevices, findSpeaker, transferTo, DEFAULT_SPEAKER } from "./core/spotify.js";
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { NUDGES, nudgePrefs, dueNudges, markSent } from "./core/nudges.js";
+import { parseCommand, suggest } from "./core/commands.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "77";
+export const APP_VERSION = "78";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -747,6 +748,18 @@ const SHORTCUTS = [
     "Atajos → <b>Automatización</b> → <b>+</b> → <b>«Hora del día»</b> <b>22:00</b>, <b>Semanalmente</b>: domingo, lunes, martes, miércoles y jueves, <b>«Ejecutar inmediatamente»</b>.",
     "Acción <b>«Mostrar notificación»</b>: <code>¿Dónde trabajas mañana? Dímelo en MANU y te propongo la alarma.</code>",
     "Suena siempre, también si ya lo dijiste (el iPhone no ve dentro de MANU). Contesta en MANU → Hoy: «Sí, en Oviedo», «En Gijón» o «No trabajo»."] },
+  { id: "dictado", name: "MANU Dictado", purpose: "dictarle a Siri sin mirar el móvil (conduciendo, andando…)", test: null, steps: [
+    "Nuevo atajo llamado <b>MANU Dictado</b> (así se lo dices a Siri: «Oye Siri, MANU Dictado»).",
+    "Acción <b>«Dictar texto»</b> (idioma español).",
+    "<b>«Formatear fecha»</b>: Fecha actual, formato <code>yyyy-MM-dd HH:mm</code>.",
+    "<b>«Texto»</b>: <code>nota|</code> Fecha formateada <code>|</code> Texto dictado. <b>«Añadir al archivo de texto»</b> igual que en Apple Pay (<code>MANU-buzon.txt</code>, nueva línea).",
+    "Opcional: <b>«Mostrar notificación»</b> «Apuntado» para oír que ha ido bien.",
+    "Luego, MANU → Tú → Atajos → «Importar del buzón»: los gastos («gasté 15 en gasolina»), tareas («tarea llamar al banco») e ideas se colocan solos; lo demás queda en «Por clasificar»."] },
+  { id: "llegada", name: "MANU Llegada", purpose: "al llegar o salir del trabajo, que te recuerde fichar", test: null, steps: [
+    "Atajos → <b>Automatización</b> → <b>+</b> → <b>«Llegar»</b>: elige la dirección de tu trabajo. <b>«Ejecutar inmediatamente»</b> si tu iOS lo permite (si no, te pedirá confirmarlo: NO_VERIFICADO).",
+    "Acción <b>«Mostrar notificación»</b>: <code>¿Fichas la entrada? Ábreme y pulsa «Entro» (o ⚡ entro).</code>",
+    "Otra automatización <b>«Salir»</b> del mismo sitio con <code>¿Has fichado la salida?</code>",
+    "Usa tu ubicación solo en el iPhone: MANU no la ve."] },
   { id: "agenda", name: "MANU Agenda", purpose: "traer tus eventos de hoy (si no usas Google)", test: null, steps: [
     "Nuevo atajo llamado <b>MANU Agenda</b>.",
     "<b>«Buscar eventos del calendario»</b> con fecha de inicio hoy.",
@@ -1195,6 +1208,7 @@ const screens = {
       <div class="stack">
       ${morningLaunch ? `<section class="card morning-hello"><h2>☀️ ${esc(greeting())}, Manu</h2><p class="muted small">Toca y te leo el día en voz alta.</p><div class="btns"><button class="btn" data-act="speak-day">🔊 Léemelo</button><button class="link small" data-act="morning-dismiss">Ahora no</button></div></section>` : ""}
       ${gentleCard()}
+      <button class="cmdk-pill glass" data-act="cmdk" aria-label="Comando rápido">⚡ <span>Haz algo rápido… <span class="muted">entro, gasto 12 café, hábitos</span></span></button>
       ${nowCard()}
       ${clockCard()}
       ${closingCard()}
@@ -2550,6 +2564,15 @@ function buzonCard() {
 function importBuzon(text) {
   const r = applyBuzon(text, vault, { now: new Date(), newEntry: (e) => newEntry(e, vault.settings.categoryRules ?? {}) });
   vault.spending.push(...r.spending);
+  // WEB-78: notes dictated to Siri («MANU Dictado»). A gasto, tarea or idea is
+  // filed like in the chat (with the time it was dictated); anything else,
+  // reminders included, waits in «Por clasificar» so nothing is guessed wrong.
+  for (const n of r.notes) {
+    const p = parse(n.text, new Date(n.at));
+    if (p.kind === "expense") vault.spending.push({ ...newEntry({ id: n.id, cents: p.cents, merchant: p.merchant, at: n.at }, vault.settings.categoryRules ?? {}), source: "SIRI" });
+    else if (p.kind === "task") vault.inbox.push({ ...capture({ id: n.id, text: p.text.slice(0, 140), at: n.at }), status: "TASK" });
+    else vault.inbox.push(capture({ id: n.id, text: (p.kind === "idea" ? p.text : n.text).slice(0, 280), at: n.at }));
+  }
   vault.health = r.health;
   vault.places = r.places;
   vault.settings.buzonSeen = r.seenAll;
@@ -2559,6 +2582,7 @@ function importBuzon(text) {
   if (r.counts.expense) done.applepay = true;
   if (r.counts.steps || r.counts.sleep || r.counts.weight) done.salud = true;
   if (r.counts.place) done.lugar = true;
+  if (r.counts.note) done.dictado = true;
   vault.settings.shortcutsDone = done;
   persist(); render(); refreshDiary();
   toast(`Buzón: ${summary}`);
@@ -2910,6 +2934,7 @@ document.addEventListener("click", async (e) => {
     }
     case "tomorrow-reset": vault.settings.tomorrow = null; persist(); render(); break;
     case "notify-on": await enableNotifications(); render(); break;
+    case "cmdk": openCmdk(); break;
     case "nudge-toggle": {
       const cur = nudgePrefs(vault.settings.nudges)[a.dataset.id];
       if (!cur) break;
@@ -3674,6 +3699,86 @@ function applyIr() {
   return goTo(ir[1]);
 }
 applyIr();
+// ---------- Barra de comandos (WEB-78) ----------
+// Outside #screen, so a render never touches it while Manu types.
+const cmdk = { el: null, items: [], sel: 0 };
+function openCmdk(prefill = "") {
+  if (!cmdk.el) {
+    const bg = document.createElement("div");
+    bg.id = "cmdkBg"; bg.className = "cmdk-bg"; bg.hidden = true;
+    bg.innerHTML = `<div class="cmdk" role="dialog" aria-modal="true" aria-label="Comando rápido">
+      <label for="cmdkInput" class="sr">Qué quieres hacer</label>
+      <input id="cmdkInput" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="go" placeholder="Entro, gasto 12 café, hábitos…" role="combobox" aria-expanded="true" aria-controls="cmdkList">
+      <ul id="cmdkList" class="cmdk-list" role="listbox"></ul>
+      <p class="muted small cmdk-help">Enter para hacerlo · Esc para cerrar</p></div>`;
+    document.body.appendChild(bg);
+    bg.addEventListener("click", (e) => {
+      const li = e.target.closest("[data-i]");
+      if (li) { pickCmdk(Number(li.dataset.i)); return; }
+      if (e.target === bg) closeCmdk();
+    });
+    bg.querySelector("#cmdkInput").addEventListener("input", () => { cmdk.sel = 0; drawCmdk(); });
+    bg.querySelector("#cmdkInput").addEventListener("keydown", (e) => {
+      if (e.isComposing) return;
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); cmdk.sel = (cmdk.sel + (e.key === "ArrowDown" ? 1 : -1) + cmdk.items.length) % Math.max(1, cmdk.items.length); drawCmdk(false); }
+      else if (e.key === "Enter") { e.preventDefault(); pickCmdk(cmdk.sel); }
+      else if (e.key === "Escape") { e.preventDefault(); closeCmdk(); }
+    });
+    cmdk.el = bg;
+  }
+  const input = cmdk.el.querySelector("#cmdkInput");
+  input.value = prefill; cmdk.sel = 0;
+  cmdk.el.hidden = false;
+  drawCmdk();
+  input.focus();
+}
+function closeCmdk() { if (cmdk.el) cmdk.el.hidden = true; }
+function drawCmdk(rebuild = true) {
+  const input = cmdk.el.querySelector("#cmdkInput");
+  if (rebuild) cmdk.items = suggest(input.value, { clock: shiftNow().state });
+  cmdk.el.querySelector("#cmdkList").innerHTML = cmdk.items.map((x, i) => `<li role="option" id="cmdk-${i}" data-i="${i}" class="cmdk-item${i === cmdk.sel ? " on" : ""}" aria-selected="${i === cmdk.sel}">${esc(x.label)}</li>`).join("");
+  input.setAttribute("aria-activedescendant", `cmdk-${cmdk.sel}`);
+}
+function pickCmdk(i) {
+  const it = cmdk.items[i];
+  if (!it) return;
+  const input = cmdk.el.querySelector("#cmdkInput");
+  if (it.fill) { input.value = it.fill; cmdk.sel = 0; drawCmdk(); input.focus(); return; }
+  closeCmdk();
+  runCommand(it.run);
+}
+function runCommand(text) {
+  const cmd = parseCommand(text);
+  if (!cmd) return;
+  if (cmd.type === "punch") { doPunch(cmd.t, cmd.why ?? null); return; }
+  if (cmd.type === "mood") {
+    vault.moods = setMood(vault.moods, localDay(), cmd.value); persist(); render();
+    toast(`Ánimo de hoy: ${MOODS.find((m) => m.value === cmd.value)?.label.toLowerCase() ?? ""}`); return;
+  }
+  if (cmd.type === "habit") {
+    const want = normalise(cmd.name);
+    const h = vault.habits.find((x) => normalise(x.name) === want) ?? vault.habits.find((x) => normalise(x.name).includes(want));
+    if (!h) { goTo("tu/habitos"); render(); toast(`No tienes un hábito «${cmd.name}»: créalo aquí`); return; }
+    if ((h.done ?? []).includes(localDay())) { toast(`«${h.name}» ya estaba hecho hoy`); return; }
+    vault.habits = vault.habits.map((x) => (x.id === h.id ? toggleHabit(x, localDay()) : x)); persist(); render();
+    toast(`✅ ${h.name}: hecho hoy`); return;
+  }
+  if (cmd.type === "go") { goTo(cmd.target); render({ enter: "page" }); return; }
+  // Anything else, as if typed in the chat. Things MANU just does (gasto, tarea,
+  // idea, aviso) stay here with a toast; questions open the chat for the answer.
+  const kind = parse(cmd.text).kind;
+  const before = vault.chat.length;
+  say(cmd.text);
+  const last = vault.chat.at(-1);
+  if (["expense", "task", "idea", "reminder"].includes(kind) && !refuge && vault.chat.length > before && last?.from === "manu") toast(String(last.text ?? "Hecho").split("\n")[0].slice(0, 160));
+  else { tab = "manu"; sub = null; render(); }
+}
+document.addEventListener("keydown", (e) => {
+  const typing = e.target.matches?.("input, textarea, select, [contenteditable]");
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); if (cmdk.el && !cmdk.el.hidden) closeCmdk(); else openCmdk(); }
+  else if (e.key === "/" && !typing && !sheet && !(cmdk.el && !cmdk.el.hidden)) { e.preventDefault(); openCmdk(); }
+});
+
 // From a Shortcut: «#di=…» (or the old «?di=…»), «#eventos=…», «#manana=1».
 function applyLaunch() {
   const q = launchParams(location.search), h = launchParams(location.hash);

@@ -68,3 +68,18 @@ test("importing twice adds nothing; health keeps one value per day", () => {
   assert.equal(again.repeated, 6);
   assert.equal(again.spending[0].merchant, "Pan");
 });
+
+test("WEB-78: notes dictated to Siri go through the buzón", async () => {
+  const { parseLine, applyBuzon, buzonSummary } = await import("../core/buzon.js");
+  const now = new Date(2026, 9, 2, 20);
+  const ev = parseLine("nota|2026-10-02 08:15|gasté 15 en gasolina", now);
+  assert.equal(ev.kind, "note");
+  assert.equal(ev.text, "gasté 15 en gasolina");
+  assert.equal(parseLine("nota|2026-10-02 08:15|", now).error, "nota vacía");
+  assert.equal(parseLine("nota|2026-10-02 08:15|precio | 12 €", now).text, "precio | 12 €");
+  const v = { settings: {}, health: [], places: [] };
+  const r = applyBuzon("nota|2026-10-02 08:15|gasté 15 en gasolina\nnota|2026-10-02 09:00|tarea llamar al banco\nnota|2026-10-02 08:15|gasté 15 en gasolina", v, { now, newEntry: (e) => e });
+  assert.equal(r.notes.length, 2);
+  assert.equal(r.repeated, 1);
+  assert.equal(buzonSummary(r), "2 notas dictadas · 1 ya estaban");
+});
