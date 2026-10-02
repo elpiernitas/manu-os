@@ -47,8 +47,11 @@ export function oviedoTrip({ workStart = "09:00", settings = MORNING } = {}) {
 }
 
 // The question appears from 18:00 until going to bed, once per evening.
+// WEB-79: only before a workday (Manu: «mañana es sábado, no trabajo»).
 export function shouldAskTomorrow(now, answeredFor, tomorrowKey) {
-  return now.getHours() >= 18 && answeredFor !== tomorrowKey;
+  const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  const weekday = next.getDay() >= 1 && next.getDay() <= 5;
+  return weekday && now.getHours() >= 18 && answeredFor !== tomorrowKey;
 }
 
 // iOS Shortcuts bridge: runs a shortcut Manu created once, passing text.

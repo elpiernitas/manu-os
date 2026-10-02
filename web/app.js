@@ -26,7 +26,7 @@ import { applyBuzon, buzonSummary } from "./core/buzon.js";
 import { briefing, briefingText, isBriefingQuestion, monthPace } from "./core/briefing.js";
 import { whatNow, whatNowText, isWhatNowQuestion, morningSpeech } from "./core/now.js";
 import { gentleMode, gentlePlan, isGentleQuestion } from "./core/lowmode.js";
-import { punch, editPunch, today as shiftToday, monthReport, reportRows, toCsv, dur, PAUSE_REASONS, clockState, clockNudge } from "./core/clock.js";
+import { punch, editPunch, today as shiftToday, monthReport, reportRows, toCsv, monthNote, monthIcs, dur, PAUSE_REASONS, clockState, clockNudge } from "./core/clock.js";
 import { closingDue, workClosing, closingText, isClosingQuestion, nextWorkDay } from "./core/closing.js";
 import { searchContacts } from "./core/contacts.js";
 import { autoFile, projectKeys, parseKeywords, buildSuggestPayload, parseSuggestions, projectMarkdown, projectZip, projectFileName } from "./core/autofile.js";
@@ -44,7 +44,7 @@ import { NUDGES, nudgePrefs, dueNudges, markSent } from "./core/nudges.js";
 import { parseCommand, suggest } from "./core/commands.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "78";
+export const APP_VERSION = "79";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -557,8 +557,11 @@ function clockCard() {
   const s = shiftNow();
   const wd = (today().getDay() + 6) % 7 < 5;
   const h = today().getHours();
-  // Before clocking in, only on workdays and around work hours.
+  // Before clocking in, only on workdays and around work hours (after 14:00
+  // with nothing punched it goes away). WEB-79: after «Salida» it goes away too
+  // (the day stays in Tú → Fichaje).
   if (s.state === "off" && (!wd || h < 7 || h >= 14)) return "";
+  if (s.state === "done") return "";
   const line = s.state === "off" ? "Cuando fiches en RK, pulsa «Entro»."
     : s.state === "working" ? (s.leftMin ? `Te quedan <b>${esc(dur(s.leftMin))}</b>: puedes salir a las <b>${esc(s.leaveAt)}</b>.` : `Jornada cumplida${s.extraMin ? ` y llevas <b>+${esc(dur(s.extraMin))}</b>` : ""}. Ya puedes salir.`)
     : s.state === "paused" ? `En pausa desde hace un rato. Te quedan <b>${esc(dur(s.leftMin))}</b> de jornada.`
@@ -585,6 +588,7 @@ async function downloadClock(month, kind) {
     } catch { toast("No he podido crear el Excel: te lo doy en CSV"); kind = "csv"; }
   }
   if (kind === "csv") file = new File([toCsv(rows)], `fichaje-${month}.csv`, { type: "text/csv" });
+  if (kind === "ics") file = new File([monthIcs(vault.clock, month, { targetMin: clockTarget(), now: today() })], `fichaje-${month}.ics`, { type: "text/calendar" });
   try { if (navigator.canShare?.({ files: [file] })) { await navigator.share({ files: [file], title: `Fichaje ${month}` }); return; } } catch (err) { if (err?.name === "AbortError") return; }
   const a = document.createElement("a"); a.href = URL.createObjectURL(file); a.download = file.name;
   document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
@@ -1175,8 +1179,12 @@ function nightCard() {
   if (!shouldAskTomorrow(today(), s.tomorrow?.day, tk)) return "";
   const tomorrowEvents = vault.agendaTomorrow?.day === tk ? vault.agendaTomorrow.events : null;
   const guess = tomorrowEvents ? guessCity(tomorrowEvents) : null;
-  return `<section class="card"><h2>${I.alarm} Antes de dormir</h2><p><b>¿Mañana trabajas en Oviedo?</b></p>${guess ? `<p class="muted small">Tu calendario: ${esc(guess.reason)}.</p>` : ""}
-    <div class="btns"><button class="btn" data-act="tomorrow" data-city="OVIEDO">Sí, en Oviedo</button><button class="btn ghost" data-act="tomorrow" data-city="GIJON">En Gijón</button><button class="btn ghost" data-act="tomorrow" data-city="NONE">No trabajo</button></div></section>`;
+  // WEB-79: Gijón is the usual answer, so it goes first (unless the calendar says Oviedo).
+  const oviedo = guess?.city === "OVIEDO";
+  const bGijon = `<button class="btn${oviedo ? " ghost" : ""}" data-act="tomorrow" data-city="GIJON">Sí, en Gijón</button>`;
+  const bOviedo = `<button class="btn${oviedo ? "" : " ghost"}" data-act="tomorrow" data-city="OVIEDO">En Oviedo</button>`;
+  return `<section class="card"><h2>${I.alarm} Antes de dormir</h2><p><b>${oviedo ? "¿Mañana trabajas en Oviedo?" : "¿Mañana en Gijón, como siempre?"}</b></p>${guess ? `<p class="muted small">Tu calendario: ${esc(guess.reason)}.</p>` : ""}
+    <div class="btns">${oviedo ? bOviedo + bGijon : bGijon + bOviedo}<button class="btn ghost" data-act="tomorrow" data-city="NONE">No trabajo</button></div></section>`;
 }
 
 // ---------- Shared bits ----------
@@ -1550,7 +1558,7 @@ const subpages = {
     return `${backBar("Fichaje")}
       <section class="card balance"><p class="muted small">Saldo de ${esc(title)}</p><h2 class="balance-line ${r.balanceMin > 0 ? "pos" : r.balanceMin < 0 ? "neg" : ""}">${esc(r.balance)}</h2>
         <p class="muted small">${r.days} ${r.days === 1 ? "día" : "días"} · trabajado ${esc(dur(r.workedMin))} de ${esc(dur(r.dueMin))}${r.openDays ? ` · <b>${r.openDays} sin salida</b> (no cuenta${r.openDays === 1 ? "" : "n"} hasta que lo corrijas)` : ""}. Jornada de ${esc(dur(clockTarget()))}; ${esc(dur(clockTarget()))} de más cuentan como 1 día.</p>
-        <div class="btns"><button class="btn" data-act="clock-dl" data-kind="xlsx">⬇️ Informe en Excel</button><button class="btn ghost" data-act="clock-dl" data-kind="csv">CSV</button></div></section>
+        <div class="btns"><button class="btn" data-act="clock-dl" data-kind="xlsx">⬇️ Informe en Excel</button><button class="btn ghost" data-act="clock-copy">📋 Copiar como nota</button><button class="btn ghost" data-act="clock-dl" data-kind="ics">📅 Calendario</button><button class="btn ghost" data-act="clock-dl" data-kind="csv">CSV</button></div></section>
       <div class="row month-nav"><button class="link" data-act="clock-month" data-d="-1" aria-label="Mes anterior">‹ Anterior</button><b class="grow center">${esc(title)}</b>${isNow ? "<span></span>" : '<button class="link" data-act="clock-month" data-d="1" aria-label="Mes siguiente">Siguiente ›</button>'}</div>
       <section class="card">${r.rows.length ? r.rows.slice().reverse().map(dayRow).join("") : '<p class="muted">Aún no hay fichajes este mes. Usa la tarjeta «⏱️ Fichaje» de Hoy.</p>'}</section>
       <section class="card"><h2>Tu jornada</h2><form class="row" id="clockTargetForm"><label for="clockTarget" class="grow">Horas por día</label><input id="clockTarget" type="time" value="${esc(`${String(Math.floor(clockTarget() / 60)).padStart(2, "0")}:${String(clockTarget() % 60).padStart(2, "0")}`)}"></form><p class="muted small">Con ella se calcula a qué hora puedes salir y cuánto te debe RK. Todo se queda en tus dispositivos (y en Tu nube si la usas).</p></section>`;
@@ -2790,6 +2798,14 @@ document.addEventListener("click", async (e) => {
     case "clock-month": { const [y, m] = (clockMonth ?? localDay().slice(0, 7)).split("-").map(Number); const d = new Date(y, m - 1 + Number(a.dataset.d), 1); clockMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; clockEdit = null; render(); break; }
     case "clock-edit": clockEdit = clockEdit === a.dataset.day ? null : a.dataset.day; render(); break;
     case "clock-del": if (window.confirm("¿Borrar este fichaje?")) { try { vault.clock = editPunch(vault.clock, a.dataset.day, a.dataset.id, { remove: true }); persist(); } catch (err) { toast(err.message); } render(); } break;
+    case "clock-copy": {
+      const month = clockMonth ?? localDay().slice(0, 7);
+      const [y, m] = month.split("-").map(Number);
+      const text = monthNote(monthReport(vault.clock, month, { targetMin: clockTarget(), now: today() }), new Date(y, m - 1, 1).toLocaleDateString("es-ES", { month: "long", year: "numeric" }));
+      try { await navigator.clipboard.writeText(text); toast("Copiado: pégalo en Notas o donde quieras"); }
+      catch { try { await navigator.share({ text }); } catch { toast("No he podido copiarlo"); } }
+      break;
+    }
     case "clock-dl": downloadClock(clockMonth ?? localDay().slice(0, 7), a.dataset.kind); break;
     case "speak-day": speakDay(); break;
     case "morning-dismiss": morningLaunch = false; render(); break;

@@ -59,3 +59,9 @@ test("meals, health, mood, reminders", () => {
   const r = [{ id: 1, at: new Date(2026, 8, 28, 9).toISOString() }, { id: 2, at: new Date(2026, 8, 28, 11).toISOString() }, { id: 3, at: new Date(2026, 8, 28, 9).toISOString(), done: true }];
   assert.deepEqual(dueReminders(r, now).map((x) => x.id), [1]);
 });
+
+test("WEB-79: the «where tomorrow» question only before a workday", () => {
+  assert.equal(shouldAskTomorrow(new Date(2026, 9, 2, 18, 28), null, "2026-10-03"), false); // Friday → Saturday
+  assert.equal(shouldAskTomorrow(new Date(2026, 9, 3, 21, 0), null, "2026-10-04"), false); // Saturday → Sunday
+  assert.equal(shouldAskTomorrow(new Date(2026, 9, 4, 21, 0), null, "2026-10-05"), true); // Sunday → Monday
+});

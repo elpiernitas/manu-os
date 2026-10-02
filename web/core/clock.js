@@ -138,6 +138,36 @@ export function reportRows(r) {
   return [...head, ...body, ...foot];
 }
 
+const signed = (m) => (m === 0 ? "jornada justa" : `${m > 0 ? "+" : "−"}${dur(m)}`);
+
+// WEB-79: the month as a note to copy and paste (one line per day).
+export function monthNote(r, title = r.month) {
+  const lines = r.rows.map((x) => {
+    const d = `${x.weekday[0].toUpperCase()}${x.weekday.slice(1, 3)} ${Number(x.day.slice(8))}`;
+    if (x.open) return `${d}: ${x.in || "—"} – sin salida`;
+    const pauses = x.pauses ? ` (${x.pauses} ${x.pauses === 1 ? "pausa" : "pausas"}, ${dur(x.pausedMin)})` : "";
+    return `${d}: ${x.in} – ${x.out} · ${dur(x.workedMin)}${pauses} · ${signed(x.diffMin)}`;
+  });
+  return [`Fichaje · ${title}`, "", ...lines, "", `Total: ${dur(r.workedMin)} de ${dur(r.dueMin)} (${r.days} ${r.days === 1 ? "día" : "días"})`, r.balance].join("\n");
+}
+
+// WEB-79: the month as a calendar (.ics): one event per day, from «Entro» to «Salida».
+// Floating local times (no zone): the calendar shows them as they were punched.
+export function monthIcs(clock, month, { targetMin = 240, now = new Date() } = {}) {
+  const r = monthReport(clock, month, { targetMin, now });
+  const stamp = (iso) => { const d = new Date(iso); return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}00`; };
+  const esc = (t) => String(t).replace(/[\\;,]/g, (c) => `\\${c}`);
+  const ev = [];
+  for (const x of r.rows) {
+    if (x.open) continue;
+    const t = tally(clock.find((d) => d.day === x.day).events, now);
+    ev.push("BEGIN:VEVENT", `UID:fichaje-${x.day}@manu-os`, `DTSTAMP:${stamp(now.toISOString())}`, `DTSTART:${stamp(t.firstIn)}`, `DTEND:${stamp(t.lastOut)}`,
+      `SUMMARY:${esc(`Trabajo ${x.in}–${x.out} (${signed(x.diffMin)})`)}`,
+      `DESCRIPTION:${esc(`Trabajado ${dur(x.workedMin)}${x.pauses ? ` · ${x.pauses} ${x.pauses === 1 ? "pausa" : "pausas"} (${dur(x.pausedMin)})` : ""}`)}`, "END:VEVENT");
+  }
+  return ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//MANU OS//Fichaje//ES", "CALSCALE:GREGORIAN", ...ev, "END:VCALENDAR"].join("\r\n") + "\r\n";
+}
+
 export function toCsv(rows) {
   const cell = (v) => { const s = String(v ?? ""); return /[;"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
   return "﻿" + rows.map((r) => r.map(cell).join(";")).join("\r\n"); // BOM + «;» for Excel in Spanish
