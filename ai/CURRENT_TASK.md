@@ -6,7 +6,7 @@ WEB-70 implementado por Claude Code. Se fusiona según la regla de fusión de `A
 
 ## Tarea activa
 
-WEB-74 — fichaje (`ai/HANDOFF.md`, «WEB-74»).
+WEB-75 — avisos del fichaje (`ai/HANDOFF.md`, «WEB-75»).
 
 ## Autorización
 
@@ -32,6 +32,7 @@ WEB-74 — fichaje (`ai/HANDOFF.md`, «WEB-74»).
 - 2026-10-01: Manu fija como objetivo de la sesión «hemos llegado al objetivo»: terminar la hoja de ruta de MANU OS sin pararse a preguntar.
 - 2026-10-01: Manu pide una auditoría completa de la plataforma, un estudio de mejoras, aplicarlas, comprobarlas y fusionarlas.
 - 2026-10-01: Manu empieza a fichar en RK Iglesias y pide en MANU los botones «Entro», «Pausa» (café, fumar…), «Vuelvo a la oficina» y «Salida»; cuánto le queda y a qué hora puede salir; el registro; informes mensuales en Excel; y el saldo «RK te debe X h Y min», en días cuando pase de 4 h.
+- 2026-10-02: Manu pide avisos de fichaje: a las 9:01 «¿fichaste ya?» si no ha fichado, y a las 13:00 «acuérdate de fichar al salir». Sin servidor de push (coste 0, ADR-0012): MANU avisa con la app abierta y el iPhone con dos automatizaciones de Atajos.
 - 2026-09-29: **cambio de gobernanza decidido por Manu.** El orquestador (ChatGPT/Codex) ya no revisa automáticamente, porque frenaba el avance. Claude Code fusiona los PR web cuando `npm test` y los dos workflows remotos están en verde y no hay conflictos. Cuando haga falta una revisión, Claude Code prepara un prompt, Manu se lo pasa a ChatGPT y le devuelve la respuesta; los defectos se corrigen en un PR nuevo con su regresión. Los PR #7, #8 y #9 siguen en borrador o pausa.
 
 ## Alcance autorizado

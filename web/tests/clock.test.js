@@ -90,3 +90,28 @@ test("WEB-74: fichajes go by the minute (no 13:01 because of seconds)", () => {
   assert.equal(new Date(c[0].events[0].at).getSeconds(), 0);
   assert.equal(today(c[0].events, { now: new Date(2026, 9, 7, 10, 10, 59) }).leaveAt, "12:50");
 });
+
+test("WEB-75: 9:01 «¿Fichaste ya?» only if not in; 13:00 «fichar al salir» only if still in", async () => {
+  const { clockNudge } = await import("../core/clock.js");
+  const none = [];
+  assert.equal(clockNudge(none, { now: at(7, 9, 0) }), null); // 9:00 sharp: not yet
+  assert.equal(clockNudge(none, { now: at(7, 9, 1) }).kind, "in");
+  assert.match(clockNudge(none, { now: at(7, 9, 1) }).text, /Fichaste ya/);
+  assert.equal(clockNudge(none, { now: at(7, 10, 5) }), null); // window closed
+  assert.equal(clockNudge(none, { now: at(3, 9, 1) }), null); // Saturday
+  assert.equal(clockNudge(none, { now: at(7, 9, 1), off: true }), null); // day off
+  assert.equal(clockNudge(none, { now: at(7, 9, 1), sent: { day: "2026-10-07", in: true } }), null); // already shown
+  assert.equal(clockNudge(none, { now: at(8, 9, 1), sent: { day: "2026-10-07", in: true } }).kind, "in"); // new day
+  const inside = day(7, [["in", 8, 55]]);
+  assert.equal(clockNudge(inside[0].events, { now: at(7, 9, 1) }), null); // already clocked in
+  const out = clockNudge(inside[0].events, { now: at(7, 13, 0) });
+  assert.equal(out.kind, "out");
+  assert.equal(out.text, "Acuérdate de fichar al salir."); // 8:55 → already done at 13:00
+  const smoked = day(7, [["in", 8, 50], ["pause", 10, 0], ["back", 10, 20]]);
+  assert.equal(clockNudge(smoked[0].events, { now: at(7, 13, 0) }).text, "Acuérdate de fichar al salir. Hoy puedes salir a las 13:10.");
+  assert.equal(clockNudge(smoked[0].events, { now: at(7, 12, 59) }), null);
+  const left = day(7, [["in", 9, 0], ["out", 12, 58]]);
+  assert.equal(clockNudge(left[0].events, { now: at(7, 13, 0) }), null); // already out
+  assert.equal(clockNudge(inside[0].events, { now: at(7, 13, 0), sent: { day: "2026-10-07", out: true } }), null);
+  assert.equal(clockNudge(none, { now: at(7, 10, 1), workStart: "10:00" }).kind, "in"); // follows his start time
+});

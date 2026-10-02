@@ -44,6 +44,22 @@ Siguientes ideas, sin compromiso:
 
 Límites reales de una web en iPhone: no hay widgets, pantalla bloqueada ni control del Chromecast. Donde se pueda, se hará con Atajos.
 
+## WEB-75 — avisos del fichaje
+
+Manu pide un aviso a las 9:01, «¿fichaste ya?», si no ha fichado, y otro a las 13:00, «acuérdate de fichar al salir».
+
+- `core/clock.js`, `clockNudge()` (puro):
+  - solo de lunes a viernes, y no si dijo que hoy no trabaja;
+  - «in»: desde entrada + 1 min (9:01) hasta las 10:00, si no ha fichado;
+  - «out»: desde entrada + jornada (13:00) hasta las 15:00, si sigue dentro; si aún le falta tiempo, añade «Hoy puedes salir a las 13:10»;
+  - cada aviso sale una vez al día (`settings.clockNudged`).
+- `app.js`: `checkClockNudge()` va en el bucle de 30 s de recordatorios. Con la app visible muestra un toast; en segundo plano, una notificación si están permitidas.
+- Límite (ADR-0012): sin servidor de push, la web no puede avisar con MANU cerrada. Para eso está el atajo «MANU Fichaje» en Tú → Atajos: dos automatizaciones «Hora del día» (9:01 y 13:00, de lunes a viernes) con «Mostrar notificación». Esas suenan siempre, porque el iPhone no ve los datos de MANU. NO_VERIFICADO en su iPhone.
+- Evidencia:
+  - `npm test`: 220 en verde.
+  - e2e75: 8/8 (9:01 sin fichar, sin repetir al recargar, 13:00 con «13:10», sin aviso si ya fichó o en sábado, y el atajo listado).
+  - Batería completa en verde.
+
 ## WEB-74 — fichaje
 
 Manu ficha en RK y quiere apuntarlo a la vez en MANU.
