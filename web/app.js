@@ -26,7 +26,7 @@ import { applyBuzon, buzonSummary } from "./core/buzon.js";
 import { briefing, briefingText, isBriefingQuestion, monthPace } from "./core/briefing.js";
 import { whatNow, whatNowText, isWhatNowQuestion, morningSpeech } from "./core/now.js";
 import { gentleMode, gentlePlan, isGentleQuestion } from "./core/lowmode.js";
-import { punch, editPunch, today as shiftToday, monthReport, reportRows, toCsv, dur, PAUSE_REASONS, clockState } from "./core/clock.js";
+import { punch, editPunch, today as shiftToday, monthReport, reportRows, toCsv, dur, PAUSE_REASONS, clockState, clockNudge } from "./core/clock.js";
 import { closingDue, workClosing, closingText, isClosingQuestion, nextWorkDay } from "./core/closing.js";
 import { searchContacts } from "./core/contacts.js";
 import { autoFile, projectKeys, parseKeywords, buildSuggestPayload, parseSuggestions, projectMarkdown, projectZip, projectFileName } from "./core/autofile.js";
@@ -42,7 +42,7 @@ import { isSpotifyClientId, pkceValid, randomVerifier, challengeFor, authorizeUr
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "74";
+export const APP_VERSION = "75";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -716,6 +716,11 @@ const SHORTCUTS = [
     `Acción <b>«Abrir URL»</b>: <code>${esc(SITE)}?manana=1</code>`,
     "Al parar la alarma, MANU se abre con «Buenos días» y el botón «🔊 Léemelo» (iOS solo deja hablar tras un toque).",
     "Aviso: puede abrirse en Safari en vez de en el icono de MANU (NO_VERIFICADO). Si pasa, en Safari funciona igual pero sin tus datos: dímelo y lo cambiamos."] },
+  { id: "fichaje", name: "MANU Fichaje", purpose: "avisos de fichar a las 9:01 y a las 13:00", test: null, steps: [
+    "Atajos → <b>Automatización</b> → <b>+</b> → <b>«Hora del día»</b> <b>9:01</b>, <b>Semanalmente</b> de lunes a viernes, <b>«Ejecutar inmediatamente»</b>.",
+    "Acción <b>«Mostrar notificación»</b>: <code>¿Fichaste ya? Si no, ficha en RK y pulsa «Entro» en MANU.</code>",
+    "Otra automatización igual a las <b>13:00</b> con <code>Acuérdate de fichar al salir.</code>",
+    "Ojo: estas dos suenan siempre, también si ya fichaste, porque el iPhone no puede mirar dentro de MANU. MANU, si está abierta, solo te avisa cuando hace falta (y a la salida te dice a qué hora puedes irte)."] },
   { id: "agenda", name: "MANU Agenda", purpose: "traer tus eventos de hoy (si no usas Google)", test: null, steps: [
     "Nuevo atajo llamado <b>MANU Agenda</b>.",
     "<b>«Buscar eventos del calendario»</b> con fecha de inicio hoy.",
@@ -3497,7 +3502,28 @@ function exportBackup() {
 }
 
 // Reminders while the app is open (for always-on alerts, the iOS Shortcut).
+async function notifyOrToast(body, tag) {
+  // Visible app: a toast is enough. In the background (Mac tab, iPhone just
+  // left): a system notification if he allowed them.
+  if (document.visibilityState !== "visible" && notificationStatus() === "granted") {
+    try { const reg = await navigator.serviceWorker.ready; await reg.showNotification("MANU", { body, tag, icon: "icons/icon-192.png" }); return; } catch {}
+  }
+  toast(`⏰ ${body}`);
+}
+// WEB-75: «¿Fichaste ya?» at 9:01 and «Acuérdate de fichar al salir» at 13:00,
+// only when they apply. Works while MANU is open; with it closed, the iPhone
+// automation in Atajos («MANU Fichaje») does it.
+async function checkClockNudge() {
+  const s = vault.settings;
+  const n = clockNudge(clockDay().events, { now: today(), workStart: s.workStart ?? "09:00", targetMin: clockTarget(), off: Boolean(s.tomorrow?.day === localDay() && s.tomorrow.work === false), sent: s.clockNudged ?? null });
+  if (!n) return;
+  const day = localDay();
+  vault.settings.clockNudged = { ...(s.clockNudged?.day === day ? s.clockNudged : {}), day, [n.kind]: true };
+  persist();
+  await notifyOrToast(n.text, `manu-clock-${n.kind}`);
+}
 async function checkReminders() {
+  await checkClockNudge();
   const due = dueReminders(vault.reminders);
   if (!due.length) return;
   for (const r of due) {

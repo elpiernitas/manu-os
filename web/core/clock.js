@@ -132,6 +132,31 @@ export function toCsv(rows) {
   return "﻿" + rows.map((r) => r.map(cell).join(";")).join("\r\n"); // BOM + «;» for Excel in Spanish
 }
 
+// WEB-75: the two nudges Manu asked for. At start + 1 min (9:01) «¿Fichaste
+// ya?» if he has not clocked in; at start + workday (13:00) «Acuérdate de fichar
+// al salir» if he is still in. Weekdays only, not on a day he said he is off,
+// and each window closes after a while so a late opening does not nag him.
+// `sent` = { day, in?, out? } remembers what was already shown today.
+export function clockNudge(events, { now = new Date(), workStart = "09:00", targetMin = 240, off = false, sent = null } = {}) {
+  if (off || (now.getDay() + 6) % 7 >= 5) return null;
+  const key = dayKey(now);
+  const done = sent?.day === key ? sent : {};
+  const m = now.getHours() * 60 + now.getMinutes();
+  const start = toMin(workStart);
+  if (!Number.isFinite(start)) return null;
+  const state = clockState(events);
+  if (state === "off" && !done.in && m >= start + 1 && m < start + 60) {
+    return { kind: "in", text: "¿Fichaste ya? Si ya estás dentro, pulsa «Entro» en MANU." };
+  }
+  const end = start + targetMin;
+  if ((state === "working" || state === "paused") && !done.out && m >= end && m < end + 120) {
+    const t = today(events, { now, targetMin });
+    const when = state === "working" && t.leftMin ? ` Hoy puedes salir a las ${t.leaveAt}.` : "";
+    return { kind: "out", text: `Acuérdate de fichar al salir.${when}` };
+  }
+  return null;
+}
+
 // Add an event to the day of `at`. Refuses impossible sequences (two «Entro»).
 export function punch(clock, t, { at = new Date(), id, why = null } = {}) {
   at = toMinute(at); // fichajes go by the minute, like RK's own clock
