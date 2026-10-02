@@ -34,7 +34,7 @@ import { newCapture, toReview, pendingCaptures, groupCaptures, buildCapturesPayl
 import { budgetStatus, budgetLine, budgetCommand } from "./core/budget.js";
 import { findInVault, findCommand } from "./core/find.js";
 import { weatherEmoji, sceneFor, PARTICLES, SHAPES, MONEY_EMOJI, dayPhase, cityMinutes } from "./core/scene.js";
-import { buildImagePayload, buildLinkPayload, isGeminiKey, mayGo, setSensitiveOk, sensitiveAllowed, pickModel, listModels, buildActionPayload, askWithActions, issueUrl, aiErrorText } from "./core/ai.js";
+import { buildImagePayload, buildLinkPayload, isGeminiKey, mayGo, setSensitiveOk, sensitiveAllowed, pickModel, backupModel, listModels, buildActionPayload, askWithActions, issueUrl, aiErrorText } from "./core/ai.js";
 import { encryptBackup, decryptBackup, passphraseProblem, isEnvelope } from "./core/crypto.js";
 import { SUPABASE_SQL, parseSyncLink, parseAuthHash, sendCode, verifyCode, refreshSession, needsRefresh, remoteHead, remoteGet, remotePut, decide, isEmptyVault, syncErrorText } from "./core/sync.js";
 import { exportFullBackup, downloadBlob, readBackupFile, restoreFullBackup, FORMAT as FULL_FORMAT } from "./core/backup-manager.js";
@@ -47,7 +47,7 @@ import { buildBankShotsPayload, parseBankShots, alreadyThere, MAX_SHOTS } from "
 import { incomeKind } from "./core/bank.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "81";
+export const APP_VERSION = "82";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -2145,6 +2145,15 @@ function shownPayload(p) {
 // the current one and try once more instead of failing.
 async function freshModel(call) {
   try { return await call(); } catch (err) {
+    if (err.code === "busy") {
+      // WEB-82: the usual model is saturated → once with another of his models,
+      // then back to the usual one for next time.
+      const usual = aiStore.model;
+      const other = backupModel(await listModels(aiStore.key).catch(() => null), usual);
+      if (!other) throw err;
+      aiStore.model = other;
+      try { return await call(); } finally { aiStore.model = usual; }
+    }
     if (err.code !== "model") throw err;
     const model = pickModel(await listModels(aiStore.key));
     if (!model || model === aiStore.model) throw err;
@@ -3836,7 +3845,8 @@ async function readBankShots(files) {
   try {
     const shots = [];
     for (const f of list) shots.push((await compressImage(f)).split(",")[1]);
-    const { text } = await askWithActions({ key: aiStore.key, model: aiStore.model, payload: buildBankShotsPayload(shots, today()), confirmed: true, permit: () => true });
+    const payload = buildBankShotsPayload(shots, today());
+    const { text } = await freshModel(() => askWithActions({ key: aiStore.key, model: aiStore.model, payload, confirmed: true, permit: () => true }));
     const items = parseBankShots(text, today()).map((m) => ({ ...m, on: !alreadyThere(m, vault.spending, vault.income) }));
     bankRead = { items };
   } catch (err) {

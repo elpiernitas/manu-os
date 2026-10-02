@@ -60,6 +60,13 @@ const GEMINI_KEY_IN_TEXT = /(AIza[0-9A-Za-z_-]{30,}|\bAQ\.[0-9A-Za-z_.-]{20,})/;
 
 // Picks a current "flash" text model from the account's list instead of
 // hard-coding a name that may be retired.
+// WEB-82: when the usual model is saturated, another one from his list
+// (usually the «lite» one or the previous version) is tried once.
+export function backupModel(json, current) {
+  const models = { models: (json?.models ?? []).filter((m) => String(m.name ?? "").replace(/^models\//, "") !== current) };
+  return pickModel(models);
+}
+
 export function pickModel(json) {
   const models = (json?.models ?? []).filter((m) => (m.supportedGenerationMethods ?? []).includes("generateContent"));
   const name = (m) => String(m.name ?? "");
@@ -139,6 +146,7 @@ export async function ask({ key, model, payload, confirmed }, fetchImpl = fetch,
 const fail = (code, message, extra = {}) => Object.assign(new Error(message), { code, ...extra });
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 export const RETRY_MS = 1500;
+export const BUSY_RETRIES = 3;
 const BLOCKED = /^(SAFETY|PROHIBITED_CONTENT|BLOCKLIST|SPII|RECITATION|OTHER)$/;
 
 async function errorDetail(res) {
@@ -148,7 +156,8 @@ async function errorDetail(res) {
 export async function generate({ key, model, payload }, fetchImpl = fetch, pause = wait) {
   let body = payload;
   let retried = false;
-  for (let attempt = 0; attempt < 4; attempt++) {
+  let busy = 0; // WEB-82: Gemini «saturado» (503) is often over in seconds: 3 more tries, waiting longer each time
+  for (let attempt = 0; attempt < 8; attempt++) {
     let res;
     try {
       res = await fetchImpl(`${API}/models/${encodeURIComponent(model)}:generateContent`, {
@@ -168,7 +177,7 @@ export async function generate({ key, model, payload }, fetchImpl = fetch, pause
     }
     if (res.status === 404) throw fail("model", `El modelo ${model} ya no está disponible`, { status: 404 });
     if (res.status >= 500) {
-      if (!retried) { retried = true; await pause(RETRY_MS); continue; }
+      if (busy < BUSY_RETRIES) { await pause(RETRY_MS * 2 ** busy); busy++; continue; }
       throw fail("busy", `Gemini respondió ${res.status}`, { status: res.status });
     }
     if (!res.ok) throw fail("http", `Gemini respondió ${res.status}`, { status: res.status });
@@ -197,7 +206,7 @@ export function aiErrorText(err) {
     case "sensitive": return "Algo de la conversación parece privado y no lo envío.";
     case "unconfirmed": return "No lo envío sin tu permiso.";
     case "network": return "No llego a Gemini: parece que no hay conexión. Prueba otra vez cuando tengas red.";
-    case "busy": return `Gemini está saturado ahora mismo (error ${err.status}). Lo he intentado dos veces; prueba en un minuto.`;
+    case "busy": return `Gemini está saturado ahora mismo (error ${err.status}). Lo he intentado varias veces y con otro modelo; prueba en unos minutos.`;
     case "model": return "El modelo de Gemini que usaba ya no existe. Entra en Tú → IA y vuelve a pegar la clave: elijo otro.";
     case "blocked": return "Gemini ha bloqueado la respuesta por sus filtros. Prueba a decirlo de otra forma.";
     case "empty": return `Gemini ha devuelto una respuesta vacía${err.reason ? ` (${err.reason})` : ""}. Prueba otra vez.`;

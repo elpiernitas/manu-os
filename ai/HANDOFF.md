@@ -44,6 +44,18 @@ Siguientes ideas, sin compromiso:
 
 Límites reales de una web en iPhone: no hay widgets, pantalla bloqueada ni control del Chromecast. Donde se pueda, se hará con Atajos.
 
+## WEB-82 — Gemini saturado (503) al leer capturas del banco
+
+Captura de Manu en v80: «No he podido leer las capturas: Gemini está saturado ahora mismo (error 503)».
+
+- `generate()` reintenta un 503 hasta 3 veces más, esperando 1,5, 3 y 6 s. Un corte de red sigue reintentándose una vez.
+- `freshModel()` prueba una vez con otro modelo de su cuenta si el habitual sigue saturado (`backupModel()`, normalmente el «lite») y después vuelve al habitual.
+- Las capturas del banco pasan por `freshModel()`.
+- El mensaje de error dice que se intentó varias veces y con otro modelo.
+- Evidencia:
+  - `npm test`: 244 en verde.
+  - e2e80 con el modelo saturado → leído con el «lite».
+
 ## WEB-81 — textos más cortos
 
 Manu: «quita el "como siempre", estorba; quita lo que creas que sobra de los textos».
