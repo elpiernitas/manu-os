@@ -63,7 +63,7 @@ Detalle y veredictos en `docs/audits/2026-10-02-revision-externa.md`.
 - Subtítulo de Tu nube: decía «cifrados»; ya no lo están desde WEB-67.
 - Test que ata `APP_VERSION` a la caché del SW.
 - Pendiente:
-  - origen propio (decisión de Manu);
+  - origen propio: Manu decide no mudarse, porque no publicará más webs en ese dominio;
   - copia por bloques;
   - extraer controladores de `app.js`;
   - Web Locks para varias pestañas.
