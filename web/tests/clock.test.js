@@ -115,3 +115,20 @@ test("WEB-75: 9:01 «¿Fichaste ya?» only if not in; 13:00 «fichar al salir» 
   assert.equal(clockNudge(inside[0].events, { now: at(7, 13, 0), sent: { day: "2026-10-07", out: true } }), null);
   assert.equal(clockNudge(none, { now: at(7, 10, 1), workStart: "10:00" }).kind, "in"); // follows his start time
 });
+
+test("QA #6: a correction that leaves the day impossible is refused", async () => {
+  const { validSequence } = await import("../core/clock.js");
+  const c = day(12, [["in", 9, 0], ["pause", 10, 0], ["back", 10, 15], ["out", 13, 15]]);
+  const [inE, pauseE, backE, outE] = c[0].events;
+  // ChatGPT's case: deleting «Vuelvo» left state=done with the pause still open
+  assert.throws(() => editPunch(c, "2026-10-12", backE.id, { remove: true }), /no cuadra/);
+  assert.throws(() => editPunch(c, "2026-10-12", outE.id, { time: "08:00" }), /no cuadra/); // «Salida» before «Entro»
+  assert.throws(() => editPunch(c, "2026-10-12", pauseE.id, { time: "14:00" }), /no cuadra/); // pause after leaving
+  assert.throws(() => editPunch(c, "2026-10-12", inE.id, { remove: true }), /no cuadra/);
+  // still allowed: fix a time in order, delete the last one, delete the only one
+  assert.equal(tally(editPunch(c, "2026-10-12", outE.id, { time: "13:30" })[0].events, at(13, 0)).workedMin, 255);
+  assert.equal(clockState(editPunch(c, "2026-10-12", outE.id, { remove: true })[0].events), "working");
+  assert.ok(validSequence(c[0].events));
+  // sort by real time even with mixed offsets
+  assert.ok(validSequence([{ t: "in", at: "2026-10-12T09:00:00+02:00" }, { t: "out", at: "2026-10-12T08:00:00Z" }]));
+});

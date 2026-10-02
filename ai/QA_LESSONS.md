@@ -186,3 +186,14 @@ En la auditoría de WEB-73, la revisión línea a línea de las 867 inserciones 
 2. Abrir la app **dos veces a la vez** (pestañas o dispositivos) y con datos dañados.
 
 Cada defecto se demuestra con una prueba que falla en el código anterior. Las capturas de las pruebas nunca se guardan dentro de `web/`, porque se publican.
+
+### QAL-044 — Lo que se reemplaza tras un `await` hay que volver a comprobarlo
+
+En la revisión externa del 2026-10-02, `nubeSync()` decidía con el estado leído antes de esperar a la red y luego reemplazaba el vault. Una tarea apuntada durante la descarga se perdía. Además, `nubePull()` daba la descarga por buena aunque `store.save()` hubiera fallado por falta de espacio.
+
+Reglas:
+1. Tras cada `await`, comprobar que el usuario no cambió nada antes de reemplazar datos. Si cambió, es un conflicto.
+2. Las escrituras automáticas (el tiempo, las copias de Google, las marcas del dispositivo) no cuentan como ediciones. La primera versión del arreglo convertía en «conflicto» el aviso de fichar guardado al abrir MANU, y solo lo descubrió la prueba e2e.
+3. Guardar primero. Cambiar la memoria y la revisión solo si el guardado devolvió `true`.
+
+La prueba e2e retrasa la red simulada, edita mientras espera y llena el almacenamiento. Falla con el código anterior.

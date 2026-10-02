@@ -25,9 +25,11 @@ export function parseEvents(text) {
   return events.filter((e) => e.title).sort((a, b) => (a.time ?? "") < (b.time ?? "") ? -1 : 1);
 }
 
-// Reads ?di=… and ?eventos=… from a URL query string.
+// Reads di=…, eventos=… and manana=1 from the URL. QA ChatGPT 2026-10 (#4):
+// Shortcuts now use the fragment (#di=…), which never reaches the server; the
+// old query form (?di=…) still works for Shortcuts already created.
 export function launchParams(search) {
-  const params = new URLSearchParams(search);
+  const params = new URLSearchParams(String(search ?? "").replace(/^[?#]/, ""));
   const say = clip(params.get("di"), LIMITS.text) || null;
   const rawEvents = params.get("eventos");
   // WEB-72: «?manana=1» from the morning Shortcut (alarm stopped).

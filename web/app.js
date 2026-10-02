@@ -42,7 +42,7 @@ import { isSpotifyClientId, pkceValid, randomVerifier, challengeFor, authorizeUr
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "75";
+export const APP_VERSION = "76";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -173,7 +173,22 @@ async function nubePush(baseRev) {
   nube.patch({ lastRev: rev, lastAt: new Date().toISOString(), conflict: null, error: null, ...(edits === nube.edits ? { dirty: false } : {}) });
 }
 
-async function nubePull(row = null) {
+// What Manu himself writes, leaving out what MANU refreshes on its own (the
+// weather, Google's copies, marks like «already nudged today»): those must not
+// turn a normal download into a conflict.
+const AUTO_KEYS = ["weather", "weatherCities", "calendar", "agenda", "agendaTomorrow", "mail", "contacts"];
+const AUTO_SETTINGS = ["gcalSyncedAt", "googleErrors", "googleStatus", "clockNudged"];
+function userPrint(v) {
+  const rest = { ...v }, set = { ...(v.settings ?? {}) };
+  for (const k of AUTO_KEYS) delete rest[k];
+  for (const k of AUTO_SETTINGS) delete set[k];
+  delete rest.settings;
+  return JSON.stringify([rest, set]);
+}
+// `before`: userPrint(vault) when the sync started. If Manu changed something
+// while the cloud copy was on its way, replacing the vault would lose it:
+// returns "edited" and the caller turns it into a conflict (QA ChatGPT 2026-10, #1).
+async function nubePull(row = null, { before = null } = {}) {
   const s = await nubeSession();
   row = row ?? await remoteGet(nubeCfg(), s);
   if (!row) return;
@@ -184,11 +199,15 @@ async function nubePull(row = null) {
   }
   const v = validateVault(row.data);
   if (!v.ok) throw new Error(`Los datos de la nube no son válidos: ${v.reason}`);
+  if (before !== null && userPrint(vault) !== before) return "edited";
+  // Saved first: if it does not fit on this device, nothing changes (memory,
+  // revision, «dirty»), or a reload would bring back the old data marked as
+  // the cloud's revision and the next push would overwrite the good copy (#2).
+  if (!store.save(v.vault)) throw new Error("No cabe en este dispositivo: libera espacio en Tú → Tus datos y vuelve a sincronizar.");
   // Audit 2026-10: swap the vault in memory instead of reloading the page, so
   // whatever Manu is typing (quick-add sheet, chat) is not lost.
   clearTimeout(nube.timer);
   vault = v.vault;
-  store.save(vault);
   nube.patch({ lastRev: row.rev, lastAt: new Date().toISOString(), dirty: false, conflict: null, error: null });
   toast(`Datos del ${row.device ?? "otro dispositivo"} cargados`);
   if (!sheet && !document.activeElement?.matches("input, textarea, select")) render();
@@ -200,20 +219,21 @@ async function nubeSync({ manual = false } = {}) {
   if (tab === "tu" && sub === "nube") render();
   try {
     const st = nube.state;
+    const before = userPrint(vault);
     const head = await remoteHead(nubeCfg(), await nubeSession());
     const what = decide({ lastRev: st.lastRev ?? null, dirty: Boolean(st.dirty), remote: head, localEmpty: isEmptyVault(vault) });
     // WEB-68: a device that never synced finds something in the cloud. If it
     // is empty or the unreadable WEB-64 packet, it is not a real conflict.
-    let replace = false;
+    let replace = false, what2 = what;
     if (what === "conflict" && (st.lastRev ?? null) === null && head) {
       const row = await remoteGet(nubeCfg(), await nubeSession());
       replace = Boolean(row && (isEnvelope(row.data) || isEmptyVault(row.data)));
     }
     if (what === "push" || replace) await nubePush(head?.rev ?? null);
-    else if (what === "pull") await nubePull();
-    else if (what === "conflict") { nube.patch({ conflict: { rev: head?.rev ?? null, device: head?.device ?? null, at: head?.updated_at ?? null } }); if (manual || tab === "tu") render(); toast(syncErrorText({ code: "conflict" })); }
-    else nube.patch({ lastAt: new Date().toISOString(), error: null });
-    if (manual) toast(what === "conflict" ? "Elige con qué datos te quedas" : "Sincronizado");
+    else if (what === "pull" && (await nubePull(null, { before })) === "edited") what2 = "conflict";
+    if (what2 === "conflict" && !(what === "push" || replace)) { nube.patch({ conflict: { rev: head?.rev ?? null, device: head?.device ?? null, at: head?.updated_at ?? null } }); if (manual || tab === "tu") render(); toast(syncErrorText({ code: "conflict" })); }
+    else if (what === "none") nube.patch({ lastAt: new Date().toISOString(), error: null });
+    if (manual) toast(what2 === "conflict" ? "Elige con qué datos te quedas" : "Sincronizado");
   } catch (err) {
     if (err.code === "conflict") nube.patch({ conflict: { rev: null } });
     nube.patch({ error: syncErrorText(err) });
@@ -711,9 +731,9 @@ const SHORTCUTS = [
     "<b>«Obtener elemento de la lista»</b> → primer elemento (el texto).",
     "<b>«Obtener elemento de la lista»</b> → último elemento → <b>«Obtener fechas de»</b>.",
     "<b>«Añadir nuevo recordatorio»</b> con el texto y la alerta en esa fecha."] },
-  { id: "manana", name: "MANU Buenos días", purpose: "que MANU se abra con tu día al parar la alarma", test: `${SITE}?manana=1`, steps: [
+  { id: "manana", name: "MANU Buenos días", purpose: "que MANU se abra con tu día al parar la alarma", test: `${SITE}#manana=1`, steps: [
     "Atajos → <b>Automatización</b> → <b>+</b> → <b>«Alarma»</b> → <b>«Se detiene»</b> (elige tu alarma de diario) y <b>«Ejecutar inmediatamente»</b>.",
-    `Acción <b>«Abrir URL»</b>: <code>${esc(SITE)}?manana=1</code>`,
+    `Acción <b>«Abrir URL»</b>: <code>${esc(SITE)}#manana=1</code>`,
     "Al parar la alarma, MANU se abre con «Buenos días» y el botón «🔊 Léemelo» (iOS solo deja hablar tras un toque).",
     "Aviso: puede abrirse en Safari en vez de en el icono de MANU (NO_VERIFICADO). Si pasa, en Safari funciona igual pero sin tus datos: dímelo y lo cambiamos."] },
   { id: "fichaje", name: "MANU Fichaje", purpose: "avisos de fichar a las 9:01 y a las 13:00", test: null, steps: [
@@ -730,7 +750,7 @@ const SHORTCUTS = [
   { id: "siri", name: "Apuntar en MANU", purpose: "decirle a Siri algo para MANU", test: null, steps: [
     "Nuevo atajo llamado <b>Apuntar en MANU</b>.",
     "<b>«Solicitar entrada»</b> (texto).",
-    `<b>«URL»</b>: <code>${esc(SITE)}?di=</code> seguido de la variable Entrada proporcionada.`,
+    `<b>«URL»</b>: <code>${esc(SITE)}#di=</code> seguido de la variable Entrada proporcionada.`,
     "<b>«Abrir URL»</b>. Aviso: se abre en Safari, que guarda sus datos aparte del icono de MANU (NO_VERIFICADO)."] },
   // WEB-43: «buzón». Shortcuts append lines to iCloud Drive/Atajos/MANU-buzon.txt.
   { id: "applepay", name: "MANU Apple Pay", purpose: "apuntar solo cada pago con Apple Pay", test: null, steps: [
@@ -1306,7 +1326,7 @@ const screens = {
         ${item("ia", "bolt", "purple", "IA (Gemini)", aiReady() ? `Activada · ${aiStore.model}` : "Chat con IA opcional")}
         ${item("atajos", "bolt", "orange", "Atajos del iPhone", shortcutsPending() ? `${shortcutsPending()} pendientes de crear` : "Todos creados")}
         ${item("avisos", "bell", "red", "Avisos", "Notificaciones de MANU")}
-        ${item("nube", "box", "blue", "Tu nube", nubeOn() ? (nube.state.conflict ? "Elige con qué datos te quedas" : nube.state.error ? "Revisar" : `Sincronizada${nube.state.lastAt ? ` · ${new Date(nube.state.lastAt).toLocaleString("es-ES", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}` : ""}`) : "iPhone y Mac con los mismos datos, cifrados")}
+        ${item("nube", "box", "blue", "Tu nube", nubeOn() ? (nube.state.conflict ? "Elige con qué datos te quedas" : nube.state.error ? "Revisar" : `Sincronizada${nube.state.lastAt ? ` · ${new Date(nube.state.lastAt).toLocaleString("es-ES", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}` : ""}`) : "iPhone y Mac con los mismos datos (sin fotos ni «Tu archivo»)")}
         ${item("datos", "box", "gray", "Tus datos", "Copia, restaurar y borrar")}
       </div>
       <p class="muted small">MANU OS web · versión ${APP_VERSION} · ${nubeOn() ? "sincronizado con tu nube" : "datos solo en este dispositivo"}</p>`;
@@ -1576,7 +1596,7 @@ const subpages = {
         <p class="muted small">Crea estos atajos en la app Atajos con el nombre exacto. Los nombres de las acciones pueden variar según tu iOS. NO_VERIFICADO en tu iPhone.</p>
         <details><summary>«${SHORTCUT_ALARM}»: alarmas</summary><ol class="muted small"><li>Nuevo atajo llamado <b>${SHORTCUT_ALARM}</b>.</li><li>Acción «Obtener fechas de» → Entrada del atajo.</li><li>Acción «Crear alarma» (Reloj) con esa hora.</li><li>En MANU, «Poner alarma» abre este atajo con la hora.</li></ol></details>
         <details><summary>«${SHORTCUT_REMINDER}»: recordatorios que suenan</summary><ol class="muted small"><li>Nuevo atajo llamado <b>${SHORTCUT_REMINDER}</b>.</li><li>«Dividir texto» la Entrada del atajo por el separador personalizado <code>|</code>.</li><li>«Obtener elemento de la lista» → primer elemento (el texto).</li><li>«Obtener elemento de la lista» → último elemento → «Obtener fechas de».</li><li>«Añadir nuevo recordatorio» con el texto y alerta en esa fecha.</li></ol></details>
-        <details><summary>Apuntar a MANU desde Siri</summary><ol class="muted small"><li>«Solicitar entrada» (texto).</li><li>«URL»: <code>${esc(SITE)}?di=</code> + Entrada proporcionada.</li><li>«Abrir URL». Se abre en Safari, que guarda sus datos aparte del icono (NO_VERIFICADO).</li></ol></details>
+        <details><summary>Apuntar a MANU desde Siri</summary><ol class="muted small"><li>«Solicitar entrada» (texto).</li><li>«URL»: <code>${esc(SITE)}#di=</code> + Entrada proporcionada.</li><li>«Abrir URL». Se abre en Safari, que guarda sus datos aparte del icono (NO_VERIFICADO).</li></ol></details>
         <details><summary>Traer la agenda de hoy</summary><ol class="muted small"><li>«Buscar eventos del calendario» de hoy.</li><li>«Repetir con cada» → «Texto»: hora de inicio (HH:mm), espacio y título.</li><li>«Combinar texto» con saltos de línea → «Copiar al portapapeles».</li><li>Abre MANU → Agenda → Pegar eventos de hoy.</li></ol></details></section>`;
   },
   datos() {
@@ -2736,7 +2756,7 @@ document.addEventListener("click", async (e) => {
     case "punch": doPunch(a.dataset.t, a.dataset.why || null); break;
     case "clock-month": { const [y, m] = (clockMonth ?? localDay().slice(0, 7)).split("-").map(Number); const d = new Date(y, m - 1 + Number(a.dataset.d), 1); clockMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; clockEdit = null; render(); break; }
     case "clock-edit": clockEdit = clockEdit === a.dataset.day ? null : a.dataset.day; render(); break;
-    case "clock-del": if (window.confirm("¿Borrar este fichaje?")) { vault.clock = editPunch(vault.clock, a.dataset.day, a.dataset.id, { remove: true }); persist(); render(); } break;
+    case "clock-del": if (window.confirm("¿Borrar este fichaje?")) { try { vault.clock = editPunch(vault.clock, a.dataset.day, a.dataset.id, { remove: true }); persist(); } catch (err) { toast(err.message); } render(); } break;
     case "clock-dl": downloadClock(clockMonth ?? localDay().slice(0, 7), a.dataset.kind); break;
     case "speak-day": speakDay(); break;
     case "morning-dismiss": morningLaunch = false; render(); break;
@@ -3124,7 +3144,7 @@ document.addEventListener("change", async (e) => {
     catch (err) { toast(err.message); }
     return;
   }
-  if (e.target.dataset?.clockId && /^\d{2}:\d{2}$/.test(e.target.value)) { vault.clock = editPunch(vault.clock, e.target.dataset.clockDay, e.target.dataset.clockId, { time: e.target.value }); persist(); render(); toast("Hora corregida"); return; }
+  if (e.target.dataset?.clockId && /^\d{2}:\d{2}$/.test(e.target.value)) { try { vault.clock = editPunch(vault.clock, e.target.dataset.clockDay, e.target.dataset.clockId, { time: e.target.value }); persist(); toast("Hora corregida"); } catch (err) { toast(err.message); } render(); return; }
   if (e.target.id === "clockTarget" && /^\d{2}:\d{2}$/.test(e.target.value)) { const [h, mi] = e.target.value.split(":").map(Number); if (h * 60 + mi >= 30) { vault.settings.clockTarget = h * 60 + mi; persist(); render(); toast(`Jornada: ${dur(h * 60 + mi)}`); } return; }
   if (e.target.id === "workStart" && /^\d{2}:\d{2}$/.test(e.target.value)) { vault.settings.workStart = e.target.value; persist(); toast(`Entrada: ${e.target.value}`); return; }
   if (e.target.dataset.cat) {
@@ -3591,13 +3611,18 @@ if (returned.has("code") && returned.has("state")) {
   toast("Has cancelado la conexión con Spotify");
 }
 
-const launch = launchParams(location.search);
-if (launch.morning) { history.replaceState(null, "", location.pathname); tab = "hoy"; morningLaunch = true; }
-if (launch.say || launch.events) {
+// From a Shortcut: «#di=…» (or the old «?di=…»), «#eventos=…», «#manana=1».
+function applyLaunch() {
+  const q = launchParams(location.search), h = launchParams(location.hash);
+  const launch = { say: h.say ?? q.say, events: h.events ?? q.events, morning: h.morning || q.morning };
+  if (!launch.morning && !launch.say && !launch.events) return false;
   history.replaceState(null, "", location.pathname);
+  if (launch.morning) { tab = "hoy"; morningLaunch = true; }
   if (launch.events) { vault.agenda = { day: localDay(), events: launch.events, importedAt: new Date().toISOString() }; persist(); tab = "agenda"; }
   if (launch.say) { tab = "manu"; say(launch.say); }
+  return true;
 }
+applyLaunch();
 // «…/manu-os/#nube=<url>|<key>»: fills «Tu nube» (also if MANU was already open).
 function applyNubeLink() {
   if (!location.hash.startsWith("#nube=")) return false;
@@ -3625,7 +3650,7 @@ applyNubeLink();
     } else setTimeout(() => toast("El enlace del correo ha caducado: pide un código nuevo"), 300);
   }
 }
-window.addEventListener("hashchange", () => { if (applyNubeLink()) render(); });
+window.addEventListener("hashchange", () => { if (applyNubeLink() || applyLaunch()) render(); });
 render({ enter: "page" });
 nubeSync();
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") nubeSync(); });

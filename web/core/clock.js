@@ -21,7 +21,18 @@ export function workdayMinutes({ workStart = "09:00", workEnd = "13:00" } = {}) 
   return Number.isFinite(m) && m > 0 ? m : 240;
 }
 
-const sorted = (events) => [...(events ?? [])].filter((e) => e && e.at && !Number.isNaN(Date.parse(e.at))).sort((a, b) => a.at.localeCompare(b.at));
+// By real time, not by text: a copy with mixed offsets still sorts right.
+const sorted = (events) => [...(events ?? [])].filter((e) => e && e.at && !Number.isNaN(Date.parse(e.at))).sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+
+// The day must read like the buttons allow: Entro → (Pausa → Vuelvo)* → Salida, again.
+export function validSequence(events) {
+  let state = "off";
+  for (const e of sorted(events)) {
+    if (!nextActions(state).includes(e.t)) return false;
+    state = { in: "working", back: "working", pause: "paused", out: "done" }[e.t];
+  }
+  return true;
+}
 
 // off → working ⇄ paused → done
 export function clockState(events) {
@@ -170,9 +181,12 @@ export function punch(clock, t, { at = new Date(), id, why = null } = {}) {
   return [...list.filter((d) => d.day !== key), rec].sort((a, b) => a.day.localeCompare(b.day)).slice(-800);
 }
 
-// Correct an event's time (forgot to clock) or remove it.
+// Correct an event's time (forgot to clock) or remove it. A change that leaves
+// the day impossible (a pause with no return, «Salida» before «Entro») is
+// refused, so the report never counts a closed day with a pause still open
+// (QA ChatGPT 2026-10, #6).
 export function editPunch(clock, day, id, { time = null, remove = false } = {}) {
-  return (clock ?? []).map((d) => {
+  const next = (clock ?? []).map((d) => {
     if (d.day !== day) return d;
     let events = d.events;
     if (remove) events = events.filter((e) => e.id !== id);
@@ -180,5 +194,10 @@ export function editPunch(clock, day, id, { time = null, remove = false } = {}) 
       events = events.map((e) => { if (e.id !== id) return e; const x = new Date(e.at); const [h, m] = time.split(":").map(Number); x.setHours(h, m, 0, 0); return { ...e, at: x.toISOString() }; });
     }
     return { ...d, events: sorted(events) };
-  }).filter((d) => d.events.length);
+  });
+  const after = next.find((d) => d.day === day);
+  if (after && !validSequence(after.events)) {
+    throw new Error(remove ? "Si borro ese, el día no cuadra: borra también el que va con él (por ejemplo, la pausa y su vuelta)." : "Con esa hora el día no cuadra: los fichajes quedarían desordenados.");
+  }
+  return next.filter((d) => d.events.length);
 }

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { exportFullBackup, readBackupFile, validatePayload, isSecretKey, FORMAT } from "../core/backup-manager.js";
+import { exportFullBackup, readBackupFile, validatePayload, isSecretKey, FORMAT, restoreFullBackup } from "../core/backup-manager.js";
 import { validateVault, emptyVault } from "../core/storage.js";
 import { encryptBackup, decryptBackup } from "../core/crypto.js";
 
@@ -63,4 +63,41 @@ test("WEB-44: an encrypted full copy (several MB) round-trips; a wrong phrase op
   assert.equal(back, text);
   assert.equal((await readBackupFile(new Blob([back]), { validateVault })).vault.inbox.length, 3001);
   await assert.rejects(decryptBackup(env, "otra frase distinta"), /Frase incorrecta/);
+});
+
+// QA ChatGPT 2026-10 (#3): a failed restore whose undo also fails must not
+// claim «He dejado tus datos como estaban».
+function flakyStorage(initial, failOn) {
+  const m = new Map(Object.entries(initial));
+  let writes = 0;
+  return {
+    get length() { return m.size; }, key: (i) => [...m.keys()][i] ?? null, getItem: (k) => (m.has(k) ? m.get(k) : null),
+    removeItem: (k) => { m.delete(k); },
+    setItem: (k, v) => { writes++; if (failOn(writes, k)) throw new Error("QuotaExceededError"); m.set(k, String(v)); },
+    dump: () => Object.fromEntries(m),
+  };
+}
+const checkedWith = (local) => ({ ok: true, payload: { localStorage: local, indexedDB: [] }, counts: {} });
+
+test("QA #3: restore failing, undo OK → data as it was, and it says so", async () => {
+  const st = flakyStorage({ "manuos.vault": "OLD", "manuos.nube": "N0" }, (n) => n === 2);
+  await assert.rejects(restoreFullBackup(checkedWith({ "manuos.nube": "N1", "manuos.vault": "NEW" }), { storage: st, idb: null }), /como estaban/);
+  assert.equal(st.dump()["manuos.vault"], "OLD");
+});
+
+test("QA #3: restore failing and undo failing → it admits the data may be half-restored", async () => {
+  const st = flakyStorage({ "manuos.vault": "OLD", "manuos.nube": "N0" }, (n) => n >= 2);
+  await assert.rejects(restoreFullBackup(checkedWith({ "manuos.nube": "N1", "manuos.vault": "NEW" }), { storage: st, idb: null }), (err) => {
+    assert.doesNotMatch(err.message, /como estaban/);
+    assert.match(err.message, /a medias/);
+    assert.ok(err.partial.length >= 1);
+    return true;
+  });
+});
+
+test("QA #3: the vault is written last when restoring", async () => {
+  const order = [];
+  const st = flakyStorage({}, (n, k) => { order.push(k); return false; });
+  await restoreFullBackup(checkedWith({ "manuos.vault": "NEW", "manuos.nube": "N1", "manuos.zz": "Z" }), { storage: st, idb: null });
+  assert.equal(order.at(-1), "manuos.vault");
 });
