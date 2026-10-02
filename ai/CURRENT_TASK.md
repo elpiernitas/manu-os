@@ -6,7 +6,7 @@ WEB-70 implementado por Claude Code. Se fusiona según la regla de fusión de `A
 
 ## Tarea activa
 
-WEB-80 — Dinero: añadir, capturas del banco y gastos compartidos (`ai/HANDOFF.md`, «WEB-80»).
+WEB-81 — textos más cortos (`ai/HANDOFF.md`, «WEB-81»).
 
 ## Autorización
 

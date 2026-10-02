@@ -44,6 +44,18 @@ Siguientes ideas, sin compromiso:
 
 Límites reales de una web en iPhone: no hay widgets, pantalla bloqueada ni control del Chromecast. Donde se pueda, se hará con Atajos.
 
+## WEB-81 — textos más cortos
+
+Manu: «quita el "como siempre", estorba; quita lo que creas que sobra de los textos».
+
+- La pregunta de la noche ahora es «¿Mañana en Gijón?» y el aviso de las 22:00, «¿Mañana trabajas en Gijón?».
+- La tarjeta «Ahora» con una sola tarea dice «Es tu única tarea pendiente.». Antes decía «solo esta tarea; empieza por la más antigua».
+- Botón ⚡: solo «Haz algo rápido…».
+- Ayudas recortadas a una frase sin perder los avisos de privacidad (qué va a Google): importar del banco, Atajos, copia cifrada, copia completa, Avisos, presupuestos, capturas del banco, recordatorios, jornada, proyectos, modo conversación, Google y exportación de ChatGPT.
+- Evidencia:
+  - `npm test`: 243 en verde.
+  - e2e71, e2e77 y e2e79 actualizados.
+
 ## WEB-80 — Dinero: añadir, capturas del banco y gastos compartidos (tipo Tricount)
 
 - Dinero → **Añadir**:

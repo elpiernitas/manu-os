@@ -47,7 +47,7 @@ import { buildBankShotsPayload, parseBankShots, alreadyThere, MAX_SHOTS } from "
 import { incomeKind } from "./core/bank.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "80";
+export const APP_VERSION = "81";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -513,7 +513,7 @@ function budgetCard() {
   const used = new Set(list.map((b) => b.cat));
   const icon = { ok: "🟢", warn: "🟠", over: "🔴" };
   return `<section class="card"><h2>🎯 Presupuestos del mes</h2>
-    ${list.length ? list.map((b) => `<div class="row budget-row"><span aria-hidden="true">${icon[b.status]}</span><div class="grow"><div>${esc(catLabel(b.cat))}</div><div class="muted small">${b.status === "over" ? `Te has pasado ${euros(-b.left)}` : `Quedan ${euros(b.left)}`} · ${euros(b.spent)} de ${euros(b.limit)}</div></div><button class="link small" data-act="budget-del" data-cat="${esc(b.cat)}" aria-label="Quitar presupuesto de ${esc(CATEGORIES[b.cat])}">Quitar</button></div>`).join("") : '<p class="muted small">Pon un límite al mes para lo que más se te va (comer fuera, ocio…). MANU te avisa en «Tu día» si vas demasiado rápido. También puedes decírselo: «pon un presupuesto de 150 para comer».</p>'}
+    ${list.length ? list.map((b) => `<div class="row budget-row"><span aria-hidden="true">${icon[b.status]}</span><div class="grow"><div>${esc(catLabel(b.cat))}</div><div class="muted small">${b.status === "over" ? `Te has pasado ${euros(-b.left)}` : `Quedan ${euros(b.left)}`} · ${euros(b.spent)} de ${euros(b.limit)}</div></div><button class="link small" data-act="budget-del" data-cat="${esc(b.cat)}" aria-label="Quitar presupuesto de ${esc(CATEGORIES[b.cat])}">Quitar</button></div>`).join("") : '<p class="muted small">Un límite al mes por categoría. Te aviso si vas demasiado rápido.</p>'}
     <form id="budgetForm" class="budget-form"><label for="budgetCat" class="sr">Categoría</label><select id="budgetCat">${Object.keys(CATEGORIES).filter((k) => !used.has(k)).map((k) => `<option value="${k}">${esc(catLabel(k))}</option>`).join("")}</select><label for="budgetAmount" class="sr">Límite al mes en euros</label><input id="budgetAmount" inputmode="decimal" placeholder="€ al mes" maxlength="9"><button class="btn" type="submit">Poner</button></form></section>`;
 }
 
@@ -864,7 +864,7 @@ async function finishSpotifyAuth(params) {
 const projAuto = { suggestions: null, busy: false };
 function suggestCard() {
   const s = projAuto.suggestions;
-  if (s?.length) return `<section class="card"><h2>✨ Tus proyectos en marcha</h2><p class="muted small">Sacados de tus conversaciones y apuntes. Al crearlos, MANU les mete tus conversaciones de ChatGPT sobre el tema y, a partir de ahí, todo lo que apuntes que tenga que ver.</p>
+  if (s?.length) return `<section class="card"><h2>✨ Tus proyectos en marcha</h2><p class="muted small">Sacados de tus conversaciones y apuntes. Lo que apuntes del tema irá entrando solo.</p>
     ${s.map((x, i) => `<div class="row"><span aria-hidden="true">${esc(x.emoji)}</span><div class="grow"><b>${esc(x.name)}</b><div class="muted small">${esc(x.keywords.join(", "))}</div></div><button class="btn ghost" data-act="proj-sug-add" data-i="${i}">Crear</button></div>`).join("")}
     <div class="btns"><button class="btn" data-act="proj-sug-all">Crear todos</button><button class="link small" data-act="proj-sug-close">Ahora no</button></div></section>`;
   if (!aiReady() || !(archive.stats?.count || vault.inbox.length)) return "";
@@ -1186,7 +1186,7 @@ function nightCard() {
   const oviedo = guess?.city === "OVIEDO";
   const bGijon = `<button class="btn${oviedo ? " ghost" : ""}" data-act="tomorrow" data-city="GIJON">Sí, en Gijón</button>`;
   const bOviedo = `<button class="btn${oviedo ? "" : " ghost"}" data-act="tomorrow" data-city="OVIEDO">En Oviedo</button>`;
-  return `<section class="card"><h2>${I.alarm} Antes de dormir</h2><p><b>${oviedo ? "¿Mañana trabajas en Oviedo?" : "¿Mañana en Gijón, como siempre?"}</b></p>${guess ? `<p class="muted small">Tu calendario: ${esc(guess.reason)}.</p>` : ""}
+  return `<section class="card"><h2>${I.alarm} Antes de dormir</h2><p><b>${oviedo ? "¿Mañana trabajas en Oviedo?" : "¿Mañana en Gijón?"}</b></p>${guess ? `<p class="muted small">Tu calendario: ${esc(guess.reason)}.</p>` : ""}
     <div class="btns">${oviedo ? bOviedo + bGijon : bGijon + bOviedo}<button class="btn ghost" data-act="tomorrow" data-city="NONE">No trabajo</button></div></section>`;
 }
 
@@ -1219,7 +1219,7 @@ const screens = {
       <div class="stack">
       ${morningLaunch ? `<section class="card morning-hello"><h2>☀️ ${esc(greeting())}, Manu</h2><p class="muted small">Toca y te leo el día en voz alta.</p><div class="btns"><button class="btn" data-act="speak-day">🔊 Léemelo</button><button class="link small" data-act="morning-dismiss">Ahora no</button></div></section>` : ""}
       ${gentleCard()}
-      <button class="cmdk-pill glass" data-act="cmdk" aria-label="Comando rápido">⚡ <span>Haz algo rápido… <span class="muted">entro, gasto 12 café, hábitos</span></span></button>
+      <button class="cmdk-pill glass" data-act="cmdk" aria-label="Comando rápido">⚡ <span>Haz algo rápido…</span></button>
       ${nowCard()}
       ${clockCard()}
       ${toAsk(vault.spending, today()).length || splitDraft ? splitAskCard() : ""}
@@ -1299,7 +1299,7 @@ const screens = {
       ${moneyMonth === 0 ? budgetCard() : ""}
       ${moneyStatsSection(ref, monthName)}
       <section class="card"><h2>${I.box} Importar del banco</h2>
-        <p class="muted small">Descarga los movimientos de tu banco (Sabadell: Excel .xls; también vale CSV) y elígelo aquí. Se analiza en tu móvil y no se envía a nadie. Importo gastos e ingresos (nómina, Bizum…) y no duplico los que ya tengas. Si corriges la categoría de un comercio, la aprendo para todos sus movimientos.</p>
+        <p class="muted small">Excel o CSV de tu banco. Se lee en el móvil, sin enviarlo a nadie, y no duplica lo que ya tengas.</p>
         <label class="btn ghost" for="bankFile" role="button" tabindex="0">Elegir archivo (Excel o CSV)</label><input id="bankFile" type="file" accept=".xls,.xlsx,.csv,text/csv,text/plain,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="sr">
         <label class="btn ghost" for="rulesFile" role="button" tabindex="0">Importar reglas (Excel de ChatGPT)</label><input id="rulesFile" type="file" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="sr">
         ${rulesCount ? `<p class="muted small">${rulesCount} reglas de categorías guardadas en este móvil.</p>` : ""}
@@ -1407,7 +1407,7 @@ const subpages = {
       <section class="card"><h2>📔 Tu diario</h2><p>${s?.diary ? `<b>${s.diary}</b> días con algo apuntado. MANU los rellena solo con tus gastos, tareas, ideas, recordatorios, agenda, ánimo, hábitos, comidas y salud.` : "MANU irá guardando aquí un resumen de cada día con lo que apuntes."}</p><p class="muted small">Pregúntale «¿qué hice ayer?», «¿cuánto gasté el martes?» o «¿qué pasó el 12?».</p></section>
       <section class="card"><h2>ChatGPT</h2>
         ${s?.count ? `<p><b>${(s.count).toLocaleString("es-ES")}</b> conversaciones${s.manu ? ` (${(s.count - s.manu).toLocaleString("es-ES")} de ChatGPT y ${(s.manu).toLocaleString("es-ES")} con MANU)` : ""} · ${(s.mine).toLocaleString("es-ES")} mensajes tuyos · de ${esc(d(s.from))} a ${esc(d(s.to))}</p>` : '<p class="muted">Cuando te llegue el correo de ChatGPT, descarga el .zip y elígelo aquí (sin descomprimir). También vale el archivo conversations.json.</p>'}
-        ${archive.busy ? '<p class="muted small">Deja MANU abierto y la pantalla encendida hasta que termine. Solo lee tus conversaciones: fotos y audios del .zip se quedan fuera.</p>' : ""}
+        ${archive.busy ? '<p class="muted small">Deja MANU abierta hasta que termine. Fotos y audios del .zip no se leen.</p>' : ""}
         <label class="btn ${s?.count ? "ghost" : ""} block" for="archiveFile" role="button" tabindex="0">${archive.busy ? esc(archive.busy) : s?.count ? "Volver a importar" : "Elegir la exportación de ChatGPT"}</label><input id="archiveFile" type="file" accept=".zip,.json,application/zip,application/json" class="sr">
         <p class="muted small">En ChatGPT: Ajustes → Controles de datos → Exportar datos. Llega un correo con el enlace.</p></section>
       ${s?.count || s?.diary ? `<section class="card"><h2>Pregúntale a tu archivo</h2>${aiReady() ? `<form id="archiveAsk" class="composer-inline"><label for="archiveAskQ" class="sr">Pregunta</label><input id="archiveAskQ" placeholder="¿Qué me recomendaron para Lisboa?" autocomplete="off"><button class="btn" type="submit">${archive.asking ? "Pensando…" : "Preguntar"}</button></form><p class="muted small">MANU busca aquí en tu iPhone y solo envía a Gemini los trozos que tienen que ver. Crisis, Refugio y contraseñas nunca salen${sensitiveAllowed() ? "" : "; salud, dinero y ánimo tampoco (Tú → IA)"}.</p>` : '<p class="muted">Activa la IA (Tú → IA) para preguntarle. Buscar funciona sin IA.</p>'}
@@ -1502,12 +1502,12 @@ const subpages = {
       <section class="card"><h2>ID de cliente</h2>
         <form id="gcalForm" class="stack"><label for="gcalId" class="muted small">ID de cliente OAuth (termina en .apps.googleusercontent.com). No es una contraseña.</label><input id="gcalId" value="${esc(id)}" autocomplete="off" spellcheck="false" placeholder="123-abc.apps.googleusercontent.com"><button class="btn ghost" type="submit">Guardar ID</button></form></section>
       ${ok && !anyOn ? `<section class="card"><h2>Conectar Google</h2><p class="muted small">Activa Calendar, Tasks y los cumpleaños de Contactos y pide los permisos en una sola ventana. Puedes desactivar cualquiera después.</p><button class="btn block" data-act="google-connect-all">Conectar Google</button></section>` : ""}
-      ${ok ? `<section class="card"><h2>Servicios</h2><p class="muted small">Cada servicio pide solo su permiso. Al sincronizar, los que actives se piden juntos en una sola ventana; si rechazas uno, los demás siguen funcionando.</p>
-        <div class="row"><div class="grow"><div>Actualizar al abrir Agenda u Hoy</div><div class="muted small">Si han pasado más de 10 minutos. Cuando el permiso de Google ha caducado (cada hora, aprox.), puede abrirse un momento su ventana.</div></div><button class="check" data-act="gauto" aria-pressed="${vault.settings.googleAutoOpen !== false}" aria-label="Actualizar al abrir">${I.check}</button></div>
+      ${ok ? `<section class="card"><h2>Servicios</h2><p class="muted small">Cada servicio pide solo su permiso, todos en una ventana.</p>
+        <div class="row"><div class="grow"><div>Actualizar al abrir Agenda u Hoy</div><div class="muted small">Cada 10 minutos como mucho. A veces se abre un momento la ventana de Google.</div></div><button class="check" data-act="gauto" aria-pressed="${vault.settings.googleAutoOpen !== false}" aria-label="Actualizar al abrir">${I.check}</button></div>
         ${GOOGLE_FEATURES.map(([k, label, desc]) => `<div class="row"><div class="grow"><div>${label}</div><div class="muted small">${esc(desc)}${st[k] && st[k] !== "off" ? ` · ${esc(st[k].replace(/^ok: /, "").replace(/^error: /, "⚠︎ "))}` : ""}</div></div><button class="check" data-act="gfeature" data-k="${k}" aria-pressed="${googleOn(k)}" aria-label="${label}">${I.check}</button></div>`).join("")}
         ${["calendar", "tasks", "contacts", "gmail"].some(googleOn) ? `<button class="btn" data-act="gcal-sync">${gcal.busy ? "Sincronizando…" : "Sincronizar ahora"}</button>` : ""}</section>` : ""}
       ${ok && googleOn("drive") ? `<section class="card"><h2>Copia completa cifrada en Drive</h2>
-        <p class="muted small">Se cifra en tu móvil (AES-256-GCM) con una frase que eliges tú y que nunca se guarda ni se sube. Sin la frase, nadie puede leerla, tampoco Google ni MANU. Si la olvidas, la copia no se puede recuperar. La copia solo se sube cuando pulsas el botón.</p>
+        <p class="muted small">Se cifra con una frase tuya que no se guarda en ningún sitio. Si la olvidas, la copia no se puede abrir.</p>
         <form id="driveForm" class="stack"><label for="drivePass" class="muted small">Frase de la copia (mínimo 10 caracteres)</label><input id="drivePass" type="password" autocomplete="new-password" minlength="10">
           <div class="btns"><button class="btn ghost" type="submit" data-drive="save">Cifrar y subir</button><button class="btn ghost" type="submit" data-drive="restore">Descargar y restaurar</button></div></form>
         ${confirmDriveRestore ? `<p>La copia de Drive es del ${esc(new Date(confirmDriveRestore.file.modifiedTime).toLocaleString("es-ES"))} y se ha descifrado bien. Reemplazará lo que hay en este móvil.</p><div class="btns"><button class="btn danger" data-act="drive-restore-yes">Sí, restaurar</button><button class="btn ghost" data-act="drive-restore-no">Cancelar</button></div>` : ""}</section>` : ""}
@@ -1527,7 +1527,7 @@ const subpages = {
       <ol class="muted small">${x.steps.map((st) => `<li>${st}</li>`).join("")}</ol>
       <div class="btns">${x.test ? `<a class="btn ghost" href="${esc(safeHref(x.test))}">Probar</a>` : ""}${done[x.id] ? `<button class="btn ghost" data-act="shortcut-undo" data-id="${x.id}">Marcar como pendiente</button>` : `<button class="btn" data-act="shortcut-done" data-id="${x.id}">Ya lo tengo</button>`}</div></details>`;
     return `${backBar("Atajos")}
-      <p class="muted small">Apple no deja que una web instale atajos por ti: cada uno se crea una vez en la app Atajos con el nombre exacto (unos 2 minutos). Pulsa «Probar» para comprobarlo y «Ya lo tengo» para quitarlo de pendientes. Los nombres de las acciones pueden variar según tu iOS.</p>
+      <p class="muted small">Cada atajo se crea una vez en la app Atajos, con el nombre exacto. Cuando lo tengas, pulsa «Ya lo tengo».</p>
       ${buzonCard()}
       ${sectionTitle(`Pendientes (${pending.length})`)}
       <div class="stack">${pending.map(card).join("") || '<p class="muted">Nada pendiente.</p>'}</div>
@@ -1566,7 +1566,7 @@ const subpages = {
         <div class="btns"><button class="btn" data-act="clock-dl" data-kind="xlsx">⬇️ Informe en Excel</button><button class="btn ghost" data-act="clock-copy">📋 Copiar como nota</button><button class="btn ghost" data-act="clock-dl" data-kind="ics">📅 Calendario</button><button class="btn ghost" data-act="clock-dl" data-kind="csv">CSV</button></div></section>
       <div class="row month-nav"><button class="link" data-act="clock-month" data-d="-1" aria-label="Mes anterior">‹ Anterior</button><b class="grow center">${esc(title)}</b>${isNow ? "<span></span>" : '<button class="link" data-act="clock-month" data-d="1" aria-label="Mes siguiente">Siguiente ›</button>'}</div>
       <section class="card">${r.rows.length ? r.rows.slice().reverse().map(dayRow).join("") : '<p class="muted">Aún no hay fichajes este mes. Usa la tarjeta «⏱️ Fichaje» de Hoy.</p>'}</section>
-      <section class="card"><h2>Tu jornada</h2><form class="row" id="clockTargetForm"><label for="clockTarget" class="grow">Horas por día</label><input id="clockTarget" type="time" value="${esc(`${String(Math.floor(clockTarget() / 60)).padStart(2, "0")}:${String(clockTarget() % 60).padStart(2, "0")}`)}"></form><p class="muted small">Con ella se calcula a qué hora puedes salir y cuánto te debe RK. Todo se queda en tus dispositivos (y en Tu nube si la usas).</p></section>`;
+      <section class="card"><h2>Tu jornada</h2><form class="row" id="clockTargetForm"><label for="clockTarget" class="grow">Horas por día</label><input id="clockTarget" type="time" value="${esc(`${String(Math.floor(clockTarget() / 60)).padStart(2, "0")}:${String(clockTarget() % 60).padStart(2, "0")}`)}"></form><p class="muted small">Para calcular tu hora de salida y el saldo con RK.</p></section>`;
   },
   nube() {
     const st = nube.state;
@@ -1623,10 +1623,10 @@ const subpages = {
     return `${backBar("Avisos y Atajos")}
       <section class="card"><h2>${I.bell} Avisos de MANU</h2><p class="muted">${esc(status)}</p>
         <div class="btns">${n === "default" ? '<button class="btn" data-act="notify-on">Activar avisos</button>' : ""}${n === "granted" ? '<button class="btn ghost" data-act="notify-test">Probar un aviso</button>' : ""}</div>
-        <p class="muted small">Los recordatorios avisan mientras MANU está abierta. Para que suenen siempre, mándalos al iPhone con los atajos de abajo.</p></section>
+        <p class="muted small">Con MANU abierta. Para que suenen siempre, usa los atajos.</p></section>
       <section class="card"><h2>Qué te aviso</h2>
         ${(() => { const prefs = nudgePrefs(vault.settings.nudges); return NUDGES.map((n) => `<div class="row nudge-row"><button class="check" data-act="nudge-toggle" data-id="${n.id}" aria-pressed="${prefs[n.id].on}" aria-label="${esc(n.label)}">${I.check}</button><div class="grow"><div>${esc(n.label)}</div><div class="muted small">${esc(n.hint)}</div></div>${n.time === null ? `<span class="muted small">${n.id === "ficharEntrada" ? esc(addMinutes(vault.settings.workStart ?? "09:00", 1)) : esc(addMinutes(vault.settings.workStart ?? "09:00", clockTarget()))}</span>` : `<label class="sr" for="nt-${n.id}">Hora de «${esc(n.label)}»</label><input id="nt-${n.id}" type="time" data-nudge-time="${n.id}" value="${esc(prefs[n.id].time)}"${prefs[n.id].on ? "" : " disabled"}>`}</div>`).join(""); })()}
-        <p class="muted small">Solo te avisa cuando hace falta (si ya has fichado, marcado el ánimo o dicho dónde trabajas, no). Con MANU cerrada en el iPhone, iOS no la deja avisar: para las de hora fija crea las automatizaciones de <button class="link small" data-sub-go="atajos">Atajos</button> («MANU Fichaje» y «MANU Noche»).</p></section>
+        <p class="muted small">Solo avisa si hace falta. Con MANU cerrada, usa las automatizaciones de <button class="link small" data-sub-go="atajos">Atajos</button> («MANU Fichaje» y «MANU Noche»).</p></section>
       <section class="card"><h2>${I.bolt} Atajos</h2><p class="muted small">Los atajos del iPhone tienen ahora su propia sección.</p><button class="btn ghost" data-sub-go="atajos">Ir a Atajos</button></section>
       <section class="card" hidden><h2>${I.bolt} Atajos (se crean una vez)</h2>
         <p class="muted small">Crea estos atajos en la app Atajos con el nombre exacto. Los nombres de las acciones pueden variar según tu iOS. NO_VERIFICADO en tu iPhone.</p>
@@ -2211,7 +2211,7 @@ function localAnswer(intent) {
 function aiModeCard() {
   const m = aiMode();
   return `<section class="card"><h2>💬 Modo conversación</h2>
-    <p class="muted small">MANU habla contigo usando Gemini: recuerda la conversación, sabe lo que elijas de tu vida y gestiona tus cosas. Lo que escribes y lo que marques aquí se envía a Google en cada mensaje.</p>
+    <p class="muted small">MANU conversa con Gemini y recuerda lo que hablas. Lo que escribes y lo que marques aquí va a Google.</p>
     ${m.on ? `<div class="row"><span class="grow">Activado</span><button class="btn ghost small-btn" data-act="ai-mode" data-v="off">Desactivar</button></div>` : `<div class="btns"><button class="btn" data-act="ai-mode" data-v="full">Activar con todo</button><button class="btn ghost" data-act="ai-mode" data-v="basic">Solo lo básico</button></div><p class="muted small">«Con todo» incluye también dinero, salud, ánimo y personas. «Solo lo básico»: agenda, tareas, tiempo y hábitos.</p>`}
     ${m.on ? `<p class="small"><b>Qué sabe MANU</b></p>${CONTEXT_CATEGORIES.map((c) => `<div class="row"><div class="grow"><div>${c.sensitive ? "🔒 " : ""}${esc(c.label)}</div>${c.sensitive ? '<div class="muted small">Dato sensible: solo si tú lo marcas.</div>' : c.note ? `<div class="muted small">${esc(c.note)}</div>` : ""}</div><button class="check" data-act="ai-ctx" data-k="${c.key}" aria-pressed="${Boolean(m.context[c.key])}" aria-label="${esc(c.label)}">${I.check}</button></div>`).join("")}
       <div class="row"><div class="grow"><div>Que haga las cosas sin preguntar</div><div class="muted small">Crear tareas, ideas y recordatorios, completar tareas. Siempre con «Deshacer». Gastos y cambios de la app siguen pidiendo tu toque.</div></div><button class="check" data-act="ai-auto-actions" aria-pressed="${m.autoActions}" aria-label="Hacer sin preguntar">${I.check}</button></div>
@@ -3570,7 +3570,7 @@ function fullBackupCard() {
       <div class="btns"><button class="btn danger" data-act="full-restore-yes">${full.busy === "restore" ? "Restaurando…" : "Sí, restaurar"}</button><button class="btn ghost" data-act="full-restore-no">Cancelar</button></div></section>`;
   }
   return `<section class="card"><h2>💾 Copia completa</h2>
-    <p class="muted small">Si borras los datos de Safari o cambias de iPhone, se pierde todo lo que no esté en una copia. Esta guarda tus datos, capturas, «Tu archivo» y el diario. La clave de Gemini y los tokens de Spotify nunca van dentro.</p>
+    <p class="muted small">Si cambias de iPhone o borras Safari, solo se salva lo que esté en una copia. Las claves no van dentro.</p>
     <p class="small">${last ? `Última copia: hace ${daysSince(last.at) === 0 ? "menos de un día" : `${daysSince(last.at)} ${daysSince(last.at) === 1 ? "día" : "días"}`} (${esc(last.where === "drive" ? "en tu Drive" : "descargada")}, ${esc(last.mb)} MB).` : "Aún no has hecho ninguna copia completa."}</p>
     <form id="fullForm" class="stack" autocomplete="off">
       <label for="fullPass" class="muted small">Frase para cifrarla (mín. 10 caracteres; sin ella no se puede abrir, apúntala en un sitio seguro)</label>
@@ -3825,7 +3825,7 @@ function addMoneyCard() {
   return `<section class="card add-money"><h2>Añadir</h2>
     <div class="btns"><button class="btn" data-act="sheet" data-kind="EXPENSE">➖ Gasto</button><button class="btn ghost" data-act="income-add" aria-expanded="${incomeForm}">➕ Ingreso</button><label class="btn ghost" for="bankShots" role="button" tabindex="0">📸 Capturas del banco</label><input id="bankShots" type="file" accept="image/*" multiple class="sr"></div>
     ${form}${review}
-    ${bankRead ? "" : `<p class="muted small">Haz capturas de los movimientos en la app del banco (hasta ${MAX_SHOTS} a la vez). Las lee Gemini, así que se envían a Google; tú revisas antes de guardar.</p>`}</section>`;
+    ${bankRead ? "" : `<p class="muted small">Hasta ${MAX_SHOTS} capturas. Las lee Gemini (van a Google) y tú revisas antes de guardar.</p>`}</section>`;
 }
 async function readBankShots(files) {
   const list = [...files].filter((f) => /^image\//.test(f.type)).slice(0, MAX_SHOTS);
