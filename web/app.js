@@ -42,9 +42,12 @@ import { isSpotifyClientId, pkceValid, randomVerifier, challengeFor, authorizeUr
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
 import { NUDGES, nudgePrefs, dueNudges, markSent } from "./core/nudges.js";
 import { parseCommand, suggest } from "./core/commands.js";
+import { toAsk, equalSplit, detailSplit, debts, settleAll, debtLine, reminderText } from "./core/split.js";
+import { buildBankShotsPayload, parseBankShots, alreadyThere, MAX_SHOTS } from "./core/bankshot.js";
+import { incomeKind } from "./core/bank.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "79";
+export const APP_VERSION = "80";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -1219,6 +1222,7 @@ const screens = {
       <button class="cmdk-pill glass" data-act="cmdk" aria-label="Comando rápido">⚡ <span>Haz algo rápido… <span class="muted">entro, gasto 12 café, hábitos</span></span></button>
       ${nowCard()}
       ${clockCard()}
+      ${toAsk(vault.spending, today()).length || splitDraft ? splitAskCard() : ""}
       ${closingCard()}
       ${briefingCard()}
       ${nightCard()}
@@ -1291,6 +1295,7 @@ const screens = {
       <div class="stack">
       <section class="card hero money-hero">${celebrateMoney ? moneyRain() : ""}<div class="row cal-head"><button class="link" data-act="money-prev" aria-label="Mes anterior">${I.back}</button><h2>${moneyMonth === 0 ? "Gastado este mes" : `Gastado en ${esc(monthName.replace(/ de \d{4}$/, ""))}`}</h2><button class="link" data-act="money-next" aria-label="Mes siguiente"${moneyMonth === 0 ? " disabled" : ""}>${I.chev}</button></div><div class="big-money" data-count-money="${month.total}">${euros(month.total)}</div>
         ${cats.map(([c, v]) => { const lim = moneyMonth === 0 ? vault.settings.budgets?.[c] : null; return `<div class="stack"><div class="row"><span>${esc(catLabel(c))}</span><span class="num">${euros(v)}${lim ? `<span class="muted small"> / ${euros(lim)}</span>` : ""}</span></div><div class="bar${lim && v > lim ? " over" : lim && v >= lim * 0.8 ? " warn" : ""}"><i data-w="${Math.max(3, Math.round((v / (lim ? Math.max(lim, v) : max)) * 100))}"></i></div></div>`; }).join("")}</section>
+      ${moneyMonth === 0 ? `${splitAskCard()}${addMoneyCard()}${debtsCard()}` : ""}
       ${moneyMonth === 0 ? budgetCard() : ""}
       ${moneyStatsSection(ref, monthName)}
       <section class="card"><h2>${I.box} Importar del banco</h2>
@@ -1464,7 +1469,7 @@ const subpages = {
       ${soon.length ? `<section class="card"><h2>Cumpleaños próximos</h2>${soon.map((b) => `<div class="row"><span class="grow">${esc(b.person.name)}</span><span class="muted">${b.days === 0 ? "¡Hoy!" : (b.days === 1 ? "Mañana" : `En ${b.days} días`)}</span></div>`).join("")}</section>` : ""}
       ${quiet.length ? `<section class="card"><h2>Hace tiempo que no hablas con</h2>${quiet.map((p) => `<div class="row"><span class="grow">${esc(p.name)}</span><button class="link small" data-act="talked" data-id="${esc(p.id)}">Hablé hoy</button></div>`).join("")}</section>` : ""}
       ${sectionTitle("Todas")}
-      <div class="list">${vault.people.length ? vault.people.map((p) => { const d = daysUntilBirthday(p.birthday); return `<details><summary class="item"><span class="ico purple">${esc(p.name.slice(0, 1).toUpperCase())}</span><span class="grow"><span>${esc(p.name)}</span><br><span class="muted small">${d !== null ? `${d === 1 ? "Cumple mañana" : `Cumple en ${d} días`}` : "Sin cumpleaños"}${p.lastContact ? ` · última vez ${new Date(p.lastContact).toLocaleDateString("es-ES", { day: "numeric", month: "short" })}` : ""}</span></span></summary>
+      <div class="list">${vault.people.length ? vault.people.map((p) => { const d = daysUntilBirthday(p.birthday); return `<details><summary class="item"><span class="ico purple">${esc(p.name.slice(0, 1).toUpperCase())}</span><span class="grow"><span>${esc(p.name)}</span><br><span class="muted small">${d !== null ? `${d === 1 ? "Cumple mañana" : `Cumple en ${d} días`}` : "Sin cumpleaños"}${p.lastContact ? ` · última vez ${new Date(p.lastContact).toLocaleDateString("es-ES", { day: "numeric", month: "short" })}` : ""}${(() => { const d = debts(vault.spending).find((x) => x.key === p.id); return d ? ` · <b>te debe ${esc(eurosTxt(d.cents))}</b>` : ""; })()}</span></span></summary>
         <div class="inner">${p.notes ? `<p>${esc(p.notes)}</p>` : '<p class="muted small">Sin notas.</p>'}<div class="btns">${p.birthday && !p.calendarEventId && googleOn("calendar") ? `<button class="btn ghost" data-act="person-cal" data-id="${esc(p.id)}">🎂 Al calendario</button>` : ""}${p.birthday && p.googleId && vault.contacts?.some((c) => c.googleId === p.googleId && !c.birthday) ? `<button class="btn ghost" data-act="person-gcontact" data-id="${esc(p.id)}">📇 A Google Contactos</button>` : ""}${whatsappUrl(p.phone, "") ? `<a class="btn ghost" href="${esc(whatsappUrl(p.phone, `¡Hola, ${p.name.split(" ")[0]}!`))}" target="_blank" rel="noopener">WhatsApp</a>` : ""}<button class="btn ghost" data-act="talked" data-id="${esc(p.id)}">Hablé hoy</button><button class="btn danger" data-act="del" data-list="people" data-id="${esc(p.id)}">Quitar</button></div></div></details>`; }).join("") : '<p class="muted item">Aún no hay nadie.</p>'}</div>
       <form class="card" id="addPerson"><h2>Añadir persona</h2>
         <label for="pName" class="muted small">Nombre${vault.contacts?.length ? ` (busca entre tus ${vault.contacts.length} contactos)` : ""}</label><input id="pName" maxlength="60" required autocomplete="off" placeholder="${vault.contacts?.length ? "Escribe «eva» y elige" : ""}">
@@ -2644,6 +2649,17 @@ document.addEventListener("click", (e) => {
 });
 document.addEventListener("input", (e) => {
   if (e.target.id === "fullPass") { full.pass = e.target.value; return; }
+  // WEB-80: the split card. Searching redraws only the matches (the keyboard stays).
+  if (e.target.id === "splitQ") {
+    const entryId = splitDraft?.entryId ?? toAsk(vault.spending, today())[0]?.id;
+    if (!entryId) return;
+    splitDraft = splitDraft?.entryId ? splitDraft : { entryId, people: [], mode: null, q: "" };
+    splitDraft.q = e.target.value;
+    const pos = e.target.selectionStart; render(); const n = $("splitQ"); if (n) { n.focus(); n.setSelectionRange(pos, pos); }
+    return;
+  }
+  if (e.target.dataset?.splitWhat && splitDraft) { const p = splitDraft.people.find((x) => x.key === e.target.dataset.splitWhat); if (p) p.what = e.target.value.slice(0, 60); return; }
+  if (e.target.dataset?.splitCents && splitDraft) { const p = splitDraft.people.find((x) => x.key === e.target.dataset.splitCents); if (p) p.cents = toCents(e.target.value) ?? 0; return; }
   if (e.target.id !== "pName") return;
   if (pickedContact && pickedContact.name !== e.target.value) pickedContact = null;
   renderContactMatches(e.target.value);
@@ -2951,6 +2967,34 @@ document.addEventListener("click", async (e) => {
     case "tomorrow-reset": vault.settings.tomorrow = null; persist(); render(); break;
     case "notify-on": await enableNotifications(); render(); break;
     case "cmdk": openCmdk(); break;
+    case "income-add": incomeForm = !incomeForm; render(); if (incomeForm) $("inAmount")?.focus(); break;
+    case "bank-tick": { const m = bankRead?.items?.[Number(a.dataset.i)]; if (m) { m.on = !m.on; render(); } break; }
+    case "bank-save": saveBankShots(); break;
+    case "bank-cancel": bankRead = null; render(); break;
+    case "split-person": {
+      const key = a.dataset.key;
+      const e = splitDraft?.entryId ? splitDraft : { entryId: (vault.spending.find((x) => x.id === splitDraft?.entryId) ?? toAsk(vault.spending, today())[0])?.id, people: [], mode: null, q: "" };
+      if (!e.entryId) break;
+      const p = vault.people.find((x) => x.id === key);
+      e.people = e.people.some((x) => x.key === key) ? e.people.filter((x) => x.key !== key) : p ? [...e.people, { key, name: p.name, ...(p.googleId ? { googleId: p.googleId } : {}) }] : e.people;
+      e.q = ""; splitDraft = e; render(); break;
+    }
+    case "split-contact": {
+      const p = personFromContact(a.dataset.gid);
+      const e = splitDraft?.entryId ? splitDraft : { entryId: toAsk(vault.spending, today())[0]?.id, people: [], mode: null, q: "" };
+      if (!p || !e.entryId) break;
+      if (!e.people.some((x) => x.key === p.id)) e.people.push({ key: p.id, name: p.name, googleId: p.googleId });
+      e.q = ""; splitDraft = e; persist(); render(); break;
+    }
+    case "split-mode": if (splitDraft) { splitDraft.mode = a.dataset.mode || null; render(); } break;
+    case "split-save": saveSplit(a.dataset.mode); break;
+    case "split-none": { const ids = new Set(toAsk(vault.spending, today()).map((x) => x.id)); vault.spending = vault.spending.map((x) => (ids.has(x.id) ? { ...x, splitAsked: true } : x)); splitDraft = null; persist(); render(); break; }
+    case "split-alone": vault.spending = vault.spending.map((x) => (x.id === a.dataset.id ? { ...x, splitAsked: true } : x)); splitDraft = null; persist(); render(); break;
+    case "debt-paid": {
+      const d = debts(vault.spending).find((x) => x.key === a.dataset.key);
+      if (d && window.confirm(`¿${d.name.split(" ")[0]} te ha pagado los ${eurosTxt(d.cents)}?`)) { vault.spending = settleAll(vault.spending, d.key, new Date()); persist(); render(); toast("Saldado"); }
+      break;
+    }
     case "nudge-toggle": {
       const cur = nudgePrefs(vault.settings.nudges)[a.dataset.id];
       if (!cur) break;
@@ -3030,6 +3074,16 @@ document.addEventListener("submit", async (e) => {
     persist(); render(); toast(id ? "ID guardado" : "Google Calendar desconectado"); return;
   }
   if (f === "workStartForm" || f === "clockTargetForm") return;
+  if (f === "incomeForm") {
+    const cents = toCents($("inAmount").value);
+    if (!cents) { toast("Pon un importe"); return; }
+    const concept = ($("inConcept").value || "Ingreso").trim().slice(0, 80);
+    const day = /^\d{4}-\d{2}-\d{2}$/.test($("inDate").value) ? $("inDate").value : localDay();
+    const [y, mo, d] = day.split("-").map(Number);
+    vault.income.push({ id: uid("in"), cents, concept, at: new Date(y, mo - 1, d, 12).toISOString(), source: "MANUAL", kind: incomeKind(concept) });
+    incomeForm = false; persist(); render(); toast(`Ingreso de ${euros(cents)} guardado`);
+    return;
+  }
   if (f === "spotifyForm") {
     const id = $("spId").value.trim();
     if (id && !isSpotifyClientId(id)) { toast("Ese no parece un Client ID de Spotify"); return; }
@@ -3247,6 +3301,7 @@ document.addEventListener("change", async (e) => {
     } catch { toast("No he podido leer ese Excel."); }
     return;
   }
+  if (e.target.id === "bankShots" && e.target.files?.length) { const files = [...e.target.files]; e.target.value = ""; readBankShots(files); return; }
   if (e.target.id === "buzonFile" && e.target.files?.[0]) {
     const file = e.target.files[0]; e.target.value = "";
     if (file.size > 5_000_000) { toast("Ese archivo es demasiado grande para ser el buzón."); return; }
@@ -3715,6 +3770,106 @@ function applyIr() {
   return goTo(ir[1]);
 }
 applyIr();
+// ---------- Dinero: añadir, capturas del banco y gastos compartidos (WEB-80) ----------
+let incomeForm = false;      // the «+ Ingreso» form is open
+let bankRead = null;         // { busy } while Gemini reads; { items: [{...mov, on}] } to review
+let splitDraft = null;       // { entryId, people: [{ key, name, googleId? }], mode: null|"detail", q: "" }
+const eurosTxt = (c) => euros(c);
+// People to offer first: whoever he talks to most recently.
+const splitCandidates = () => [...(vault.people ?? [])].sort((a, b) => String(b.lastContact ?? "").localeCompare(String(a.lastContact ?? ""))).slice(0, 8);
+function personFromContact(gid) {
+  const c = vault.contacts?.find((x) => x.googleId === gid);
+  if (!c) return null;
+  let p = vault.people.find((x) => x.googleId === gid);
+  if (!p) { p = { id: uid("p"), name: c.name, googleId: gid, ...(c.birthday ? { birthday: c.birthday } : {}) }; vault.people.push(p); }
+  return p;
+}
+function splitAskCard() {
+  const e = splitDraft ? vault.spending.find((x) => x.id === splitDraft.entryId) : toAsk(vault.spending, today())[0];
+  if (!e) return "";
+  const d = splitDraft?.entryId === e.id ? splitDraft : null;
+  const when = new Date(e.at).toLocaleDateString("es-ES", { weekday: "long", day: "numeric" });
+  const chosen = new Set((d?.people ?? []).map((p) => p.key));
+  const chips = [...(d?.people ?? []), ...splitCandidates().filter((p) => !chosen.has(p.id)).map((p) => ({ key: p.id, name: p.name }))]
+    .map((p) => `<button class="chip${chosen.has(p.key) ? " on" : ""}" data-act="split-person" data-key="${esc(p.key)}" aria-pressed="${chosen.has(p.key)}">${esc(p.name.split(" ")[0])}</button>`).join("");
+  const q = d?.q ?? "";
+  const matches = q.trim().length >= 2 ? [
+    ...vault.people.filter((p) => !chosen.has(p.id) && normalise(p.name).includes(normalise(q))).slice(0, 5).map((p) => `<button class="contact-row" data-act="split-person" data-key="${esc(p.id)}"><span class="grow">${esc(p.name)}</span></button>`),
+    ...searchContacts(vault.contacts ?? [], q, vault.people).filter((c) => !c.added).slice(0, 5).map((c) => `<button class="contact-row" data-act="split-contact" data-gid="${esc(c.googleId)}"><span class="grow">${esc(c.name)} <span class="muted small">· Google</span></span></button>`),
+  ].join("") : "";
+  const detail = d?.mode === "detail" ? `<div class="stack split-detail">${d.people.map((p) => `<div class="row"><span class="grow">${esc(p.name.split(" ")[0])}</span><label class="sr" for="sw-${esc(p.key)}">Qué tomó ${esc(p.name)}</label><input id="sw-${esc(p.key)}" data-split-what="${esc(p.key)}" placeholder="qué tomó" maxlength="60" value="${esc(p.what ?? "")}"><label class="sr" for="sc-${esc(p.key)}">Cuánto ${esc(p.name)}</label><input id="sc-${esc(p.key)}" class="num split-amount" data-split-cents="${esc(p.key)}" inputmode="decimal" placeholder="€" value="${p.cents ? esc((p.cents / 100).toFixed(2).replace(".", ",")) : ""}"></div>`).join("")}
+      <p class="muted small">Lo que no pongas es tuyo.</p><div class="btns"><button class="btn" data-act="split-save" data-mode="detail">Guardar</button><button class="btn ghost" data-act="split-mode" data-mode="">Atrás</button></div></div>` : "";
+  return `<section class="card split-ask" aria-labelledby="splitTitle"><h2 id="splitTitle">🍻 ${esc(eurosTxt(e.cents))}${e.merchant ? ` en ${esc(e.merchant)}` : ""}</h2>
+    <p>${d?.people?.length ? "¿Cómo lo repartís?" : `¿Con quién estabas el ${esc(when)}?`}</p>
+    ${d?.mode === "detail" ? detail : `<div class="chips" role="group" aria-label="Personas">${chips}</div>
+    <label class="sr" for="splitQ">Buscar persona o contacto</label><input id="splitQ" placeholder="Busca en Personas o Google Contactos" autocomplete="off" value="${esc(q)}"><div class="contact-matches">${matches}</div>
+    <div class="btns">${d?.people?.length ? `<button class="btn" data-act="split-save" data-mode="equal">A partes iguales (${esc(eurosTxt(Math.floor(e.cents / (d.people.length + 1))))} cada uno)</button><button class="btn ghost" data-act="split-mode" data-mode="detail">Cada uno lo suyo</button>` : ""}<button class="btn ghost" data-act="split-alone" data-id="${esc(e.id)}">Pagué solo yo</button></div>${toAsk(vault.spending, today()).length > 1 && !d?.people?.length ? `<button class="link small" data-act="split-none">No preguntar por estos ${toAsk(vault.spending, today()).length}</button>` : ""}`}</section>`;
+}
+function debtsCard() {
+  const list = debts(vault.spending);
+  if (!list.length) return "";
+  const total = list.reduce((s, d) => s + d.cents, 0);
+  return `<section class="card debts"><h2>🤝 Te deben ${esc(eurosTxt(total))}</h2>${list.map((d) => {
+    const p = vault.people.find((x) => x.id === d.key);
+    const wa = p?.phone ? whatsappUrl(p.phone, reminderText(d)) : null;
+    return `<div class="stack debt"><div class="row"><span class="grow">${esc(debtLine(d))}</span></div><div class="btns">${wa ? `<a class="btn ghost small-btn" href="${esc(safeHref(wa))}" target="_blank" rel="noopener">Recordárselo</a>` : ""}<button class="btn small-btn" data-act="debt-paid" data-key="${esc(d.key)}">Me ha pagado</button></div></div>`;
+  }).join("")}</section>`;
+}
+function addMoneyCard() {
+  const form = incomeForm ? `<form id="incomeForm" class="stack"><label for="inAmount" class="muted small">Ingreso</label><input id="inAmount" inputmode="decimal" placeholder="Importe (€)" required>
+      <label for="inConcept" class="sr">Concepto</label><input id="inConcept" placeholder="Concepto (nómina, Bizum de Ana…)" maxlength="80">
+      <label for="inDate" class="sr">Fecha</label><input id="inDate" type="date" value="${esc(localDay())}"><div class="btns"><button class="btn" type="submit">Guardar ingreso</button><button class="btn ghost" type="button" data-act="income-add">Cancelar</button></div></form>` : "";
+  const review = bankRead?.busy ? `<p class="muted">📸 ${esc(bankRead.busy)}</p>` : bankRead?.items ? `<div class="stack bank-review"><p><b>${bankRead.items.length ? `He leído ${bankRead.items.length} movimiento${bankRead.items.length === 1 ? "" : "s"}` : "No he visto movimientos claros en esas capturas."}</b>${bankRead.items.some((x) => !x.on) ? ' <span class="muted small">Los que ya tenías van sin marcar.</span>' : ""}</p>
+      ${bankRead.items.map((m, i) => `<div class="row"><button class="check" data-act="bank-tick" data-i="${i}" aria-pressed="${m.on}" aria-label="Añadir ${esc(m.concept)}">${I.check}</button><div class="grow"><div>${esc(m.concept)}</div><div class="muted small">${esc(new Date(m.at).toLocaleDateString("es-ES", { day: "numeric", month: "short" }))}${m.income ? ` · ${esc(INCOME_KIND[m.kind] ?? "Ingreso")}` : ""}</div></div><b class="num ${m.income ? "pos" : ""}">${m.income ? "+" : "−"}${esc(eurosTxt(m.cents))}</b></div>`).join("")}
+      <div class="btns">${bankRead.items.some((x) => x.on) ? `<button class="btn" data-act="bank-save">Añadir ${bankRead.items.filter((x) => x.on).length}</button>` : ""}<button class="btn ghost" data-act="bank-cancel">${bankRead.items.length ? "Descartar" : "Vale"}</button></div></div>` : "";
+  return `<section class="card add-money"><h2>Añadir</h2>
+    <div class="btns"><button class="btn" data-act="sheet" data-kind="EXPENSE">➖ Gasto</button><button class="btn ghost" data-act="income-add" aria-expanded="${incomeForm}">➕ Ingreso</button><label class="btn ghost" for="bankShots" role="button" tabindex="0">📸 Capturas del banco</label><input id="bankShots" type="file" accept="image/*" multiple class="sr"></div>
+    ${form}${review}
+    ${bankRead ? "" : `<p class="muted small">Haz capturas de los movimientos en la app del banco (hasta ${MAX_SHOTS} a la vez). Las lee Gemini, así que se envían a Google; tú revisas antes de guardar.</p>`}</section>`;
+}
+async function readBankShots(files) {
+  const list = [...files].filter((f) => /^image\//.test(f.type)).slice(0, MAX_SHOTS);
+  if (!list.length) return;
+  if (!aiReady()) { toast("Para leer capturas necesito tu clave de Gemini (Tú → IA)"); return; }
+  if (!sensitiveAllowed() && !window.confirm("Las capturas del banco se enviarán a Google (Gemini) para leer los movimientos. No se guardan en Google Drive ni en el chat. ¿Seguimos?")) return;
+  bankRead = { busy: `Leyendo ${list.length} captura${list.length === 1 ? "" : "s"}…` }; render();
+  try {
+    const shots = [];
+    for (const f of list) shots.push((await compressImage(f)).split(",")[1]);
+    const { text } = await askWithActions({ key: aiStore.key, model: aiStore.model, payload: buildBankShotsPayload(shots, today()), confirmed: true, permit: () => true });
+    const items = parseBankShots(text, today()).map((m) => ({ ...m, on: !alreadyThere(m, vault.spending, vault.income) }));
+    bankRead = { items };
+  } catch (err) {
+    bankRead = null;
+    toast(err.code === "quota" ? "Hoy ya no queda IA gratuita." : err.code === "key" ? "La clave de Gemini no funciona. Revísala en Tú → IA." : `No he podido leer las capturas: ${aiErrorText(err)}`);
+  }
+  render();
+}
+function saveBankShots() {
+  const on = (bankRead?.items ?? []).filter((m) => m.on);
+  let out = 0, inn = 0;
+  for (const m of on) {
+    if (m.income) { vault.income.push({ id: uid("in"), cents: m.cents, concept: m.concept, at: m.at, source: "SHOT", kind: m.kind ?? incomeKind(m.concept) }); inn++; }
+    else { vault.spending.push({ ...newEntry({ id: uid("s"), cents: m.cents, merchant: m.concept, at: m.at }, vault.settings.categoryRules ?? {}), source: "SHOT" }); out++; }
+  }
+  bankRead = null;
+  persist(); render();
+  toast(`Añadidos ${out} gasto${out === 1 ? "" : "s"} y ${inn} ingreso${inn === 1 ? "" : "s"}${toAsk(vault.spending, today()).length ? ". ¿Con quién fuiste al bar? Te lo pregunto arriba" : ""}`);
+}
+function saveSplit(mode) {
+  const e = vault.spending.find((x) => x.id === splitDraft?.entryId);
+  if (!e || !splitDraft.people.length) return;
+  try {
+    const people = splitDraft.people.map((p) => ({ key: p.key, name: p.name, ...(p.googleId ? { googleId: p.googleId } : {}), ...(mode === "detail" ? { cents: p.cents ?? 0, what: p.what } : {}) }));
+    const split = mode === "equal" ? equalSplit(e.cents, people) : detailSplit(e.cents, people);
+    vault.spending = vault.spending.map((x) => (x.id === e.id ? { ...x, split, splitAsked: true } : x));
+    splitDraft = null;
+    persist(); render();
+    const owed = split.people.reduce((s, p) => s + p.cents, 0);
+    toast(owed ? `Apuntado: te deben ${eurosTxt(owed)}` : "Apuntado: todo tuyo");
+  } catch (err) { toast(err.message); }
+}
+
 // ---------- Barra de comandos (WEB-78) ----------
 // Outside #screen, so a render never touches it while Manu types.
 const cmdk = { el: null, items: [], sel: 0 };
