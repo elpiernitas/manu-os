@@ -50,7 +50,7 @@ const TEXT = {
   },
   animo: (c) => (c.moodToday ? null : "¿Qué tal el día? Márcalo en MANU en un toque."),
   habitos: (c) => (c.habitsLeft ? `Te ${c.habitsLeft === 1 ? "queda 1 hábito" : `quedan ${c.habitsLeft} hábitos`} por marcar hoy.` : null),
-  manana: (c) => (c.tomorrowAnswered ? null : "¿Mañana en Gijón, como siempre? Si vas a Oviedo o no trabajas, dímelo y te ajusto la alarma."),
+  manana: (c) => (c.tomorrowAnswered ? null : "¿Mañana trabajas en Gijón?"),
   copia: (c) => (c.backupDays === null || c.backupDays >= 7 ? (c.backupDays === null ? "Aún no tienes ninguna copia de MANU. Hazla hoy: tarda un momento." : `Hace ${c.backupDays} días que no haces copia de MANU.`) : null),
 };
 

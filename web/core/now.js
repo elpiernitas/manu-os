@@ -131,7 +131,7 @@ export function whatNow({ now = new Date(), mode = "AFTERNOON", events = [], tom
   // 9. Any open task.
   if (firstTask && mode !== "WORK") out.push(gentle
     ? { e: "🌱", t: `Si te apetece, solo una: ${firstTask.text}.`, why: "Y si no, mañana. Hoy no pasa nada por no hacerla.", go: { tab: "agenda" } }
-    : { e: "✅", t: `Quítate de encima: ${firstTask.text}.`, why: `Tienes ${tasks.length === 1 ? "solo esta tarea" : `${tasks.length} tareas abiertas`}; empieza por la más antigua.`, go: { tab: "agenda" } });
+    : { e: "✅", t: `Quítate de encima: ${firstTask.text}.`, why: tasks.length === 1 ? "Es tu única tarea pendiente." : `Tienes ${tasks.length} tareas; esta es la más antigua.`, go: { tab: "agenda" } });
 
   // 10. Nothing pending.
   if (!out.length) {

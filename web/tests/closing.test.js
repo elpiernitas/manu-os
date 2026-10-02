@@ -66,13 +66,18 @@ const seq = (...rs) => { const calls = []; const f = async (url, init) => { call
 const noPause = async () => {};
 const payload = { contents: [{ role: "user", parts: [{ text: "hola" }] }], generationConfig: { maxOutputTokens: 600 } };
 
-test("WEB-63: a 503 or a network blip is retried once", async () => {
+test("WEB-63/82: a 503 is retried up to 3 times; a network blip once", async () => {
   const f = seq(reply(503, {}), okText("hola"));
   assert.equal((await askWithActions({ key: "k", model: "m", payload, confirmed: true }, f, noPause)).text, "hola");
   const g = seq(new TypeError("Failed to fetch"), okText("vale"));
   assert.equal((await askWithActions({ key: "k", model: "m", payload, confirmed: true }, g, noPause)).text, "vale");
-  const h = seq(reply(503, {}), reply(503, {}));
+  const h = seq(reply(503, {}), reply(503, {}), reply(503, {}), reply(503, {}));
   await assert.rejects(generate({ key: "k", model: "m", payload }, h, noPause), (e) => e.code === "busy" && e.status === 503);
+  assert.equal(h.calls.length, 4); // WEB-82: 3 more tries before giving up
+  const waits = [];
+  const b = seq(reply(503, {}), reply(503, {}), reply(503, {}), okText("ya"));
+  assert.equal((await askWithActions({ key: "k", model: "m", payload, confirmed: true }, b, async (ms) => waits.push(ms))).text, "ya");
+  assert.deepEqual(waits, [1500, 3000, 6000]); // waiting longer each time
   const n = seq(new TypeError("x"), new TypeError("x"));
   await assert.rejects(generate({ key: "k", model: "m", payload }, n, noPause), (e) => e.code === "network");
 });
@@ -102,4 +107,12 @@ test("WEB-63: bad key, bad request, retired model and filters are told apart", a
   assert.match(aiErrorText({ code: "network" }), /conexión/);
   assert.match(aiErrorText(new Error("algo raro")), /algo raro/);
   assert.doesNotMatch(aiErrorText({ code: "empty", reason: null }), /\(null\)/);
+});
+
+test("WEB-82: a backup model when the usual one is saturated", async () => {
+  const { backupModel } = await import("../core/ai.js");
+  const list = { models: ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash", "gemini-2.5-pro"].map((n) => ({ name: `models/${n}`, supportedGenerationMethods: ["generateContent"] })) };
+  assert.equal(backupModel(list, "gemini-2.5-flash"), "gemini-2.5-flash-lite");
+  assert.equal(backupModel({ models: [list.models[0]] }, "gemini-2.5-flash"), null);
+  assert.equal(backupModel(null, "x"), null);
 });
