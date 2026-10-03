@@ -656,6 +656,8 @@ function nowCard() {
 function briefingCard() {
   const b = dayBriefing();
   if (!b.lines.length) return "";
+  // WEB-83: in the evening the «Repaso de hoy» takes its place (no two summaries).
+  if (b.evening && nightDue(today(), vault.settings.reviewedDay ?? null) && !tonightReview().empty) return "";
   return `<section class="card brief${b.evening ? " evening" : ""}"><div class="row"><h2 class="grow">${b.evening ? "🌙" : "☀️"} ${esc(b.title)}</h2>${"speechSynthesis" in globalThis ? '<button class="link small" data-act="speak-day" aria-label="Leérmelo en voz alta">🔊 Léemelo</button>' : ""}</div><ul class="brief-list">${b.lines.map((l) => `<li><span aria-hidden="true">${l.e}</span><span>${esc(l.t)}</span></li>`).join("")}</ul></section>`;
 }
 // WEB-72: MANU reads the morning aloud (needs a tap: iOS only speaks after one).
@@ -3911,6 +3913,9 @@ function nightReviewCard() {
   if (!nightDue(today(), vault.settings.reviewedDay ?? null)) return "";
   const r = tonightReview();
   if (r.empty) return "";
+  // Tomorrow's weather, from the evening summary it replaces.
+  const wx = dayBriefing().lines.find((l) => /^Mañana \d+°/.test(l.t));
+  if (wx) r.tomorrow.push(wx.t);
   return `<section class="card brief rev-card" aria-labelledby="revTitle"><h2 id="revTitle">🌙 Repaso de hoy</h2>${reviewLines("Bien", r.wins, "✅")}${reviewLines("A mejorar", r.improve, "🔧")}${reviewLines("Mañana", r.tomorrow, "➡️")}
     ${reviewNote ? `<form id="reviewForm" class="stack"><label for="revNote" class="sr">Qué te llevas de hoy</label><textarea id="revNote" rows="2" maxlength="500" placeholder="Qué te llevas de hoy"></textarea><button class="btn" type="submit">Guardar y cerrar el día</button></form>`
     : `<div class="btns"><button class="btn" data-act="review-done">Hecho</button><button class="btn ghost" data-act="review-note">Apuntar algo</button></div>`}</section>`;
