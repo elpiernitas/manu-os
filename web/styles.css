@@ -768,3 +768,10 @@ pre.code { white-space: pre-wrap; word-break: break-word; overflow-wrap: anywher
 .cmdk-item.on, .cmdk-item:hover { background: rgba(36,107,253,.22); }
 .cmdk-help { margin: 8px 4px 0; }
 @media (hover: none) { .cmdk-help { display: none; } }
+
+/* WEB-83..85: repaso, documentos, biblioteca */
+.review-h { margin: 10px 0 2px; text-transform: uppercase; letter-spacing: .04em; }
+.doc summary, .lib summary { list-style: none; cursor: pointer; }
+.doc summary::-webkit-details-marker, .lib summary::-webkit-details-marker { display: none; }
+.doc .warn { color: var(--warm); font-weight: 600; }
+.doc-form .row input, .doc-form .row select { flex: 1; min-width: 0; }
