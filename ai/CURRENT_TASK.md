@@ -6,7 +6,7 @@ WEB-70 implementado por Claude Code. Se fusiona según la regla de fusión de `A
 
 ## Tarea activa
 
-WEB-83..85 — repaso, documentos y biblioteca (`ai/HANDOFF.md`).
+WEB-86 — dinero con doble toque, ingresos fijos y lo que se repite (`ai/HANDOFF.md`).
 
 ## Autorización
 
@@ -44,6 +44,7 @@ WEB-83..85 — repaso, documentos y biblioteca (`ai/HANDOFF.md`).
   - dar Gijón como respuesta predeterminada;
   - en Dinero, añadir gastos con capturas del banco y repartir gastos de bar tipo Tricount, unidos a contactos de Google.
 - 2026-10-03: Manu comparte un vídeo con 5 ideas para montar con Claude y responde «haz lo que tú veas» a la propuesta: repaso de la noche y semanal, documentos con vencimientos y biblioteca.
+- 2026-10-03: Manu pide el doble toque del iPhone para apuntar gastos e ingresos con categoría, como la app de un amigo, y analizar lo que se repite. El buzón en la nube necesita que Manu ejecute un SQL una vez (permiso de solo inserción para `anon`, ADR-0017, enmienda WEB-86).
 - 2026-09-29: **cambio de gobernanza decidido por Manu.** El orquestador (ChatGPT/Codex) ya no revisa automáticamente, porque frenaba el avance. Claude Code fusiona los PR web cuando `npm test` y los dos workflows remotos están en verde y no hay conflictos. Cuando haga falta una revisión, Claude Code prepara un prompt, Manu se lo pasa a ChatGPT y le devuelve la respuesta; los defectos se corrigen en un PR nuevo con su regresión. Los PR #7, #8 y #9 siguen en borrador o pausa.
 
 ## Alcance autorizado

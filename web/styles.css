@@ -775,3 +775,7 @@ pre.code { white-space: pre-wrap; word-break: break-word; overflow-wrap: anywher
 .doc summary::-webkit-details-marker, .lib summary::-webkit-details-marker { display: none; }
 .doc .warn { color: var(--warm); font-weight: 600; }
 .doc-form .row input, .doc-form .row select { flex: 1; min-width: 0; }
+
+/* WEB-86 */
+pre.code { white-space: pre-wrap; word-break: break-word; max-height: 220px; overflow: auto; background: var(--surface-2); border-radius: 12px; padding: 10px; }
+.fixed-income .row { gap: 8px; }

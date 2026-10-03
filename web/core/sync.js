@@ -182,3 +182,77 @@ export function syncErrorText(err) {
     default: return `No he podido sincronizar: ${String(err?.message ?? "error").slice(0, 160)}`;
   }
 }
+
+// ---------- Buzón en la nube (WEB-86) ----------
+// The «MANU Dinero» Shortcut (back tap) cannot open the installed app, so it
+// drops its line in a small table of Manu's Supabase; MANU picks it up when it
+// opens and deletes it. The Shortcut only knows the publishable key and a
+// random code made on Manu's device: anyone can drop a line (insert only),
+// only Manu's session can read or delete the lines with his code.
+export const INBOX_SQL = `-- MANU: buzón del atajo «MANU Dinero» (WEB-86)
+create table if not exists public.manu_inbox (
+  id uuid primary key default gen_random_uuid(),
+  token text not null check (length(token) between 20 and 80),
+  line text not null check (length(line) <= 300),
+  created_at timestamptz not null default now()
+);
+create table if not exists public.manu_inbox_owner (
+  user_id uuid primary key default auth.uid() references auth.users on delete cascade,
+  token text not null unique check (length(token) between 20 and 80)
+);
+alter table public.manu_inbox enable row level security;
+alter table public.manu_inbox_owner enable row level security;
+revoke all on public.manu_inbox from anon, authenticated;
+revoke all on public.manu_inbox_owner from anon, authenticated;
+grant insert (token, line) on public.manu_inbox to anon;
+grant select, delete on public.manu_inbox to authenticated;
+grant select, insert, update on public.manu_inbox_owner to authenticated;
+create policy "atajo deja" on public.manu_inbox for insert to anon with check (true);
+create policy "dueño lee" on public.manu_inbox for select to authenticated using (token in (select token from public.manu_inbox_owner where user_id = auth.uid()));
+create policy "dueño borra" on public.manu_inbox for delete to authenticated using (token in (select token from public.manu_inbox_owner where user_id = auth.uid()));
+create policy "dueño de su código" on public.manu_inbox_owner for all to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());`;
+
+// A random code for the Shortcut (24 bytes, URL-safe).
+export function newInboxToken(cryptoImpl = globalThis.crypto) {
+  const b = new Uint8Array(24);
+  cryptoImpl.getRandomValues(b);
+  return btoa(String.fromCharCode(...b)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+const inboxMissing = (status, d) => status === 404 || /manu_inbox|PGRST205|relation .* does not exist/i.test(d);
+
+// Saves this account's code (one per account; a new one replaces the old).
+export async function registerInboxToken(cfg, s, token, fetchImpl = fetch) {
+  const res = await call(fetchImpl, `${cfg.url}/rest/v1/manu_inbox_owner?on_conflict=user_id`, { method: "POST", headers: restHeaders(cfg, s, { Prefer: "resolution=merge-duplicates,return=minimal" }), body: JSON.stringify({ token }) });
+  if (res.ok) return true;
+  const d = await detail(res);
+  if (inboxMissing(res.status, d)) throw fail("inbox", "Falta crear el buzón en Supabase (un paso, una vez).", { status: res.status });
+  if (res.status === 401) throw fail("expired", "Tu sesión ha caducado: vuelve a entrar.", { status: 401 });
+  throw fail("http", `Tu nube respondió ${res.status}${d ? `: ${d}` : ""}`, { status: res.status });
+}
+
+// The lines waiting (oldest first) and, once filed, their removal.
+export async function pullInbox(cfg, s, fetchImpl = fetch) {
+  const res = await call(fetchImpl, `${cfg.url}/rest/v1/manu_inbox?select=id,line,created_at&order=created_at.asc&limit=200`, { headers: restHeaders(cfg, s) });
+  if (res.ok) return res.json();
+  const d = await detail(res);
+  if (inboxMissing(res.status, d)) throw fail("inbox", "Falta crear el buzón en Supabase.", { status: res.status });
+  if (res.status === 401) throw fail("expired", "Tu sesión ha caducado: vuelve a entrar.", { status: 401 });
+  throw fail("http", `Tu nube respondió ${res.status}`, { status: res.status });
+}
+export async function deleteInbox(cfg, s, ids, fetchImpl = fetch) {
+  const list = (ids ?? []).map(String).filter((x) => /^[0-9a-f-]{36}$/i.test(x));
+  if (!list.length) return;
+  const res = await call(fetchImpl, `${cfg.url}/rest/v1/manu_inbox?id=in.(${list.join(",")})`, { method: "DELETE", headers: restHeaders(cfg, s, { Prefer: "return=minimal" }) });
+  if (!res.ok) throw fail("http", `Tu nube respondió ${res.status}`, { status: res.status });
+}
+
+// What the Shortcut sends (shown in Atajos and used by the tests).
+export function inboxRequest(cfg, token, line) {
+  return {
+    url: `${cfg.url}/rest/v1/manu_inbox`,
+    method: "POST",
+    headers: { apikey: cfg.key, "Content-Type": "application/json", Prefer: "return=minimal" },
+    body: { token, line },
+  };
+}
