@@ -44,6 +44,36 @@ Siguientes ideas, sin compromiso:
 
 Límites reales de una web en iPhone: no hay widgets, pantalla bloqueada ni control del Chromecast. Donde se pueda, se hará con Atajos.
 
+## WEB-83..85 — repaso, documentos y biblioteca
+
+Salen de un vídeo de ideas para montar con Claude que pasó Manu, quien dijo «haz lo que tú veas». El «panel de vida» ya existía (Hoy). El «kit de marca» no encaja en MANU.
+
+- **WEB-83 Repaso** (`core/review.js`, todo se calcula en el dispositivo):
+  - «🌙 Repaso de hoy» en Hoy desde las 20:00, con lo bien (tareas cerradas, hábitos, jornada, día sin gasto), lo que mejorar (hábitos que faltan, gasto muy por encima de la media, tareas de más de una semana, salida sin fichar) y mañana (primera cita, recordatorios, por dónde empezar);
+  - «Apuntar algo» guarda una nota del día en `vault.reviews`;
+  - «🗓️ Tu semana», del domingo a las 18:00 al lunes a las 14:00, con lo bien, lo que mejorar y el plan (cerrar dos tareas, un hábito foco, tope de gasto, primera cita de la semana);
+  - Tú → Repaso;
+  - en el chat, «¿cómo fue la semana?»;
+  - aviso «Repaso de la semana» el domingo a las 20:30;
+  - el ánimo nunca se juzga.
+- **WEB-84 Documentos** (`core/docs.js`):
+  - foto o PDF: Gemini lo lee (pide confirmación si no están permitidos los datos sensibles) y rellena título, tipo, compañía, importe, periodicidad, vencimiento, renovación, referencia, teléfono y resumen;
+  - se descartan IBAN, tarjetas, DNI y NIE;
+  - Manu revisa y guarda; también se pueden añadir a mano;
+  - el archivo va a IndexedDB (no al vault ni a Tu nube) y se abre desde «Ver archivo»;
+  - tarjeta en Hoy si algo vence en 30 días («Ya lo sé» la oculta hasta 3 días antes);
+  - aviso a las 9:30 si algo vence en 7 días, sin nombres;
+  - en el chat, «¿cuándo vence el seguro del coche?» o «teléfono del seguro» se responde en el dispositivo, sin Gemini.
+- **WEB-85 Biblioteca** (`core/library.js`):
+  - libros, artículos, vídeos, podcasts y cursos, con estado (quiero, en curso, hecho), notas y enlace;
+  - «💡 Ideas clave» envía solo las notas de Manu a Gemini (con el filtro de lo sensible);
+  - en el chat, «¿qué aprendí de X?», «qué estoy leyendo» y «libros pendientes».
+- La barra ⚡ abre «repaso», «documentos» y «biblioteca».
+- `vault.docs`, `vault.library` y `vault.reviews` entran en `OPTIONAL_LISTS`, con validación por registro.
+- Evidencia:
+  - `npm test`: 252 en verde.
+  - e2e83: 22/22, con Gemini simulado y datos inventados.
+
 ## WEB-82 — Gemini saturado (503) al leer capturas del banco
 
 Captura de Manu en v80: «No he podido leer las capturas: Gemini está saturado ahora mismo (error 503)».

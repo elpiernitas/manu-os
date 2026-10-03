@@ -45,9 +45,12 @@ import { parseCommand, suggest } from "./core/commands.js";
 import { toAsk, equalSplit, detailSplit, debts, settleAll, debtLine, reminderText } from "./core/split.js";
 import { buildBankShotsPayload, parseBankShots, alreadyThere, MAX_SHOTS } from "./core/bankshot.js";
 import { incomeKind } from "./core/bank.js";
+import { nightReview, weekReview, nightDue, weekDue } from "./core/review.js";
+import { KINDS as DOC_KINDS, daysLeft, expiringSoon, leftText, buildDocPayload, parseDocReply, isDocQuestion, answerDoc, DOC_LIMIT } from "./core/docs.js";
+import { LIB_KINDS, STATUSES, newItem, setStatus, ideasPayload, parseIdeas, isLibraryQuestion, answerLibrary } from "./core/library.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "82";
+export const APP_VERSION = "83";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -653,6 +656,8 @@ function nowCard() {
 function briefingCard() {
   const b = dayBriefing();
   if (!b.lines.length) return "";
+  // WEB-83: in the evening the «Repaso de hoy» takes its place (no two summaries).
+  if (b.evening && nightDue(today(), vault.settings.reviewedDay ?? null) && !tonightReview().empty) return "";
   return `<section class="card brief${b.evening ? " evening" : ""}"><div class="row"><h2 class="grow">${b.evening ? "🌙" : "☀️"} ${esc(b.title)}</h2>${"speechSynthesis" in globalThis ? '<button class="link small" data-act="speak-day" aria-label="Leérmelo en voz alta">🔊 Léemelo</button>' : ""}</div><ul class="brief-list">${b.lines.map((l) => `<li><span aria-hidden="true">${l.e}</span><span>${esc(l.t)}</span></li>`).join("")}</ul></section>`;
 }
 // WEB-72: MANU reads the morning aloud (needs a tap: iOS only speaks after one).
@@ -1224,6 +1229,9 @@ const screens = {
       ${clockCard()}
       ${toAsk(vault.spending, today()).length || splitDraft ? splitAskCard() : ""}
       ${closingCard()}
+      ${weekReviewCard()}
+      ${nightReviewCard()}
+      ${docsSoonCard()}
       ${briefingCard()}
       ${nightCard()}
       ${weatherCard()}
@@ -1343,10 +1351,13 @@ const screens = {
       <div class="list">
         ${item("capturas", "shots", "blue", "Bandeja de capturas", toReview(vault.captures).length ? `${toReview(vault.captures).length} por revisar` : "Suelta aquí tus capturas y MANU las ordena")}
         ${item("fichaje", "clock", "blue", "Fichaje", (() => { const r = monthReport(vault.clock, localDay().slice(0, 7), { targetMin: clockTarget(), now: today() }); return r.days || r.openDays ? r.balance : "Entradas, pausas y lo que te debe RK"; })())}
+        ${item("repaso", "repeat", "purple", "Repaso", "Tu día y tu semana: lo que fue bien y el plan")}
         ${item("habitos", "repeat", "green", "Hábitos", vault.habits.length ? `${habitsDone} de ${vault.habits.length} hechos hoy` : "Crea tu primer hábito")}
         ${item("salud", "pulse", "red", "Salud", hs.sleep !== null || hs.steps !== null ? [hs.sleep !== null ? `${dec(hs.sleep)} h de sueño` : null, hs.steps !== null ? `${Math.round(hs.steps)} pasos` : null].filter(Boolean).join(" · ") + " (media semanal)" : "Sueño, pasos y peso")}
         ${item("comidas", "fork", "orange", "Comidas", `${vault.meals.filter((m) => m.day === t).length} apuntadas hoy`)}
         ${item("archivo", "box", "teal", "Tu archivo", archive.stats?.count ? `${archive.stats.count} conversaciones guardadas` : "Tus conversaciones y tu exportación de ChatGPT")}
+        ${item("documentos", "box", "orange", "Documentos", (() => { const s = expiringSoon(vault.docs, today(), 30); return s.length ? `${s[0].doc.title}: ${leftText(s[0].left)}` : vault.docs?.length ? `${vault.docs.length} guardados` : "Seguros, contratos y garantías"; })())}
+        ${item("biblioteca", "leaf", "teal", "Biblioteca", vault.library?.length ? `${vault.library.length} cosas · ${vault.library.filter((x) => x.status === "en curso").length} en curso` : "Libros, vídeos y podcasts con lo que aprendes")}
         ${item("personas", "people", "purple", "Personas", vault.people.length ? `${vault.people.length} personas` : "Cumpleaños y detalles")}
         <button class="item" data-act="refuge"><span class="ico teal">${I.leaf}</span><span class="grow"><span>Refugio</span><br><span class="muted small">Para cuando no estás bien</span></span><span class="chev">${I.chev}</span></button>
       </div>
@@ -1383,6 +1394,33 @@ const profileForm = (text) => `<form id="profileForm" class="stack"><label for="
 const backBar = (title) => `<button class="link" data-act="back">${I.back} Tú</button><h1>${title}</h1>`;
 
 const subpages = {
+  repaso() {
+    const n = tonightReview(), w = lastWeekReview();
+    const notes = [...(vault.reviews ?? [])].sort((a, b) => b.day.localeCompare(a.day)).slice(0, 14);
+    return `${backBar("Repaso")}
+      <section class="card brief rev-card"><h2>🌙 Hoy</h2>${n.empty ? '<p class="muted">Aún no hay nada que repasar hoy.</p>' : `${reviewLines("Bien", n.wins, "✅")}${reviewLines("A mejorar", n.improve, "🔧")}${reviewLines("Mañana", n.tomorrow, "➡️")}`}
+        <form id="reviewForm" class="stack"><label for="revNote" class="sr">Qué te llevas de hoy</label><textarea id="revNote" rows="2" maxlength="500" placeholder="Qué te llevas de hoy">${esc((vault.reviews ?? []).find((r) => r.day === localDay())?.note ?? "")}</textarea><button class="btn ghost" type="submit">Guardar nota</button></form></section>
+      <section class="card brief rev-card"><h2>🗓️ Últimos 7 días</h2>${w.empty ? '<p class="muted">Aún no hay datos esta semana.</p>' : `${reviewLines("Bien", w.wins, "✅")}${reviewLines("A mejorar", w.improve, "🔧")}${reviewLines("Plan", w.plan, "🎯")}`}</section>
+      ${notes.length ? `${sectionTitle("Tus notas")}<section class="card">${notes.map((r) => `<div class="stack"><b class="small">${esc(new Date(`${r.day}T12:00`).toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "short" }))}</b><p>${esc(r.note)}</p></div>`).join("")}</section>` : ""}`;
+  },
+  documentos() {
+    const list = [...(vault.docs ?? [])].sort((a, b) => (daysLeft(a, today()) ?? 1e9) - (daysLeft(b, today()) ?? 1e9));
+    const draft = docDraft?.busy ? `<p class="muted">📄 ${esc(docDraft.busy)}</p>` : docDraft?.fields ? docForm(docDraft.fields) : "";
+    return `${backBar("Documentos")}
+      <section class="card"><h2>Añadir</h2><div class="btns"><label class="btn" for="docFile" role="button" tabindex="0">📷 Foto o PDF</label><input id="docFile" type="file" accept="image/*,application/pdf" class="sr"><button class="btn ghost" data-act="doc-manual">✍️ A mano</button></div>
+        <p class="muted small">Gemini lee la foto o el PDF (va a Google) y tú revisas. No guarda IBAN, tarjetas ni DNI.</p>${draft}</section>
+      ${list.length ? `<div class="stack">${list.map(docRow).join("")}</div>` : '<p class="muted">Aún no hay documentos. Luego pregúntame «¿cuándo vence el seguro del coche?».</p>'}`;
+  },
+  biblioteca() {
+    const items = [...(vault.library ?? [])].filter((i) => libFilter === "todo" || i.status === libFilter).sort((a, b) => String(b.at).localeCompare(String(a.at)));
+    return `${backBar("Biblioteca")}
+      <form class="card stack" id="libForm"><h2>Añadir</h2><label for="lTitle" class="sr">Título</label><input id="lTitle" placeholder="Título" maxlength="120" required>
+        <div class="row"><label for="lKind" class="sr">Tipo</label><select id="lKind">${Object.entries(LIB_KINDS).map(([k, v]) => `<option value="${k}">${v}</option>`).join("")}</select><label for="lStatus" class="sr">Estado</label><select id="lStatus">${STATUSES.map((st) => `<option value="${st}">${st}</option>`).join("")}</select></div>
+        <label for="lAuthor" class="sr">Autor</label><input id="lAuthor" placeholder="Autor (opcional)" maxlength="80"><label for="lUrl" class="sr">Enlace</label><input id="lUrl" type="url" placeholder="Enlace (opcional)">
+        <label for="lNotes" class="sr">Lo que te llevas</label><textarea id="lNotes" rows="3" placeholder="Lo que te llevas (opcional)"></textarea><button class="btn" type="submit">Añadir</button></form>
+      <div class="chips" role="group" aria-label="Filtro">${["todo", ...STATUSES].map((st) => `<button class="chip${libFilter === st ? " on" : ""}" data-act="lib-filter" data-v="${st}" aria-pressed="${libFilter === st}">${st}</button>`).join("")}</div>
+      <div class="stack">${items.length ? items.map(libRow).join("") : '<p class="muted">Nada por aquí.</p>'}</div>`;
+  },
   // WEB-59: drop all the screenshots, MANU reads, groups and proposes; Manu keeps the text.
   capturas() {
     const list = vault.captures ?? [];
@@ -1912,7 +1950,7 @@ function render({ focus = false, enter = null } = {}) {
   $("screen").querySelectorAll(".week-bars i[data-h], .ie-bars i[data-h]").forEach((el) => { el.style.height = `${Math.max(Number(el.dataset.h) ? 2 : 0, Number(el.dataset.h))}%`; });
   $("screen").querySelectorAll("[data-c]").forEach((el) => { if (/^#[0-9a-f]{6}$/i.test(el.dataset.c)) el.style.setProperty("--ev", el.dataset.c); });
   hydrateImages($("screen"));
-  $("topTitle").textContent = sub ? { habitos: "Hábitos", salud: "Salud", comidas: "Comidas", personas: "Personas", tiempo: "Tiempo", avisos: "Avisos", datos: "Tus datos", gcal: "Google", correo: "Correo", archivo: "Tu archivo", capturas: "Capturas", ia: "IA", spotify: "Spotify", atajos: "Atajos" }[sub] : TABS.find(([id]) => id === tab)[1];
+  $("topTitle").textContent = sub ? { habitos: "Hábitos", salud: "Salud", comidas: "Comidas", personas: "Personas", tiempo: "Tiempo", avisos: "Avisos", datos: "Tus datos", gcal: "Google", correo: "Correo", archivo: "Tu archivo", capturas: "Capturas", ia: "IA", spotify: "Spotify", atajos: "Atajos", fichaje: "Fichaje", repaso: "Repaso", documentos: "Documentos", biblioteca: "Biblioteca" }[sub] : TABS.find(([id]) => id === tab)[1];
   const sheetKey = sheet ? sheet.kind : null;
   if (sheetKey !== renderedSheetKind || !sheet) {
     const wasOpen = Boolean($("sheetBg"));
@@ -2025,6 +2063,22 @@ function say(text) {
   // WEB-46: «¿cómo va mi día?», «resumen del día».
   if (isBriefingQuestion(normalise(clean))) {
     vault.chat.push({ from: "me", text: clean, at }, { from: "manu", text: briefingText(dayBriefing()), at });
+    persist(); render(); return;
+  }
+  // WEB-84/85: documents and library, answered on the device.
+  if (!["reminder", "task", "idea", "expense"].includes(intent.kind) && isDocQuestion(clean) && (vault.docs ?? []).length) {
+    vault.chat.push({ from: "me", text: clean, at }, { from: "manu", text: answerDoc(clean, vault.docs, today()), at });
+    persist(); render(); return;
+  }
+  if (isLibraryQuestion(clean)) {
+    vault.chat.push({ from: "me", text: clean, at }, { from: "manu", text: answerLibrary(clean, vault.library), at });
+    persist(); render(); return;
+  }
+  // WEB-83: «mi semana», «repaso de la semana».
+  if (/\b(mi semana|repaso( semanal| de la semana)?|como (me )?(fue|ha ido) la semana|resumen de la semana)\b/.test(normalise(clean))) {
+    const w = lastWeekReview();
+    const text = w.empty ? "Aún no tengo datos de esta semana." : [w.wins.length ? `Bien:\n${w.wins.map((x) => `✅ ${x}`).join("\n")}` : "", w.improve.length ? `A mejorar:\n${w.improve.map((x) => `🔧 ${x}`).join("\n")}` : "", w.plan.length ? `Plan:\n${w.plan.map((x) => `🎯 ${x}`).join("\n")}` : ""].filter(Boolean).join("\n\n");
+    vault.chat.push({ from: "me", text: clean, at }, { from: "manu", text, at });
     persist(); render(); return;
   }
   // WEB-41: «¿qué hice ayer?», «¿cuánto gasté el martes?» from the diary.
@@ -2976,6 +3030,41 @@ document.addEventListener("click", async (e) => {
     case "tomorrow-reset": vault.settings.tomorrow = null; persist(); render(); break;
     case "notify-on": await enableNotifications(); render(); break;
     case "cmdk": openCmdk(); break;
+    case "review-done": vault.settings.reviewedDay = localDay(); reviewNote = false; persist(); render(); toast("Día cerrado. ¡Buenas noches!"); break;
+    case "review-note": reviewNote = true; render(); $("revNote")?.focus(); break;
+    case "week-done": vault.settings.weekReviewed = a.dataset.key; persist(); render(); break;
+    case "docs-seen": { const seen = { ...(vault.settings.docsSeen ?? {}) }; for (const x of expiringSoon(vault.docs, today(), 30)) seen[x.doc.id] = x.doc.expires; vault.settings.docsSeen = seen; persist(); render(); break; }
+    case "doc-manual": docDraft = { fields: {} }; render(); $("dTitle")?.focus(); break;
+    case "doc-cancel": docDraft = null; render(); break;
+    case "doc-edit": { const d = vault.docs.find((x) => x.id === a.dataset.id); if (d) { docDraft = { fields: d, editId: d.id }; render(); $("docForm")?.scrollIntoView({ block: "center" }); } break; }
+    case "doc-del": {
+      const d = vault.docs.find((x) => x.id === a.dataset.id);
+      if (d && window.confirm(`¿Borrar «${d.title}»?`)) { if (d.fileId) deleteImage(d.fileId).catch(() => {}); vault.docs = vault.docs.filter((x) => x.id !== d.id); persist(); render(); }
+      break;
+    }
+    case "doc-file": {
+      const d = vault.docs.find((x) => x.id === a.dataset.id);
+      const data = d?.fileId ? await getImage(d.fileId).catch(() => null) : null;
+      if (!data) { toast("No encuentro el archivo en este dispositivo"); break; }
+      const url = URL.createObjectURL(dataUrlToBlob(data));
+      window.open(url, "_blank", "noopener"); setTimeout(() => URL.revokeObjectURL(url), 60000);
+      break;
+    }
+    case "lib-filter": libFilter = a.dataset.v; render(); break;
+    case "lib-status": vault.library = vault.library.map((x) => (x.id === a.dataset.id ? setStatus(x, a.dataset.v, new Date()) : x)); persist(); render(); break;
+    case "lib-del": { const it = vault.library.find((x) => x.id === a.dataset.id); if (it && window.confirm(`¿Borrar «${it.title}»?`)) { vault.library = vault.library.filter((x) => x.id !== it.id); persist(); render(); } break; }
+    case "lib-ideas": {
+      const it = vault.library.find((x) => x.id === a.dataset.id);
+      if (!it?.notes || !aiReady()) break;
+      toast("Sacando las ideas clave…");
+      try {
+        const { text } = await freshModel(() => askWithActions({ key: aiStore.key, model: aiStore.model, payload: ideasPayload(it), confirmed: true }));
+        const ideas = parseIdeas(text);
+        if (!ideas.length) { toast("Gemini no ha sacado ideas claras"); break; }
+        vault.library = vault.library.map((x) => (x.id === it.id ? { ...x, ideas } : x)); persist(); render(); toast(`${ideas.length} ideas clave guardadas`);
+      } catch (err) { toast(err.code === "sensitive" ? "Tus notas parecen privadas: no las envío" : aiErrorText(err)); }
+      break;
+    }
     case "income-add": incomeForm = !incomeForm; render(); if (incomeForm) $("inAmount")?.focus(); break;
     case "bank-tick": { const m = bankRead?.items?.[Number(a.dataset.i)]; if (m) { m.on = !m.on; render(); } break; }
     case "bank-save": saveBankShots(); break;
@@ -3083,6 +3172,22 @@ document.addEventListener("submit", async (e) => {
     persist(); render(); toast(id ? "ID guardado" : "Google Calendar desconectado"); return;
   }
   if (f === "workStartForm" || f === "clockTargetForm") return;
+  if (f === "reviewForm") {
+    const note = ($("revNote")?.value ?? "").trim().slice(0, 500);
+    const day = localDay();
+    vault.reviews = [...(vault.reviews ?? []).filter((r) => r.day !== day), ...(note ? [{ day, note }] : [])].slice(-400);
+    vault.settings.reviewedDay = day; reviewNote = false;
+    persist(); render(); toast(note ? "Nota guardada" : "Día cerrado");
+    return;
+  }
+  if (f === "docForm") { await saveDoc(); return; }
+  if (f === "libForm") {
+    try {
+      const it = newItem({ id: uid("lib"), title: $("lTitle").value, kind: $("lKind").value, status: $("lStatus").value, author: $("lAuthor").value, url: $("lUrl").value.trim() || null, notes: $("lNotes").value }, new Date());
+      vault.library = [...(vault.library ?? []), it]; persist(); render(); toast("Añadido a tu biblioteca");
+    } catch (err) { toast(err.message); }
+    return;
+  }
   if (f === "incomeForm") {
     const cents = toCents($("inAmount").value);
     if (!cents) { toast("Pon un importe"); return; }
@@ -3310,6 +3415,8 @@ document.addEventListener("change", async (e) => {
     } catch { toast("No he podido leer ese Excel."); }
     return;
   }
+  if (e.target.id === "docFile" && e.target.files?.[0]) { const file = e.target.files[0]; e.target.value = ""; readDocFile(file).catch(() => { docDraft = null; render(); toast("No he podido abrir ese archivo"); }); return; }
+  if (e.target.dataset?.libNotes) { const id = e.target.dataset.libNotes; vault.library = vault.library.map((x) => (x.id === id ? { ...x, notes: e.target.value.slice(0, 4000) } : x)); persist(); toast("Notas guardadas"); return; }
   if (e.target.id === "bankShots" && e.target.files?.length) { const files = [...e.target.files]; e.target.value = ""; readBankShots(files); return; }
   if (e.target.id === "buzonFile" && e.target.files?.[0]) {
     const file = e.target.files[0]; e.target.value = "";
@@ -3674,6 +3781,8 @@ function nudgeContext() {
     habitsLeft: vault.habits.filter((h) => !(h.done ?? []).includes(t)).length,
     tomorrowAnswered: vault.settings.tomorrow?.day === tomorrowKey(),
     backupDays: vault.settings.lastFullBackup?.at ? daysSince(vault.settings.lastFullBackup.at) : null,
+    weekPending: Boolean(weekDue(today(), vault.settings.weekReviewed ?? null)),
+    docsSoon: expiringSoon(vault.docs, today(), 7).filter((x) => x.left >= 0).length,
   };
 }
 // WEB-75 + WEB-77: the nudges Manu turned on, only when they apply. They work
@@ -3779,6 +3888,128 @@ function applyIr() {
   return goTo(ir[1]);
 }
 applyIr();
+// ---------- Repaso, documentos y biblioteca (WEB-83..85) ----------
+let reviewNote = false;  // the «Apuntar algo» box on tonight's card
+let docDraft = null;     // { busy } while Gemini reads; { fields, fileData?, fileType?, editId? } to review
+let libFilter = "todo";
+const reviewData = (now = today()) => ({ now, inbox: vault.inbox, habits: vault.habits, spending: vault.spending, clock: vault.clock, targetMin: clockTarget(), reminders: vault.reminders });
+function tonightReview() {
+  const t = today(); const next = new Date(t.getFullYear(), t.getMonth(), t.getDate() + 1);
+  return nightReview({ ...reviewData(), tomorrowEvents: eventsFor(dayKey(next)) });
+}
+// On Monday morning the «week» is the one that ended yesterday.
+function lastWeekReview() {
+  const now = today();
+  const ref = now.getDay() === 1 && now.getHours() < 14 ? new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 23, 59) : now;
+  const next = [];
+  for (let i = 1; i <= 7; i++) {
+    const d = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate() + i);
+    for (const e of eventsFor(dayKey(d))) next.push({ ...e, label: `${d.toLocaleDateString("es-ES", { weekday: "long" })}${e.time ? ` ${e.time}` : ""}` });
+  }
+  return weekReview({ ...reviewData(ref), nextWeekEvents: next });
+}
+const reviewLines = (title, xs, e) => (xs.length ? `<p class="small muted review-h">${title}</p><ul class="brief-list">${xs.map((t) => `<li><span aria-hidden="true">${e}</span><span>${esc(t)}</span></li>`).join("")}</ul>` : "");
+function nightReviewCard() {
+  if (!nightDue(today(), vault.settings.reviewedDay ?? null)) return "";
+  const r = tonightReview();
+  if (r.empty) return "";
+  // Tomorrow's weather, from the evening summary it replaces.
+  const wx = dayBriefing().lines.find((l) => /^Mañana \d+°/.test(l.t));
+  if (wx) r.tomorrow.push(wx.t);
+  return `<section class="card brief rev-card" aria-labelledby="revTitle"><h2 id="revTitle">🌙 Repaso de hoy</h2>${reviewLines("Bien", r.wins, "✅")}${reviewLines("A mejorar", r.improve, "🔧")}${reviewLines("Mañana", r.tomorrow, "➡️")}
+    ${reviewNote ? `<form id="reviewForm" class="stack"><label for="revNote" class="sr">Qué te llevas de hoy</label><textarea id="revNote" rows="2" maxlength="500" placeholder="Qué te llevas de hoy"></textarea><button class="btn" type="submit">Guardar y cerrar el día</button></form>`
+    : `<div class="btns"><button class="btn" data-act="review-done">Hecho</button><button class="btn ghost" data-act="review-note">Apuntar algo</button></div>`}</section>`;
+}
+function weekReviewCard() {
+  const key = weekDue(today(), vault.settings.weekReviewed ?? null);
+  if (!key) return "";
+  const r = lastWeekReview();
+  if (r.empty) return "";
+  return `<section class="card brief rev-card" aria-labelledby="wkTitle"><h2 id="wkTitle">🗓️ Tu semana</h2>${reviewLines("Bien", r.wins, "✅")}${reviewLines("A mejorar", r.improve, "🔧")}${reviewLines("Plan para la semana que viene", r.plan, "🎯")}<div class="btns"><button class="btn" data-act="week-done" data-key="${esc(key)}">Hecho</button></div></section>`;
+}
+function docsSoonCard() {
+  const seen = vault.settings.docsSeen ?? {};
+  const soon = expiringSoon(vault.docs, today(), 30).filter((x) => !(seen[x.doc.id] === x.doc.expires && x.left > 3));
+  if (!soon.length) return "";
+  return `<section class="card docs-soon"><h2>📄 Documentos</h2>${soon.slice(0, 3).map((x) => `<div class="row"><span class="grow">${esc(x.doc.title)}</span><span class="muted small">${esc(leftText(x.left))}</span></div>`).join("")}<div class="btns"><button class="btn ghost" data-sub-go="documentos">Ver</button><button class="link small" data-act="docs-seen">Ya lo sé</button></div></section>`;
+}
+function docForm(f) {
+  const v = (k) => esc(f[k] ?? "");
+  return `<form id="docForm" class="stack doc-form"><p class="small muted">Revisa y guarda.</p>
+    <label for="dTitle" class="sr">Título</label><input id="dTitle" value="${v("title")}" placeholder="Título (p. ej. Seguro del coche)" maxlength="60" required>
+    <div class="row"><label for="dKind" class="sr">Tipo</label><select id="dKind">${Object.entries(DOC_KINDS).map(([k, l]) => `<option value="${k}"${(f.kind ?? "otro") === k ? " selected" : ""}>${l}</option>`).join("")}</select>
+      <label for="dExpires" class="sr">Vence</label><input id="dExpires" type="date" value="${v("expires")}" aria-label="Vence"></div>
+    <label for="dCompany" class="sr">Compañía</label><input id="dCompany" value="${v("company")}" placeholder="Compañía" maxlength="60">
+    <div class="row"><label for="dAmount" class="sr">Importe</label><input id="dAmount" inputmode="decimal" value="${f.cents ? esc((f.cents / 100).toFixed(2).replace(".", ",")) : ""}" placeholder="Importe (€)"><label for="dPeriod" class="sr">Periodicidad</label><input id="dPeriod" value="${v("period")}" placeholder="anual, mensual…" maxlength="20"></div>
+    <div class="row"><label for="dRef" class="sr">Referencia</label><input id="dRef" value="${v("ref")}" placeholder="Nº de póliza o contrato" maxlength="40"><label for="dPhone" class="sr">Teléfono</label><input id="dPhone" value="${v("phone")}" placeholder="Teléfono" maxlength="20"></div>
+    <label class="row"><input type="checkbox" id="dRenew"${f.autoRenew ? " checked" : ""}> <span>Se renueva sola</span></label>
+    <label for="dSummary" class="sr">Resumen</label><textarea id="dSummary" rows="3" maxlength="400" placeholder="Qué cubre, lo importante">${v("summary")}</textarea>
+    <div class="btns"><button class="btn" type="submit">Guardar</button><button class="btn ghost" type="button" data-act="doc-cancel">Cancelar</button></div></form>`;
+}
+function docRow(d) {
+  const left = daysLeft(d, today());
+  const warn = left !== null && left <= 30;
+  return `<details class="card doc"><summary class="row"><span class="grow"><b>${esc(d.title)}</b><br><span class="muted small">${esc(DOC_KINDS[d.kind] ?? "")}${d.company ? ` · ${esc(d.company)}` : ""}</span></span><span class="small${warn ? " warn" : " muted"}">${esc(d.expires ? leftText(left) : "sin fecha")}</span></summary>
+    <div class="stack">${d.expires ? `<p class="small">Vence el ${esc(new Date(`${d.expires}T12:00`).toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" }))}${d.autoRenew ? " · se renueva sola" : ""}</p>` : ""}
+      ${d.cents ? `<p class="small">${esc(euros(d.cents))}${d.period ? ` ${esc(d.period)}` : ""}</p>` : ""}${d.ref ? `<p class="small muted">Ref. ${esc(d.ref)}</p>` : ""}${d.summary ? `<p class="small">${esc(d.summary)}</p>` : ""}
+      <div class="btns">${d.phone ? `<a class="btn ghost small-btn" href="${esc(safeHref(`tel:${d.phone.replace(/\s/g, "")}`))}">Llamar</a>` : ""}${d.fileId ? `<button class="btn ghost small-btn" data-act="doc-file" data-id="${esc(d.id)}">Ver archivo</button>` : ""}<button class="btn ghost small-btn" data-act="doc-edit" data-id="${esc(d.id)}">Editar</button><button class="btn danger small-btn" data-act="doc-del" data-id="${esc(d.id)}">Borrar</button></div></div></details>`;
+}
+function dataUrlToBlob(dataUrl) {
+  const [head, b64] = String(dataUrl).split(",");
+  const mime = /data:([^;]+)/.exec(head)?.[1] ?? "application/octet-stream";
+  const bin = atob(b64 ?? ""); const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new Blob([bytes], { type: mime });
+}
+const readAsDataUrl = (file) => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.onerror = () => rej(r.error); r.readAsDataURL(file); });
+async function readDocFile(file) {
+  const pdf = file.type === "application/pdf";
+  if (!pdf && !/^image\//.test(file.type)) { toast("Solo fotos o PDF"); return; }
+  if (pdf && file.size > DOC_LIMIT) { toast("Ese PDF es muy grande: haz una foto de la página importante"); return; }
+  const fileData = pdf ? await readAsDataUrl(file) : await compressImage(file);
+  const fileType = pdf ? "application/pdf" : "image/jpeg";
+  const title = file.name.replace(/\.[a-z0-9]+$/i, "").slice(0, 60);
+  if (!aiReady()) { docDraft = { fields: { title }, fileData, fileType }; render(); toast("Sin IA: rellénalo tú"); return; }
+  if (!sensitiveAllowed() && !window.confirm("El documento se enviará a Google (Gemini) para leer sus datos. ¿Seguimos?")) { docDraft = { fields: { title }, fileData, fileType }; render(); return; }
+  docDraft = { busy: "Leyendo el documento…" }; render();
+  try {
+    const payload = buildDocPayload({ base64: fileData.split(",")[1], mime: fileType }, today());
+    const { text } = await freshModel(() => askWithActions({ key: aiStore.key, model: aiStore.model, payload, confirmed: true, permit: () => true }));
+    docDraft = { fields: parseDocReply(text) ?? { title }, fileData, fileType };
+  } catch (err) {
+    docDraft = { fields: { title }, fileData, fileType };
+    toast(`No he podido leerlo: ${aiErrorText(err)}. Rellénalo tú.`);
+  }
+  render();
+}
+async function saveDoc() {
+  const d = docDraft ?? { fields: {} };
+  const old = d.editId ? vault.docs.find((x) => x.id === d.editId) : null;
+  const val = (id) => ($(id)?.value ?? "").trim();
+  const doc = {
+    ...(old ?? {}), id: old?.id ?? uid("doc"), title: val("dTitle").slice(0, 60) || "Documento", kind: DOC_KINDS[val("dKind")] ? val("dKind") : "otro",
+    company: val("dCompany") || undefined, expires: /^\d{4}-\d{2}-\d{2}$/.test(val("dExpires")) ? val("dExpires") : undefined, cents: toCents(val("dAmount")) || undefined,
+    period: val("dPeriod") || undefined, ref: val("dRef") || undefined, phone: val("dPhone") || undefined, autoRenew: $("dRenew")?.checked || undefined,
+    summary: val("dSummary") || undefined, at: old?.at ?? new Date().toISOString(),
+  };
+  if (d.fileData) {
+    const fileId = uid("f");
+    try { await putImage(fileId, d.fileData); doc.fileId = fileId; doc.fileType = d.fileType; if (old?.fileId) deleteImage(old.fileId).catch(() => {}); } catch { toast("No he podido guardar el archivo; guardo los datos"); }
+  }
+  const clean = Object.fromEntries(Object.entries(doc).filter(([, v]) => v !== undefined));
+  vault.docs = old ? vault.docs.map((x) => (x.id === old.id ? clean : x)) : [...(vault.docs ?? []), clean];
+  docDraft = null; persist(); render();
+  toast(clean.expires ? `Guardado: ${leftText(daysLeft(clean, today()))}` : "Guardado");
+}
+function libRow(i) {
+  return `<details class="card lib"><summary class="row"><span class="grow"><b>${esc(LIB_KINDS[i.kind] ?? "")} ${esc(i.title)}</b>${i.author ? `<br><span class="muted small">${esc(i.author)}</span>` : ""}</span><span class="chip">${esc(i.status)}</span></summary>
+    <div class="stack">${i.url ? `<a class="link small" href="${esc(safeHref(i.url))}" target="_blank" rel="noopener">Abrir enlace</a>` : ""}
+      <label for="ln-${esc(i.id)}" class="sr">Notas</label><textarea id="ln-${esc(i.id)}" data-lib-notes="${esc(i.id)}" rows="3" placeholder="Lo que te llevas">${esc(i.notes ?? "")}</textarea>
+      ${i.ideas?.length ? `<ul class="brief-list">${i.ideas.map((x) => `<li><span aria-hidden="true">💡</span><span>${esc(x)}</span></li>`).join("")}</ul>` : ""}
+      <div class="chips" role="group" aria-label="Estado">${STATUSES.map((st) => `<button class="chip${i.status === st ? " on" : ""}" data-act="lib-status" data-id="${esc(i.id)}" data-v="${st}" aria-pressed="${i.status === st}">${st}</button>`).join("")}</div>
+      <div class="btns">${i.notes && aiReady() ? `<button class="btn ghost small-btn" data-act="lib-ideas" data-id="${esc(i.id)}">💡 Ideas clave (Gemini)</button>` : ""}<button class="btn danger small-btn" data-act="lib-del" data-id="${esc(i.id)}">Borrar</button></div></div></details>`;
+}
+
 // ---------- Dinero: añadir, capturas del banco y gastos compartidos (WEB-80) ----------
 let incomeForm = false;      // the «+ Ingreso» form is open
 let bankRead = null;         // { busy } while Gemini reads; { items: [{...mov, on}] } to review

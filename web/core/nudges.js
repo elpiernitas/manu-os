@@ -24,6 +24,8 @@ export const NUDGES = [
   { id: "habitos", label: "Hábitos", hint: "Si te queda alguno por marcar hoy", time: "21:30", days: EVERY_DAY },
   { id: "manana", label: "¿Dónde trabajas mañana?", hint: "De domingo a jueves, si no lo has dicho", time: "22:00", days: BEFORE_WORKDAY },
   { id: "copia", label: "Copia de seguridad", hint: "Los domingos, si hace más de una semana", time: "20:00", days: [DAY.sun] },
+  { id: "repaso", label: "Repaso de la semana", hint: "Los domingos, con el plan para la siguiente", time: "20:30", days: [DAY.sun] },
+  { id: "documentos", label: "Documentos que vencen", hint: "Si algo vence en 7 días o menos", time: "09:30", days: EVERY_DAY },
 ];
 
 const toMin = (hhmm) => { const m = /^(\d{1,2}):(\d{2})$/.exec(String(hhmm ?? "")); return m ? Number(m[1]) * 60 + Number(m[2]) : null; };
@@ -51,6 +53,8 @@ const TEXT = {
   animo: (c) => (c.moodToday ? null : "¿Qué tal el día? Márcalo en MANU en un toque."),
   habitos: (c) => (c.habitsLeft ? `Te ${c.habitsLeft === 1 ? "queda 1 hábito" : `quedan ${c.habitsLeft} hábitos`} por marcar hoy.` : null),
   manana: (c) => (c.tomorrowAnswered ? null : "¿Mañana trabajas en Gijón?"),
+  repaso: (c) => (c.weekPending ? "Tu repaso de la semana está listo: lo que fue bien y el plan para la siguiente." : null),
+  documentos: (c) => (c.docsSoon ? (c.docsSoon === 1 ? "Tienes un documento que vence en los próximos días." : `Tienes ${c.docsSoon} documentos que vencen en los próximos días.`) : null),
   copia: (c) => (c.backupDays === null || c.backupDays >= 7 ? (c.backupDays === null ? "Aún no tienes ninguna copia de MANU. Hazla hoy: tarda un momento." : `Hace ${c.backupDays} días que no haces copia de MANU.`) : null),
 };
 
@@ -78,7 +82,7 @@ export function dueNudges(ctx, { now = new Date(), prefs = nudgePrefs(), sent = 
 }
 
 // Where tapping the notification takes him: "tab" or "tab/subpage".
-const GO = { animo: "tu", habitos: "tu/habitos", copia: "tu/datos" };
+const GO = { animo: "tu", habitos: "tu/habitos", copia: "tu/datos", repaso: "tu/repaso", documentos: "tu/documentos" };
 
 // Marks what was shown today (device-local: each device nudges on its own).
 export function markSent(sent, day, id) {
