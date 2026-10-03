@@ -11,10 +11,13 @@
 //   peso|2026-09-29|72,4
 //   lugar|2026-09-29 17:40|Calle Ejemplo 1, Gijón
 //   nota|2026-09-29 17:40|gasté 15 en gasolina      (WEB-78: dictated to Siri)
+//   gasto|2026-10-03 21:40|12,50|Bar|cañas          (WEB-86: «MANU Dinero», back tap)
+//   ingreso|2026-10-01 09:00|300|Manutención|papá   (WEB-86)
 import { normalise } from "./text.js";
+import { quickSpendCategory, quickIncomeKind } from "./quickmoney.js";
 
 export const LIMITS = { lines: 5000, seen: 5000, places: 1000, text: 120, note: 280 };
-const KINDS = { gasto: "expense", compra: "expense", pago: "expense", pasos: "steps", sueno: "sleep", dormir: "sleep", peso: "weight", lugar: "place", ubicacion: "place", nota: "note", apunte: "note", dictado: "note" };
+const KINDS = { gasto: "expense", compra: "expense", pago: "expense", pasos: "steps", sueno: "sleep", dormir: "sleep", peso: "weight", lugar: "place", ubicacion: "place", nota: "note", apunte: "note", dictado: "note", ingreso: "income", cobro: "income" };
 const pad = (n) => String(n).padStart(2, "0");
 const clip = (s, n) => String(s ?? "").replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, n);
 
@@ -66,7 +69,18 @@ export function parseLine(raw, now = new Date()) {
   const id = lineId(line);
   if (kind === "expense") {
     const cents = amountCents(value);
-    return cents ? { id, kind, at, cents, merchant: clip(rest.join(" "), LIMITS.text) || null } : { error: "importe no válido" };
+    if (!cents) return { error: "importe no válido" };
+    // WEB-86: «gasto|fecha|importe|Bar|concepto»: a known category first.
+    const category = quickSpendCategory(rest[0]);
+    if (category) return { id, kind, at, cents, category, merchant: clip(rest.slice(1).join(" "), LIMITS.text) || rest[0] };
+    return { id, kind, at, cents, merchant: clip(rest.join(" "), LIMITS.text) || null };
+  }
+  if (kind === "income") {
+    const cents = amountCents(value);
+    if (!cents) return { error: "importe no válido" };
+    const incomeKind = quickIncomeKind(rest[0]);
+    const concept = clip((incomeKind ? [rest[0], ...rest.slice(1)] : rest).filter(Boolean).join(" · "), LIMITS.text) || "Ingreso";
+    return { id, kind, at, cents, concept, incomeKind: incomeKind ?? "OTHER" };
   }
   if (kind === "note") {
     const text = clip([value, ...rest].join(" | "), LIMITS.note);
@@ -87,7 +101,7 @@ const HEALTH = { steps: "STEPS", sleep: "SLEEP", weight: "WEIGHT" };
 // categorises an expense like any other (money.js). Pure: returns what changed.
 export function applyBuzon(text, vault, { now = new Date(), newEntry }) {
   const seen = new Set(vault.settings?.buzonSeen ?? []);
-  const out = { spending: [], health: [...(vault.health ?? [])], places: [...(vault.places ?? [])], seen: [], notes: [], counts: { expense: 0, steps: 0, sleep: 0, weight: 0, place: 0, note: 0 }, repeated: 0, errors: [] };
+  const out = { spending: [], health: [...(vault.health ?? [])], places: [...(vault.places ?? [])], seen: [], notes: [], income: [], counts: { expense: 0, income: 0, steps: 0, sleep: 0, weight: 0, place: 0, note: 0 }, repeated: 0, errors: [] };
   const all = String(text ?? "").split(/\r?\n/);
   const skip = Math.max(0, all.length - LIMITS.lines); // the file only grows: the newest lines matter
   all.slice(skip).forEach((raw, j) => {
@@ -98,7 +112,13 @@ export function applyBuzon(text, vault, { now = new Date(), newEntry }) {
     if (seen.has(ev.id)) { out.repeated++; return; }
     seen.add(ev.id); out.seen.push(ev.id);
     out.counts[ev.kind]++;
-    if (ev.kind === "expense") out.spending.push({ ...newEntry({ id: ev.id, cents: ev.cents, merchant: ev.merchant, at: ev.at.toISOString() }), source: "APPLEPAY" });
+    if (ev.kind === "expense") {
+      const e = newEntry({ id: ev.id, cents: ev.cents, merchant: ev.merchant, at: ev.at.toISOString() });
+      // A category picked in the Shortcut wins over the guess; it is not «to review».
+      const { review, ...picked } = e;
+      out.spending.push(ev.category ? { ...picked, category: ev.category, inferred: false, source: "ATAJO" } : { ...e, source: "APPLEPAY" });
+    }
+    else if (ev.kind === "income") out.income.push({ id: ev.id, cents: ev.cents, concept: ev.concept, at: ev.at.toISOString(), source: "ATAJO", kind: ev.incomeKind });
     else if (ev.kind === "place") out.places.push({ id: ev.id, at: ev.at.toISOString(), text: ev.text });
     else if (ev.kind === "note") out.notes.push({ id: ev.id, at: ev.at.toISOString(), text: ev.text });
     else {
@@ -117,6 +137,7 @@ export function applyBuzon(text, vault, { now = new Date(), newEntry }) {
 export function buzonSummary(r) {
   const c = r.counts, parts = [];
   if (c.expense) parts.push(`${c.expense} ${c.expense === 1 ? "gasto" : "gastos"}`);
+  if (c.income) parts.push(`${c.income} ${c.income === 1 ? "ingreso" : "ingresos"}`);
   if (c.steps) parts.push(`pasos de ${c.steps} ${c.steps === 1 ? "día" : "días"}`);
   if (c.sleep) parts.push(`sueño de ${c.sleep} ${c.sleep === 1 ? "día" : "días"}`);
   if (c.weight) parts.push(`${c.weight} ${c.weight === 1 ? "peso" : "pesos"}`);

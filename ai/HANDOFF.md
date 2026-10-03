@@ -44,6 +44,30 @@ Siguientes ideas, sin compromiso:
 
 Límites reales de una web en iPhone: no hay widgets, pantalla bloqueada ni control del Chromecast. Donde se pueda, se hará con Atajos.
 
+## WEB-86 — dinero con doble toque (como la app de su amigo)
+
+Manu quiere «literalmente» lo de su amigo: doble toque en la parte de atrás del iPhone, ingreso o gasto, cantidad, categoría y guardado. También controlar ingresos y gastos y ver lo que se repite. Sus ingresos fijos son la nómina, la manutención y lo de su abuelo. Los importes reales no van al repositorio: los mete él en la app.
+
+- **Atajo «MANU Dinero»** (Tú → Atajos):
+  - «Elegir del menú» Gasto o Ingreso, cantidad y categoría de una lista (`QUICK_SPEND`, `QUICK_INCOME`);
+  - envía `gasto|fecha|importe|Categoría|concepto` o `ingreso|…`;
+  - se lanza con el doble toque: Accesibilidad → Tocar → Tocar atrás.
+- **Buzón en la nube** (ADR-0017, enmienda WEB-86):
+  - el atajo hace un POST a `manu_inbox` con la clave publishable y su código;
+  - MANU recoge las líneas al abrirse y al volver a primer plano, las archiva y las borra;
+  - si falta la tabla, Atajos enseña el SQL con «Copiar SQL» y «Ya lo he hecho»;
+  - sin nube, el atajo puede usar el buzón de archivo de siempre.
+- **El buzón** entiende la categoría elegida (gana a la deducida y no queda «por revisar») y los ingresos, con el tipo nuevo `FAMILY` (👨‍👦 Familia).
+- **Ingresos fijos** en Dinero (`settings.fixedIncome`):
+  - nombre, importe, día y tipo, con el total al mes;
+  - cada mes se marcan como llegados si hay un ingreso parecido (±5 % o con el mismo nombre);
+  - si no ha llegado, «¿Ha llegado ya?» en Dinero y «💶 ¿Ha llegado?» en Hoy, con un toque para apuntarlo.
+- **«Lo que más se repite»** (90 días): los gastos más frecuentes, con número de veces y media, y los ingresos que llegan cada mes.
+- Evidencia:
+  - `npm test`: 257 en verde.
+  - e2e86: 16/16, con Supabase simulado.
+  - El SQL real y el atajo en su iPhone: NO_VERIFICADO.
+
 ## WEB-83..85 — repaso, documentos y biblioteca
 
 Salen de un vídeo de ideas para montar con Claude que pasó Manu, quien dijo «haz lo que tú veas». El «panel de vida» ya existía (Hoy). El «kit de marca» no encaja en MANU.

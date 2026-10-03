@@ -36,7 +36,7 @@ import { findInVault, findCommand } from "./core/find.js";
 import { weatherEmoji, sceneFor, PARTICLES, SHAPES, MONEY_EMOJI, dayPhase, cityMinutes } from "./core/scene.js";
 import { buildImagePayload, buildLinkPayload, isGeminiKey, mayGo, setSensitiveOk, sensitiveAllowed, pickModel, backupModel, listModels, buildActionPayload, askWithActions, issueUrl, aiErrorText } from "./core/ai.js";
 import { encryptBackup, decryptBackup, passphraseProblem, isEnvelope } from "./core/crypto.js";
-import { SUPABASE_SQL, parseSyncLink, parseAuthHash, sendCode, verifyCode, refreshSession, needsRefresh, remoteHead, remoteGet, remotePut, decide, isEmptyVault, syncErrorText } from "./core/sync.js";
+import { SUPABASE_SQL, parseSyncLink, parseAuthHash, sendCode, verifyCode, refreshSession, needsRefresh, remoteHead, remoteGet, remotePut, decide, isEmptyVault, syncErrorText, INBOX_SQL, newInboxToken, registerInboxToken, pullInbox, deleteInbox, inboxRequest } from "./core/sync.js";
 import { exportFullBackup, downloadBlob, readBackupFile, restoreFullBackup, FORMAT as FULL_FORMAT } from "./core/backup-manager.js";
 import { isSpotifyClientId, pkceValid, randomVerifier, challengeFor, authorizeUrl, exchangeCode, refreshTokens, listDevices, findSpeaker, transferTo, DEFAULT_SPEAKER } from "./core/spotify.js";
 import { appsFor, whatsappUrl, askElsewhereUrl } from "./core/hub.js";
@@ -48,9 +48,10 @@ import { incomeKind } from "./core/bank.js";
 import { nightReview, weekReview, nightDue, weekDue } from "./core/review.js";
 import { KINDS as DOC_KINDS, daysLeft, expiringSoon, leftText, buildDocPayload, parseDocReply, isDocQuestion, answerDoc, DOC_LIMIT } from "./core/docs.js";
 import { LIB_KINDS, STATUSES, newItem, setStatus, ideasPayload, parseIdeas, isLibraryQuestion, answerLibrary } from "./core/library.js";
+import { QUICK_SPEND, QUICK_INCOME, fixedIncomeStatus, commonSpends, recurringIncome } from "./core/quickmoney.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "83";
+export const APP_VERSION = "84";
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -756,6 +757,15 @@ const SHORTCUTS = [
     "Acción <b>«Mostrar notificación»</b>: <code>¿Fichaste ya? Si no, ficha en RK y pulsa «Entro» en MANU.</code>",
     "Otra automatización igual a las <b>13:00</b> con <code>Acuérdate de fichar al salir.</code>",
     "Ojo: estas dos suenan siempre, también si ya fichaste, porque el iPhone no puede mirar dentro de MANU. MANU, si está abierta, solo te avisa cuando hace falta (y a la salida te dice a qué hora puedes irte)."] },
+  { id: "dinero", name: "MANU Dinero", purpose: "doble toque atrás: gasto o ingreso, cantidad y categoría", test: null, steps: [
+    "Nuevo atajo llamado <b>MANU Dinero</b>.",
+    "<b>«Elegir del menú»</b> con dos opciones: <b>Gasto</b> e <b>Ingreso</b>.",
+    `En <b>Gasto</b>: <b>«Solicitar entrada»</b> (Número, «¿Cuánto?»), <b>«Elegir de la lista»</b> con: ${QUICK_SPEND.map(([l]) => l).join(", ")}; y si quieres, otra <b>«Solicitar entrada»</b> (Texto, «¿Qué era?»).`,
+    "<b>«Formatear fecha»</b>: Fecha actual, formato <code>yyyy-MM-dd HH:mm</code>. <b>«Texto»</b>: <code>gasto|</code>Fecha formateada<code>|</code>Número<code>|</code>Elemento elegido<code>|</code>Texto.",
+    `En <b>Ingreso</b>, lo mismo con la lista ${QUICK_INCOME.map(([l]) => l).join(", ")} y el texto empezando por <code>ingreso|</code>.`,
+    "Después del menú: <b>«Obtener contenido de URL»</b>, método <b>POST</b>, con la URL, las cabeceras y el cuerpo JSON que te da Dinero → «Doble toque». Si no usas Tu nube: <b>«Añadir al archivo de texto»</b> <code>MANU-buzon.txt</code> (y luego «Importar del buzón»).",
+    "Opcional: <b>«Mostrar notificación»</b> «Apuntado».",
+    "<b>Ajustes → Accesibilidad → Tocar → Tocar atrás → Doble toque → MANU Dinero</b>. NO_VERIFICADO en tu iPhone."] },
   { id: "noche", name: "MANU Noche", purpose: "a las 22:00, de domingo a jueves: ¿dónde trabajas mañana?", test: null, steps: [
     "Atajos → <b>Automatización</b> → <b>+</b> → <b>«Hora del día»</b> <b>22:00</b>, <b>Semanalmente</b>: domingo, lunes, martes, miércoles y jueves, <b>«Ejecutar inmediatamente»</b>.",
     "Acción <b>«Mostrar notificación»</b>: <code>¿Dónde trabajas mañana? Dímelo en MANU y te propongo la alarma.</code>",
@@ -1034,7 +1044,7 @@ async function askProject(question, label = null) {
 }
 
 // ---------- Money statistics (WEB-21) ----------
-const INCOME_KIND = { PAYROLL: "💼 Nómina", BIZUM: "📲 Bizum recibidos", TRANSFER: "🏦 Transferencias", REFUND: "↩️ Devoluciones", OTHER: "➕ Otros ingresos" };
+const INCOME_KIND = { PAYROLL: "💼 Nómina", FAMILY: "👨‍👦 Familia", BIZUM: "📲 Bizum recibidos", TRANSFER: "🏦 Transferencias", REFUND: "↩️ Devoluciones", OTHER: "➕ Otros ingresos" };
 const pctText = (p) => (p === null ? "" : `${p > 0 ? "▲" : p < 0 ? "▼" : "="} ${Math.abs(p)} %`);
 function moneyStatsSection(ref, monthName) {
   const key = `${ref.getFullYear()}-${String(ref.getMonth() + 1).padStart(2, "0")}`;
@@ -1073,6 +1083,29 @@ function moneyStatsSection(ref, monthName) {
     ${st.topMerchants.length ? `<section class="card"><h2>Dónde más gastas en ${esc(month)}</h2>${st.topMerchants.map((m, i) => `<div class="row"><span class="rank" aria-hidden="true">${i + 1}</span><span class="grow">${esc(m.name)}<br><span class="muted small">${m.count} ${m.count === 1 ? "vez" : "veces"}</span></span><b class="num">${euros(m.cents)}</b></div>`).join("")}</section>` : ""}
     ${st.income.length ? `<section class="card"><h2>Ingresos de ${esc(month)}</h2>${st.incomeByKind.map(([k, c]) => `<div class="row"><span>${INCOME_KIND[k]}</span><b class="num">${euros(c)}</b></div>`).join("")}
       <details><summary class="muted small">Ver los ${st.income.length} ingresos</summary>${st.income.map((i) => `<div class="row"><div class="grow"><div>${esc(i.concept ?? "Ingreso")}</div><div class="muted small">${new Date(i.at).toLocaleDateString("es-ES", { day: "numeric", month: "short" })}${i.payroll ? " · nómina" : ""}</div></div><span class="num">+${euros(i.cents)}</span></div>`).join("")}</details></section>` : ""}`;
+}
+
+// ---------- Ingresos fijos y lo que se repite (WEB-86) ----------
+let fixedForm = false;
+function fixedIncomeCard() {
+  const fixed = vault.settings.fixedIncome ?? [];
+  const st = fixedIncomeStatus(fixed, vault.income, today());
+  const total = fixed.reduce((t, f) => t + f.cents, 0);
+  const form = fixedForm ? `<form id="fixedForm" class="stack"><label for="fxName" class="sr">Nombre</label><input id="fxName" placeholder="Nombre (Nómina, Manutención…)" maxlength="40" required>
+      <div class="row"><label for="fxAmount" class="sr">Importe</label><input id="fxAmount" inputmode="decimal" placeholder="€ al mes" required><label for="fxDay" class="sr">Día</label><input id="fxDay" inputmode="numeric" placeholder="Día del mes" maxlength="2"><label for="fxKind" class="sr">Tipo</label><select id="fxKind"><option value="PAYROLL">Nómina</option><option value="FAMILY">Familia</option><option value="OTHER">Otro</option></select></div>
+      <div class="btns"><button class="btn" type="submit">Guardar</button><button class="btn ghost" type="button" data-act="fixed-add">Cancelar</button></div></form>` : "";
+  if (!fixed.length) return `<section class="card"><h2>Ingresos fijos</h2><p class="muted small">Nómina, manutención… Te pregunto cada mes si han llegado.</p>${form || '<button class="btn ghost" data-act="fixed-add">➕ Añadir ingreso fijo</button>'}</section>`;
+  return `<section class="card fixed-income"><h2>Ingresos fijos · ${esc(euros(total))} al mes</h2>
+    ${st.map(({ f, got, due }) => `<div class="row"><span class="grow">${esc(f.name)}<br><span class="muted small">${got ? `✅ llegó el ${esc(new Date(got.at).toLocaleDateString("es-ES", { day: "numeric", month: "short" }))}` : due ? "¿Ha llegado ya?" : `hacia el día ${esc(f.day)}`}</span></span><b class="num">${esc(euros(f.cents))}</b>${!got ? `<button class="btn${due ? "" : " ghost"} small-btn" data-act="fixed-got" data-id="${esc(f.id)}">Ha llegado</button>` : ""}<button class="link small" data-act="fixed-del" data-id="${esc(f.id)}" aria-label="Quitar ${esc(f.name)}">✕</button></div>`).join("")}
+    ${form || '<button class="link small" data-act="fixed-add">➕ Añadir otro</button>'}</section>`;
+}
+function repeatsCard() {
+  const common = commonSpends(vault.spending, today(), 90, CATEGORIES);
+  const inc = recurringIncome(vault.income, today());
+  if (!common.length && !inc.length) return "";
+  return `<section class="card"><h2>Lo que más se repite · 90 días</h2>
+    ${common.map((c) => `<div class="row"><span class="cat-emoji" aria-hidden="true">${CATEGORY_EMOJI[c.category] ?? "📦"}</span><span class="grow">${esc(c.label)}<br><span class="muted small">${c.count} veces · ${esc(euros(c.avg))} de media</span></span><b class="num">${esc(euros(c.cents))}</b></div>`).join("")}
+    ${inc.length ? `<p class="small muted review-h">Ingresos que llegan cada mes</p>${inc.map((r) => `<div class="row"><span class="grow">${esc(r.merchant)}<br><span class="muted small">hacia el día ${r.dayOfMonth}</span></span><b class="num pos">+${esc(euros(r.cents))}</b></div>`).join("")}` : ""}</section>`;
 }
 
 // ---------- Money insights ----------
@@ -1228,6 +1261,7 @@ const screens = {
       ${nowCard()}
       ${clockCard()}
       ${toAsk(vault.spending, today()).length || splitDraft ? splitAskCard() : ""}
+      ${(() => { const due = fixedIncomeStatus(vault.settings.fixedIncome, vault.income, today()).filter((x) => x.due); return due.length ? `<section class="card"><h2>💶 ¿Ha llegado?</h2>${due.map(({ f }) => `<div class="row"><span class="grow">${esc(f.name)} · ${esc(euros(f.cents))}</span><button class="btn small-btn" data-act="fixed-got" data-id="${esc(f.id)}">Sí</button></div>`).join("")}</section>` : ""; })()}
       ${closingCard()}
       ${weekReviewCard()}
       ${nightReviewCard()}
@@ -1303,9 +1337,10 @@ const screens = {
       <div class="stack">
       <section class="card hero money-hero">${celebrateMoney ? moneyRain() : ""}<div class="row cal-head"><button class="link" data-act="money-prev" aria-label="Mes anterior">${I.back}</button><h2>${moneyMonth === 0 ? "Gastado este mes" : `Gastado en ${esc(monthName.replace(/ de \d{4}$/, ""))}`}</h2><button class="link" data-act="money-next" aria-label="Mes siguiente"${moneyMonth === 0 ? " disabled" : ""}>${I.chev}</button></div><div class="big-money" data-count-money="${month.total}">${euros(month.total)}</div>
         ${cats.map(([c, v]) => { const lim = moneyMonth === 0 ? vault.settings.budgets?.[c] : null; return `<div class="stack"><div class="row"><span>${esc(catLabel(c))}</span><span class="num">${euros(v)}${lim ? `<span class="muted small"> / ${euros(lim)}</span>` : ""}</span></div><div class="bar${lim && v > lim ? " over" : lim && v >= lim * 0.8 ? " warn" : ""}"><i data-w="${Math.max(3, Math.round((v / (lim ? Math.max(lim, v) : max)) * 100))}"></i></div></div>`; }).join("")}</section>
-      ${moneyMonth === 0 ? `${splitAskCard()}${addMoneyCard()}${debtsCard()}` : ""}
+      ${moneyMonth === 0 ? `${splitAskCard()}${addMoneyCard()}${fixedIncomeCard()}${debtsCard()}` : ""}
       ${moneyMonth === 0 ? budgetCard() : ""}
       ${moneyStatsSection(ref, monthName)}
+      ${moneyMonth === 0 ? repeatsCard() : ""}
       <section class="card"><h2>${I.box} Importar del banco</h2>
         <p class="muted small">Excel o CSV de tu banco. Se lee en el móvil, sin enviarlo a nadie, y no duplica lo que ya tengas.</p>
         <label class="btn ghost" for="bankFile" role="button" tabindex="0">Elegir archivo (Excel o CSV)</label><input id="bankFile" type="file" accept=".xls,.xlsx,.csv,text/csv,text/plain,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="sr">
@@ -1566,6 +1601,7 @@ const subpages = {
       <div class="btns">${x.test ? `<a class="btn ghost" href="${esc(safeHref(x.test))}">Probar</a>` : ""}${done[x.id] ? `<button class="btn ghost" data-act="shortcut-undo" data-id="${x.id}">Marcar como pendiente</button>` : `<button class="btn" data-act="shortcut-done" data-id="${x.id}">Ya lo tengo</button>`}</div></details>`;
     return `${backBar("Atajos")}
       <p class="muted small">Cada atajo se crea una vez en la app Atajos, con el nombre exacto. Cuando lo tengas, pulsa «Ya lo tengo».</p>
+      ${dineroAtajoCard()}
       ${buzonCard()}
       ${sectionTitle(`Pendientes (${pending.length})`)}
       <div class="stack">${pending.map(card).join("") || '<p class="muted">Nada pendiente.</p>'}</div>
@@ -2637,9 +2673,10 @@ function buzonCard() {
     ${last ? `<p class="small">Última importación: ${esc(new Date(last.at).toLocaleString("es-ES", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }))} · ${esc(last.text)}</p>` : ""}
     <label class="btn block" for="buzonFile" role="button" tabindex="0">Importar del buzón</label><input id="buzonFile" type="file" accept=".txt,text/plain" class="sr"></section>`;
 }
-function importBuzon(text) {
+function importBuzon(text, { from = "Buzón" } = {}) {
   const r = applyBuzon(text, vault, { now: new Date(), newEntry: (e) => newEntry(e, vault.settings.categoryRules ?? {}) });
   vault.spending.push(...r.spending);
+  vault.income = [...(vault.income ?? []), ...r.income];
   // WEB-78: notes dictated to Siri («MANU Dictado»). A gasto, tarea or idea is
   // filed like in the chat (with the time it was dictated); anything else,
   // reminders included, waits in «Por clasificar» so nothing is guessed wrong.
@@ -2659,9 +2696,53 @@ function importBuzon(text) {
   if (r.counts.steps || r.counts.sleep || r.counts.weight) done.salud = true;
   if (r.counts.place) done.lugar = true;
   if (r.counts.note) done.dictado = true;
+  if (r.spending.some((x) => x.source === "ATAJO") || r.income.length) done.dinero = true;
   vault.settings.shortcutsDone = done;
   persist(); render(); refreshDiary();
-  toast(`Buzón: ${summary}`);
+  toast(`${from}: ${summary}`);
+  return r;
+}
+
+// ---------- Buzón en la nube para «MANU Dinero» (WEB-86) ----------
+let inboxBusy = false;
+async function nubeInbox() {
+  const ib = vault.settings.inbox;
+  if (!ib?.token || inboxBusy || !nubeOn() || restoring) return;
+  inboxBusy = true;
+  try {
+    const s = await nubeSession();
+    const rows = await pullInbox(nubeCfg(), s);
+    if (ib.missing) { vault.settings.inbox = { ...ib, missing: false }; persist(); }
+    if (!rows.length) return;
+    importBuzon(rows.map((r) => r.line).join("\n"), { from: "Del atajo" });
+    await deleteInbox(nubeCfg(), s, rows.map((r) => r.id));
+  } catch (err) {
+    if (err.code === "inbox") { vault.settings.inbox = { ...ib, missing: true }; persist(); }
+  } finally { inboxBusy = false; }
+}
+async function setupInbox() {
+  if (!nubeOn()) { toast("Primero entra en Tu nube (Tú → Tu nube)"); return; }
+  const token = vault.settings.inbox?.token ?? newInboxToken();
+  try {
+    await registerInboxToken(nubeCfg(), await nubeSession(), token);
+    vault.settings.inbox = { token, missing: false, at: new Date().toISOString() };
+    persist(); render(); toast("Código listo: cópialo en el atajo");
+  } catch (err) {
+    vault.settings.inbox = { token, missing: err.code === "inbox" };
+    persist(); render();
+    toast(err.code === "inbox" ? "Falta un paso en Supabase: te lo explico abajo" : syncErrorText(err));
+  }
+}
+function dineroAtajoCard() {
+  const ib = vault.settings.inbox;
+  const req = ib?.token ? inboxRequest(nubeCfg(), ib.token, "…") : null;
+  const sql = ib?.missing ? `<details open><summary><b>Paso único en Supabase</b></summary><p class="small">Abre Supabase → SQL Editor, pega esto y pulsa Run (o pídeselo a Claude Cowork). Crea un buzón donde el atajo solo puede dejar líneas; solo tu cuenta puede leerlas.</p><pre class="code small">${esc(INBOX_SQL)}</pre><div class="btns"><button class="btn ghost" data-act="copy-text" data-text="${esc(INBOX_SQL)}">Copiar SQL</button><button class="btn" data-act="inbox-setup">Ya lo he hecho</button></div></details>` : "";
+  return `<section class="card"><h2>💸 Doble toque: gasto o ingreso</h2>
+    <p class="muted small">El atajo «MANU Dinero» pregunta gasto o ingreso, cantidad y categoría, y lo manda a tu nube. MANU lo recoge al abrirse.</p>
+    ${req ? `<div class="stack"><div class="row"><span class="grow small">Tu código del atajo</span><button class="btn ghost small-btn" data-act="copy-text" data-text="${esc(ib.token)}">Copiar código</button></div>
+      <p class="small muted">URL: <code>${esc(req.url)}</code> · Cabeceras: <code>apikey</code> = <code>${esc(req.headers.apikey)}</code>, <code>Prefer</code> = <code>return=minimal</code> · Cuerpo JSON: <code>token</code> = tu código, <code>line</code> = el texto.</p></div>${sql}`
+    : `<button class="btn block" data-act="inbox-setup">Crear mi código del atajo</button>`}
+  </section>`;
 }
 
 // ---------- Personas (WEB-38) ----------
@@ -3030,6 +3111,17 @@ document.addEventListener("click", async (e) => {
     case "tomorrow-reset": vault.settings.tomorrow = null; persist(); render(); break;
     case "notify-on": await enableNotifications(); render(); break;
     case "cmdk": openCmdk(); break;
+    case "inbox-setup": await setupInbox(); nubeInbox(); break;
+    case "copy-text": try { await navigator.clipboard.writeText(a.dataset.text ?? ""); toast("Copiado"); } catch { toast("No he podido copiarlo"); } break;
+    case "fixed-add": fixedForm = !fixedForm; render(); if (fixedForm) $("fxName")?.focus(); break;
+    case "fixed-del": { const f = (vault.settings.fixedIncome ?? []).find((x) => x.id === a.dataset.id); if (f && window.confirm(`¿Quitar «${f.name}» de tus ingresos fijos?`)) { vault.settings.fixedIncome = vault.settings.fixedIncome.filter((x) => x.id !== f.id); persist(); render(); } break; }
+    case "fixed-got": {
+      const f = (vault.settings.fixedIncome ?? []).find((x) => x.id === a.dataset.id);
+      if (!f) break;
+      vault.income = [...(vault.income ?? []), { id: uid("in"), cents: f.cents, concept: f.name, at: new Date().toISOString(), source: "FIJO", kind: f.kind ?? "OTHER", fixedId: f.id }];
+      persist(); render(); toast(`${f.name}: +${euros(f.cents)}`);
+      break;
+    }
     case "review-done": vault.settings.reviewedDay = localDay(); reviewNote = false; persist(); render(); toast("Día cerrado. ¡Buenas noches!"); break;
     case "review-note": reviewNote = true; render(); $("revNote")?.focus(); break;
     case "week-done": vault.settings.weekReviewed = a.dataset.key; persist(); render(); break;
@@ -3186,6 +3278,15 @@ document.addEventListener("submit", async (e) => {
       const it = newItem({ id: uid("lib"), title: $("lTitle").value, kind: $("lKind").value, status: $("lStatus").value, author: $("lAuthor").value, url: $("lUrl").value.trim() || null, notes: $("lNotes").value }, new Date());
       vault.library = [...(vault.library ?? []), it]; persist(); render(); toast("Añadido a tu biblioteca");
     } catch (err) { toast(err.message); }
+    return;
+  }
+  if (f === "fixedForm") {
+    const cents = toCents($("fxAmount").value);
+    const name = $("fxName").value.trim().slice(0, 40);
+    if (!cents || !name) { toast("Pon nombre e importe"); return; }
+    const day = Math.min(31, Math.max(1, Number($("fxDay").value) || 1));
+    vault.settings.fixedIncome = [...(vault.settings.fixedIncome ?? []), { id: uid("fx"), name, cents, day, kind: ["PAYROLL", "FAMILY", "OTHER"].includes($("fxKind").value) ? $("fxKind").value : "OTHER" }];
+    fixedForm = false; persist(); render(); toast(`${name}: ${euros(cents)} cada mes`);
     return;
   }
   if (f === "incomeForm") {
@@ -4232,8 +4333,8 @@ applyNubeLink();
 }
 window.addEventListener("hashchange", () => { if (applyNubeLink() || applyLaunch() || applyIr()) render(); });
 render({ enter: "page" });
-nubeSync();
-document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") nubeSync(); });
+nubeSync().finally(() => nubeInbox());
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") nubeSync().finally(() => nubeInbox()); });
 refreshWeather();
 if (isClientId(gClientId()) && GOOGLE_FEATURES.some(([k]) => googleOn(k))) loadGis().catch(() => {});
 checkReminders();

@@ -45,3 +45,16 @@ Cambia lo siguiente:
 - **Migración:** la fila cifrada de WEB-64 (un vault vacío del Mac) no se puede leer, así que los datos de un dispositivo la sustituyen. La base IndexedDB `manu-sync-key` se borra.
 
 Siguen igual: RLS por usuario, `rev` con aviso de conflicto, CSP limitada al host de Manu, sesión en `manuos.nube.token` fuera de las copias, y que Tu archivo y las fotos se quedan en cada dispositivo.
+
+## Enmienda WEB-86 (2026-10-03): buzón del atajo «MANU Dinero»
+
+El atajo del doble toque no puede abrir la app instalada. Por eso deja su línea en una tabla `manu_inbox` del Supabase de Manu, y MANU la recoge al abrirse y la borra.
+
+- **Permiso nuevo, solo si Manu lo activa:** el rol `anon` (la clave publishable) puede **insertar** en `manu_inbox` las columnas `token` y `line`. No puede leer ni borrar nada.
+- **Quién lee:** solo la sesión de Manu puede leer o borrar, y solo las líneas con el código de su cuenta (`manu_inbox_owner`, con RLS por `auth.uid()`).
+- **El código:**
+  - lo genera el dispositivo de Manu (24 bytes aleatorios);
+  - se copia a mano en el atajo;
+  - se guarda en el vault, que es local y va a Tu nube.
+- **Riesgo aceptado:** quien tenga la clave publishable, que es pública, podría llenar la tabla de líneas. Nadie las leería sin el código, y cada línea está limitada a 300 caracteres.
+- **Cómo se activa:** el SQL está en `web/core/sync.js` (`INBOX_SQL`) y Manu lo ejecuta una vez en el SQL Editor. Sin él, el atajo puede escribir en `MANU-buzon.txt`.

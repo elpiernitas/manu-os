@@ -197,6 +197,7 @@ export function classifiedFromRows(rawRows, existing = [], learned = {}) {
 export function incomeKind(concept) {
   const t = ` ${normalise(concept ?? "").replace(/[^a-z0-9ñ]+/g, " ")} `;
   if (/ (nomina|nominas|salario|haberes|payroll) /.test(t)) return "PAYROLL";
+  if (/ (manutencion|pension alimenticia) /.test(t)) return "FAMILY"; // WEB-86
   // Banks write «ABONO BIZUM» for a Bizum received: Bizum first, and «abono»
   // alone (any credit) is not a refund.
   if (/ bizum /.test(t)) return "BIZUM";
