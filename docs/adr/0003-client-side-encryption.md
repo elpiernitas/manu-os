@@ -3,6 +3,8 @@
 Status: **ACCEPTED**  
 Date: **2026-09-28**
 
+> **Excepción vigente (WEB-87, 2026-10-04):** la sincronización web «Tu nube» no cumple esta decisión por elección de Manu: el vault va sin cifrar a su Supabase ([ADR-0017](0017-supabase-sync.md), enmienda WEB-67). Las copias completas (archivo y Drive) sí van cifradas por defecto.
+
 ## Contexto
 
 El corpus contendrá conversaciones, relaciones, calendario, documentos y posibles datos sensibles. El proveedor remoto no debe convertirse en una copia legible de la vida de Manu.

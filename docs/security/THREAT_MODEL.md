@@ -42,7 +42,7 @@
 | --- | --- | --- | --- |
 | pérdida o robo del dispositivo | acceso al vault desbloqueado | passcode/biometría del SO, ~~bloqueo de sesión~~ (sustituido: sin bloqueo interno por decisión de Manu, R-33), cifrado local, revocación de dispositivo | DECIDIDO |
 | dispositivo desbloqueado en manos de otra persona | acceso a Refugio, salud, finanzas y personas sin barrera adicional | riesgo aceptado por Manu (R-33); lo sensible no aparece en superficies bloqueadas ni notificaciones | ACEPTADO |
-| proveedor cloud comprometido | filtración de corpus | cifrado en cliente; servidor recibe ciphertext y metadatos mínimos | DECIDIDO |
+| proveedor cloud comprometido | filtración de corpus | cifrado en cliente; servidor recibe ciphertext y metadatos mínimos. **Web (Tu nube):** sin cifrar por decisión de Manu (ADR-0017, enmienda WEB-67); solo RLS y sesión. Copias completas cifradas | ACEPTADO (web) |
 | XSS o dependencia maliciosa | robo de datos/clave con vault abierto | CSP estricta, sin scripts remotos, lockfile, auditoría, Trusted Types cuando sea viable, escapar HTML | DECIDIDO |
 | secreto en Git | toma de cuentas | `.env.example`, secret scanning, CI sin volcar entorno, rotación y revisión de commits | DECIDIDO |
 | robo de refresh token | acceso a integración | cifrado en reposo, scopes mínimos, revocación, no exponer al frontend si no es necesario | DECIDIDO |

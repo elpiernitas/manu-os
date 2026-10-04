@@ -51,7 +51,7 @@ Reglas:
 - **Local-first**: capturar y consultar lo esencial no depende de la red.
 - **Funciona sin IA**: organización, memoria, búsqueda y automatizaciones funcionan sin ningún modelo (ADR-0009).
 - **Proveedor sustituible**: IA, hosting, almacenamiento y sync entran mediante adaptadores. MANU OS no depende de ChatGPT, Claude ni Gemini.
-- **Privacidad por diseño**: mínimo privilegio, permisos pedidos en el momento de uso, cifrado del contenido antes de subirlo y datos sensibles etiquetados.
+- **Privacidad por diseño**: mínimo privilegio, permisos pedidos en el momento de uso, cifrado del contenido antes de subirlo y datos sensibles etiquetados. *Excepción decidida por Manu (2026-09-30, enmienda WEB-67 de [ADR-0017](../adr/0017-supabase-sync.md)): Tu nube guarda el vault sin cifrar, protegido por RLS y por su sesión; Supabase técnicamente puede leerlo. Las copias completas siguen cifradas por defecto.*
 - **Aprobación antes de consecuencias**: acciones pequeñas y rutinas previamente autorizadas pueden ser automáticas; toda acción con consecuencias se prepara y se confirma. Ningún mensaje se envía automáticamente fuera de una lista blanca explícita.
 - **Temporalidad real**: una afirmación puede quedar sustituida sin borrar su historia.
 - **Portabilidad**: exportación legible y documentada, con procedencia y eventos de eliminación.
