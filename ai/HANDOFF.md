@@ -2,13 +2,33 @@
 
 ## Próximo paso vigente
 
-1. WEB-07/08 fusionadas (PR #16). WEB-09 (movimiento) fusionada (PR #17); WEB-10 sigue el mismo flujo: Claude Code fusiona con CI en verde y `web.yml` publica. La revisión de ChatGPT es bajo petición.
-2. Manu, en su dispositivo y fuera del repositorio, crea el ID de cliente OAuth de Google (Calendar, Tasks, People y Drive, cada uno activable por separado) y, si quiere, la clave gratuita de Gemini.
-3. La línea nativa (PR #7, #8 y #9) sigue en pausa. D-04B y D-03 son gates futuros.
+1. **WEB-87:** Manu prueba en su iPhone la lista de la sección «WEB-87». Lo que falle se arregla en esa misma tarea, con su regresión.
+2. No se añaden funciones hasta cerrar WEB-87.
+3. La línea nativa (PR #7, #8 y #9) sigue en pausa.
 
 ## Estado
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
+
+## WEB-87 — activación y QA real en el iPhone
+
+Auditoría externa del 2026-10-04 (pegada por Manu), verificada punto por punto en el repositorio: documentación de estado atrasada, versión visible «84» con WEB-86 publicada, el charter y ADR-0003 exigían cifrar antes de subir aunque Tu nube va sin cifrar desde WEB-67, y demasiadas funciones sin probar en el iPhone.
+
+Hecho en el repositorio:
+- `PROJECT_STATE.md` y `CURRENT_TASK.md` al día.
+- `APP_VERSION` y el service worker pasan a 87. Desde ahora, la versión es el número de la última tarea WEB publicada.
+- ADR-0017 se renombra a `0017-supabase-sync.md`; el charter, ADR-0003 y el threat model dicen la excepción de Tu nube.
+
+Prueba que solo puede hacer Manu (todo NO_VERIFICADO hasta entonces):
+1. Tú → Atajos → crear el código de MANU Dinero y ejecutar `INBOX_SQL` en el SQL Editor de su Supabase.
+2. Crear el atajo «MANU Dinero» y asignarlo a Tocar atrás → Doble toque.
+3. Enviar un gasto y un ingreso de prueba; abrir MANU y comprobar que aparecen una vez, con tipo y categoría correctos; borrarlos.
+4. Atajos de alarma, llegada y noche sin confirmaciones inesperadas; voz española de «Léemelo».
+5. Gmail, Spotify, Google y Gemini con sus cuentas.
+
+Límite conocido, no es un fallo: las imágenes, los archivos de Documentos y «Tu archivo» viven en IndexedDB de cada dispositivo y no van a Tu nube (ADR-0017, alcance v1). En el otro dispositivo se ve la ficha, no el archivo.
+
+Deuda técnica que sigue abierta (no urgente): `app.js` concentra demasiada coordinación; sin Web Locks entre pestañas; las copias grandes no van por bloques.
 
 ## Visión de MANU OS (2026-09-30, a partir de las respuestas de Manu)
 

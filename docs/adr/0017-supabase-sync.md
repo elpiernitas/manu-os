@@ -4,6 +4,8 @@ Status: **ACCEPTED** (decisión de Manu, 2026-09-30: «todo lo que sea gratis te
 Date: **2026-09-30**
 Complementa: **ADR-0012** y **ADR-0013**
 
+> **Nota (WEB-87, 2026-10-04):** el archivo se llamaba `0017-encrypted-sync-supabase.md`. Se renombra porque, desde la enmienda WEB-67, Tu nube **no cifra** el vault (decisión de Manu). La decisión 2 de abajo es histórica; lo vigente está en las enmiendas.
+
 ## Contexto
 
 MANU guarda todo en el dispositivo (ADR-0012). Manu quiere tener lo mismo en el iPhone y en el Mac, y un sitio privado para sus datos que no sea el repositorio público. Netlify con un «enlace privado» no es privado, así que se descarta. Supabase tiene un plan gratuito. Sus límites (unos 500 MB y pausa tras una semana sin uso) son NO_VERIFICADOS y hay que comprobarlos en su web.
