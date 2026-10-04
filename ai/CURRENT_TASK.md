@@ -1,6 +1,8 @@
 # CURRENT TASK
 
-Status: **BLOCKED_ON_DEVICE** (espera la prueba de Manu en su iPhone)
+Status: **BLOCKED**
+
+Espera la prueba de Manu en su iPhone (WEB-87).
 
 ## Tarea activa
 
