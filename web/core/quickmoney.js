@@ -40,6 +40,21 @@ export function fixedIncomeStatus(fixed, income, now = new Date()) {
   });
 }
 
+// WEB-88: bank concepts are long («COMPRA TARJ. 5402XXXXXXXX5011 CAFE DE LA
+// ACADEMIA-GIJON»). Keeps the shop's name: «Cafe de la Academia».
+const SMALL = new Set(["de", "del", "la", "las", "el", "los", "y", "e", "a"]);
+export function cleanConcept(text) {
+  const raw = String(text ?? "").replace(/\s+/g, " ").trim();
+  if (raw !== raw.toUpperCase()) return raw; // written by a person: as is
+  let s = raw.replace(/^(?:compra|pago|adeudo|devoluci[oó]n|anulaci[oó]n)(?:\s+(?:con|de))?\s+tarj(?:eta|\.)?\s*(?:[\dx*]{4,}\s*)?/i, "")
+    .replace(/^(?:\d{4}[x*]{4,}\d{4})\s+/i, "");
+  const cut = s.split(/\s*-\s*/)[0];
+  if (cut && cut.length >= 3) s = cut;
+  s = s.trim();
+  if (!s) return raw;
+  return s.toLowerCase().split(" ").map((w, i) => (i > 0 && SMALL.has(w) ? w : w.charAt(0).toUpperCase() + w.slice(1))).join(" ");
+}
+
 // What he spends on most often (last `days`), by count: «Bar · 9 veces · 63 €».
 export function commonSpends(spending, now = new Date(), days = 90, labels = {}) {
   const from = now.getTime() - days * DAY;
@@ -47,7 +62,7 @@ export function commonSpends(spending, now = new Date(), days = 90, labels = {})
   for (const s of spending ?? []) {
     const t = Date.parse(s.at);
     if (!(t >= from && t <= now.getTime()) || !(s.cents > 0)) continue;
-    const label = String(s.merchant ?? "").trim() || labels[s.category] || "Otros";
+    const label = cleanConcept(s.merchant) || labels[s.category] || "Otros";
     const k = normalise(label);
     const g = by.get(k) ?? { label, count: 0, cents: 0, category: s.category };
     g.count++; g.cents += s.cents;

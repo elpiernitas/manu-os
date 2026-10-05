@@ -197,3 +197,12 @@ Reglas:
 3. Guardar primero. Cambiar la memoria y la revisión solo si el guardado devolvió `true`.
 
 La prueba e2e retrasa la red simulada, edita mientras espera y llena el almacenamiento. Falla con el código anterior.
+
+### QAL-045 — Todo lo que se puede añadir se tiene que poder quitar
+
+En la primera prueba real de MANU Dinero (2026-10-05), Manu apuntó 1 € de prueba y no pudo borrarlo: Dinero no tenía forma de quitar un gasto ni un ingreso. Ninguna prueba lo detectó porque todas comprobaban que los datos *llegaban*, no que se pudieran deshacer.
+
+Reglas:
+1. Cada forma nueva de añadir datos (atajo, captura, importación, chat) llega con su forma de quitarlos, y una prueba e2e que añade y borra.
+2. Las pruebas en el dispositivo real empiezan por un dato de prueba que luego hay que borrar: así sale este fallo el primer día.
+3. `CURRENT_TASK.md` solo admite los estados que comprueba `foundation-check.yml` (`BLOCKED`, no `BLOCKED_ON_DEVICE`).

@@ -10,6 +10,22 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
+## WEB-88 — lo que salió al probar en el iPhone (2026-10-05)
+
+**VERIFICADO en el iPhone de Manu:** `INBOX_SQL` ejecutado en su Supabase («Success. No rows returned»); el atajo «MANU Dinero» enviado de Gasto → 1 → Otros llegó a MANU una sola vez, con su categoría.
+
+Cómo se instaló, porque montarlo a mano era demasiado pesado y Cowork no puede escribir en la app Atajos:
+- `tools/shortcuts/manu_dinero.py` genera el archivo, sin el código: el iPhone lo pregunta al añadirlo.
+- `shortcuts sign --mode anyone` lo firma en el Mac (avisos «Unrecognized attribute string flag» inofensivos).
+- AirDrop al iPhone.
+
+Arreglos:
+- No había forma de borrar un gasto ni un ingreso. Ahora, al tocar la categoría de un movimiento sale «Borrar», y hay una lista «Ingresos» con «Borrar» (con confirmación).
+- Los conceptos del banco («COMPRA TARJ. 5402XXXXXXXX5011 CAFE…-GIJON») se muestran como el nombre del sitio (`cleanConcept`), en Movimientos y en «Lo que más se repite».
+- «vs mes anterior» compara con los mismos días del mes pasado, no con el mes entero (salía «▼ 100 %» con 0 € el día 5).
+
+Sigue NO_VERIFICADO: doble toque asignado, automatización de Apple Pay («Transacción» → Ejecutar atajo MANU Dinero), rama Ingreso del atajo, avisos.
+
 ## WEB-87 — activación y QA real en el iPhone
 
 Auditoría externa del 2026-10-04 (pegada por Manu), verificada punto por punto en el repositorio: documentación de estado atrasada, versión visible «84» con WEB-86 publicada, el charter y ADR-0003 exigían cifrar antes de subir aunque Tu nube va sin cifrar desde WEB-67, y demasiadas funciones sin probar en el iPhone.
