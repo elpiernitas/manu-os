@@ -6,7 +6,7 @@ Espera la prueba de Manu en su iPhone (WEB-87).
 
 ## Tarea activa
 
-WEB-87/88 — activación y QA real en el iPhone (`ai/HANDOFF.md`, «WEB-88» y «WEB-87»). MANU Dinero y el buzón ya están VERIFICADOS en su iPhone; falta el resto de la lista. WEB-86 está fusionada (PR #90, `a615bbe`). La parte de documentación y versión de WEB-87 va en su propio PR; la prueba real solo la puede hacer Manu.
+WEB-87/88/89 — activación y QA real en el iPhone (`ai/HANDOFF.md`, «WEB-89», «WEB-88» y «WEB-87»). MANU Dinero, el buzón y MANU Recordatorio están VERIFICADOS en su iPhone; los demás atajos esperan su prueba.
 
 ## Autorización
 

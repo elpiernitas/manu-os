@@ -83,3 +83,18 @@ test("WEB-78: notes dictated to Siri go through the buzón", async () => {
   assert.equal(r.repeated, 1);
   assert.equal(buzonSummary(r), "2 notas dictadas · 1 ya estaban");
 });
+
+test("WEB-89: «MANU Fichar» and «MANU Ánimo» lines", async () => {
+  const { parseLine, applyBuzon } = await import("../core/buzon.js");
+  const now = new Date(2026, 9, 6, 22);
+  assert.deepEqual(parseLine("fichaje|2026-10-06 09:02:10|entro", now).t, "in");
+  const p = parseLine("fichaje|2026-10-06 11:00:00|pausa|Café", now);
+  assert.equal(p.t, "pause"); assert.equal(p.why, "Café");
+  assert.ok(parseLine("fichaje|2026-10-06 11:00|bailar", now).error);
+  assert.equal(parseLine("animo|2026-10-06 21:00:00|bien", now).value, 3);
+  assert.equal(parseLine("animo|2026-10-06 21:00:00|4", now).value, 4);
+  assert.ok(parseLine("animo|2026-10-06 21:00|9", now).error);
+  const r = applyBuzon("fichaje|2026-10-06 13:01:00|salida\nfichaje|2026-10-06 09:02:00|entro\nanimo|2026-10-06 21:00:00|mal", { settings: {} }, { now, newEntry: (e) => e });
+  assert.deepEqual(r.punches.map((x) => x.t), ["in", "out"], "sorted by time");
+  assert.deepEqual(r.moods, [{ day: "2026-10-06", value: 1, at: r.moods[0].at }]);
+});

@@ -26,7 +26,7 @@ import { applyBuzon, buzonSummary } from "./core/buzon.js";
 import { briefing, briefingText, isBriefingQuestion, monthPace } from "./core/briefing.js";
 import { whatNow, whatNowText, isWhatNowQuestion, morningSpeech } from "./core/now.js";
 import { gentleMode, gentlePlan, isGentleQuestion } from "./core/lowmode.js";
-import { punch, editPunch, today as shiftToday, monthReport, reportRows, toCsv, monthNote, monthIcs, dur, PAUSE_REASONS, clockState, clockNudge } from "./core/clock.js";
+import { punch, punchAt, editPunch, today as shiftToday, monthReport, reportRows, toCsv, monthNote, monthIcs, dur, PAUSE_REASONS, clockState, clockNudge } from "./core/clock.js";
 import { closingDue, workClosing, closingText, isClosingQuestion, nextWorkDay } from "./core/closing.js";
 import { searchContacts } from "./core/contacts.js";
 import { autoFile, projectKeys, parseKeywords, buildSuggestPayload, parseSuggestions, projectMarkdown, projectZip, projectFileName } from "./core/autofile.js";
@@ -51,7 +51,7 @@ import { LIB_KINDS, STATUSES, newItem, setStatus, ideasPayload, parseIdeas, isLi
 import { cleanConcept, QUICK_SPEND, QUICK_INCOME, fixedIncomeStatus, commonSpends, recurringIncome } from "./core/quickmoney.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "88"; // = número de la última tarea WEB publicada (desde WEB-87)
+export const APP_VERSION = "89"; // = número de la última tarea WEB publicada (desde WEB-87)
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -2694,6 +2694,13 @@ function importBuzon(text, { from = "Buzón" } = {}) {
     else if (p.kind === "task") vault.inbox.push({ ...capture({ id: n.id, text: p.text.slice(0, 140), at: n.at }), status: "TASK" });
     else vault.inbox.push(capture({ id: n.id, text: (p.kind === "idea" ? p.text : n.text).slice(0, 280), at: n.at }));
   }
+  // WEB-89: «MANU Fichar» and «MANU Ánimo».
+  const punchSkipped = [];
+  for (const p of r.punches) {
+    try { vault.clock = punchAt(vault.clock, p.t, { at: new Date(p.at), id: p.id, why: p.why }); }
+    catch (err) { punchSkipped.push(`${hhmm(new Date(p.at))} (${err.message})`); }
+  }
+  for (const m of r.moods) vault.moods = setMood(vault.moods, m.day, m.value);
   vault.health = r.health;
   vault.places = r.places;
   vault.settings.buzonSeen = r.seenAll;
@@ -2707,7 +2714,7 @@ function importBuzon(text, { from = "Buzón" } = {}) {
   if (r.spending.some((x) => x.source === "ATAJO") || r.income.length) done.dinero = true;
   vault.settings.shortcutsDone = done;
   persist(); render(); refreshDiary();
-  toast(`${from}: ${summary}`);
+  toast(`${from}: ${summary}${punchSkipped.length ? ` · fichaje ignorado: ${punchSkipped.join(", ")}` : ""}`);
   return r;
 }
 

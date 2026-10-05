@@ -6,7 +6,11 @@ cada atajo que lo necesita. La URL y la clave publishable son públicas
 
 Estado:
 - MANU Dinero: COMPROBADO en el iPhone de Manu (2026-10-05).
-- MANU Dictado, MANU Apuntar, MANU Recordatorio: NO_VERIFICADOS.
+- MANU Recordatorio: COMPROBADO (2026-10-05).
+- MANU Dictado, MANU Apuntar, MANU Fichar, MANU Llegada, MANU Salida,
+  MANU Ánimo, MANU Lugar: NO_VERIFICADOS.
+- MANU Alarma: EXPERIMENTAL. El identificador de «Crear alarma» no está
+  documentado por Apple; si el iPhone no lo reconoce, se cambia a mano.
 
 Uso:
   python3 tools/shortcuts/atajos.py CARPETA        # escribe un .shortcut por atajo
@@ -20,7 +24,7 @@ import uuid
 
 URL = "https://xqsexjpuhvmwkclpnvjo.supabase.co/rest/v1/manu_inbox"
 KEY = "sb_publishable_sfml3vmi8c7Un7kTi4xjkg_Ioj1eAwQ"
-DATE_FMT = "yyyy-MM-dd HH:mm"
+DATE_FMT = "yyyy-MM-dd HH:mm:ss"  # seconds: two equal lines in the same minute are not merged
 OBJ = "￼"
 QUESTION = "Pega tu código del atajo (MANU → Tú → Atajos → «Copiar código»)"
 
@@ -138,7 +142,69 @@ def recordatorio():
     return sc
 
 
-ALL = [dinero, lambda: nota("MANU Dictado", 2071128575, 59797, True), lambda: nota("MANU Apuntar", 463140863, 59654, False), recordatorio]
+def menu_send(name, color, glyph, prompt, options):
+    """A menu whose every option sends one fixed line (with the time) to the buzón."""
+    sc = Shortcut(name, color, glyph)
+    code = sc.code()
+    g, end = U(), U()
+    sc.act("is.workflow.actions.choosefrommenu", {"GroupingIdentifier": g, "WFControlFlowMode": 0, "WFMenuPrompt": prompt, "WFMenuItems": [o for o, _ in options]})
+    for title, line in options:
+        sc.act("is.workflow.actions.choosefrommenu", {"GroupingIdentifier": g, "WFControlFlowMode": 1, "WFMenuItemTitle": title})
+        if line is None:  # «Ahora no»: nothing is sent
+            sc.act("is.workflow.actions.exit", {})
+            continue
+        d = sc.date()
+        kind, rest = line.split("|", 1)
+        sc.act("is.workflow.actions.gettext", {"UUID": U(), "WFTextActionText": tstr([kind + "|", att(d, "Fecha formateada"), "|" + rest])})
+    sc.act("is.workflow.actions.choosefrommenu", {"GroupingIdentifier": g, "WFControlFlowMode": 2, "UUID": end})
+    sc.send(code, att(end, "Elegir del menú"))
+    return sc
+
+
+def fichar():
+    return menu_send("MANU Fichar", 4271458815, 59779, "¿Fichaje?", [
+        ("🟢 Entro", "fichaje|entro"), ("☕ Pausa café", "fichaje|pausa|Café"), ("🚬 Salgo a fumar", "fichaje|pausa|Fumar"),
+        ("🏢 Vuelvo", "fichaje|vuelvo"), ("🚪 Salida", "fichaje|salida")])
+
+
+def llegada():
+    """For «Llegar» automations (one per office). It reminds and, if he says so, records the punch."""
+    return menu_send("MANU Llegada", 4271458815, 59779, "Has llegado a la oficina. ¿Fichas en RK?", [
+        ("✅ Ya he fichado, apúntalo", "fichaje|entro"), ("Ahora no", None)])
+
+
+def salida():
+    """For «Salir» automations (one per office)."""
+    return menu_send("MANU Salida", 4282601983, 59779, "Te vas de la oficina. ¿Has fichado la salida en RK?", [
+        ("✅ Sí, apúntalo", "fichaje|salida"), ("Aún no", None)])
+
+
+def animo():
+    return menu_send("MANU Ánimo", 4251333119, 59813, "¿Qué tal el día?", [
+        ("😄 Muy bien", "animo|muy bien"), ("🙂 Bien", "animo|bien"), ("😐 Regular", "animo|regular"), ("😞 Mal", "animo|mal")])
+
+
+def lugar():
+    sc = Shortcut("MANU Lugar", 3980825855, 59460)
+    code = sc.code()
+    loc = sc.act("is.workflow.actions.getcurrentlocation", {"UUID": U()})
+    city = sc.act("is.workflow.actions.properties.locations", {"UUID": U(), "WFInput": tok(loc, "Ubicación actual"), "WFContentItemPropertyName": "City"})
+    d = sc.date()
+    line = sc.act("is.workflow.actions.gettext", {"UUID": U(), "WFTextActionText": tstr(["lugar|", att(d, "Fecha formateada"), "|", att(city, "Ciudad")])})
+    sc.send(code, att(line, "Texto"))
+    return sc
+
+
+def alarma():
+    """MANU opens it with «07:00». EXPERIMENTAL (see the top of this file)."""
+    sc = Shortcut("MANU Alarma", 4274264319, 59506)
+    when = sc.act("is.workflow.actions.detect.date", {"UUID": U(), "WFInput": tstr([{"Type": "ExtensionInput"}])})
+    sc.act("com.apple.mobiletimer-framework.MobileTimerIntents.MTCreateAlarmIntent", {"UUID": U(), "dateComponents": tstr([att(when, "Fechas")]), "label": "MANU"})
+    return sc
+
+
+ALL = [dinero, lambda: nota("MANU Dictado", 2071128575, 59797, True), lambda: nota("MANU Apuntar", 463140863, 59654, False), recordatorio,
+       fichar, llegada, salida, animo, lugar, alarma]
 
 if __name__ == "__main__":
     out = sys.argv[1] if len(sys.argv) > 1 else "."

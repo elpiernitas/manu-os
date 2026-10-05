@@ -211,6 +211,20 @@ export function punch(clock, t, { at = new Date(), id, why = null } = {}) {
   return [...list.filter((d) => d.day !== key), rec].sort((a, b) => a.day.localeCompare(b.day)).slice(-800);
 }
 
+// WEB-89: a punch that arrives later from a Shortcut, at the time it was made.
+// It goes in its place on that day; if the day stops making sense (two
+// «Entro», a «Vuelvo» with no pause…), it is refused. Same id twice: no-op.
+export function punchAt(clock, t, { at, id, why = null }) {
+  const when = toMinute(at);
+  const key = dayKey(when);
+  const list = [...(clock ?? [])];
+  const rec = list.find((d) => d.day === key) ?? { day: key, events: [] };
+  if (rec.events.some((e) => e.id === id)) return list;
+  const events = sorted([...rec.events, { id, t, at: when.toISOString(), ...(why ? { why: String(why).slice(0, 40) } : {}) }]);
+  if (!validSequence(events)) throw new Error({ in: "ya estabas dentro", pause: "no estabas trabajando", back: "no estabas en pausa", out: "no estabas trabajando" }[t] ?? "no cuadra");
+  return [...list.filter((d) => d.day !== key), { day: key, events }].sort((a, b) => a.day.localeCompare(b.day)).slice(-800);
+}
+
 // Correct an event's time (forgot to clock) or remove it. A change that leaves
 // the day impossible (a pause with no return, «Salida» before «Entro») is
 // refused, so the report never counts a closed day with a pause still open
