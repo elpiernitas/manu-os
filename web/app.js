@@ -48,10 +48,10 @@ import { incomeKind } from "./core/bank.js";
 import { nightReview, weekReview, nightDue, weekDue } from "./core/review.js";
 import { KINDS as DOC_KINDS, daysLeft, expiringSoon, leftText, buildDocPayload, parseDocReply, isDocQuestion, answerDoc, DOC_LIMIT } from "./core/docs.js";
 import { LIB_KINDS, STATUSES, newItem, setStatus, ideasPayload, parseIdeas, isLibraryQuestion, answerLibrary } from "./core/library.js";
-import { QUICK_SPEND, QUICK_INCOME, fixedIncomeStatus, commonSpends, recurringIncome } from "./core/quickmoney.js";
+import { cleanConcept, QUICK_SPEND, QUICK_INCOME, fixedIncomeStatus, commonSpends, recurringIncome } from "./core/quickmoney.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "87"; // = número de la última tarea WEB publicada (desde WEB-87)
+export const APP_VERSION = "88"; // = número de la última tarea WEB publicada (desde WEB-87)
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -1099,6 +1099,13 @@ function fixedIncomeCard() {
     ${st.map(({ f, got, due }) => `<div class="row"><span class="grow">${esc(f.name)}<br><span class="muted small">${got ? `✅ llegó el ${esc(new Date(got.at).toLocaleDateString("es-ES", { day: "numeric", month: "short" }))}` : due ? "¿Ha llegado ya?" : `hacia el día ${esc(f.day)}`}</span></span><b class="num">${esc(euros(f.cents))}</b>${!got ? `<button class="btn${due ? "" : " ghost"} small-btn" data-act="fixed-got" data-id="${esc(f.id)}">Ha llegado</button>` : ""}<button class="link small" data-act="fixed-del" data-id="${esc(f.id)}" aria-label="Quitar ${esc(f.name)}">✕</button></div>`).join("")}
     ${form || '<button class="link small" data-act="fixed-add">➕ Añadir otro</button>'}</section>`;
 }
+// WEB-88: the last incomes, each one removable (there was no way to undo one).
+function incomeListSection() {
+  const list = [...(vault.income ?? [])].sort((a, b) => (a.at < b.at ? 1 : -1)).slice(0, 20);
+  if (!list.length) return "";
+  return `${sectionTitle("Ingresos")}<section class="card">${list.map((x) => `<div class="row"><div class="grow"><div>${esc(cleanConcept(x.concept) || "Ingreso")}</div><div class="muted small">${new Date(x.at).toLocaleDateString("es-ES", { day: "numeric", month: "short" })}</div></div><div class="stack"><b class="num pos">+${esc(euros(x.cents))}</b><button class="link small danger-link" data-act="income-del" data-id="${esc(x.id)}" aria-label="Borrar ingreso">Borrar</button></div></div>`).join("")}</section>`;
+}
+
 function repeatsCard() {
   const common = commonSpends(vault.spending, today(), 90, CATEGORIES);
   const inc = recurringIncome(vault.income, today());
@@ -1351,9 +1358,10 @@ const screens = {
         ${imp ? `<p class="muted small">Última importación: ${imp.added} gastos nuevos, ${imp.duplicates} repetidos${imp.incomeAdded !== undefined ? `, ${imp.incomeAdded} ingresos nuevos${imp.incomeDuplicates ? ` (${imp.incomeDuplicates} ya estaban)` : ""}` : imp.income ? ` · ${imp.income} ingresos sin importar: vuelve a elegir el archivo para añadirlos` : ""}${imp.invalid ? `, ${imp.invalid} filas no reconocidas` : ""}.</p>` : ""}</section>
       ${moneyInsights()}
       ${sectionTitle("Movimientos", `${toReview ? `<button class="link small" data-act="money-filter">${moneyFilter === "review" ? "Ver todos" : `Por revisar (${toReview})`}</button>` : ""}${addLink("EXPENSE")}`)}
-      <section class="card">${entries.length ? entries.map((x) => `<div class="row"><span class="cat-emoji" aria-hidden="true">${CATEGORY_EMOJI[x.category] ?? "📦"}</span><div class="grow"><div>${esc(x.merchant ?? "Sin concepto")}</div><div class="muted small">${new Date(x.at).toLocaleDateString("es-ES", { day: "numeric", month: "short" })}${x.sub ? ` · ${esc(x.sub)}` : ""}${x.source === "BANK" ? " · banco" : ""}${x.review ? ' · <b class="review">revisar</b>' : x.inferred ? " · categoría propuesta" : x.ruled ? " · según tus reglas" : ""}</div></div>
-          <div class="stack"><span class="num">${euros(x.cents)}</span>${catEditing === x.id ? `<label class="sr" for="cat-${esc(x.id)}">Categoría</label><select id="cat-${esc(x.id)}" data-cat="${esc(x.id)}">${Object.keys(CATEGORIES).map((k) => `<option value="${k}"${k === x.category ? " selected" : ""}>${esc(catLabel(k))}</option>`).join("")}</select>` : `<button class="cat-chip" data-act="cat-edit" data-id="${esc(x.id)}" aria-label="Cambiar categoría: ${esc(CATEGORIES[x.category] ?? "Otros")}">${esc(catLabel(x.category))}</button>`}</div></div>`).join("")
+      <section class="card">${entries.length ? entries.map((x) => `<div class="row"><span class="cat-emoji" aria-hidden="true">${CATEGORY_EMOJI[x.category] ?? "📦"}</span><div class="grow"><div>${esc(x.merchant ? cleanConcept(x.merchant) : "Sin concepto")}</div><div class="muted small">${new Date(x.at).toLocaleDateString("es-ES", { day: "numeric", month: "short" })}${x.sub ? ` · ${esc(x.sub)}` : ""}${x.source === "BANK" ? " · banco" : ""}${x.review ? ' · <b class="review">revisar</b>' : x.inferred ? " · categoría propuesta" : x.ruled ? " · según tus reglas" : ""}</div></div>
+          <div class="stack"><span class="num">${euros(x.cents)}</span>${catEditing === x.id ? `<label class="sr" for="cat-${esc(x.id)}">Categoría</label><select id="cat-${esc(x.id)}" data-cat="${esc(x.id)}">${Object.keys(CATEGORIES).map((k) => `<option value="${k}"${k === x.category ? " selected" : ""}>${esc(catLabel(k))}</option>`).join("")}</select><button class="link small danger-link" data-act="spend-del" data-id="${esc(x.id)}">Borrar</button>` : `<button class="cat-chip" data-act="cat-edit" data-id="${esc(x.id)}" aria-label="Cambiar categoría: ${esc(CATEGORIES[x.category] ?? "Otros")}">${esc(catLabel(x.category))}</button>`}</div></div>`).join("")
         : '<p class="muted">Sin gastos. Escribe a MANU «gasté 12,50 en café» o importa el extracto del banco.</p>'}</section>
+      ${incomeListSection()}
       </div>`;
   },
   proyectos() {
@@ -3196,6 +3204,19 @@ document.addEventListener("click", async (e) => {
     case "export": exportBackup(); break;
     case "show-all": showAll[a.dataset.k] = true; render(); break;
     case "cat-edit": catEditing = a.dataset.id; render(); $(`cat-${catEditing}`)?.focus(); break;
+    case "income-del": {
+      const x = (vault.income ?? []).find((s) => s.id === a.dataset.id); if (!x) break;
+      if (!window.confirm(`¿Borrar el ingreso ${cleanConcept(x.concept) || ""} (${euros(x.cents)})?`)) break;
+      vault.income = vault.income.filter((s) => s.id !== x.id);
+      persist(); render(); toast("Ingreso borrado"); break;
+    }
+    case "spend-del": { // WEB-88: there was no way to remove a movement (found testing on the iPhone)
+      const x = vault.spending.find((s) => s.id === a.dataset.id); if (!x) break;
+      const owed = (x.split?.people ?? []).some((p) => !p.paid); // the split lives in the entry: it goes with it
+      if (!window.confirm(`¿Borrar ${x.merchant ? cleanConcept(x.merchant) : "este gasto"} (${euros(x.cents)})?${owed ? " También se borra lo que te deben de este gasto." : ""}`)) break;
+      vault.spending = vault.spending.filter((s) => s.id !== x.id); catEditing = null;
+      persist(); render(); toast("Gasto borrado"); break;
+    }
     case "find-clear": findQ = ""; render(); break;
     case "find-go": if (a.dataset.project) { openProject = a.dataset.project; go("proyectos"); } else go(a.dataset.tab); break;
     case "budget-del": { const b = { ...(vault.settings.budgets ?? {}) }; delete b[a.dataset.cat]; vault.settings.budgets = b; persist(); render(); break; }

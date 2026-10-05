@@ -99,12 +99,16 @@ export function monthStats(spending, income, key, now = new Date()) {
     merchants.set(k, cur);
   }
   const pct = (a, b) => (b > 0 ? Math.round(((a - b) / b) * 100) : null);
+  // WEB-88: the month in course is compared with the same days of the last
+  // one (5 days of October vs 1–5 September), not with the whole month.
+  const soFar = (list) => (current ? list.filter((e) => Number(String(e.at).slice(8, 10)) <= daysElapsed) : list);
+  const prevSpentSoFar = sum(soFar(inMonth(spending, prevKey))), prevEarnedSoFar = sum(soFar(inMonth(income, prevKey)));
   return {
     key, spent, earned, saved: earned - spent,
     savingRate: earned > 0 ? Math.round(((earned - spent) / earned) * 100) : null,
     payroll: { cents: sum(payroll), days: payroll.map((e) => Number(e.at.slice(8, 10))) },
     incomeByKind: ["PAYROLL", "BIZUM", "TRANSFER", "REFUND", "OTHER"].map((k) => [k, sum(inc.filter((e) => (k === "PAYROLL" ? e.payroll : !e.payroll && e.kind === k)))]).filter(([, c]) => c > 0),
-    prevSpent, prevEarned, spentDelta: pct(spent, prevSpent), earnedDelta: pct(earned, prevEarned),
+    prevSpent, prevEarned, spentDelta: pct(spent, prevSpentSoFar), earnedDelta: pct(earned, prevEarnedSoFar),
     avgDaily: daysElapsed ? Math.round(spent / daysElapsed) : 0,
     projection: current && daysElapsed ? Math.round((spent / daysElapsed) * daysInMonth) : null,
     count: sp.length,

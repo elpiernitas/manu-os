@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { QUICK_SPEND, QUICK_INCOME, quickSpendCategory, quickIncomeKind, fixedIncomeStatus, commonSpends, recurringIncome } from "../core/quickmoney.js";
+import { cleanConcept, QUICK_SPEND, QUICK_INCOME, quickSpendCategory, quickIncomeKind, fixedIncomeStatus, commonSpends, recurringIncome } from "../core/quickmoney.js";
 import { parseLine, applyBuzon, buzonSummary } from "../core/buzon.js";
 import { newEntry } from "../core/money.js";
 import { INBOX_SQL, newInboxToken, registerInboxToken, pullInbox, deleteInbox, inboxRequest } from "../core/sync.js";
@@ -74,4 +74,22 @@ test("WEB-86: cloud inbox for the Shortcut", async () => {
   await assert.rejects(pullInbox(cfg, s, f(404, { code: "PGRST205", message: "Could not find the table 'public.manu_inbox'" })), (e) => e.code === "inbox");
   await deleteInbox(cfg, s, ["11111111-1111-1111-1111-111111111111", "1; drop"], f(204, {}));
   assert.match(calls.at(-1).url, /id=in\.\(11111111-1111-1111-1111-111111111111\)$/);
+});
+
+test("WEB-88: bank concepts keep only the shop's name", () => {
+  assert.equal(cleanConcept("COMPRA TARJ. 5402XXXXXXXX5011 CAFE DE LA ACADEMIA-GIJON"), "Cafe de la Academia");
+  assert.equal(cleanConcept("COMPRA TARJ. 5402XXXXXXXX5011 EN SU PUNTO-NICANOR PIÑOL"), "En Su Punto");
+  assert.equal(cleanConcept("COMPRA TARJ. 5402XXXXXXXX5011 ALIMERKA GIJON-GIJON"), "Alimerka Gijon");
+  assert.equal(cleanConcept("Bar de Pepe"), "Bar de Pepe", "what a person typed stays as is");
+  assert.equal(cleanConcept(""), "");
+  assert.equal(cleanConcept(null), "");
+  const common = commonSpends([
+    { id: "a", at: "2026-10-01T10:00:00", cents: 300, merchant: "COMPRA TARJ. 5402XXXXXXXX5011 CAFE EJEMPLO-GIJON", category: "FOOD_AND_DRINK" },
+    { id: "b", at: "2026-10-02T10:00:00", cents: 350, merchant: "COMPRA TARJ. 5402XXXXXXXX5011 CAFE EJEMPLO-GIJON", category: "FOOD_AND_DRINK" },
+  ], now);
+  assert.equal(common[0].label, "Cafe Ejemplo");
+});
+
+test("WEB-88: a concept typed by a person is never cut", () => {
+  assert.equal(cleanConcept("Bar-Pepe con amigos"), "Bar-Pepe con amigos");
 });

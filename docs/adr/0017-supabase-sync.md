@@ -60,3 +60,4 @@ El atajo del doble toque no puede abrir la app instalada. Por eso deja su línea
   - se guarda en el vault, que es local y va a Tu nube.
 - **Riesgo aceptado:** quien tenga la clave publishable, que es pública, podría llenar la tabla de líneas. Nadie las leería sin el código, y cada línea está limitada a 300 caracteres.
 - **Cómo se activa:** el SQL está en `web/core/sync.js` (`INBOX_SQL`) y Manu lo ejecuta una vez en el SQL Editor. Sin él, el atajo puede escribir en `MANU-buzon.txt`.
+- **Comprobado (2026-10-05):** Manu ejecutó el SQL y un gasto enviado desde el atajo llegó a MANU una sola vez. El atajo se genera con `tools/shortcuts/atajos.py` (sin el código, que pide el iPhone).

@@ -52,3 +52,12 @@ test("vault keeps income and rejects broken income entries", () => {
   assert.equal(validateVault({ ...v, income: [{ id: "i1", cents: -5, at: at("2026-09-01") }] }).ok, false);
   assert.deepEqual(validateVault({ ...emptyVault(), income: undefined }).vault.income, []);
 });
+
+test("WEB-88: the month in course is compared with the same days of the last one", () => {
+  const spending = [exp("p1", "2026-09-03", 1000, "A"), exp("p2", "2026-09-20", 50000, "B"), exp("c1", "2026-10-02", 2000, "C")];
+  const s = monthStats(spending, [], "2026-10", new Date(2026, 9, 5, 12));
+  assert.equal(s.spentDelta, 100, "20 € vs 10 € on 1–5 September, not vs the whole 510 €");
+  assert.equal(s.prevSpent, 51000, "the whole previous month is still there");
+  const empty = monthStats([exp("p1", "2026-09-20", 5000, "A")], [], "2026-10", new Date(2026, 9, 5, 12));
+  assert.equal(empty.spentDelta, null, "nothing to compare on the same days");
+});
