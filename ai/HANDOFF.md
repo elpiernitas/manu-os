@@ -10,6 +10,18 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
+## WEB-89 — todos los atajos, hechos
+
+Manu pide «termina absolutamente todos los atajos, y si quieres hacer más, mejor». `tools/shortcuts/atajos.py` genera 8 atajos sin el código privado (el iPhone lo pide al añadirlos); Manu los firma en el Mac con `shortcuts sign` y los pasa por AirDrop.
+
+- COMPROBADOS en su iPhone: MANU Dinero, MANU Recordatorio (MANU lo abre con «texto | fecha» y el recordatorio queda con su hora).
+- Nuevos, con soporte en MANU: **MANU Fichar** (`fichaje|fecha|entro`, `pausa|Café`, `vuelvo`, `salida`) y **MANU Ánimo** (`animo|fecha|bien`). El fichaje entra en su sitio del día con `punchAt`; si no cuadra (dos «Entro»), se ignora y MANU lo dice.
+- **MANU Lugar** usa las líneas `lugar|…` que ya existían.
+- **MANU Alarma**: EXPERIMENTAL, el identificador de «Crear alarma» no está documentado.
+- La fecha lleva segundos (`yyyy-MM-dd HH:mm:ss`): dos gastos iguales en el mismo minuto ya no se funden en uno.
+- No se pueden empaquetar: las automatizaciones (hora, llegar, Transacción) ni el doble toque. Se crean en el iPhone y solo ejecutan uno de estos atajos.
+- Avisos: con la app cerrada iOS no deja a una web avisar sin servidor de notificaciones. Propuesta pendiente de Manu: Web Push con una Edge Function y `pg_cron` en su Supabase (gratis, pero es una pieza de servidor nueva).
+
 ## WEB-88 — lo que salió al probar en el iPhone (2026-10-05)
 
 **VERIFICADO en el iPhone de Manu:** `INBOX_SQL` ejecutado en su Supabase («Success. No rows returned»); el atajo «MANU Dinero» enviado de Gasto → 1 → Otros llegó a MANU una sola vez, con su categoría.

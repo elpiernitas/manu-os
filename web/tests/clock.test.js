@@ -149,3 +149,23 @@ test("WEB-79: the month as a note and as a calendar", async () => {
   assert.equal((ics.match(/BEGIN:VEVENT/g) ?? []).length, 1); // the open day is left out
   assert.ok(ics.endsWith("END:VCALENDAR\r\n"));
 });
+
+test("WEB-89: punchAt puts a late punch in its place and refuses what does not fit", async () => {
+  const { punchAt, punch } = await import("../core/clock.js");
+  let c = punch([], "in", { at: new Date(2026, 9, 6, 9, 0), id: "a" });
+  c = punchAt(c, "pause", { at: new Date(2026, 9, 6, 11, 0), id: "c", why: "Café" });
+  c = punchAt(c, "back", { at: new Date(2026, 9, 6, 11, 10), id: "d" });
+  c = punchAt(c, "out", { at: new Date(2026, 9, 6, 13, 5), id: "b" });
+  assert.deepEqual(c[0].events.map((e) => e.t), ["in", "pause", "back", "out"]);
+  assert.deepEqual(punchAt(c, "back", { at: new Date(2026, 9, 6, 11, 10), id: "d" }), c, "same id twice: nothing changes");
+  assert.throws(() => punchAt(c, "in", { at: new Date(2026, 9, 6, 10, 0), id: "e" }), /ya estabas dentro/);
+});
+
+test("WEB-89: a Shortcut punch that arrives late goes before a later one made in the app", async () => {
+  const { punchAt, punch } = await import("../core/clock.js");
+  // «Entro» from the Shortcut at 9:02, then a pause tapped in MANU at 11:00.
+  let c = punchAt([], "in", { at: new Date(2026, 9, 6, 9, 2), id: "s1" });
+  c = punch(c, "pause", { at: new Date(2026, 9, 6, 11, 0), id: "a1" });
+  assert.deepEqual(c[0].events.map((e) => e.t), ["in", "pause"]);
+  assert.throws(() => punchAt(c, "out", { at: new Date(2026, 9, 6, 10, 0), id: "s2" }), /no estabas trabajando|cuadra/, "an «out» before a pause that has no return does not fit");
+});
