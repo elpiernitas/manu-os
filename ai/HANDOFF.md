@@ -15,7 +15,7 @@ BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED
 **VERIFICADO en el iPhone de Manu:** `INBOX_SQL` ejecutado en su Supabase («Success. No rows returned»); el atajo «MANU Dinero» enviado de Gasto → 1 → Otros llegó a MANU una sola vez, con su categoría.
 
 Cómo se instaló, porque montarlo a mano era demasiado pesado y Cowork no puede escribir en la app Atajos:
-- `tools/shortcuts/manu_dinero.py` genera el archivo, sin el código: el iPhone lo pregunta al añadirlo.
+- `tools/shortcuts/atajos.py` genera el archivo, sin el código: el iPhone lo pregunta al añadirlo.
 - `shortcuts sign --mode anyone` lo firma en el Mac (avisos «Unrecognized attribute string flag» inofensivos).
 - AirDrop al iPhone.
 

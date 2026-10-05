@@ -3212,7 +3212,8 @@ document.addEventListener("click", async (e) => {
     }
     case "spend-del": { // WEB-88: there was no way to remove a movement (found testing on the iPhone)
       const x = vault.spending.find((s) => s.id === a.dataset.id); if (!x) break;
-      if (!window.confirm(`¿Borrar ${x.merchant ? cleanConcept(x.merchant) : "este gasto"} (${euros(x.cents)})?`)) break;
+      const owed = (x.split?.people ?? []).some((p) => !p.paid); // the split lives in the entry: it goes with it
+      if (!window.confirm(`¿Borrar ${x.merchant ? cleanConcept(x.merchant) : "este gasto"} (${euros(x.cents)})?${owed ? " También se borra lo que te deben de este gasto." : ""}`)) break;
       vault.spending = vault.spending.filter((s) => s.id !== x.id); catEditing = null;
       persist(); render(); toast("Gasto borrado"); break;
     }
