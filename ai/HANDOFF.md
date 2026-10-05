@@ -12,11 +12,12 @@ BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED
 
 ## WEB-89 — todos los atajos, hechos
 
-Manu pide «termina absolutamente todos los atajos, y si quieres hacer más, mejor». `tools/shortcuts/atajos.py` genera 8 atajos sin el código privado (el iPhone lo pide al añadirlos); Manu los firma en el Mac con `shortcuts sign` y los pasa por AirDrop.
+Manu pide «termina absolutamente todos los atajos, y si quieres hacer más, mejor». `tools/shortcuts/atajos.py` genera 10 atajos sin el código privado (el iPhone lo pide al añadirlos); Manu los firma en el Mac con `shortcuts sign` y los pasa por AirDrop.
 
 - COMPROBADOS en su iPhone: MANU Dinero, MANU Recordatorio (MANU lo abre con «texto | fecha» y el recordatorio queda con su hora).
 - Nuevos, con soporte en MANU: **MANU Fichar** (`fichaje|fecha|entro`, `pausa|Café`, `vuelvo`, `salida`) y **MANU Ánimo** (`animo|fecha|bien`). El fichaje entra en su sitio del día con `punchAt`; si no cuadra (dos «Entro»), se ignora y MANU lo dice.
 - **MANU Lugar** usa las líneas `lugar|…` que ya existían.
+- **MANU Llegada** y **MANU Salida**, para automatizaciones «Llegar»/«Salir» de cada oficina (Gijón y Oviedo): recuerdan fichar en RK y, si Manu dice que ya fichó, lo apuntan en MANU. «Ahora no» no envía nada.
 - **MANU Alarma**: EXPERIMENTAL, el identificador de «Crear alarma» no está documentado.
 - La fecha lleva segundos (`yyyy-MM-dd HH:mm:ss`): dos gastos iguales en el mismo minuto ya no se funden en uno.
 - No se pueden empaquetar: las automatizaciones (hora, llegar, Transacción) ni el doble toque. Se crean en el iPhone y solo ejecutan uno de estos atajos.

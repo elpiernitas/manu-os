@@ -7,7 +7,8 @@ cada atajo que lo necesita. La URL y la clave publishable son públicas
 Estado:
 - MANU Dinero: COMPROBADO en el iPhone de Manu (2026-10-05).
 - MANU Recordatorio: COMPROBADO (2026-10-05).
-- MANU Dictado, MANU Apuntar, MANU Fichar, MANU Ánimo, MANU Lugar: NO_VERIFICADOS.
+- MANU Dictado, MANU Apuntar, MANU Fichar, MANU Llegada, MANU Salida,
+  MANU Ánimo, MANU Lugar: NO_VERIFICADOS.
 - MANU Alarma: EXPERIMENTAL. El identificador de «Crear alarma» no está
   documentado por Apple; si el iPhone no lo reconoce, se cambia a mano.
 
@@ -149,6 +150,9 @@ def menu_send(name, color, glyph, prompt, options):
     sc.act("is.workflow.actions.choosefrommenu", {"GroupingIdentifier": g, "WFControlFlowMode": 0, "WFMenuPrompt": prompt, "WFMenuItems": [o for o, _ in options]})
     for title, line in options:
         sc.act("is.workflow.actions.choosefrommenu", {"GroupingIdentifier": g, "WFControlFlowMode": 1, "WFMenuItemTitle": title})
+        if line is None:  # «Ahora no»: nothing is sent
+            sc.act("is.workflow.actions.exit", {})
+            continue
         d = sc.date()
         kind, rest = line.split("|", 1)
         sc.act("is.workflow.actions.gettext", {"UUID": U(), "WFTextActionText": tstr([kind + "|", att(d, "Fecha formateada"), "|" + rest])})
@@ -161,6 +165,18 @@ def fichar():
     return menu_send("MANU Fichar", 4271458815, 59779, "¿Fichaje?", [
         ("🟢 Entro", "fichaje|entro"), ("☕ Pausa café", "fichaje|pausa|Café"), ("🚬 Salgo a fumar", "fichaje|pausa|Fumar"),
         ("🏢 Vuelvo", "fichaje|vuelvo"), ("🚪 Salida", "fichaje|salida")])
+
+
+def llegada():
+    """For «Llegar» automations (one per office). It reminds and, if he says so, records the punch."""
+    return menu_send("MANU Llegada", 4271458815, 59779, "Has llegado a la oficina. ¿Fichas en RK?", [
+        ("✅ Ya he fichado, apúntalo", "fichaje|entro"), ("Ahora no", None)])
+
+
+def salida():
+    """For «Salir» automations (one per office)."""
+    return menu_send("MANU Salida", 4282601983, 59779, "Te vas de la oficina. ¿Has fichado la salida en RK?", [
+        ("✅ Sí, apúntalo", "fichaje|salida"), ("Aún no", None)])
 
 
 def animo():
@@ -188,7 +204,7 @@ def alarma():
 
 
 ALL = [dinero, lambda: nota("MANU Dictado", 2071128575, 59797, True), lambda: nota("MANU Apuntar", 463140863, 59654, False), recordatorio,
-       fichar, animo, lugar, alarma]
+       fichar, llegada, salida, animo, lugar, alarma]
 
 if __name__ == "__main__":
     out = sys.argv[1] if len(sys.argv) > 1 else "."
