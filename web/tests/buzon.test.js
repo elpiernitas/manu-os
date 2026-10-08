@@ -98,3 +98,16 @@ test("WEB-89: «MANU Fichar» and «MANU Ánimo» lines", async () => {
   assert.deepEqual(r.punches.map((x) => x.t), ["in", "out"], "sorted by time");
   assert.deepEqual(r.moods, [{ day: "2026-10-06", value: 1, at: r.moods[0].at }]);
 });
+
+test("WEB-90: Apple Pay text from the Shortcut → amount and shop", async () => {
+  const { walletText, parseLine } = await import("../core/buzon.js");
+  assert.deepEqual(walletText("Mercadona 12,50 €"), { cents: 1250, merchant: "Mercadona" });
+  assert.deepEqual(walletText("€12.50 Bar Ejemplo"), { cents: 1250, merchant: "Bar Ejemplo" });
+  assert.deepEqual(walletText("BAR EJEMPLO | 3,50 € | Visa •••• 5011"), { cents: 350, merchant: "BAR EJEMPLO" });
+  assert.deepEqual(walletText("Importe: 25.00 EUR Comercio: Cine"), { cents: 2500, merchant: "Cine" });
+  assert.equal(walletText("algo sin precio"), null);
+  const e = parseLine("applepay|2026-10-08 18:00:00|Bar Ejemplo 4,20 €", new Date(2026, 9, 8, 20));
+  assert.equal(e.kind, "expense"); assert.equal(e.cents, 420);
+  const unk = parseLine("applepay|2026-10-08 18:00:00|sin importe", new Date(2026, 9, 8, 20));
+  assert.equal(unk.kind, "note"); assert.match(unk.text, /Apple Pay que no entendí: sin importe/);
+});

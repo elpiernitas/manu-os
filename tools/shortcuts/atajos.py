@@ -8,7 +8,7 @@ Estado:
 - MANU Dinero: COMPROBADO en el iPhone de Manu (2026-10-05).
 - MANU Recordatorio: COMPROBADO (2026-10-05).
 - MANU Dictado, MANU Apuntar, MANU Fichar, MANU Llegada, MANU Salida,
-  MANU Ánimo, MANU Lugar: NO_VERIFICADOS.
+  MANU Ánimo, MANU Lugar, MANU Apple Pay: NO_VERIFICADOS.
 - MANU Alarma: EXPERIMENTAL. El identificador de «Crear alarma» no está
   documentado por Apple; si el iPhone no lo reconoce, se cambia a mano.
 
@@ -80,11 +80,12 @@ class Shortcut:
                                                      "WFDate": tstr([{"Type": "CurrentDate"}])})
         return uid
 
-    def send(self, code_uid, line_attachment):
+    def send(self, code_uid, line_attachment, notify=True):
         self.act("is.workflow.actions.downloadurl", {"UUID": U(), "WFURL": URL, "WFHTTPMethod": "POST", "ShowHeaders": True,
                  "WFHTTPHeaders": dic([("apikey", [KEY]), ("Prefer", ["return=minimal"])]),
                  "WFHTTPBodyType": "JSON", "WFJSONValues": dic([("token", [att(code_uid, "Texto")]), ("line", [line_attachment])])})
-        self.act("is.workflow.actions.notification", {"WFNotificationActionTitle": "MANU", "WFNotificationActionBody": "Apuntado ✅"})
+        if notify:
+            self.act("is.workflow.actions.notification", {"WFNotificationActionTitle": "MANU", "WFNotificationActionBody": "Apuntado ✅"})
 
     def plist(self):
         return {"WFWorkflowClientVersion": "2302.0.4", "WFWorkflowMinimumClientVersion": 900, "WFWorkflowMinimumClientVersionString": "900",
@@ -195,6 +196,18 @@ def lugar():
     return sc
 
 
+def applepay():
+    """For the «Transacción» automation: sends whatever the iPhone passes about the
+    payment, as text; MANU finds the amount and the shop (buzon.js walletText).
+    Silent: one notification per payment would be noise."""
+    sc = Shortcut("MANU Apple Pay", 4292093695, 59446)
+    code = sc.code()
+    d = sc.date()
+    line = sc.act("is.workflow.actions.gettext", {"UUID": U(), "WFTextActionText": tstr(["applepay|", att(d, "Fecha formateada"), "|", {"Type": "ExtensionInput"}])})
+    sc.send(code, att(line, "Texto"), notify=False)
+    return sc
+
+
 def alarma():
     """MANU opens it with «07:00». EXPERIMENTAL (see the top of this file)."""
     sc = Shortcut("MANU Alarma", 4274264319, 59506)
@@ -204,7 +217,7 @@ def alarma():
 
 
 ALL = [dinero, lambda: nota("MANU Dictado", 2071128575, 59797, True), lambda: nota("MANU Apuntar", 463140863, 59654, False), recordatorio,
-       fichar, llegada, salida, animo, lugar, alarma]
+       fichar, llegada, salida, animo, lugar, applepay, alarma]
 
 if __name__ == "__main__":
     out = sys.argv[1] if len(sys.argv) > 1 else "."

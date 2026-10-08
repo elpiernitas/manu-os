@@ -10,6 +10,15 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
+## WEB-90 — replanteamiento y Apple Pay automático
+
+Tres días después Manu no usa MANU: ni gastos, ni fichaje, ni tiempo, ni alarmas. Revisión de producto con ChatGPT (propósito: «quitarme cosas de la cabeza y entender mi dinero sin trabajo»). Respuestas de Manu: no sabe en qué gasta, quiere ver lo que le deben y una visión completa; apunta ideas en todas partes; paga casi todo con Apple Pay (ocio), la compra la hace su madre con su tarjeta física, Amazon con la virtual; acepta 2 minutos a la semana. No quiere ver deudas ni totales al abrir: entre amigos unas veces paga él y otras ellos. Las alertas de Sabadell solo llegan como notificación de su app (ni SMS ni email), que nada puede leer.
+
+Decisión de esta tarea (sin rediseñar aún la app):
+- **MANU Apple Pay**: para la automatización «Transacción». Envía lo que el iPhone le pase, como texto (`applepay|fecha|…`); `walletText` saca el importe y el comercio. Lo que no entiende queda en «Por clasificar» con el texto recibido, para ajustar el formato con la primera prueba real. Silencioso. NO_VERIFICADO.
+- Tarjeta física y Amazon: extracto semanal.
+- Pendiente con Manu: qué es MANU (portada sin deudas ni totales). No se rediseña hasta que lo tenga claro.
+
 ## WEB-89 — todos los atajos, hechos
 
 Manu pide «termina absolutamente todos los atajos, y si quieres hacer más, mejor». `tools/shortcuts/atajos.py` genera 10 atajos sin el código privado (el iPhone lo pide al añadirlos); Manu los firma en el Mac con `shortcuts sign` y los pasa por AirDrop.
