@@ -13,6 +13,8 @@
 //   nota|2026-09-29 17:40|gasté 15 en gasolina      (WEB-78: dictated to Siri)
 //   gasto|2026-10-03 21:40|12,50|Bar|cañas          (WEB-86: «MANU Dinero», back tap)
 //   ingreso|2026-10-01 09:00|300|Manutención|papá   (WEB-86)
+//   applepay|2026-10-08 18:00:00|<lo que pase el iPhone>  (WEB-90: «MANU Apple Pay»,
+//        automatización «Transacción»; MANU busca el importe y el comercio)
 //   fichaje|2026-10-06 09:02:10|entro               (WEB-89: «MANU Fichar»)
 //   fichaje|2026-10-06 11:00:00|pausa|Café
 //   animo|2026-10-06 21:00:00|bien                  (WEB-89: «MANU Ánimo», 1–4 or a word)
@@ -20,7 +22,7 @@ import { normalise } from "./text.js";
 import { quickSpendCategory, quickIncomeKind } from "./quickmoney.js";
 
 export const LIMITS = { lines: 5000, seen: 5000, places: 1000, text: 120, note: 280 };
-const KINDS = { gasto: "expense", compra: "expense", pago: "expense", pasos: "steps", sueno: "sleep", dormir: "sleep", peso: "weight", lugar: "place", ubicacion: "place", nota: "note", apunte: "note", dictado: "note", ingreso: "income", cobro: "income", fichaje: "punch", fichar: "punch", animo: "mood" };
+const KINDS = { gasto: "expense", compra: "expense", pago: "expense", pasos: "steps", sueno: "sleep", dormir: "sleep", peso: "weight", lugar: "place", ubicacion: "place", nota: "note", apunte: "note", dictado: "note", ingreso: "income", cobro: "income", fichaje: "punch", fichar: "punch", animo: "mood", applepay: "applepay", wallet: "applepay" };
 const PUNCH = { entro: "in", entrada: "in", in: "in", pausa: "pause", pause: "pause", vuelvo: "back", vuelta: "back", back: "back", salida: "out", salgo: "out", out: "out" };
 const MOOD = { "muy bien": 4, genial: 4, bien: 3, regular: 2, mal: 1 };
 const pad = (n) => String(n).padStart(2, "0");
@@ -61,6 +63,19 @@ export function lineId(line) {
   return `bz-${h.toString(36)}`;
 }
 
+// WEB-90: what the iPhone hands a Shortcut for an Apple Pay payment is not
+// documented, so the Shortcut sends it as text and this finds the amount
+// («12,50 €», «€12.50», «12.50 EUR») and keeps the rest as the shop.
+export function walletText(text) {
+  const t = clip(text, 300);
+  const m = t.match(/(?:€|eur)\s*(\d{1,5}(?:[.,]\d{1,2})?)/i) ?? t.match(/(\d{1,5}(?:[.,]\d{1,2})?)\s*(?:€|eur\b|euros?\b)/i) ?? t.match(/(\d{1,5}[.,]\d{2})(?!\d)/);
+  if (!m) return null;
+  const cents = amountCents(m[1]);
+  if (!cents) return null;
+  const merchant = clip(t.replace(m[0], " ").replace(/\b(?:importe|comercio|tarjeta|amount|merchant|card|visa|mastercard|apple pay)\s*:?/gi, " ").replace(/[•*·]{2,}\s*\d{4}|\b\d{4}\b/g, " ").replace(/[|,;:]+/g, " "), LIMITS.text);
+  return { cents, merchant: merchant || null };
+}
+
 // One line → an event, or { error } for a line that is not understood.
 export function parseLine(raw, now = new Date()) {
   const line = clip(raw, 400).replace(/^manu\s*\|/i, "");
@@ -90,6 +105,12 @@ export function parseLine(raw, now = new Date()) {
   if (kind === "note") {
     const text = clip([value, ...rest].join(" | "), LIMITS.note);
     return text ? { id, kind, at, text } : { error: "nota vacía" };
+  }
+  if (kind === "applepay") {
+    const text = [value, ...rest].join(" ");
+    const r = walletText(text);
+    // Not understood: kept in «Por clasificar» with what arrived, so nothing is lost.
+    return r ? { id, kind: "expense", at, cents: r.cents, merchant: r.merchant } : { id, kind: "note", at, text: clip(`Pago con Apple Pay que no entendí: ${text}`, LIMITS.note) };
   }
   if (kind === "punch") {
     const t = PUNCH[normalise(value ?? "")];
