@@ -779,3 +779,16 @@ pre.code { white-space: pre-wrap; word-break: break-word; overflow-wrap: anywher
 /* WEB-86 */
 pre.code { white-space: pre-wrap; word-break: break-word; max-height: 220px; overflow: auto; background: var(--surface-2); border-radius: 12px; padding: 10px; }
 .fixed-income .row { gap: 8px; }
+
+/* Bahía 00 (WEB-91) */
+.bz-card { padding: 10px; }
+.bz-scene { position: relative; border-radius: 14px; overflow: hidden; background: #0b1530; }
+.bz-scene canvas { display: block; width: 100%; height: auto; image-rendering: pixelated; image-rendering: crisp-edges; }
+.bz-spot { position: absolute; border: 0; background: transparent; padding: 0; cursor: pointer; border-radius: 8px; }
+.bz-spot:focus-visible { outline: 2px solid var(--accent); }
+.bz-spot span { position: absolute; bottom: 2px; right: 2px; min-width: 18px; height: 18px; border-radius: 9px; background: rgba(0,0,0,.55); color: #fff; font: 700 11px/18px var(--display, system-ui); text-align: center; }
+.bz-status { margin-top: 10px; align-items: center; }
+.bz-vit { display: grid; gap: 4px; width: 38%; }
+.bz-new { border: 1px solid var(--accent); }
+.bz-place h2 { margin: 0; }
+.bz-proj { gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--line, rgba(255,255,255,.08)); }

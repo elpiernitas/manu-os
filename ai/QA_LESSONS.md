@@ -206,3 +206,9 @@ Reglas:
 1. Cada forma nueva de añadir datos (atajo, captura, importación, chat) llega con su forma de quitarlos, y una prueba e2e que añade y borra.
 2. Las pruebas en el dispositivo real empiezan por un dato de prueba que luego hay que borrar: así sale este fallo el primer día.
 3. `CURRENT_TASK.md` solo admite los estados que comprueba `foundation-check.yml` (`BLOCKED`, no `BLOCKED_ON_DEVICE`).
+
+### QAL-046 — Las pruebas de navegador viven en el repositorio
+
+La batería e2e (unos 90 scripts de Playwright) estaba en el scratchpad de la sesión. Al cambiar de contenedor desapareció entera, y WEB-91 tuvo que empezar sin ella.
+
+Regla: toda prueba e2e nueva se guarda en `e2e/` en el repositorio (fuera de `web/`, que se publica), con datos inventados y sin credenciales.

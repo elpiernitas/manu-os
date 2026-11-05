@@ -10,6 +10,18 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
+## WEB-91 — Bahía 00: MANU como juego
+
+Manu quiere MANU como un videojuego (le gustan Stardew Valley, Animal Crossing, Tomodachi Life y los tycoons de Roblox) en el que su vida real construya algo. Concepto «Bahía 00» propuesto por ChatGPT a partir de lo que sabe de él y aceptado por Manu con estas decisiones: 5 lugares en la primera versión, dibujo hecho en código, el trabajo de RK fuera, y la bebida como pregunta suave por la mañana.
+
+- `core/bahia.js` (puro): lugares, niveles desde todo el historial (nunca bajan), vitalidad temporal y no clínica, estado de ánimo del personaje, pregunta de la noche (gastos NIGHTLIFE o bares ≥ 15 € del día anterior), cronómetro de proyectos (máximo 3 h al día cuentan) e ideas (máximo 3 al día). Estado en `vault.settings.game`.
+- `core/bahia-draw.js`: la ciudad en pixel art sobre un canvas de 192 × 128, con cielo según la hora, tres aspectos por lugar y el personaje según su ánimo. Sin imágenes ni librerías.
+- Pestaña «Bahía» la primera y la pantalla de inicio; Agenda sale de la barra y queda en Hoy («Agenda») y en la barra de comandos.
+- Nada personal en el código (es público): lo de Manu (proyectos, premios, cumpleaños…) irá en su perfil del vault en tareas posteriores.
+- Pruebas: `tests/bahia.test.js` y `e2e/bahia.e2e.mjs`, que ahora vive en el repositorio (la batería e2e anterior estaba en el scratchpad y se perdió al cambiar de contenedor).
+
+Siguiente: WEB-92, banco con Enable Banking más Supabase (Manu dio permiso). Pendiente de Manu: el dibujo de su personaje del portfolio.
+
 ## WEB-90 — replanteamiento y Apple Pay automático
 
 Tres días después Manu no usa MANU: ni gastos, ni fichaje, ni tiempo, ni alarmas. Revisión de producto con ChatGPT (propósito: «quitarme cosas de la cabeza y entender mi dinero sin trabajo»). Respuestas de Manu: no sabe en qué gasta, quiere ver lo que le deben y una visión completa; apunta ideas en todas partes; paga casi todo con Apple Pay (ocio), la compra la hace su madre con su tarjeta física, Amazon con la virtual; acepta 2 minutos a la semana. No quiere ver deudas ni totales al abrir: entre amigos unas veces paga él y otras ellos. Las alertas de Sabadell solo llegan como notificación de su app (ni SMS ni email), que nada puede leer.
