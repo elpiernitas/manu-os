@@ -4,7 +4,7 @@ Status: **IN_PROGRESS**
 
 ## Tarea activa
 
-WEB-91 — Bahía 00, MANU como juego (`ai/HANDOFF.md`, «WEB-91»). Después, WEB-92: banco con Enable Banking y Supabase.
+WEB-92 — el personaje de Manu en Bahía 00 (`ai/HANDOFF.md`, «WEB-92»). Después, WEB-93: banco con Enable Banking y Supabase.
 
 ## Autorización
 

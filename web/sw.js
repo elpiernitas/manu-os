@@ -1,5 +1,5 @@
 // Offline shell: every file of the app is cached.
-const VERSION = "manuos-v91";
+const VERSION = "manuos-v92";
 const SHELL = [
   "./", "index.html", "styles.css", "app.js", "manifest.webmanifest",
   "core/text.js", "core/money.js", "core/modes.js", "core/assistant.js",
