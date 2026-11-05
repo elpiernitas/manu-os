@@ -29,27 +29,37 @@ function sky(hour) {
 
 const hash = (s) => [...s].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
 
-// The character: a big head, messy brown hair, glasses, a silver earring,
-// white t-shirt, baggy jeans. 10 × 16. «.» is transparent.
-const SPRITE = [
-  "..hhhhhh..",
-  ".hhhhhhhh.",
-  "hhssssssh.",
-  "hsggsggsse",
-  ".sssssssse",
-  ".sssmmsss.",
-  "..ssssss..",
-  "...wwww...",
-  "..wwwwww..",
-  ".swwwwwws.",
-  ".swwwwwws.",
-  "..bbbbbb..",
-  "..bbbbbb..",
-  "..bb..bb..",
-  "..bb..bb..",
-  ".kkk..kkk.",
+// The character, from Manu's own drawings: chibi head, brown hair swept to
+// the right, glasses black on top and clear below, a silver hoop, a serious
+// half-frown, oversized white tee, baggy dark jeans, white trainers with black
+// stripes. 16 × 24. «.» is transparent.
+export const SPRITE = [
+  ".....hhhhhh.....",
+  "...hhhhHhhhhh...",
+  "..hhhHhhhhhhhhh.",
+  ".hhhhhhhhhhhHhhh",
+  ".hhhhhhhhhhhhh.h",
+  ".hsssshhhhhhhh..",
+  ".hsssssssssssh..",
+  ".sGGGGGGGGGGGs..",
+  ".sLLoLLsLLoLLs..",
+  ".eCCCCCsCCCCCs..",
+  ".esssssssssss...",
+  "..sssssmmssss...",
+  "...sssssssss....",
+  "....sssssss.....",
+  "......sss.......",
+  "..wwwwwwwwwwww..",
+  ".swwwwwwwwwwwws.",
+  ".s.wwwwwwwwww.s.",
+  "...jjjjjjjjjj...",
+  "...jjjjjJjjjj...",
+  "...jjjjj.jjjjj..",
+  "..jjjjjj.jjjjjj.",
+  "..WkWkW..WkWkWW.",
+  "..OOOOO..OOOOOO.",
 ];
-const PAL = { h: C.hair, s: C.skin, g: C.ink, e: C.ring, m: "#c97b6b", w: C.shirt, b: C.jeans, k: C.shoe };
+export const PAL = { h: "#6b3a1e", H: "#8f5530", s: C.skin, G: C.ink, L: "#d6e7f3", o: C.ink, C: "#b9c3cc", e: C.ring, m: "#c08470", w: "#fafafa", j: "#2e4f9a", J: "#23407d", W: "#f5f5f5", k: C.ink, O: "#9aa3ad" };
 
 export function drawTown(ctx, { places, mood = "tranquilo", now = new Date(), tick = 0 }) {
   const lv = Object.fromEntries(places.map((p) => [p.id, p.level]));
@@ -124,14 +134,14 @@ export function drawTown(ctx, { places, mood = "tranquilo", now = new Date(), ti
   if (lv.muro === 3) { r(84, 108, 24, 4, C.stoneDark); r(86, 100, 1, 8, C.ink); r(87, 100, 6, 3, C.blue); r(170, 113, 4, 6, C.red); }
 
   // The character, by the place that matches his mood.
-  const spot = { trabajando: [o.x + 4, 88], inspirado: [c.x + 2, 88], cansado: [24, 96], descansado: [a.x + 18, 48], celebrando: [80, 88], tranquilo: [70, 90] }[mood] ?? [70, 90];
+  const spot = { trabajando: [o.x + 32, 82], inspirado: [c.x - 4, 82], cansado: [29, 86], descansado: [a.x + 16, 46], celebrando: [80, 82], tranquilo: [80, 84] }[mood] ?? [80, 84];
   const bob = mood === "celebrando" ? (tick % 2) * -2 : mood === "cansado" ? 0 : (tick % 4 === 0 ? -1 : 0);
   const [sx, sy] = [spot[0], spot[1] + bob];
-  SPRITE.forEach((row, y) => [...row].forEach((ch, x) => { if (ch !== ".") r(sx + x, sy + y, 1, 1, mood === "celebrando" && ch === "g" ? "#ff3df5" : PAL[ch]); }));
-  if (mood === "inspirado") { r(sx + 3, sy - 7, 4, 4, C.lit); r(sx + 4, sy - 3, 2, 2, C.grey); }
-  if (mood === "trabajando") { r(sx + 9, sy + 8, 6, 4, C.grey); r(sx + 10, sy + 9, 4, 2, C.glass); }
-  if (mood === "cansado") { r(sx + 11, sy - 4, 3, 1, C.white); r(sx + 13, sy - 6, 3, 1, C.white); r(sx + 10, sy + 9, 2, 3, C.glass); }
-  if (mood === "descansado") { r(sx + 11, sy - 3, 1, 4, C.ink); r(sx + 12, sy - 3, 2, 1, C.ink); }
+  SPRITE.forEach((row, y) => [...row].forEach((ch, x) => { if (ch !== ".") r(sx + x, sy + y, 1, 1, mood === "celebrando" && ch === "L" ? "#ff3df5" : PAL[ch]); }));
+  if (mood === "inspirado") { r(sx + 6, sy - 7, 4, 4, C.lit); r(sx + 7, sy - 3, 2, 2, C.grey); }
+  if (mood === "trabajando") { r(sx + 12, sy + 13, 7, 5, C.grey); r(sx + 13, sy + 14, 5, 3, C.glass); }
+  if (mood === "cansado") { r(sx + 14, sy - 2, 3, 1, C.white); r(sx + 16, sy - 5, 3, 1, C.white); r(sx - 2, sy + 13, 2, 3, C.glass); }
+  if (mood === "descansado") { r(sx + 15, sy - 3, 1, 4, C.ink); r(sx + 16, sy - 3, 2, 1, C.ink); }
   if (mood === "celebrando") for (let i = 0; i < 10; i++) { const h = hash(`c${i}${tick}`); r(sx - 10 + (h % 30), sy - 12 + ((h >> 5) % 10), 1, 2, [C.lit, C.red, C.blue, C.green][i % 4]); }
 
   // A drizzly day now and then (chirimiri): nothing to do, it just happens.

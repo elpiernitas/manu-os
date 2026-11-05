@@ -10,6 +10,10 @@
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
 
+## WEB-92 — el personaje de Manu
+
+Manu pasa 16 dibujos de su personaje del portfolio. El sprite (16 × 24, `SPRITE` y `PAL` en `core/bahia-draw.js`) los sigue: pelo castaño despeinado hacia la derecha, gafas de pasta negra arriba y transparentes abajo, aro plateado en la oreja, media mueca seria, camiseta blanca ancha, vaqueros anchos y zapatillas blancas con rayas negras. Al celebrar, las lentes se vuelven rosas. Fuera queda el cigarro de dos dibujos (no se premian hábitos así). El personaje ya no tapa las insignias de los lugares. Regresión en `tests/bahia.test.js` (tamaño y colores definidos).
+
 ## WEB-91 — Bahía 00: MANU como juego
 
 Manu quiere MANU como un videojuego (le gustan Stardew Valley, Animal Crossing, Tomodachi Life y los tycoons de Roblox) en el que su vida real construya algo. Concepto «Bahía 00» propuesto por ChatGPT a partir de lo que sabe de él y aceptado por Manu con estas decisiones: 5 lugares en la primera versión, dibujo hecho en código, el trabajo de RK fuera, y la bebida como pregunta suave por la mañana.
@@ -20,7 +24,7 @@ Manu quiere MANU como un videojuego (le gustan Stardew Valley, Animal Crossing, 
 - Nada personal en el código (es público): lo de Manu (proyectos, premios, cumpleaños…) irá en su perfil del vault en tareas posteriores.
 - Pruebas: `tests/bahia.test.js` y `e2e/bahia.e2e.mjs`, que ahora vive en el repositorio (la batería e2e anterior estaba en el scratchpad y se perdió al cambiar de contenedor).
 
-Siguiente: WEB-92, banco con Enable Banking más Supabase (Manu dio permiso). Pendiente de Manu: el dibujo de su personaje del portfolio.
+Siguiente: WEB-93, banco con Enable Banking más Supabase (Manu dio permiso).
 
 ## WEB-90 — replanteamiento y Apple Pay automático
 

@@ -122,3 +122,13 @@ test("WEB-91: moods and a stable line for the day", () => {
   assert.equal(lineFor("tranquilo", now), lineFor("tranquilo", new Date(2026, 10, 5, 20)));
   assert.equal(typeof lineFor("nadie", now), "string");
 });
+
+test("WEB-92: his character is a clean 16 × 24 sprite with every colour defined", async () => {
+  const { SPRITE, PAL } = await import("../core/bahia-draw.js");
+  assert.equal(SPRITE.length, 24);
+  assert.ok(SPRITE.every((row) => row.length === 16));
+  const used = new Set(SPRITE.join("").replace(/\./g, ""));
+  for (const ch of used) assert.ok(PAL[ch], `colour for «${ch}»`);
+  assert.ok(used.has("e"), "the silver hoop");
+  assert.ok(used.has("G") && used.has("C"), "glasses: dark on top, clear below");
+});
