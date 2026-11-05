@@ -48,10 +48,12 @@ import { incomeKind } from "./core/bank.js";
 import { nightReview, weekReview, nightDue, weekDue } from "./core/review.js";
 import { KINDS as DOC_KINDS, daysLeft, expiringSoon, leftText, buildDocPayload, parseDocReply, isDocQuestion, answerDoc, DOC_LIMIT } from "./core/docs.js";
 import { LIB_KINDS, STATUSES, newItem, setStatus, ideasPayload, parseIdeas, isLibraryQuestion, answerLibrary } from "./core/library.js";
+import { PLACES as BZ_PLACES, NIGHT_OPTIONS, gameState, town, vitality, mood as bzMood, nightQuestion, lineFor, moveDays, projectMinutesByDay, setTreadmill, setRest, answerNight, startTimer, stopTimer, markSeen } from "./core/bahia.js";
+import { drawTown, SPOTS, W as BZ_W, H as BZ_H } from "./core/bahia-draw.js";
 import { cleanConcept, QUICK_SPEND, QUICK_INCOME, fixedIncomeStatus, commonSpends, recurringIncome } from "./core/quickmoney.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "90"; // = número de la última tarea WEB publicada (desde WEB-87)
+export const APP_VERSION = "91"; // = número de la última tarea WEB publicada (desde WEB-87)
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -65,7 +67,7 @@ const DEFAULT_SPOTIFY_CLIENT_ID = "f5a3acb0124f45179c0d1d0b54e66f3b";
 const store = new LocalStore(globalThis.localStorage ?? { getItem: () => null, setItem: () => { throw new Error("no storage"); } });
 const loaded = store.load();
 let vault = loaded.vault;
-let tab = sessionStorage.getItem("manuos.tab") || "hoy";
+let tab = sessionStorage.getItem("manuos.tab") || "bahia"; // WEB-91: MANU opens on the town
 let sub = null; // Tú subpage
 let morningLaunch = false; // WEB-72: opened by the morning Shortcut
 let refuge = null; // Refugio lives only in memory
@@ -339,6 +341,7 @@ function toast(msg) {
 // ---------- Icons (inline SVG, stroke) ----------
 const svg = (d, extra = "") => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" ${extra}>${d}</svg>`;
 const I = {
+  bahia: svg('<path d="M3 17c2 0 2-1.5 4.5-1.5S10 17 12 17s2.5-1.5 4.5-1.5S19 17 21 17M3 21c2 0 2-1.5 4.5-1.5S10 21 12 21s2.5-1.5 4.5-1.5S19 21 21 21"/><path d="M6 13V8l3-2 3 2v5M15 13V5h3v8"/>'),
   hoy: svg('<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'),
   agenda: svg('<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/>'),
   dinero: svg('<rect x="2" y="6" width="20" height="13" rx="3"/><circle cx="12" cy="12.5" r="2.5"/>'),
@@ -378,7 +381,7 @@ const I = {
   alarm: svg('<circle cx="12" cy="13" r="7"/><path d="M12 9v4l2.5 2M4 4l3 2.5M20 4l-3 2.5"/>'),
 };
 
-const TABS = [["hoy", "Hoy"], ["agenda", "Agenda"], ["manu", "MANU"], ["dinero", "Dinero"], ["proyectos", "Proyectos"], ["tu", "Tú"]];
+const TABS = [["bahia", "Bahía"], ["hoy", "Hoy"], ["manu", "MANU"], ["dinero", "Dinero"], ["proyectos", "Proyectos"], ["tu", "Tú"]];
 
 function latestMonthOffset() {
   const last = vault.spending.reduce((m, x) => (x.at > m ? x.at : m), "");
@@ -1251,6 +1254,41 @@ const addLink = (kind, label = "Añadir") => `<button class="link small" data-ac
 
 // ---------- Screens ----------
 const screens = {
+  // ---------- Bahía 00 (WEB-91) ----------
+  bahia() {
+    const now = new Date(), k = localDay(), g = gameState(vault);
+    const places = town(vault, now), v = vitality(vault, now), m = bzMood(vault, now);
+    const moved = moveDays(vault).has(k), steps = vault.health.find((h) => h.day === k && h.kind === "STEPS")?.value;
+    const minsToday = projectMinutesByDay(vault, now)[k] ?? 0;
+    const nq = nightQuestion(vault, now);
+    const fresh = places.filter((p) => p.isNew);
+    const pct = (x) => Math.round(x * 100);
+    const feel = { celebrando: "De celebración", cansado: "Cansado", inspirado: "Inspirado", trabajando: "Trabajando", descansado: "Descansado", tranquilo: "Tranquilo" }[m];
+    const place = bahiaPlace ? places.find((p) => p.id === bahiaPlace) : null;
+    const projOpts = `<option value="">Sin proyecto</option>${(vault.projects ?? []).map((p) => `<option value="${esc(p.id)}"${g.timer?.projectId === p.id ? " selected" : ""}>${esc(`${p.emoji ?? ""} ${p.name}`)}</option>`).join("")}`;
+    const running = g.timer ? Math.max(0, Math.round((now - Date.parse(g.timer.start)) / 60000)) : 0;
+    return `<h1>Bahía 00</h1><p class="subtitle">Una ciudad. Un empleado. Demasiadas cosas pasando.</p>
+      <div class="stack">
+      <section class="card bz-card"><div class="bz-scene"><canvas id="bzCanvas" width="${BZ_W}" height="${BZ_H}" aria-label="Tu bahía: ${esc(places.map((p) => `${p.name}, nivel ${p.level}`).join("; "))}" role="img"></canvas>
+        ${places.map((p) => { const s = SPOTS[p.id]; return `<button class="bz-spot" data-act="bz-place" data-id="${p.id}" data-l="${(s.x / BZ_W) * 100}" data-t="${(s.y / BZ_H) * 100}" data-w="${(s.w / BZ_W) * 100}" data-h="${(s.h / BZ_H) * 100}" aria-label="${esc(p.name)}, nivel ${p.level}"><span>${p.level}</span></button>`; }).join("")}</div>
+        <div class="row bz-status"><span class="grow"><b>${esc(feel)}</b><br><span class="muted small">${esc(lineFor(m, now))}</span></span><span class="bz-vit" aria-label="Vitalidad ${v} de 100"><span class="small muted">Vitalidad</span><span class="bar"><i data-w="${v}"></i></span></span></div></section>
+      ${fresh.length ? `<section class="card bz-new"><h2>🎉 ¡Obra terminada!</h2>${fresh.map((p) => `<p><b>${esc(p.name)}</b> sube a nivel ${p.level}: ${esc(p.look)}</p>`).join("")}<button class="btn" data-act="bz-seen">¡Qué bien!</button></section>` : ""}
+      ${nq ? `<section class="card"><h2>🌙 ¿Qué tal anoche?</h2><p class="muted small">Ayer: ${nq.items.map((i) => `${esc(cleanConcept(i.merchant))} ${esc(euros(i.cents))}`).join(" · ")}. ¿Qué bebiste? Solo cambia un poco la vitalidad de tu personaje, nada más.</p>
+        <div class="btns">${NIGHT_OPTIONS.map((o) => `<button class="btn ghost" data-act="bz-night" data-day="${esc(nq.day)}" data-v="${o.value}">${esc(o.label)}</button>`).join("")}</div></section>` : ""}
+      ${place ? `<section class="card bz-place"><div class="row"><h2 class="grow">${esc(place.name)}</h2><button class="link small" data-act="bz-place" data-id="">Cerrar</button></div>
+        <p class="muted small">${esc(place.area)} · nivel ${place.level} de 3</p><p>${esc(place.look)}</p>
+        ${place.next === null ? '<p class="small">Nivel máximo. Lo que construiste se queda para siempre.</p>' : `<div class="bar"><i data-w="${pct(place.progress)}"></i></div><p class="muted small">${place.points} ${esc(place.unit[place.points === 1 ? 0 : 1])} · siguiente nivel a ${place.next}: ${esc(place.looks[place.level])}</p>`}
+        <p class="small">${esc(place.how)}</p>${place.id === "faro" ? `<p class="muted small">${place.extra.thisMonthPositive ? "Este mes, de momento, entra más de lo que sale." : "Este mes, de momento, sale más de lo que entra. No pasa nada: el faro no se apaga."}</p>` : ""}</section>` : ""}
+      <section class="card"><h2>Hoy en la bahía</h2>
+        <div class="row"><span class="grow">🚶 <b>Muévete</b><br><span class="muted small">${moved ? "Hecho: una vuelta más al Muro." : `Tus 200 kcal en la cinta${steps ? ` o ${g.stepGoal.toLocaleString("es-ES")} pasos (llevas ${Number(steps).toLocaleString("es-ES")})` : ` o ${g.stepGoal.toLocaleString("es-ES")} pasos`}.`}</span></span><button class="check" data-act="bz-move" aria-pressed="${Boolean(g.treadmill[k])}" aria-label="200 kcal en la cinta hoy">${I.check}</button></div>
+        <div class="stack bz-proj"><span>💻 <b>Proyecto</b><br><span class="muted small">${g.timer ? `En marcha: ${running} min` : minsToday ? `Hoy: ${minsToday} min` : "Dale al ▶ cuando empieces."}</span></span>
+          <div class="row">${g.timer ? '<span class="grow"></span>' : `<label class="sr" for="bzProject">Proyecto</label><select id="bzProject" class="grow">${projOpts}</select>`}<button class="btn small-btn" data-act="bz-timer">${g.timer ? "⏹ Parar" : "▶ Empezar"}</button></div></div>
+        <form id="bzIdea" class="row"><span>💡</span><label class="sr" for="bzIdeaIn">Idea</label><input id="bzIdeaIn" class="grow" maxlength="280" autocomplete="off" placeholder="Suelta una idea…"><button class="btn small-btn" type="submit">Soltar</button></form>
+        <div class="row"><span class="grow">🛋️ <b>Descansar</b><br><span class="muted small">Si hoy te has cuidado, márcalo.</span></span><button class="check" data-act="bz-rest" aria-pressed="${Boolean(g.rest[k])}" aria-label="Hoy he descansado">${I.check}</button></div>
+      </section>
+      <details class="card"><summary class="small">Ajustes de la bahía</summary><label class="small" for="bzSteps">Pasos que cuentan como «moverte»</label><input id="bzSteps" inputmode="numeric" value="${g.stepGoal}"></details>
+      </div>`;
+  },
   hoy() {
     const m = modeState(today(), undefined, vault.settings.override);
     const inbox = pending(vault.inbox);
@@ -1260,7 +1298,7 @@ const screens = {
     const next = agendaToday() ? nextEvent(vault.agenda) : null;
     const rems = vault.reminders.filter((r) => !r.done && dayKey(new Date(r.at)) === localDay()).sort((a, b) => (a.at < b.at ? -1 : 1));
     const bdays = upcomingBirthdays(vault.people, today(), 7);
-    return `<h1>${greeting()}, Manu</h1><p class="subtitle">${esc(longDate())} · <span class="chip">${esc(MODE_TITLES[m.mode])}</span></p>
+    return `<h1>${greeting()}, Manu</h1><p class="subtitle">${esc(longDate())} · <span class="chip">${esc(MODE_TITLES[m.mode])}</span> · <button class="link small" data-tab="agenda">Agenda</button></p>
       <div class="stack">
       ${morningLaunch ? `<section class="card morning-hello"><h2>☀️ ${esc(greeting())}, Manu</h2><p class="muted small">Toca y te leo el día en voz alta.</p><div class="btns"><button class="btn" data-act="speak-day">🔊 Léemelo</button><button class="link small" data-act="morning-dismiss">Ahora no</button></div></section>` : ""}
       ${gentleCard()}
@@ -1994,6 +2032,7 @@ function render({ focus = false, enter = null } = {}) {
   $("screen").querySelectorAll(".week-bars i[data-h], .ie-bars i[data-h]").forEach((el) => { el.style.height = `${Math.max(Number(el.dataset.h) ? 2 : 0, Number(el.dataset.h))}%`; });
   $("screen").querySelectorAll("[data-c]").forEach((el) => { if (/^#[0-9a-f]{6}$/i.test(el.dataset.c)) el.style.setProperty("--ev", el.dataset.c); });
   hydrateImages($("screen"));
+  if (tab === "bahia" && !sub && !overlay) paintBahia();
   $("topTitle").textContent = sub ? { habitos: "Hábitos", salud: "Salud", comidas: "Comidas", personas: "Personas", tiempo: "Tiempo", avisos: "Avisos", datos: "Tus datos", gcal: "Google", correo: "Correo", archivo: "Tu archivo", capturas: "Capturas", ia: "IA", spotify: "Spotify", atajos: "Atajos", fichaje: "Fichaje", repaso: "Repaso", documentos: "Documentos", biblioteca: "Biblioteca" }[sub] : TABS.find(([id]) => id === tab)[1];
   const sheetKey = sheet ? sheet.kind : null;
   if (sheetKey !== renderedSheetKind || !sheet) {
@@ -2027,6 +2066,17 @@ function render({ focus = false, enter = null } = {}) {
   else { if ($("fullPass")) $("fullPass").value = full.pass; if ($("fullPlain")) $("fullPlain").checked = full.plain; }
   if (focus) $("screen").focus();
 }
+
+// ---------- Bahía 00: drawing (WEB-91) ----------
+let bahiaPlace = null, bahiaTick = 0, bahiaTimer = null;
+function paintBahia() {
+  const cv = $("bzCanvas"); if (!cv) return;
+  const now = new Date();
+  drawTown(cv.getContext("2d"), { places: town(vault, now), mood: bzMood(vault, now), now, tick: bahiaTick });
+  $("screen").querySelectorAll(".bz-spot").forEach((b) => { Object.assign(b.style, { left: `${b.dataset.l}%`, top: `${b.dataset.t}%`, width: `${b.dataset.w}%`, height: `${b.dataset.h}%` }); });
+  if (!bahiaTimer && !reduceMotion()) bahiaTimer = setInterval(() => { if (tab !== "bahia" || document.hidden || !$("bzCanvas")) return; bahiaTick++; const n = new Date(); drawTown($("bzCanvas").getContext("2d"), { places: town(vault, n), mood: bzMood(vault, n), now: n, tick: bahiaTick }); }, 600);
+}
+const saveGame = (game) => { vault.settings.game = game; persist(); render(); };
 
 function go(newTab) {
   tab = newTab;
@@ -3101,6 +3151,17 @@ document.addEventListener("click", async (e) => {
     case "ai-remember": { const k = aiStore.key; aiStore.remember = !aiStore.remember; aiStore.key = k; render(); break; }
     case "ai-forget": aiStore.key = ""; aiStore.model = ""; render(); toast("Clave borrada de este móvil"); break;
     case "ai-toggle": vault.settings.aiEnabled = vault.settings.aiEnabled === false; persist(); render(); break;
+    case "bz-place": bahiaPlace = a.dataset.id || null; render(); break;
+    case "bz-seen": saveGame(markSeen(vault)); break;
+    case "bz-move": { const k = localDay(); saveGame(setTreadmill(vault, k, !gameState(vault).treadmill[k])); break; }
+    case "bz-rest": { const k = localDay(); saveGame(setRest(vault, k, !gameState(vault).rest[k])); break; }
+    case "bz-night": saveGame(answerNight(vault, a.dataset.day, Number(a.dataset.v))); toast("Apuntado. Tu personaje se toma un café tranquilo."); break;
+    case "bz-timer": {
+      const g = gameState(vault);
+      if (g.timer) { const mins = Math.round((Date.now() - Date.parse(g.timer.start)) / 60000); saveGame(stopTimer(vault, uid("ses"))); toast(mins >= 1 ? `${mins} min en la Oficina de Uno` : "Menos de un minuto: no cuenta"); }
+      else { saveGame(startTimer(vault, $("bzProject")?.value || null)); toast("Cronómetro en marcha"); }
+      break;
+    }
     case "mood": {
       vault.moods = setMood(vault.moods, localDay(), Number(a.dataset.v)); persist(); render();
       if (!reduceMotion()) document.querySelector(`[data-act="mood"][data-v="${Number(a.dataset.v)}"] .mood-e`)?.classList.add("bounce");
@@ -3256,6 +3317,11 @@ document.addEventListener("submit", async (e) => {
   e.preventDefault();
   const f = e.target.id;
   if (f === "nubeMail") { nubeMail($("nubeEmail").value.trim()); return; }
+  if (f === "bzIdea") { // WEB-91: an idea goes straight to MANU as an idea, no questions
+    const text = $("bzIdeaIn").value.trim().slice(0, 280); if (!text) return;
+    vault.inbox.push({ ...capture({ id: uid("i"), text, at: new Date().toISOString() }), status: "IDEA" });
+    persist(); render(); toast("Una servilleta más en el Café"); return;
+  }
   if (f === "nubeForm") { nubeCodeSubmit($("nubeCode").value); return; }
   if (f === "projKeys") {
     const p = currentProject(); if (!p) return;
@@ -3505,6 +3571,7 @@ document.addEventListener("change", async (e) => {
     vault.settings.nudges = { ...(vault.settings.nudges ?? {}), [id]: { ...(vault.settings.nudges?.[id] ?? {}), time: e.target.value } };
     persist(); toast(`Aviso a las ${e.target.value}`); return;
   }
+  if (e.target.id === "bzSteps") { const n = Math.round(Number(String(e.target.value).replace(/\D/g, ""))); if (n >= 500 && n <= 50000) { vault.settings.game = { ...(vault.settings.game ?? {}), stepGoal: n }; persist(); render(); toast(`Moverte: ${n.toLocaleString("es-ES")} pasos`); } return; }
   if (e.target.id === "workStart" && /^\d{2}:\d{2}$/.test(e.target.value)) { vault.settings.workStart = e.target.value; persist(); toast(`Entrada: ${e.target.value}`); return; }
   if (e.target.dataset.cat) {
     catEditing = null;
