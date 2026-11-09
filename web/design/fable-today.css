@@ -1,0 +1,65 @@
+/* Fable 5.1 · Hoy phase 2. Scoped: does not alter MANU's other five sections. */
+.fable-hoy { --ft-white: #f7f8fa; --ft-blue: var(--mo-blue-active, #4d8dff); display: grid; gap: 20px; padding-bottom: 8px; }
+.ft-intro { padding: 16px 2px 6px; display: flex; flex-direction: column; gap: 0; }
+.ft-kicker { display: flex; justify-content: space-between; gap: 12px; align-items: center; color: #aab0bb; font-size: 12px; letter-spacing: .025em; }
+.ft-tag { display: inline-flex; align-items: center; justify-content: center; padding: 5px 10px; border: 1px solid rgba(255,255,255,.13); border-radius: 999px; line-height: 1.2; font-size: 12px; color: #c9ced8; white-space: nowrap; }
+.ft-greeting { font-size: clamp(34px, 9vw, 48px); font-weight: 600; line-height: 1.06; letter-spacing: -.045em; max-width: 500px; margin: 22px 0 8px; text-wrap: balance; }
+.ft-dot { color: var(--mo-blue-active, #4d8dff); }
+.ft-subline { color: #aeb5c0; font-size: 15px; line-height: 1.5; margin: 0 0 23px; }
+.ft-weather { display: flex; text-align: left; align-items: center; gap: 16px; padding: 16px 0 22px; border: 0; border-bottom: 1px solid rgba(255,255,255,.11); background: none; color: inherit; width: 100%; min-height: 100px; cursor: pointer; }
+.ft-weather:focus-visible, .ft-next:focus-visible, .ft-service:focus-visible { border-radius: 8px; outline: 2px solid var(--mo-blue-active, #4d8dff); outline-offset: 3px; }
+.ft-temp { font-size: clamp(53px, 15vw, 69px); font-variant-numeric: tabular-nums; font-weight: 500; line-height: .95; letter-spacing: -.07em; color: var(--ft-white); white-space: nowrap; }
+.ft-weather-info { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; line-height: 1.25; min-width: 0; }
+.ft-weather-info b { font-size: 15px; font-weight: 600; }
+.ft-weather-info > span { font-size: 14px; color: #bac0cb; overflow-wrap: anywhere; }
+.ft-weather-info small { font-size: 12px; color: #949aa6; }
+.ft-more { align-self: flex-start; margin: 5px 0 0 auto; font-size: 18px; color: #aab0bb; }
+.ft-weather-empty { min-height: 75px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; color: #c3cad4; }
+.ft-weather-placeholder { color: #949aa6; font-size: 12px; }
+.ft-next { background: none; border: 0; border-bottom: 1px solid rgba(255,255,255,.11); width: 100%; color: inherit; padding: 17px 0 23px; text-align: left; min-height: 96px; cursor: pointer; display: grid; gap: 12px; }
+.ft-next-body { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.ft-next-time { min-width: 60px; font-size: 22px; line-height: 1.15; letter-spacing: -.03em; font-variant-numeric: tabular-nums; font-weight: 600; color: var(--ft-white); }
+.ft-next-title { flex: 1; font-size: 15px; font-weight: 500; line-height: 1.35; overflow-wrap: anywhere; }
+.ft-next-arrow { color: #9fa6b5; font-size: 18px; align-self: flex-start; }
+.ft-next-empty { display: grid; }
+.ft-next-empty .ft-next-title { color: #a0a7b3; font-weight: 400; }
+.ft-overline, .ft-section-label { font-size: 11px; font-weight: 600; letter-spacing: .095em; text-transform: uppercase; color: #a0a7b3; }
+.ft-briefline { display: flex; align-items: center; gap: 9px; color: #9da5b2; font-size: 12px; padding-top: 20px; flex-wrap: wrap; }
+.ft-work { gap: 16px; min-width: 0; }
+.ft-work .mem-hoy { border: 1px solid rgba(77,141,255,.25); background: linear-gradient(160deg, rgba(36,107,253,.13), rgba(17,19,24,.85) 72%); border-radius: 18px; padding: 19px; box-shadow: none; }
+.ft-work .mem-hoy .mem-kicker { color: var(--mo-blue-active, #4d8dff); text-transform: uppercase; letter-spacing: .08em; font-size: 11px; }
+.ft-work .mem-hoy > p:not(.mem-kicker) { font-size: 17px; line-height: 1.45; letter-spacing: -.01em; }
+.ft-work .now-card { background: transparent; border: 0; border-radius: 0; box-shadow: none; border-bottom: 1px solid rgba(255,255,255,.1); padding: 10px 2px 22px; }
+.ft-work .now-card h2 { letter-spacing: .08em; font-size: 11px; }
+.ft-work .now-card .now-main { font-size: 17px; line-height: 1.4; }
+.ft-rest-label { margin: 5px 1px 0; }
+.ft-section-label { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 9px; align-items: center; }
+.ft-section-label span { color: #777e8c; font-weight: 400; font-size: 11px; letter-spacing: 0; text-transform: none; }
+.ft-services { display: grid; gap: 13px; border-top: 1px solid rgba(255,255,255,.1); padding: 18px 0 4px; }
+.ft-services-list { display: grid; gap: 0; }
+.ft-service { min-height: 70px; padding: 12px 2px; display: flex; gap: 13px; align-items: center; background: transparent; border: 0; border-bottom: 1px solid rgba(255,255,255,.08); width: 100%; text-align: left; color: inherit; cursor: pointer; }
+.ft-service-icon { display: grid; place-items: center; width: 38px; height: 38px; background: rgba(77,141,255,.12); border-radius: 12px; flex: none; font-size: 20px; font-weight: 500; color: var(--mo-blue-active, #4d8dff); }
+.ft-service-copy { display: grid; gap: 4px; flex: 1; min-width: 0; }
+.ft-service-copy b { font-size: 14px; font-weight: 600; }
+.ft-service-copy small { font-size: 12px; color: #a5acb8; overflow-wrap: anywhere; line-height: 1.4; }
+.ft-service-copy .ft-service-hint { color: #737c8c; }
+.ft-status-dot { display: inline-block; flex: none; width: 8px; height: 8px; border-radius: 50%; background: #6f7784; border: 1px solid rgba(255,255,255,.15); }
+.ft-status-dot[data-status="ok"] { background: #3dbe8b; }
+.ft-status-dot[data-status="pending"] { background: #e0a64a; }
+.ft-status-dot[data-status="warn"] { background: #e5574f; }
+.fable-hoy .ft-work > .card:not(.mem-hoy, .now-card) { box-shadow: none; }
+@media (max-width: 374px) {
+  .fable-hoy { gap: 12px; }
+  .ft-greeting { font-size: 32px; }
+  .ft-temp { font-size: 52px; }
+  .ft-weather { gap: 12px; }
+  .ft-next-time { min-width: 52px; font-size: 20px; }
+}
+@media (min-width: 900px) {
+  .fable-hoy { max-width: 720px; margin-inline: auto; }
+  .ft-greeting { font-size: 50px; }
+  .ft-work > .ft-services { margin: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fable-hoy * { scroll-behavior: auto; }
+}
