@@ -1,5 +1,20 @@
 # HANDOFF
 
+## WEB-93b — Enable Banking / Sabadell AIS (ChatGPT, 2026-11-09)
+
+**Rama:** `chatgpt/web-93b-enable-banking-bridge`. **No fusionar ni desplegar antes de cerrar las condiciones bancarias.**
+
+Se ha preparado un puente de acceso exclusivamente de lectura entre MANU OS y Enable Banking utilizando Supabase Edge Functions, con JWT RS256 firmado en servidor, sesión y estado OAuth en tabla privada, callback en servidor, datos de saldos y movimientos consultados bajo demanda y revocación de la sesión. La interfaz Dinero ofrece las acciones de conexión, consulta y desconexión, sin incorporar automáticamente datos bancarios a Tu nube. Las pruebas nuevas usan claves y datos ficticios.
+
+La aplicación bancaria de producción restringida está activa y tiene vinculada una cuenta propia del usuario, pero **todavía no se ha realizado el consentimiento de API ni se ha probado el acceso AIS real**.
+
+**Bloqueos de activación:** la clave privada RSA inicial se adjuntó a una conversación y debe rotarse; la URL registrada en Enable Banking apunta a GitHub Pages, no al nuevo callback de Supabase; los secretos no están instalados ni la nueva función desplegada. La decisión de rotar la clave y el consentimiento bancario deben ser realizados personalmente por Manu. No usar la clave adjuntada.
+
+**Archivos:** `supabase/functions/manu-bank/`, `supabase/migrations/20261109140000_bank_ais.sql`, `web/core/enablebanking.js`, `web/core/bank-ais-view.js`, `web/app.js`, `web/sw.js`, `web/tests/enablebanking.test.js`, `docs/integrations/ENABLE_BANKING_AIS.md`.
+
+**NO_VERIFICADO:** despliegue en Supabase, compatibilidad con el PEM real, callback/consentimiento real, saldo/movimientos de Sabadell, uso en Safari del iPhone. Leer la guía y ejecutar pruebas y auditoría antes de considerar la fase terminada.
+
+
 ## Próximo paso vigente
 
 0. **WEB-93a (preparar Enable Banking):** rutas públicas `banco/vuelta/` (callback: limpia la URL, comprueba un `state` de un solo uso y deja el código solo en la pestaña, como mucho 10 min, para un canje en servidor que está pendiente), `privacidad/` y `condiciones/`. El service worker ya no cachea ni sirve como app páginas que no sean la app. No se ha registrado nada en Enable Banking ni conectado Sabadell. Límite conocido: en el iPhone, la vuelta del banco se abre en Safari y no en el icono; el `state` tendrá que iniciarse en el mismo navegador o guardarse en el servidor (diseño de WEB-93).
