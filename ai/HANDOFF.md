@@ -1,5 +1,14 @@
 # HANDOFF
 
+## Activación Sabadell · callback Edge Function y proyecto Supabase incorrecto (2026-11-09)
+
+Rama `chatgpt/sabadell-callback-hardening`. Tras la orden de activar Sabadell, la cuenta de Enable Banking continúa vinculada en modo producción restringido, pero la Edge Function bancaria **NO se ha desplegado**. La conexión Supabase disponible en este chat devuelve otros proyectos y **no incluye** `manu-os` (`xqsexjpuhvmwkclpnvjo`); es peligroso desplegar en un proyecto distinto. Requiere conectar la cuenta/organización correctas antes de operar.
+
+Se descubrió un requisito de autenticación: los callbacks GET bancarios no incluyen JWT de usuario de Supabase. Se añadió `supabase/config.toml` con `[functions.manu-bank] verify_jwt = false` exclusivamente para la función bancaria, que sigue protegiendo los POST mediante la validación propia en `/auth/v1/user`, y el GET mediante state aleatorio, hasheado, caducado y de un uso. Pruebas en `web/tests/manu-bank-callback.test.js`.
+
+Guía completa de acceso, despliegue y comprobación: `docs/integrations/SABADELL_ACTIVATION.md`. **Sin secretos, claves, movimientos ni IBAN; NO se ha activado la lectura de la cuenta real.** El usuario ha rehusado rotar la clave RSA previa: riesgo pendiente y no minimizar.
+
+
 ## QA real en iPhone — Fable, chat y Dinero (2026-11-09)
 
 Manu aportó capturas reales de las seis secciones. Rama `chatgpt/ios-screenshot-qa-108`: el puente bancario sin desplegar ahora muestra un aviso honesto cuando falla la comprobación del servidor (404/503); bienvenida de MANU coherente con Gemini activo o desactivado; barra superior opaca al desplazarse para evitar títulos borrosos en Safari; total de gastos marcado explícitamente como datos locales de MANU, no saldo Sabadell. Pruebas `web/tests/ios-screenshot-qa.test.js`; documentación `docs/design/IPHONE_SCREENSHOT_QA.md`. Sin acceso bancario real ni cambios en Supabase. **NO_VERIFICADO:** nueva captura de la cabecera en iPhone después del CSS.

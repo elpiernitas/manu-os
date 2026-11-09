@@ -1,0 +1,9 @@
+# Only the Enable Banking OAuth callback can arrive without an Authorization header.
+# Keep all other Supabase functions at their existing authentication defaults.
+#
+# IMPORTANT: Disabling the platform JWT gate for manu-bank is intentional because
+# the user's bank redirects with GET + code + state (no Supabase user JWT).
+# The function MUST validate the one-time OAuth state for GET and validate
+# the user's Supabase session (via /auth/v1/user) for all POST operations.
+[functions.manu-bank]
+verify_jwt = false
