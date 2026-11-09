@@ -4,7 +4,7 @@ Status: **IN_PROGRESS**
 
 ## Tarea activa
 
-WEB-97 — Centro de permisos y conexiones e integración con iOS (`ai/HANDOFF.md`, «WEB-97»). Está en un PR en borrador. WEB-95 está fusionada (PR #98). Pendientes: WEB-93, banco con Enable Banking y Supabase; y WEB-96, modo amanecer, bloqueada hasta saber qué luces tiene Manu.
+WEB-98 — memoria y estilo en Tu nube (seguridad y borrado) e investigación de avisos push (`ai/HANDOFF.md`, «WEB-98»). PR abierto sin fusionar. WEB-97 está fusionada (PR #99). Pendientes: WEB-93, banco con Enable Banking y Supabase; y WEB-96, modo amanecer, bloqueada hasta saber qué luces tiene Manu.
 
 ## Autorización
 
@@ -56,6 +56,7 @@ WEB-97 — Centro de permisos y conexiones e integración con iOS (`ai/HANDOFF.m
 - 2026-10-04: auditoría externa tras WEB-86: recomienda parar las funciones nuevas y probar en el iPhone real. Claude Code la verifica y abre WEB-87 (documentación al día, versión = número de tarea, excepción de cifrado de Tu nube escrita en el charter, ADR-0003 y threat model).
 - 2026-09-29: **cambio de gobernanza decidido por Manu.** El orquestador (ChatGPT/Codex) ya no revisa automáticamente, porque frenaba el avance. Claude Code fusiona los PR web cuando `npm test` y los dos workflows remotos están en verde y no hay conflictos. Cuando haga falta una revisión, Claude Code prepara un prompt, Manu se lo pasa a ChatGPT y le devuelve la respuesta; los defectos se corrigen en un PR nuevo con su regresión. Los PR #7, #8 y #9 siguen en borrador o pausa.
 - 2026-11-09 (tarde): Manu fusiona WEB-95 y encarga la «ampliación de visión»: auditar las capacidades reales de iOS y de la web, y un centro de permisos y conexiones gestionable desde el iPhone. Condiciones: sin permisos decorativos, sin rastreo publicitario, sin acceso masivo a datos privados, y MANU solo interactúa con él. Se hace como WEB-97.
+- 2026-11-09 (tarde): Manu fusiona WEB-97. **Decide sincronizar la memoria y el estilo por Tu nube**, previa revisión de seguridad, borrado y riesgos, sin declarar un cifrado de extremo a extremo que no existe. Pide investigar los avisos push con la app cerrada reutilizando la infraestructura existente, sin incorporar servicios sin justificarlo y sin su autorización. Todo gestionable desde el iPhone. Las luces LED y el banco siguen pendientes de datos. Se hace como WEB-98.
 
 ## Alcance autorizado
 

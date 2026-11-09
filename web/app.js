@@ -6,6 +6,7 @@ import { capture, confirm, markUnclassified, pending, tasks, ideas, toggleDone }
 import { initialRefuge, refugeReply } from "./core/refuge.js";
 import { LocalStore, emptyVault, validateVault, wipeDeviceKeys, storageUse } from "./core/storage.js";
 import { notificationStatus, isInstalled, enableNotifications, testNotification } from "./core/notify.js";
+import { cloudPayload, applyRemote, erasedVault, isErased, cloudInventory, brainInCloud } from "./core/cloudprivacy.js";
 import { probe as capProbeRead, catalog as capCatalog, summary as capSummary, GROUPS as CAP_GROUPS, ROUTES as CAP_ROUTES, STATES as CAP_STATES, badgeCount, locateOnce, requestPersist, setBadge } from "./core/capabilities.js";
 import { launchParams, parseEvents, nextEvent, localDay } from "./core/intake.js";
 import { fetchForecast, searchCities, advice, WEATHER_TTL_MS } from "./core/weather.js";
@@ -64,7 +65,7 @@ import { removeJoke } from "./core/voice.js";
 import { memoriaPage, hoyMemCard } from "./core/memview.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "97"; // = número de la última tarea WEB publicada (desde WEB-87)
+export const APP_VERSION = "98"; // = número de la última tarea WEB publicada (desde WEB-87)
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -158,7 +159,7 @@ async function refreshCaps() {
   try { capProbe = await capProbeRead(); } catch { capProbe = {}; }
   if (tab === "tu" && sub === "permisos" && !document.activeElement?.matches("input, textarea")) render();
 }
-const capItems = () => capCatalog({ probe: capProbe ?? {}, settings: vault.settings, google: vault.settings.google ?? {}, ai: aiReady(), spotify: Boolean(spotifyStore.tokens), nube: nubeOn(), shortcutsDone: vault.settings.shortcutsDone ?? {}, style: vault.brain?.style?.on !== false });
+const capItems = () => capCatalog({ probe: capProbe ?? {}, settings: vault.settings, google: vault.settings.google ?? {}, ai: aiReady(), spotify: Boolean(spotifyStore.tokens), nube: nubeOn(), nubeBrain: brainInCloud(vault), shortcutsDone: vault.settings.shortcutsDone ?? {}, style: vault.brain?.style?.on !== false });
 // The icon badge: only the count of reminders left today, only if Manu turned it on.
 let lastBadge = 0; // nothing to clear until MANU has set one
 function syncBadge() {
@@ -214,7 +215,7 @@ function nubeChanged() {
 async function nubePush(baseRev) {
   const s = await nubeSession();
   const edits = nube.edits;
-  const rev = await remotePut(nubeCfg(), s, { data: vault, baseRev, device: deviceName() });
+  const rev = await remotePut(nubeCfg(), s, { data: cloudPayload(vault), baseRev, device: deviceName() });
   nube.patch({ lastRev: rev, lastAt: new Date().toISOString(), conflict: null, error: null, ...(edits === nube.edits ? { dirty: false } : {}) });
 }
 
@@ -242,7 +243,11 @@ async function nubePull(row = null, { before = null } = {}) {
     // so this device's data replaces it.
     nube.patch({ dirty: true }); await nubePush(row.rev); return;
   }
-  const v = validateVault(row.data);
+  // WEB-98: the cloud was emptied from another device. Its empty copy never replaces this
+  // device's data: this device keeps everything and disconnects.
+  if (isErased(row.data)) { await nubeLeave(); nube.patch({ erasedNotice: row.data.erased }); toast("Tu nube se vació desde otro dispositivo. Aquí no se ha borrado nada."); return "erased"; }
+  // WEB-98: if Manu keeps his memory only on each device, the cloud copy has none: keep this one's.
+  const v = validateVault(applyRemote(row.data, vault));
   if (!v.ok) throw new Error(`Los datos de la nube no son válidos: ${v.reason}`);
   if (before !== null && userPrint(vault) !== before) return "edited";
   // Saved first: if it does not fit on this device, nothing changes (memory,
@@ -315,7 +320,7 @@ async function nubeAfterSignIn(cfg = nubeCfg()) {
   // this device's data simply goes up over it.
   const replaceable = row && (isEnvelope(row.data) || isEmptyVault(row.data));
   nube.lastRowExisting = Boolean(row && !replaceable);
-  nube.patch({ lastRev: replaceable ? row.rev : null, dirty: Boolean(replaceable), conflict: null, error: null, codeSentAt: null });
+  nube.patch({ lastRev: replaceable ? row.rev : null, dirty: Boolean(replaceable), conflict: null, error: null, codeSentAt: null, erasedNotice: null });
 }
 
 async function nubeMail(email) {
@@ -332,6 +337,23 @@ async function nubeCodeSubmit(code) {
     toast(r === "existing" ? "Dentro: traigo tus datos…" : "Dentro: subo tus datos…");
     await nubeSync({ manual: true });
   } catch (err) { toast(["network", "expired", "table", "conflict"].includes(err.code) ? syncErrorText(err) : err.message); }
+}
+
+// WEB-98: «Vaciar mi nube» from the iPhone. The table only lets Manu's account update its row
+// (no DELETE grant), so its content is replaced by an empty, marked copy. This device keeps
+// its data and disconnects; the other device, when it sees the mark, does the same.
+async function nubeErase() {
+  if (!window.confirm("¿Vaciar tu nube? Se borra todo lo que hay en ella (memoria, tareas, dinero…). Los datos de este dispositivo se quedan aquí.")) return;
+  if (!window.confirm("Última confirmación: el otro dispositivo conserva sus datos, pero la copia de la nube no se puede recuperar. ¿Vaciar?")) return;
+  toast("Vaciando tu nube…");
+  try {
+    const s = await nubeSession();
+    const head = await remoteHead(nubeCfg(), s);
+    if (head) await remotePut(nubeCfg(), s, { data: erasedVault({ device: deviceName() }), baseRev: head.rev, device: deviceName() });
+    await nubeLeave();
+    nube.patch({ erasedNotice: { at: new Date().toISOString(), device: deviceName(), self: true } });
+    render(); toast("Tu nube está vacía. Este dispositivo conserva sus datos y se ha desconectado.");
+  } catch (err) { toast(err.code === "conflict" ? "El otro dispositivo acaba de subir cambios: vuelve a intentarlo." : syncErrorText(err)); }
 }
 
 async function nubeLeave() {
@@ -1514,6 +1536,31 @@ function setupCard() {
 const profileForm = (text) => `<form id="profileForm" class="stack"><label for="profileText" class="sr">Tu perfil</label><textarea id="profileText" rows="14" placeholder="Quién eres, cómo quieres que te hable MANU, tu día a día, lo que te importa…">${esc(text)}</textarea><div class="btns"><button class="btn" type="submit">Guardar</button><button class="btn ghost" type="button" data-act="profile-cancel">Cancelar</button></div></form>`;
 const backBar = (title) => `<button class="link" data-act="back">${I.back} Tú</button><h1>${title}</h1>`;
 
+// WEB-98: what of Manu's memory is in the cloud (counts only) and the switch to keep it per device.
+function nubeBrainCard() {
+  const inv = cloudInventory(vault);
+  const on = inv.brain;
+  return `<section class="card"><h2>Tu memoria en la nube</h2>
+    <div class="row"><div class="grow"><div>Memoria y estilo en Tu nube</div><div class="muted small">${on ? "El iPhone y el Mac comparten lo que MANU sabe de ti y cómo escribes." : "Cada dispositivo guarda su propia memoria; en la nube no hay ninguna."}</div></div><button class="check" data-act="nube-brain" aria-pressed="${on}" aria-label="Memoria y estilo en Tu nube">${I.check}</button></div>
+    ${on ? `<ul class="muted small cloud-inv">
+      <li>${inv.memories} recuerdo${inv.memories === 1 ? "" : "s"}${inv.decisions ? `, ${inv.decisions} decisi${inv.decisions === 1 ? "ón" : "ones"}` : ""}${inv.sensitive ? `, ${inv.sensitive} marcado${inv.sensitive === 1 ? "" : "s"} como sensible${inv.sensitive === 1 ? "" : "s"}` : ""}.</li>
+      ${inv.thirdParty ? `<li><b>${inv.thirdParty} sobre otras personas.</b> Viajan con el resto; revísalos en Memoria si no quieres que estén.</li>` : ""}
+      <li>Tu estilo: ${inv.styleMsgs} mensaje${inv.styleMsgs === 1 ? "" : "s"} contado${inv.styleMsgs === 1 ? "" : "s"}, ${inv.styleExpressions} expresi${inv.styleExpressions === 1 ? "ón" : "ones"} y ${inv.examples} ejemplo${inv.examples === 1 ? "" : "s"} corto${inv.examples === 1 ? "" : "s"} (los nombres, cifras y enlaces salen como «…»).</li>
+      <li>${inv.jokes} chiste${inv.jokes === 1 ? "" : "s"} tuyo${inv.jokes === 1 ? "" : "s"} y ${inv.expressions} expresi${inv.expressions === 1 ? "ón" : "ones"} que MANU usa.</li></ul>` : ""}
+    <p class="muted small">Lo que olvidas en Memoria (o «Olvidar lo observado» en Tu estilo) desaparece también de la nube en la siguiente sincronización, unos segundos después.</p>
+    <button class="btn ghost small-btn" data-sub-go="memoria">Revisar Memoria</button></section>`;
+}
+// WEB-98: security and deletion, stated as they are (no end-to-end encryption).
+function nubeSafetyCard(connected) {
+  return `<section class="card"><h2>Seguridad y borrado</h2><ul class="muted small">
+    <li><b>Protegido:</b> solo tu cuenta puede leer la fila (reglas RLS de la tabla) y viaja cifrado (HTTPS). Supabase dice cifrar sus discos (AES-256).</li>
+    <li><b>No es de extremo a extremo:</b> Supabase, como empresa, o quien entrase en tu panel de Supabase, podría leer tus datos.</li>
+    <li><b>Copias del proveedor:</b> según su web, el plan gratuito no hace copias automáticas, así que lo borrado no se puede recuperar de una copia suya (NO_VERIFICADO en tu proyecto).</li>
+    <li><b>Conflictos:</b> si eliges «Quedarme con este» en un dispositivo que aún tenía algo que olvidaste, vuelve a la nube.</li>
+    <li><b>Tu cuenta:</b> vaciar la nube no borra tu cuenta de Supabase (tu correo). Eso solo se hace desde su panel.</li></ul>
+    ${connected ? '<button class="btn danger small-btn" data-act="nube-erase">Vaciar mi nube…</button><p class="muted small">Borra lo que hay en la nube. Este dispositivo conserva sus datos y se desconecta; el otro, al verlo, también se desconecta sin borrar nada.</p>' : ""}</section>`;
+}
+
 const subpages = {
   permisos() {
     if (!capProbe) refreshCaps();
@@ -1757,10 +1804,13 @@ const subpages = {
           <p>${nube.running ? "Sincronizando…" : st.error ? esc(st.error) : st.dirty ? "Cambios pendientes de subir." : st.lastRev ? "Todo sincronizado." : "Conectado. Aún no hay nada en la nube ni nada que subir desde aquí: en cuanto apuntes algo, o conectes el dispositivo que tiene tus datos, se sincroniza."}</p>
           <p class="muted small">Cuenta: ${esc(st.email ?? "")}${st.lastAt ? ` · última vez ${esc(when(st.lastAt))}` : ""}${st.lastRev ? ` · versión ${esc(st.lastRev)}` : ""}</p>
           <div class="btns"><button class="btn" data-act="nube-sync">Sincronizar ahora</button><button class="btn ghost" data-act="nube-leave">Desconectar este dispositivo</button></div></section>
+        ${nubeBrainCard()}
+        ${nubeSafetyCard(true)}
         <section class="card"><h2>Cómo funciona</h2>${what}<ul class="muted small"><li>Solo tu cuenta puede leer tus datos en la nube. No van cifrados con una frase (lo elegiste así para no tener nada que recordar): Supabase, como empresa, técnicamente podría verlos.</li><li>Al cambiar algo, se sube en unos segundos. Al abrir MANU, se trae lo último del otro dispositivo.</li><li>Para entrar en otro dispositivo, te llega un código al correo.</li></ul></section>`;
     }
     const sent = Boolean(st.codeSentAt && st.email);
     return `${backBar("Tu nube")}
+      ${st.erasedNotice ? `<section class="card"><h2>Tu nube está vacía</h2><p class="muted small">${st.erasedNotice.self ? "La vaciaste desde este dispositivo" : `Se vació desde ${esc(st.erasedNotice.device ?? "otro dispositivo")}`} el ${esc(new Date(st.erasedNotice.at).toLocaleString("es-ES", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }))}. Los datos de este dispositivo siguen aquí. Si vuelves a entrar, se suben de nuevo.</p></section>` : ""}
       <section class="card"><h2>iPhone y Mac con los mismos datos</h2><p class="muted small">Tu propio Supabase (gratis). Entras con un enlace que te llega al correo: nada que recordar.</p>${what}</section>
       ${nube.handoff ? `<section class="card"><h2>📋 Tu código para MANU</h2><p class="muted small">Estás en Safari, no en la app. Copia este código, abre MANU desde tu pantalla de inicio y pégalo en Tú → Tu nube.</p><pre class="code">${esc(nube.handoff)}</pre><button class="btn block" data-act="nube-copy-handoff">Copiar código</button></section>` : ""}
       <section class="card"><h2>${sent ? "2. Abre el correo" : "1. Tu correo"}</h2>
@@ -3186,6 +3236,14 @@ document.addEventListener("click", async (e) => {
     case "nube-other": nube.patch({ codeSentAt: null }); render(); break;
     case "nube-copy-sql": navigator.clipboard?.writeText(SUPABASE_SQL).then(() => toast("SQL copiado: pégalo en Supabase → SQL Editor"), () => toast("No he podido copiarlo: ábrelo y cópialo a mano")); break;
     case "nube-sync": nubeSync({ manual: true }); break;
+    case "nube-brain": {
+      const on = !brainInCloud(vault);
+      if (!on && !window.confirm("¿Dejar tu memoria y tu estilo solo en cada dispositivo? Se quitan de la nube en la próxima sincronización y el iPhone y el Mac dejarán de compartirlos.")) break;
+      vault.settings.cloudBrain = on; persist(); render();
+      toast(on ? "Tu memoria y tu estilo viajarán en Tu nube" : "Tu memoria se queda en cada dispositivo; se quita de la nube al sincronizar");
+      break;
+    }
+    case "nube-erase": nubeErase(); break;
     case "nube-leave": if (window.confirm("¿Desconectar este dispositivo de tu nube? Tus datos se quedan aquí y en la nube.")) nubeLeave().then(() => { render(); toast("Desconectado"); }); break;
     case "nube-keep-local": nubeResolve("local"); break;
     case "nube-keep-remote": if (window.confirm("Se sustituyen los datos de este dispositivo por los de la nube. ¿Seguro?")) nubeResolve("remote"); break;
