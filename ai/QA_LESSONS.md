@@ -230,3 +230,9 @@ Regla: un commit en una rama que se va a publicar ejecuta `npm test` aunque sea 
 En WEB-95, el aprendizaje de una nota de proyecto leía `$("projText")` después de `updateProject()`, que guarda y vuelve a pintar la pantalla. El formulario ya no existía, la lectura fallaba dentro del `try` y no se aprendía nada, sin ningún error visible. Lo detectó la prueba de navegador; las pruebas unitarias del núcleo pasaban.
 
 Regla: en `app.js`, los valores de un formulario se leen a variables al principio del manejador, antes de `persist()`, `render()` o cualquier `update…()`. Cada aprendizaje conectado a la interfaz tiene una prueba e2e que comprueba que el dato llega a `localStorage`.
+
+### QAL-050 — Chromium sin interfaz siempre dice «denied» a los avisos
+
+En WEB-97, `Notification.permission` devolvía `denied` en Chromium sin interfaz incluso con `grantPermissions(["notifications"])`. Además, `grantPermissions` *sustituye* los permisos concedidos: tras conceder solo avisos, la geolocalización pasó a `denied` y desapareció su botón. La prueba fallaba por el entorno, no por la app.
+
+Regla: en las e2e, el aviso de permisos de iOS se simula de forma explícita y comentada (un `Notification` falso cuyo `requestPermission()` concede). `grantPermissions` se llama con la lista completa de permisos que deben seguir concedidos. Un estado de permiso del navegador de pruebas nunca se presenta como el de Safari: queda NO_VERIFICADO.

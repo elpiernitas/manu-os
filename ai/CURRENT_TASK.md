@@ -4,7 +4,7 @@ Status: **IN_PROGRESS**
 
 ## Tarea activa
 
-WEB-95 — aprender de ideas, decisiones, correcciones y conversaciones (`ai/HANDOFF.md`, «WEB-95»). Está en un PR en borrador. WEB-94 (Memoria) está fusionada (PR #97). Pendientes: WEB-93, banco con Enable Banking y Supabase; y WEB-96, modo amanecer, bloqueada hasta saber qué luces tiene Manu.
+WEB-97 — Centro de permisos y conexiones e integración con iOS (`ai/HANDOFF.md`, «WEB-97»). Está en un PR en borrador. WEB-95 está fusionada (PR #98). Pendientes: WEB-93, banco con Enable Banking y Supabase; y WEB-96, modo amanecer, bloqueada hasta saber qué luces tiene Manu.
 
 ## Autorización
 
@@ -55,6 +55,7 @@ WEB-95 — aprender de ideas, decisiones, correcciones y conversaciones (`ai/HAN
 - 2026-11-09 (mañana): Manu fusiona WEB-94 y encarga ampliar el aprendizaje a sus ideas, decisiones, correcciones y conversaciones dentro de MANU, incluidos su forma de expresarse, su humor y sus juegos de palabras. Sin inventar recuerdos ni convertir hipótesis en hechos, y sin datos sensibles ni servicios externos. Pide también añadir al backlog el modo amanecer (las luces están por confirmar), trabajar en una rama nueva, abrir un PR y dejar un informe. Se hace como WEB-95.
 - 2026-10-04: auditoría externa tras WEB-86: recomienda parar las funciones nuevas y probar en el iPhone real. Claude Code la verifica y abre WEB-87 (documentación al día, versión = número de tarea, excepción de cifrado de Tu nube escrita en el charter, ADR-0003 y threat model).
 - 2026-09-29: **cambio de gobernanza decidido por Manu.** El orquestador (ChatGPT/Codex) ya no revisa automáticamente, porque frenaba el avance. Claude Code fusiona los PR web cuando `npm test` y los dos workflows remotos están en verde y no hay conflictos. Cuando haga falta una revisión, Claude Code prepara un prompt, Manu se lo pasa a ChatGPT y le devuelve la respuesta; los defectos se corrigen en un PR nuevo con su regresión. Los PR #7, #8 y #9 siguen en borrador o pausa.
+- 2026-11-09 (tarde): Manu fusiona WEB-95 y encarga la «ampliación de visión»: auditar las capacidades reales de iOS y de la web, y un centro de permisos y conexiones gestionable desde el iPhone. Condiciones: sin permisos decorativos, sin rastreo publicitario, sin acceso masivo a datos privados, y MANU solo interactúa con él. Se hace como WEB-97.
 
 ## Alcance autorizado
 
