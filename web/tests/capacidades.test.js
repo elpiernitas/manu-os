@@ -71,7 +71,9 @@ test("connections reflect MANU's settings; nothing native or forbidden is offere
   const c = Object.fromEntries(items.map((x) => [x.id, x]));
   assert.equal(c.google.state, "on"); assert.match(c.google.detail, /calendar, gmail/);
   assert.equal(c.gemini.state, "on"); assert.equal(c.nube.state, "off"); assert.equal(c.estilo.state, "off");
-  assert.equal(c.banco.state, "pending"); assert.equal(c.push.state, "pending");
+  assert.equal(c.banco.state, "pending"); assert.equal(c.push.state, "off", "WEB-99: push is real now; off until Manu turns it on");
+  const pc = (push) => catalog({ push }).find((x) => x.id === "push").state;
+  assert.deepEqual([pc({ on: true, here: true }), pc({ on: true, here: false }), pc({ on: false })], ["on", "pending", "off"]);
   for (const x of items.filter((x) => x.route === "nativa" || x.route === "no")) { assert.ok(!x.action, `${x.id} has no action`); assert.ok(["unavailable", "never"].includes(x.state)); }
   assert.match(c.att.detail, /no lo usa ni lo usará/);
   assert.match(c.mensajes.detail, /nunca escribe a nadie/);

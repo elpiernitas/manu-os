@@ -1,9 +1,9 @@
 // Offline shell: every file of the app is cached.
-const VERSION = "manuos-v98";
+const VERSION = "manuos-v99";
 const SHELL = [
   "./", "index.html", "styles.css", "app.js", "manifest.webmanifest",
   "core/text.js", "core/money.js", "core/modes.js", "core/assistant.js",
-  "core/inbox.js", "core/refuge.js", "core/storage.js", "core/notify.js", "core/intake.js", "core/weather.js", "core/bank.js", "core/night.js", "core/life.js", "core/gcal.js", "core/google.js", "core/ai.js", "core/crypto.js", "core/spotify.js", "core/hub.js", "core/insights.js", "core/converse.js", "core/imagestore.js", "core/links.js", "core/projects.js", "core/scene.js", "core/gmail.js", "core/archive.js", "core/archivestore.js", "core/recall.js", "core/diary.js", "core/buzon.js", "core/backup-manager.js", "core/briefing.js", "core/budget.js", "core/find.js", "core/now.js", "core/captures.js", "core/autofile.js", "core/zipwrite.js", "core/contacts.js", "core/closing.js", "core/lowmode.js", "core/clock.js", "core/sync.js", "core/nudges.js", "core/commands.js", "core/split.js", "core/bankshot.js", "core/review.js", "core/docs.js", "core/library.js", "core/quickmoney.js", "core/bahia.js", "core/bahia-draw.js", "core/bahia-svg.js", "core/brain.js", "core/learn.js", "core/proposals.js", "core/conocernos.js", "core/voice.js", "core/memchat.js", "core/memview.js", "core/style.js", "core/topics.js", "core/capabilities.js", "core/cloudprivacy.js",
+  "core/inbox.js", "core/refuge.js", "core/storage.js", "core/notify.js", "core/intake.js", "core/weather.js", "core/bank.js", "core/night.js", "core/life.js", "core/gcal.js", "core/google.js", "core/ai.js", "core/crypto.js", "core/spotify.js", "core/hub.js", "core/insights.js", "core/converse.js", "core/imagestore.js", "core/links.js", "core/projects.js", "core/scene.js", "core/gmail.js", "core/archive.js", "core/archivestore.js", "core/recall.js", "core/diary.js", "core/buzon.js", "core/backup-manager.js", "core/briefing.js", "core/budget.js", "core/find.js", "core/now.js", "core/captures.js", "core/autofile.js", "core/zipwrite.js", "core/contacts.js", "core/closing.js", "core/lowmode.js", "core/clock.js", "core/sync.js", "core/nudges.js", "core/commands.js", "core/split.js", "core/bankshot.js", "core/review.js", "core/docs.js", "core/library.js", "core/quickmoney.js", "core/bahia.js", "core/bahia-draw.js", "core/bahia-svg.js", "core/brain.js", "core/learn.js", "core/proposals.js", "core/conocernos.js", "core/voice.js", "core/memchat.js", "core/memview.js", "core/style.js", "core/topics.js", "core/capabilities.js", "core/cloudprivacy.js", "core/push.js",
   "icons/icon-180.png", "icons/icon-192.png", "icons/icon-512.png",
 ];
 
@@ -55,4 +55,16 @@ self.addEventListener("notificationclick", (event) => {
     if (list[0]) { list[0].postMessage({ go }); return list[0].focus(); }
     return self.clients.openWindow(`./#ir=${go}`);
   }));
+});
+
+// WEB-99: a push from MANU's server (Declarative Web Push JSON). iOS 18.4+ may show it by itself;
+// otherwise the worker shows it here. Every push must show a notice (userVisibleOnly), so a
+// payload that cannot be read still shows the generic one. Never the server's text unless Manu
+// turned «Mostrar el texto» on (the server only has it then).
+self.addEventListener("push", (event) => {
+  let n = null;
+  try { n = event.data?.json()?.notification ?? null; } catch {}
+  const body = typeof n?.body === "string" && n.body.trim() ? n.body.slice(0, 160) : "Tienes un recordatorio en MANU";
+  const tag = typeof n?.tag === "string" ? n.tag.slice(0, 80) : "manu-push";
+  event.waitUntil(self.registration.showNotification("MANU", { body, tag, icon: "icons/icon-192.png", data: { go: "hoy" } }));
 });

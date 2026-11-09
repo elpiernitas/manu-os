@@ -1,7 +1,7 @@
 // WEB-98 — memoria y estilo en Tu nube: qué sube, qué baja, cómo se borra. Datos inventados.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { cloudPayload, applyRemote, erasedVault, isErased, cloudInventory, brainInCloud } from "../core/cloudprivacy.js";
+import { cloudPayload, applyRemote, erasedVault, isErased, cloudInventory, brainInCloud, claimCloud, intimate, applyTombstones } from "../core/cloudprivacy.js";
 import { maskExample, observeText, emptyStyle, surfaceForm, expressionCandidates, scrubStyle } from "../core/style.js";
 import { emptyBrain, remember, forget } from "../core/brain.js";
 import { emptyVault, validateVault } from "../core/storage.js";
@@ -35,7 +35,7 @@ test("what goes up: memory and style by default (Manu's decision), old examples 
   const p = cloudPayload(v);
   assert.equal(JSON.stringify(v), before, "never mutates the vault");
   assert.ok(brainInCloud(v));
-  assert.equal(p.brain.claims.length, 3);
+  assert.deepEqual(p.brain.claims.map((c) => c.id), ["c1", "c3"], "WEB-99: the memory about another person stays on the device unless authorized");
   assert.equal(p.brain.style.grams["que maquina"].ex, "ayer con … en el bar, qué máquina");
   assert.doesNotMatch(JSON.stringify(p), /Lucía/);
   assert.equal(scrubStyle(null), null);
@@ -50,8 +50,8 @@ test("memory kept per device: not uploaded, and the local one survives a downloa
   assert.ok(merged.ok);
   assert.equal(merged.vault.brain.claims.length, 3, "this device's memory is kept");
   assert.equal(merged.vault.inbox[0].id, "i9", "the rest comes from the cloud");
-  const on = { ...emptyVault(), brain: emptyBrain() };
-  assert.equal(applyRemote(on, v), on, "with memory in the cloud, the cloud copy wins as before");
+  const on = { ...emptyVault(), brain: { ...emptyBrain(), claims: [v.brain.claims[0]] } };
+  assert.deepEqual(applyRemote(on, { ...v, settings: {} }).brain.claims.map((c) => c.id), ["c1", "c2"], "with memory in the cloud, the cloud's wins and this device keeps its local-only memory (c2)");
 });
 
 test("forgetting a memory removes its text from what goes up", () => {
@@ -71,9 +71,53 @@ test("«Vaciar mi nube»: an empty, marked copy that no device applies over its 
 
 test("inventory: counts only, flags other people's data", () => {
   const inv = cloudInventory(vaultWithBrain());
-  assert.deepEqual([inv.brain, inv.memories, inv.thirdParty, inv.decisions, inv.styleMsgs, inv.examples], [true, 3, 1, 1, 3, 1]);
+  assert.deepEqual([inv.brain, inv.memories, inv.thirdParty, inv.localOnly, inv.decisions, inv.styleMsgs, inv.examples], [true, 2, 0, 1, 1, 3, 1]);
   assert.equal(inv.rest.tareas, 1);
   assert.doesNotMatch(JSON.stringify(inv), /café|Persona/);
   const off = cloudInventory({ ...vaultWithBrain(), settings: { cloudBrain: false } });
   assert.equal(off.brain, false); assert.equal(off.memories, 0);
+});
+
+// ---------------- WEB-99: selective sync and tombstones ----------------
+test("selective: conversations never go up, and come back from this device", () => {
+  const v = { ...vaultWithBrain(), chat: [{ from: "me", text: "conversación inventada" }], projects: [{ id: "p1", name: "Proyecto", sources: [], chat: [{ q: "pregunta inventada" }] }] };
+  const up = cloudPayload(v);
+  assert.ok(!("chat" in up)); assert.ok(!("chat" in up.projects[0]));
+  assert.doesNotMatch(JSON.stringify(up), /conversación inventada|pregunta inventada/);
+  const down = applyRemote({ ...up, projects: [{ id: "p1", name: "Proyecto (Mac)", sources: [] }] }, v);
+  assert.equal(down.chat[0].text, "conversación inventada"); assert.equal(down.projects[0].chat[0].q, "pregunta inventada"); assert.equal(down.projects[0].name, "Proyecto (Mac)");
+  assert.ok(validateVault(down).ok);
+});
+
+test("selective: other people's memories travel only if authorized, intimate ones never", () => {
+  const base = { id: "t", kind: "FACT", status: "ACTIVE", thirdParty: true };
+  assert.equal(claimCloud({ ...base, text: "A Persona Inventada le gusta el té" }).sync, false);
+  assert.equal(claimCloud({ ...base, text: "A Persona Inventada le gusta el té", cloud: true }).sync, true);
+  const intim = claimCloud({ ...base, text: "Persona Inventada está en el hospital", cloud: true });
+  assert.deepEqual([intim.sync, intim.canAuthorize], [false, false], "intimate: never, even if authorized");
+  for (const t of ["su novia", "le han despedido", "tiene ansiedad", "vota a alguien", "tiene deudas"]) assert.ok(intimate(t), t);
+  assert.ok(!intimate("le gusta el café"));
+  assert.equal(claimCloud({ id: "m", text: "Me gusta el mar", kind: "FACT", status: "ACTIVE" }).sync, true, "Manu's own memories travel");
+});
+
+test("tombstones: a memory forgotten on one device never comes back from the other's copy", () => {
+  const v = vaultWithBrain();
+  // iPhone forgets c1; the Mac still has it.
+  const iphone = { ...v, brain: forget(v.brain, "c1", { now: NOW }).brain };
+  assert.deepEqual(iphone.brain.forgotten.map((t) => t.id), ["c1"]);
+  assert.doesNotMatch(JSON.stringify(iphone.brain.forgotten), /café/, "a tombstone has no text");
+  const macCopy = cloudPayload(v);
+  // 1) iPhone downloads the Mac's older copy: c1 stays forgotten.
+  const down = applyRemote(macCopy, iphone);
+  assert.ok(!down.brain.claims.some((c) => c.id === "c1"));
+  assert.deepEqual(down.brain.forgotten.map((t) => t.id), ["c1"]);
+  // 2) Conflict «Quedarme con este» on the Mac: the iPhone's tombstones are applied before upload.
+  const iphoneUp = cloudPayload(iphone);
+  const macKeeps = { ...v, brain: applyTombstones(v.brain, iphoneUp.brain) };
+  assert.ok(!macKeeps.brain.claims.some((c) => c.id === "c1"));
+  assert.ok(!macKeeps.brain.events.some((e) => e.claimId === "c1"));
+  // 3) A local-only memory forgotten on the other device does not come back either.
+  const otherForgot = { ...macCopy, brain: { ...macCopy.brain, forgotten: [{ id: "c2", at: NOW.toISOString() }] } };
+  assert.ok(!applyRemote(otherForgot, v).brain.claims.some((c) => c.id === "c2"));
+  assert.ok(validateVault(down).ok);
 });

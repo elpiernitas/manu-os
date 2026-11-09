@@ -2,7 +2,8 @@
 
 ## Próximo paso vigente
 
-0. **WEB-98 (memoria y estilo en Tu nube, revisión de seguridad y borrado; investigación de avisos push):** PR abierto sin fusionar. Informe en `INFORME_WEB-98.md`. La propuesta de push (`docs/integrations/PUSH.md`) espera la autorización de Manu.
+0. **WEB-99 (avisos push; sincronización selectiva; lápidas):** PR abierto sin fusionar. Informe en `INFORME_WEB-99.md`. **Para activar los avisos falta un paso:** reactivar el proyecto Supabase, que está pausado. El entorno de Claude bloqueó esa acción y hace falta el permiso explícito de Manu. Después, `node tools/supabase/desplegar.mjs --aplicar --restaurar`.
+- (Anterior) **WEB-98 (memoria y estilo en Tu nube, revisión de seguridad y borrado; investigación de avisos push):** PR abierto sin fusionar. Informe en `INFORME_WEB-98.md`. La propuesta de push (`docs/integrations/PUSH.md`) espera la autorización de Manu.
 - (Anterior) **WEB-97 (Centro de permisos y conexiones, integración con iOS):** fusionada (PR #99). Informe en `INFORME_WEB-97.md`; auditoría con fuentes en `docs/integrations/IOS_CAPABILITIES.md`. WEB-95 ya está fusionada (PR #98).
 - (Anterior) **WEB-95 (aprender de ideas, decisiones y conversaciones):** PR en borrador. Informe en `INFORME_WEB-95.md`. WEB-94 (Memoria) ya está fusionada (PR #97). Sigue pendiente de Manu si la memoria debe quedar fuera de Tu nube.
 1. **WEB-87:** Manu prueba en su iPhone la lista de la sección «WEB-87». Lo que falle se arregla en esa misma tarea, con su regresión.
@@ -12,6 +13,50 @@
 ## Estado
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
+
+## WEB-99 — Avisos con MANU cerrada, sincronización selectiva y lápidas (2026-11-09)
+
+**Peticiones de Manu:**
+- Avisos push en su Supabase, con condiciones: plan gratuito, sin costes, dentro de cuota, sin texto personal por defecto, gestión completa desde MANU, RLS, claves privadas solo en el servidor, pruebas reales, sin duplicados, que se pueda desactivar todo y que los Recordatorios de iOS sigan como alternativa.
+- Sincronización selectiva: sin conversaciones completas ni datos íntimos de terceros.
+- Investigar el cifrado de extremo a extremo.
+- Que lo olvidado no reaparezca en un conflicto.
+- No tener que configurar Supabase a mano.
+
+**Verificado con la API de gestión de Supabase** (token de Manu inyectado por el proxy; solo lectura):
+- plan `free`;
+- sin complementos de pago;
+- **proyecto `INACTIVE` (pausado)**;
+- sin copias de seguridad ni PITR;
+- ninguna función desplegada.
+
+**Bloqueo:** al intentar reactivar el proyecto, el clasificador de permisos del entorno lo denegó («Modify Shared Resources»). No se ha esquivado. Queda pendiente del permiso de Manu.
+
+**Qué se ha hecho:**
+
+| Pieza | Qué hace |
+|---|---|
+| `supabase/functions/manu-push/webpush.js` | Cifrado RFC 8291 y VAPID RFC 8292 sin dependencias. Reproduce **byte a byte** el ejemplo del RFC 8291. |
+| `supabase/functions/manu-push/handler.js` + `index.ts` | Reclama los avisos con un DELETE … RETURNING (sin duplicados). Aviso genérico por defecto. Solo envía a servicios push reales. Borra las suscripciones con 404/410. Las claves se generan en el servidor. |
+| `supabase/migrations/` | Base idempotente (`manu_sync` y buzón) y push: RLS, límites y cron que solo llama a la función si hay algo pendiente. |
+| `tools/supabase/desplegar.mjs` + `audit.mjs` | Un solo comando: freno de facturación, reactivación opcional, auditoría de RLS, permisos y políticas antes y después, migraciones y despliegue. |
+| `web/core/push.js` + Tú → Avisos | Cola mínima: id opaco y hora, texto solo si se activa. Activar, quitar, «Desactivar en todos», «Probar» y «Comprobar la seguridad». |
+| `sw.js` | Evento `push`: muestra el aviso, genérico si no puede leer el contenido. |
+| `core/cloudprivacy.js` | Sincronización selectiva (sin chat, terceros con autorización, íntimos nunca) y lápidas (`applyTombstones`). |
+| `core/brain.js` | `forget` deja lápidas `{ id, at }` sin texto. |
+| Memoria | «Sincronizar entre mis dispositivos» o «Dejar solo en este dispositivo» por recuerdo de terceros. |
+| Docs | `PUSH.md` (verificación y activación), `E2E_CIFRADO.md` (propuesta WEB-100) y enmienda WEB-99 a ADR-0017. |
+
+**Comandos y resultados:**
+- `npm test`: 347 de 347. Nuevos: `webpush` (5), `push` (7), `supabase-audit` (3) y ampliación de `nube-privacidad` (+3).
+- e2e: `push.e2e.mjs` 18 de 18 y `nube.e2e.mjs` 25 de 25. Ambas con un Supabase **falso**: nada sale a la red.
+- `node tools/supabase/desplegar.mjs` (solo comprobación) contra el Supabase real: se detuvo correctamente en «INACTIVE».
+
+**NO_VERIFICADO:**
+- La función desplegada y el cron en el proyecto real.
+- Un aviso real en el iPhone.
+- `POST /v1/projects/{ref}/database/query` y `supabase functions deploy --use-api` contra este proyecto.
+- Si el cron cuenta como actividad para evitar la pausa.
 
 ## WEB-98 — Memoria y estilo en Tu nube; avisos con MANU cerrada (2026-11-09)
 

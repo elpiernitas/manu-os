@@ -242,3 +242,9 @@ Regla: en las e2e, el aviso de permisos de iOS se simula de forma explícita y c
 Tu nube sube y baja el vault como un único JSON. En WEB-98, dejar la memoria fuera de la subida sin más habría hecho que el otro dispositivo, al bajar esa copia sin `brain`, perdiera la suya. Lo mismo con «vaciar la nube»: una copia vacía aplicada como descarga normal habría borrado el otro dispositivo.
 
 Regla: toda exclusión o vaciado de una parte del documento sincronizado va en pareja con una regla de bajada (`applyRemote`, `isErased`). Cada una tiene una prueba e2e con dos dispositivos simulados que comprueba que los datos del otro dispositivo siguen intactos.
+
+### QAL-052 — Comprobar el estado real de la infraestructura antes de dar algo por funcionando
+
+En WEB-99, la API de gestión mostró que el proyecto Supabase de Tu nube llevaba un tiempo **pausado**: el plan gratuito pausa tras 1 semana sin actividad. Los documentos de WEB-98 daban por hecho que estaba activo por el uso diario (NO_VERIFICADO). Además, el `fetch` de Node ignora el proxy HTTPS del entorno salvo con `NODE_USE_ENV_PROXY=1`: sin él, la primera comprobación pareció un fallo de credenciales.
+
+Regla: antes de diseñar o activar algo sobre un servicio externo, se lee su estado real con una herramienta de solo lectura (plan, estado, complementos, copias) y se apunta el resultado con fecha. Las herramientas de despliegue se detienen solas si el estado no es el esperado.

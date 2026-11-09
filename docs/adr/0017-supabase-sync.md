@@ -84,3 +84,20 @@ El atajo del doble toque no puede abrir la app instalada. Por eso deja su línea
   - Postgres puede conservar versiones antiguas de la fila hasta que se compactan (MVCC/vacuum). Es TEÓRICAMENTE_POSIBLE y no es accesible por la API.
   - La cuenta de Supabase (correo) solo se borra desde el panel.
 - **Riesgo aceptado:** en un conflicto, elegir «Quedarme con este» en un dispositivo que aún tenía algo olvidado lo vuelve a subir.
+
+## Enmienda WEB-99 (2026-11-09): sincronización selectiva, lápidas y avisos push
+
+- **Selectiva (decisión de Manu):**
+  - Las conversaciones completas (`chat` y `projects[].chat`) no suben; cada dispositivo conserva las suyas.
+  - Los recuerdos `thirdParty` se quedan en el dispositivo salvo autorización individual (`claim.cloud`, desde Memoria).
+  - Los íntimos (salud, sexualidad, pareja, dinero, religión, política, justicia…) no suben nunca.
+  - Al bajar, `applyRemote` añade lo que el dispositivo guarda para sí.
+- **Lápidas:**
+  - `forget` añade `{ id, at }` a `brain.forgotten`, sin texto y con un máximo de 2000.
+  - Se aplican al bajar, al resolver un conflicto en cualquier dirección y antes de subir.
+  - Si una bajada quita algo que la nube aún tiene, se vuelve a subir enseguida. Lo olvidado no reaparece.
+  - Límite: cubre la memoria. Las demás listas (tareas…) siguen la versión elegida en el conflicto.
+- **Copias del proveedor:** verificado por la API de gestión que el proyecto no tiene copias (`backups: []`) ni PITR.
+- **Push:** tablas nuevas con RLS (`docs/integrations/PUSH.md`). Las claves privadas solo las lee `service_role`.
+- **Despliegue sin SQL a mano:** `supabase/migrations/` (idempotentes) y `tools/supabase/desplegar.mjs`, con freno de facturación y auditoría de seguridad antes y después.
+- **Cifrado de extremo a extremo:** sigue sin existir; está propuesto en `docs/integrations/E2E_CIFRADO.md`.

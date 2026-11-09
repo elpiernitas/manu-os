@@ -7,6 +7,7 @@ import { QUESTIONS, progress } from "./conocernos.js";
 import { featureText } from "./learn.js";
 import { HUMOR_LABEL, FRANQUEZA_LABEL, WHEN, JOKE_KINDS, line } from "./voice.js";
 import { styleSummary } from "./style.js";
+import { claimCloud } from "./cloudprivacy.js";
 import { CATEGORIES } from "./money.js";
 
 const ESC = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
@@ -62,9 +63,12 @@ function detail(brain, id, ui, now) {
     c.confidence != null && ["Confianza", `${Math.round(c.confidence * 100)} % — ${c.reason}`],
     ["Apuntado", day(c.recordedAt)], c.confirmedAt && ["Confirmado", day(c.confirmedAt)], c.validUntil && ["Válido hasta", day(c.validUntil)],
     st.stale && ["Vigencia", `Hace ${st.ageDays} días que no lo confirmas`], c.sensitive && ["Privacidad", "Sensible: no sale en avisos ni en pantallas bloqueadas"],
+    ["Tu nube", claimCloud(c).why],
   ].filter(Boolean);
+  const cc = claimCloud(c);
+  const cloudBtn = cc.canAuthorize ? `<button class="btn ghost small" data-act="mem-cloud" data-id="${esc(id)}" data-on="${c.cloud === true ? "0" : "1"}">${c.cloud === true ? "Dejar solo en este dispositivo" : "Sincronizar entre mis dispositivos"}</button>` : "";
   return `<section class="card mem-detail" aria-label="Detalle del recuerdo"><div class="row"><h2 class="grow">${esc(c.text)}</h2><button class="link small" data-act="mem-open" data-id="">Cerrar</button></div>
-    <dl class="mem-dl">${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl>
+    <dl class="mem-dl">${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl>${cloudBtn ? `<div class="btns">${cloudBtn}</div>` : ""}
     ${ui.correcting === id ? `<form class="stack" id="memCorrectForm" data-id="${esc(id)}"><label for="memCorrectText" class="small muted">Cómo es en realidad</label><textarea id="memCorrectText" rows="3" maxlength="600" required>${esc(c.text)}</textarea><div class="btns"><button class="btn" type="submit">Guardar corrección</button><button class="btn ghost" type="button" data-act="mem-correct" data-id="">Cancelar</button></div><p class="small muted">La versión anterior no se borra: queda en el historial como sustituida.</p></form>`
       : `<div class="btns">${live && (c.status === "PROPOSED" || st.stale) ? `<button class="btn small" data-act="mem-confirm" data-id="${esc(id)}">${c.status === "PROPOSED" ? "Es verdad" : "Sigue así"}</button>` : ""}${c.status === "PROPOSED" ? `<button class="btn ghost small" data-act="mem-reject" data-id="${esc(id)}">No es verdad</button>` : ""}${live ? `<button class="btn ghost small" data-act="mem-correct" data-id="${esc(id)}">Corregir</button><button class="btn ghost small" data-act="mem-expire" data-id="${esc(id)}">Ya no es así</button>` : ""}<button class="link small danger-link" data-act="mem-forget" data-id="${esc(id)}">Olvidar para siempre</button></div>`}
     ${h.length > 1 ? `<h3 class="small muted">Historial</h3><ol class="mem-hist">${h.map((x) => `<li${x.id === id ? ' aria-current="true"' : ""}><b>${esc(x.text)}</b> <span class="muted small">${esc(STATUS_LABEL[x.status])} · ${day(x.recordedAt)}${x.validUntil ? ` → ${day(x.validUntil)}` : ""}</span></li>`).join("")}</ol>` : ""}

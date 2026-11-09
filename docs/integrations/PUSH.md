@@ -1,8 +1,55 @@
 # Avisos con MANU cerrada (push) — investigación WEB-98
 
-Estado: **PROPUESTA, sin implementar.** Hace falta la autorización de Manu para activar algo en Supabase.
+Estado (WEB-99): **IMPLEMENTADO y probado en local; PENDIENTE DE ACTIVAR.**
+- Manu lo autorizó el 2026-11-09, siempre que fuera en el plan gratuito, sin costes y dentro de cuota. Ver la sección 0.
+- El proyecto de Supabase está **pausado**, y reactivarlo requiere un permiso que el entorno de Claude no concedió automáticamente.
 
 Etiquetas: VERIFICADO, TEÓRICAMENTE_POSIBLE, NO_VERIFICADO, DECIDIDO. Nada de esto se ha probado en el iPhone de Manu.
+
+## 0. Verificación real (2026-11-09, API de gestión de Supabase, solo lectura)
+
+| Comprobación | Resultado |
+|---|---|
+| Plan de la organización «Manu» | `free` |
+| Complementos de pago (`billing/addons`) | ninguno |
+| Proyecto `manu-os` (eu-west-1, Postgres 17) | **`INACTIVE` (pausado por inactividad)** |
+| Copias de seguridad y PITR | `backups: []`, `pitr_enabled: false` |
+| Funciones desplegadas | ninguna |
+| Cuotas del plan gratuito ([precios](https://supabase.com/pricing)) | 500.000 invocaciones de funciones al mes, 500 MB de base de datos, 5 GB de tráfico; pausa tras 1 semana sin actividad; 2 proyectos activos (Manu tiene 1) |
+| Riesgo de facturación | **Ninguno detectado:** plan gratuito y sin complementos |
+
+La auditoría de RLS, permisos y políticas (`tools/supabase/audit.mjs`) necesita el proyecto activo. La ejecuta `desplegar.mjs` antes y después de cualquier cambio, y se detiene si encuentra algo.
+
+## 0.1 Cómo se activa (un comando, sin SQL a mano)
+
+```sh
+node tools/supabase/desplegar.mjs                       # comprueba: no cambia nada
+node tools/supabase/desplegar.mjs --aplicar --restaurar # reactiva, audita, migra, despliega, vuelve a auditar
+```
+
+El comando se detiene si el plan no es `free`, si hay complementos de pago o si la auditoría falla. Después, en MANU: Tú → Avisos → «Activar en este dispositivo».
+
+## 0.2 Qué hay implementado
+
+- **`supabase/migrations/20261109120000_push.sql`:**
+  - tablas `manu_push_subs` y `manu_push_queue`, con RLS por `auth.uid()`;
+  - las claves VAPID y el token del cron, solo para el servidor;
+  - límites de 100 avisos y 5 dispositivos;
+  - endpoints solo de servicios push;
+  - cron cada minuto que **solo llama a la función si hay algo pendiente**.
+- **`supabase/functions/manu-push/`:**
+  - cifrado RFC 8291 y VAPID RFC 8292, sin dependencias y probados contra el ejemplo del RFC;
+  - claves VAPID generadas en el servidor;
+  - cada aviso se **reclama** con un único DELETE … RETURNING, así que no hay duplicados;
+  - aviso genérico por defecto;
+  - las suscripciones con 404/410 se borran.
+- **App** (Tú → Avisos):
+  - activar o quitar en este dispositivo;
+  - «Desactivar en todos»;
+  - «Mostrar el texto» (apagado por defecto);
+  - «Probar»;
+  - «Comprobar la seguridad de mi nube», que lee y nunca escribe;
+  - «Al iPhone» sigue como alternativa.
 
 ## 1. Qué hace falta de verdad
 

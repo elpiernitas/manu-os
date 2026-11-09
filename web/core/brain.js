@@ -46,6 +46,7 @@ export function validateBrain(b) {
 }
 
 const iso = (d) => new Date(d).toISOString();
+export const MAX_TOMBSTONES = 2000;
 const defaultId = () => (globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : `m-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`);
 const clean = (t) => String(t ?? "").replace(/\s+/g, " ").trim().slice(0, MAX_TEXT);
 export const keyOf = (t) => normalise(String(t ?? "")).replace(/[^a-z0-9ñ ]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 80) || null;
@@ -201,6 +202,9 @@ export function forget(brain, id, { now = new Date() } = {}) {
   while (changed) { changed = false; for (const x of brain.claims) if (!chain.has(x.id) && ((x.supersededBy && chain.has(x.supersededBy)) || (x.supersedes && chain.has(x.supersedes)))) { chain.add(x.id); changed = true; } }
   const next = { ...brain, claims: brain.claims.filter((x) => !chain.has(x.id)), events: brain.events.filter((e) => !chain.has(e.claimId)) };
   next.events.push({ type: "forget", at: iso(now), count: chain.size });
+  // WEB-99: a «lápida» per forgotten id (no text, only the random id and the date), so a sync
+  // conflict cannot bring the memory back from the other device's older copy.
+  next.forgotten = [...(brain.forgotten ?? []), ...[...chain].map((cid) => ({ id: cid, at: iso(now) }))].slice(-MAX_TOMBSTONES);
   // Learned rules or proposals that pointed to the forgotten claims are dropped too.
   next.outcomes = Object.fromEntries(Object.entries(brain.outcomes ?? {}).filter(([k]) => ![...chain].some((cid) => k.includes(cid))));
   return { brain: next, removed: chain.size };
