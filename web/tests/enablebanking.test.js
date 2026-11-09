@@ -63,7 +63,7 @@ test("browser adapter sends only an authenticated action to our Supabase", async
 
 test("bank UI escapes bank-provided text, does not claim an unverified connection", () => {
   const noSession = bankAisCard({ checked: false }, false);
-  assert.match(noSession, /Conecta Tu nube/);
+  assert.match(noSession, /Tú → Tu nube/);
   const html = bankAisCard({ checked: true, connected: true, index: 0, accounts: [{ index: 0, label: "<img src=x onerror=alert(1)>", currency: "EUR" }], transactions: [{ description: "<script>alert(1)</script>", amount: "12", currency: "EUR", date: "2026-11-09", direction: "debit" }] }, true);
   assert.doesNotMatch(html, /<script>|<img/);
   assert.match(html, /&lt;script&gt;/);
