@@ -49,6 +49,7 @@ import { toAsk, equalSplit, detailSplit, debts, settleAll, debtLine, reminderTex
 import { buildBankShotsPayload, parseBankShots, alreadyThere, MAX_SHOTS } from "./core/bankshot.js";
 import { incomeKind } from "./core/bank.js";
 import { fableIcon, fableMark } from "./design/fable-icons.js";
+import { fableHoyIntro, fableHoyServices } from "./design/fable-today.js";
 import { nightReview, weekReview, nightDue, weekDue } from "./core/review.js";
 import { KINDS as DOC_KINDS, daysLeft, expiringSoon, leftText, buildDocPayload, parseDocReply, isDocQuestion, answerDoc, DOC_LIMIT } from "./core/docs.js";
 import { LIB_KINDS, STATUSES, newItem, setStatus, ideasPayload, parseIdeas, isLibraryQuestion, answerLibrary } from "./core/library.js";
@@ -67,7 +68,7 @@ import { removeJoke } from "./core/voice.js";
 import { memoriaPage, hoyMemCard } from "./core/memview.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "101"; // = número de la última tarea WEB publicada (desde WEB-87)
+export const APP_VERSION = "102"; // = número de la última tarea WEB publicada (desde WEB-87)
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -1437,13 +1438,29 @@ const screens = {
     const next = agendaToday() ? nextEvent(vault.agenda) : null;
     const rems = vault.reminders.filter((r) => !r.done && dayKey(new Date(r.at)) === localDay()).sort((a, b) => (a.at < b.at ? -1 : 1));
     const bdays = upcomingBirthdays(vault.people, today(), 7);
-    return `<h1>${greeting()}, Manu</h1><p class="subtitle">${esc(longDate())} · <span class="chip">${esc(MODE_TITLES[m.mode])}</span> · <button class="link small" data-tab="agenda">Agenda</button></p>
-      <div class="stack">
+    const city = activeCity();
+    const actualWeather = vault.weather?.city?.name === city.name ? vault.weather.data : null;
+    const cloudState = nube.state;
+    return `<div class="fable-hoy">
+      ${fableHoyIntro({
+        greeting: greeting(), date: longDate(), mode: MODE_TITLES[m.mode],
+        city: city.name, weather: actualWeather,
+        next: next ? { time: next.time, title: next.title } : null,
+        tasks: open.length, reminders: rems.length,
+      })}
+      <div class="ft-work stack">
       ${morningLaunch ? `<section class="card morning-hello"><h2>☀️ ${esc(greeting())}, Manu</h2><p class="muted small">Toca y te leo el día en voz alta.</p><div class="btns"><button class="btn" data-act="speak-day">🔊 Léemelo</button><button class="link small" data-act="morning-dismiss">Ahora no</button></div></section>` : ""}
       ${gentleCard()}
       ${vault.brain || vault.spending.length ? hoyMemCard(topProposal(brain(), { spending: vault.spending, projects: vault.projects, now: new Date() })) : ""}
       <button class="cmdk-pill glass" data-act="cmdk" aria-label="Comando rápido">⚡ <span>Haz algo rápido…</span></button>
       ${nowCard()}
+      ${fableHoyServices({
+        cloud: { signedIn: nubeOn(), conflict: Boolean(cloudState.conflict), dirty: Boolean(cloudState.dirty), error: Boolean(cloudState.error), lastAt: cloudState.lastAt },
+        push: { enabled: pushPrefs().on, here: Boolean(pushDev.v.endpoint), error: Boolean(pushUi.msg) },
+        bank: { connected: false, available: false },
+      })}
+      ${!actualWeather ? weatherCard() : ""}
+      <div class="ft-section-label ft-rest-label">Tu día <span>Lo importante, a tu ritmo</span></div>
       ${clockCard()}
       ${toAsk(vault.spending, today()).length || splitDraft ? splitAskCard() : ""}
       ${(() => { const due = fixedIncomeStatus(vault.settings.fixedIncome, vault.income, today()).filter((x) => x.due); return due.length ? `<section class="card"><h2>💶 ¿Ha llegado?</h2>${due.map(({ f }) => `<div class="row"><span class="grow">${esc(f.name)} · ${esc(euros(f.cents))}</span><button class="btn small-btn" data-act="fixed-got" data-id="${esc(f.id)}">Sí</button></div>`).join("")}</section>` : ""; })()}
@@ -1453,11 +1470,9 @@ const screens = {
       ${docsSoonCard()}
       ${briefingCard()}
       ${nightCard()}
-      ${weatherCard()}
       ${backupNudge()}
       ${mailCards()}
       ${googleOn("gmail") && vault.mail?.important?.length ? `<section class="card"><h2>${I.mail} ${vault.mail.important.length} correo${vault.mail.important.length === 1 ? "" : "s"} importante${vault.mail.important.length === 1 ? "" : "s"}</h2>${vault.mail.important.slice(0, 3).map((x) => `<a class="row" href="${esc(messageUrl(x.id))}" target="_blank" rel="noopener"><div class="grow"><div>${esc(x.name)}</div><div class="muted small">${esc(x.subject || "(sin asunto)")}</div></div></a>`).join("")}<button class="link small" data-sub-go="correo">Ver todo el correo</button></section>` : ""}
-      ${next || agendaToday() ? `<section class="card"><h2>Próximo</h2>${next ? `<div class="row"><span class="chip num">${esc(next.time)}</span><span class="grow">${esc(next.title)}</span></div>` : '<p class="muted">No te queda nada más hoy.</p>'}</section>` : ""}
       ${rems.length ? `<section class="card"><h2>${I.bell} Recordatorios de hoy</h2>${rems.map(reminderRow).join("")}</section>` : ""}
       ${inbox.length ? `<section class="card"><h2>Bandeja · ${inbox.length}</h2>${inbox.map((c) => `<div class="stack"><div>${esc(c.text)}</div><div class="btns">
           <button class="btn" data-act="task" data-id="${esc(c.id)}">Tarea</button><button class="btn ghost" data-act="idea" data-id="${esc(c.id)}">Idea</button><button class="btn ghost" data-act="forget" data-id="${esc(c.id)}">No recuerdo</button></div></div>`).join("")}</section>` : ""}
@@ -1465,7 +1480,7 @@ const screens = {
       <section class="card"><div class="row"><h2>Tareas</h2>${addLink("TASK")}</div>${open.length ? open.slice(0, 5).map(taskRow).join("") + (open.length > 5 ? `<p class="muted small">Y ${open.length - 5} más en Agenda.</p>` : "") : '<p class="muted">Nada pendiente. Toca «Añadir» o díselo a MANU.</p>'}</section>
       ${bdays.length ? `<section class="card"><h2>${I.people} Cumpleaños</h2>${bdays.map((b) => { const wa = b.days === 0 ? whatsappUrl(b.person.phone, `¡Feliz cumpleaños, ${b.person.name.split(" ")[0]}! 🎉`) : null; return `<div class="row"><span class="grow">${esc(b.person.name)}</span>${wa ? `<a class="btn" href="${esc(safeHref(wa))}" target="_blank" rel="noopener">Felicitar por WhatsApp</a>` : `<span class="muted">${b.days === 0 ? "¡Hoy!" : b.days === 1 ? "Mañana" : (b.days === 1 ? "Mañana" : `En ${b.days} días`)}</span>`}</div>`; }).join("")}</section>` : ""}
       <section class="card"><div class="row"><h2>Este mes</h2><button class="link small" data-tab="dinero">Ver dinero</button></div><div class="big-money">${euros(month.total)}</div></section>
-      </div>`;
+      </div></div>`;
   },
   agenda() {
     const open = tasks(vault.inbox);
