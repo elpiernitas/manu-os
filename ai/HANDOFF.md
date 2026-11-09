@@ -1,5 +1,9 @@
 # HANDOFF
 
+## QA real en iPhone — Fable, chat y Dinero (2026-11-09)
+
+Manu aportó capturas reales de las seis secciones. Rama `chatgpt/ios-screenshot-qa-108`: el puente bancario sin desplegar ahora muestra un aviso honesto cuando falla la comprobación del servidor (404/503); bienvenida de MANU coherente con Gemini activo o desactivado; barra superior opaca al desplazarse para evitar títulos borrosos en Safari; total de gastos marcado explícitamente como datos locales de MANU, no saldo Sabadell. Pruebas `web/tests/ios-screenshot-qa.test.js`; documentación `docs/design/IPHONE_SCREENSHOT_QA.md`. Sin acceso bancario real ni cambios en Supabase. **NO_VERIFICADO:** nueva captura de la cabecera en iPhone después del CSS.
+
 ## WEB-93c · Sabadell solo lectura preparado (ChatGPT, 2026-11-09)
 
 Rama `chatgpt/web-93c-bank-staging`, basada en Fable fase 2 ya fusionada. Integra el código servidor de Enable Banking AIS desde #104 y su vista optativa en Dinero, sin borrar el nuevo Hoy de Fable. La sesión bancaria y el state permanecen en backend; las vistas de Hoy/Dinero solo afirman conexión cuando el servidor la confirme. Sin pagos, sin importación automática, sin uso de claves reales, sin despliegue Supabase ni activación bancaria; la publicación del frontend sin claves se puede fusionar por separado.

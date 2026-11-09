@@ -102,7 +102,9 @@ textarea { resize: vertical; }
 @media (prefers-reduced-transparency: reduce) { .glass { background: var(--glass-strong); -webkit-backdrop-filter: none; backdrop-filter: none; } }
 
 .topbar { position: fixed; top: 0; left: 0; right: 0; z-index: 9; padding: calc(env(safe-area-inset-top, 0px) + 10px) 16px 10px; text-align: center; font-weight: 600; font-size: 17px; border-radius: 0; border-width: 0 0 1px; opacity: 0; pointer-events: none; transition: opacity .2s; }
-.topbar.show { opacity: 1; }
+/* Screenshot QA, iOS: the glass toolbar blurred headings beneath it and could soften its label.
+   Keep other glass surfaces unchanged; give this compact navigation header an opaque backing. */
+.topbar.show { opacity: 1; background: rgba(8, 11, 17, .97); -webkit-backdrop-filter: none; backdrop-filter: none; color: #f7f8fa; }
 
 .tabbar { position: fixed; z-index: 10; left: max(12px, calc(50% - 260px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 10px); width: min(calc(100% - 24px - var(--tabbar-h) - 10px), 446px); height: var(--tabbar-h); border-radius: 999px; padding: 6px; display: grid; grid-template-columns: repeat(6, 1fr); }
 .tab { border: 0; background: none; border-radius: 999px; display: grid; justify-items: center; align-content: center; gap: 2px; color: var(--muted); font-size: 10.5px; font-weight: 600; cursor: pointer; }
