@@ -48,5 +48,5 @@ test("iOS scroll header is readable over content and money total is labeled corr
   assert.match(css, /\.topbar\.show \{[^}]*background: rgba\(8, 11, 17, \.97\)/);
   assert.match(css, /\.topbar\.show \{[^}]*-webkit-backdrop-filter: none/);
   assert.match(app, /Gastos registrados en MANU, no es el saldo de Sabadell/);
-  assert.match(sw, /const VERSION = "manuos-v104"/);
+  assert.match(sw, /const VERSION = "manuos-v\d+"/); // the exact number is checked against APP_VERSION in sw-shell.test.js
 });
