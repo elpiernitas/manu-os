@@ -12,7 +12,7 @@ const brain = { schema: 1, claims: [
   { id: "c2", text: "A Persona Inventada le gusta el té", kind: "FACT", status: "ACTIVE", subject: "Persona Inventada", thirdParty: true, tags: [], sensitive: true, source: { kind: "manu" }, recordedAt: "2026-11-08T09:00:00.000Z", validFrom: "2026-11-08T09:00:00.000Z", confirmedAt: "2026-11-08T09:00:00.000Z" }],
   events: [], learn: { obs: {}, rules: [] }, outcomes: {}, answers: {}, voice: { humor: 1, franqueza: 1, examples: [], jokes: [] }, settings: { maxPerDay: 3 },
   style: { on: true, msgs: 3, days: ["2026-11-08"], grams: { "que maquina": { n: 3, days: ["2026-11-08"], ex: "ayer con Lucía en el bar, qué máquina" } }, laugh: {}, emoji: {}, emojiMsgs: 0, decided: {}, since: "2026-11-08T09:00:00.000Z" }, topics: null };
-const seed = { schema: 1, settings: {}, inbox: [{ id: "i1", text: "Tarea inventada", kind: "TASK", at: "2026-11-08T09:00:00.000Z" }], chat: [], income: [], spending: [], projects: [], reminders: [], brain };
+const seed = { schema: 1, settings: {}, inbox: [{ id: "i1", text: "Tarea inventada", kind: "TASK", at: "2026-11-08T09:00:00.000Z" }], chat: [{ id: "m1", from: "me", text: "Conversación inventada que no debe subir", at: "2026-11-08T09:00:00.000Z" }], income: [], spending: [], projects: [], reminders: [], brain };
 
 // The fake cloud: one row, with the same rev rule as PostgREST + RLS (PATCH only at the expected rev).
 const cloud = { row: { rev: 1, device: "Mac", updated_at: "2026-11-08T09:00:00Z", data: seed }, puts: [] };
@@ -47,11 +47,13 @@ const { ctx, page, errors } = await device();
 const vault = () => page.evaluate(() => JSON.parse(localStorage.getItem("manuos.vault")));
 const nubeState = () => page.evaluate(() => [JSON.parse(localStorage.getItem("manuos.nube") || "{}"), localStorage.getItem("manuos.nube.token")]);
 const shot = async (n) => { if (out) await page.screenshot({ path: `${out}/${n}.png` }); };
+let v;
 const syncNow = async () => { await page.click('[data-act="nube-sync"]'); await page.waitForTimeout(500); };
 
 await page.click('[data-sub="nube"]'); await page.waitForTimeout(300);
 let text = await page.textContent("#screen");
-ok("Tu nube shows the memory in counts: 2 memories, 1 about another person", /2 recuerdos/.test(text) && /1 sobre otras personas/.test(text));
+ok("Tu nube counts: 1 memory travels, 1 about another person stays on this device", /1 recuerdo\b/.test(text) && /1 sobre otras personas solo en este dispositivo/.test(text));
+ok("…and says conversations do not go up", /Tus conversaciones .* no suben/.test(text));
 ok("states honestly that it is not end-to-end encrypted", /No es de extremo a extremo/.test(text));
 ok("the inventory never shows the memories' text", !/café solo|le gusta el té/.test(text));
 await shot("01-nube");
@@ -61,7 +63,8 @@ await page.click('[data-act="nube-brain"]'); await page.waitForTimeout(200); // 
 await page.click('[data-act="nube-brain"]'); await page.waitForTimeout(200); // back on
 await syncNow();
 let up = cloud.puts.at(-1);
-ok("memory and style go up with the vault", up?.brain?.claims?.length === 2 && up.brain.style.grams["que maquina"]);
+ok("memory and style go up, without the memory about another person", up?.brain?.claims?.map((c) => c.id).join() === "c1" && up.brain.style.grams["que maquina"]);
+ok("the conversation never goes up", !("chat" in up) && !JSON.stringify(up).includes("Conversación inventada"));
 ok("the old style example goes up masked (no name)", up.brain.style.grams["que maquina"].ex === "ayer con … en el bar, qué máquina" && !JSON.stringify(up).includes("Lucía"));
 
 // Switch off: the next upload has no memory; this device keeps it.
@@ -76,17 +79,46 @@ ok("the card says each device keeps its own", /Cada dispositivo guarda su propia
 // The other device uploads a change (without memory): this one downloads it and keeps its memory.
 cloud.row = { ...cloud.row, rev: cloud.row.rev + 1, device: "Mac", data: { ...up, inbox: [...up.inbox, { id: "i2", text: "Tarea del Mac", kind: "TASK", at: "2026-11-09T09:00:00.000Z" }] } };
 await syncNow();
-let v = await vault();
+v = await vault();
 ok("download from the Mac: the new task arrives, the memory stays", v.inbox.some((x) => x.id === "i2") && v.brain?.claims?.length === 2);
 
 // Back on and «Vaciar mi nube».
 await page.click('[data-act="nube-brain"]'); await page.waitForTimeout(200); await syncNow();
-ok("switched on again: the memory goes back up", cloud.puts.at(-1)?.brain?.claims?.length === 2);
+ok("switched on again: the memory goes back up", cloud.puts.at(-1)?.brain?.claims?.length === 1);
+ok("the local-only memory survived all of it", (await vault()).brain.claims.some((c) => c.id === "c2"));
+
+// Authorize the memory about another person from Memoria: it travels from now on.
+await page.click('[data-act="back"]'); await page.click('[data-sub="memoria"]'); await page.waitForTimeout(300);
+await page.click('[data-act="mem-open"][data-id="c2"]'); await page.waitForTimeout(200);
+ok("Memoria explains where it lives", /solo en este dispositivo salvo que lo autorices/.test(await page.textContent("#screen")));
+await page.click('[data-act="mem-cloud"][data-id="c2"]'); await page.waitForTimeout(200);
+await page.click('[data-act="back"]').catch(() => {}); await page.waitForTimeout(100);
+await page.click('[data-sub="nube"]'); await page.waitForTimeout(200); await syncNow();
+ok("authorized: it travels between devices", cloud.puts.at(-1)?.brain?.claims?.some((c) => c.id === "c2"));
+
+// A conversation on this device (it must never go up, and must survive downloads).
+await page.click('[data-tab="manu"]'); await page.fill("#msg", "hola, esto es una conversación inventada"); await page.press("#msg", "Enter"); await page.waitForTimeout(400);
+await page.click('[data-tab="tu"]'); await page.click('[data-sub="nube"]'); await page.waitForTimeout(200);
+// Conflict: the iPhone forgets c1 while the Mac uploads a change that still has it.
+await page.click('[data-act="back"]'); await page.click('[data-sub="memoria"]'); await page.waitForTimeout(300);
+await page.click('[data-act="mem-open"][data-id="c1"]'); await page.waitForTimeout(200);
+await page.click('[data-act="mem-forget"][data-id="c1"]'); await page.waitForTimeout(300);
+const macUp = { ...cloud.row.data, inbox: [...cloud.row.data.inbox, { id: "i3", text: "Otra tarea del Mac", kind: "TASK", at: "2026-11-09T09:30:00.000Z" }] };
+cloud.row = { ...cloud.row, rev: cloud.row.rev + 1, device: "Mac", data: { ...macUp, brain: { ...macUp.brain, claims: [brain.claims[0], ...macUp.brain.claims.filter((c) => c.id !== "c1")] } } };
+await page.click('[data-act="back"]').catch(() => {}); await page.click('[data-sub="nube"]'); await page.waitForTimeout(200); await syncNow();
+ok("a real conflict is offered", (await page.locator('[data-act="nube-keep-local"]').count()) === 1);
+const chatBefore = JSON.stringify((await vault()).chat);
+await page.click('[data-act="nube-keep-remote"]'); await page.waitForTimeout(600);
+v = await vault();
+ok("«Traer la de la nube»: the Mac's task arrives but the forgotten memory does not come back", v.inbox.some((x) => x.id === "i3") && !v.brain.claims.some((c) => c.id === "c1"));
+ok("…and this device's conversation is exactly as it was (the cloud has none)", JSON.parse(chatBefore).length > 0 && JSON.stringify(v.chat) === chatBefore);
+await syncNow();
+ok("after the conflict, the cloud copy has no forgotten memory either", !cloud.row.data.brain.claims.some((c) => c.id === "c1") && cloud.row.data.brain.forgotten.some((t) => t.id === "c1"));
 await page.click('[data-act="nube-erase"]'); await page.waitForTimeout(600);
 ok("«Vaciar mi nube» leaves an empty, marked copy in the cloud", cloud.row.data.erased && cloud.row.data.inbox.length === 0 && !cloud.row.data.brain && !JSON.stringify(cloud.row.data).includes("Tarea"));
 const [st, token] = await nubeState();
 v = await vault();
-ok("this device keeps its data and is disconnected", v.inbox.length === 2 && v.brain.claims.length === 2 && token === null && st.erasedNotice?.self === true);
+ok("this device keeps its data and is disconnected", v.inbox.length === 3 && v.brain.claims.length === 1 && token === null && st.erasedNotice?.self === true);
 ok("the page says the cloud is empty", /Tu nube está vacía/.test(await page.textContent("#screen")));
 await shot("02-vaciada");
 

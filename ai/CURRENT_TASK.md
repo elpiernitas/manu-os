@@ -4,7 +4,7 @@ Status: **IN_PROGRESS**
 
 ## Tarea activa
 
-WEB-98 — memoria y estilo en Tu nube (seguridad y borrado) e investigación de avisos push (`ai/HANDOFF.md`, «WEB-98»). PR abierto sin fusionar. WEB-97 está fusionada (PR #99). Pendientes: WEB-93, banco con Enable Banking y Supabase; y WEB-96, modo amanecer, bloqueada hasta saber qué luces tiene Manu.
+WEB-99 — avisos push con MANU cerrada, sincronización selectiva y lápidas (`ai/HANDOFF.md`, «WEB-99»). PR abierto sin fusionar. La activación espera a que se reactive el proyecto Supabase, que está pausado. WEB-98 está fusionada (PR #100). Pendientes: WEB-93, banco con Enable Banking y Supabase; y WEB-96, modo amanecer, bloqueada hasta saber qué luces tiene Manu.
 
 ## Autorización
 
@@ -57,6 +57,7 @@ WEB-98 — memoria y estilo en Tu nube (seguridad y borrado) e investigación de
 - 2026-09-29: **cambio de gobernanza decidido por Manu.** El orquestador (ChatGPT/Codex) ya no revisa automáticamente, porque frenaba el avance. Claude Code fusiona los PR web cuando `npm test` y los dos workflows remotos están en verde y no hay conflictos. Cuando haga falta una revisión, Claude Code prepara un prompt, Manu se lo pasa a ChatGPT y le devuelve la respuesta; los defectos se corrigen en un PR nuevo con su regresión. Los PR #7, #8 y #9 siguen en borrador o pausa.
 - 2026-11-09 (tarde): Manu fusiona WEB-95 y encarga la «ampliación de visión»: auditar las capacidades reales de iOS y de la web, y un centro de permisos y conexiones gestionable desde el iPhone. Condiciones: sin permisos decorativos, sin rastreo publicitario, sin acceso masivo a datos privados, y MANU solo interactúa con él. Se hace como WEB-97.
 - 2026-11-09 (tarde): Manu fusiona WEB-97. **Decide sincronizar la memoria y el estilo por Tu nube**, previa revisión de seguridad, borrado y riesgos, sin declarar un cifrado de extremo a extremo que no existe. Pide investigar los avisos push con la app cerrada reutilizando la infraestructura existente, sin incorporar servicios sin justificarlo y sin su autorización. Todo gestionable desde el iPhone. Las luces LED y el banco siguen pendientes de datos. Se hace como WEB-98.
+- 2026-11-09 (tarde): Manu autoriza **implementar y activar los avisos push en su Supabase existente**. Condiciones: plan gratuito confirmado, sin costes adicionales y dentro de cuota; sin contenido personal por defecto; gestión completa desde MANU; RLS; claves privadas solo en el servidor; sin duplicados; que se pueda desactivar todo; y los Recordatorios de iOS como alternativa. Si hay riesgo de facturación, se detiene. Pide además sincronización selectiva (sin conversaciones completas ni datos íntimos de terceros), investigar el cifrado de extremo a extremo y que lo olvidado no reaparezca en un conflicto. Quiere evitar la configuración manual de Supabase. Guarda un token de acceso de Supabase en el entorno de la sesión, que inyecta el proxy. Se hace como WEB-99.
 
 ## Alcance autorizado
 
