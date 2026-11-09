@@ -1,5 +1,14 @@
 # HANDOFF
 
+## WEB · Fable 5.1 fase 2 (ChatGPT, 2026-11-09)
+
+Rama `chatgpt/fable-phase2-hoy-services`. Rediseño editorial de Hoy con los datos reales de fecha, contexto, Open-Meteo, próximo evento, tareas y recordatorios. Se mantiene la propuesta del motor de MANU y todas las acciones de los módulos existentes. Nuevo bloque de estados de Tu nube/Supabase y notificaciones configuradas en este dispositivo, con entradas a sus pantallas. Banco Sabadell aparece como **integración pendiente**, sin afirmar que esté conectado por API (PR #104 independiente, sin desplegar).
+
+**Cambios:** `web/design/fable-today.js`, `web/design/fable-today.css`, `web/app.js`, `web/index.html`, `web/sw.js`, `web/tests/fable-today.test.js`, `docs/design/FABLE_PHASE2.md`. Sin datos nuevos, secretos, permisos ni servicios de pago.
+
+**NO_VERIFICADO:** render visual en Safari real/iPhone instalado y confirmación de estados de red en un dispositivo real. Manual y riesgos en `docs/design/FABLE_PHASE2.md`.
+
+
 ## Fable 5.1 · fase 1 de identidad (ChatGPT, 2026-11-09)
 
 Rama `chatgpt/fable-phase1-identity` (independiente de WEB-93b / PR #104). Integra los tokens de Fable, su familia de 31 iconos vectoriales más una adaptación de Bahía, la marca M modular para el navegador y la nueva iconografía en las seis pestañas reales. Mantiene toda la lógica existente, los PNG de la PWA instalada, los permisos, datos, conectores y el banco sin cambios. El ZIP original lo ha proporcionado Manu. Pruebas adicionales en `web/tests/fable-icons.test.js`; guía en `docs/design/FABLE_PHASE1.md`.
