@@ -1,5 +1,7 @@
 // Local-first storage behind a tiny adapter (AGENTS.md: keep adapter interfaces).
 // Everything stays on the device; nothing is sent anywhere.
+import { validateBrain } from "./brain.js";
+
 export const SCHEMA_VERSION = 1;
 
 const OPTIONAL_LISTS = ["reminders", "habits", "people", "meals", "health", "moods", "income", "projects", "places", "captures", "clock", "docs", "library", "reviews"];
@@ -40,7 +42,11 @@ export function validateVault(data) {
   for (const entry of data.income ?? []) {
     if (!Number.isInteger(entry.cents) || entry.cents <= 0 || typeof entry.at !== "string") return { ok: false, reason: "Hay un ingreso con un importe no válido." };
   }
+  // WEB-94: the memory is optional (older copies have none) but, if present, must be valid.
+  const brain = validateBrain(data.brain);
+  if (!brain.ok) return { ok: false, reason: brain.reason };
   const vault = { ...emptyVault(), ...data, settings: data.settings ?? {} };
+  if (data.brain !== undefined) vault.brain = brain.brain;
   for (const key of OPTIONAL_LISTS) vault[key] = data[key] ?? [];
   // WEB-46: an old or hand-edited copy may lack a project's lists; one bad
   // project must not break the whole Proyectos tab.

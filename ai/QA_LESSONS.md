@@ -212,3 +212,15 @@ Reglas:
 La batería e2e (unos 90 scripts de Playwright) estaba en el scratchpad de la sesión. Al cambiar de contenedor desapareció entera, y WEB-91 tuvo que empezar sin ella.
 
 Regla: toda prueba e2e nueva se guarda en `e2e/` en el repositorio (fuera de `web/`, que se publica), con datos inventados y sin credenciales.
+
+### QAL-047 — Una sección nueva del vault se revisa en todos sus guardianes
+
+En WEB-94 se añadió `vault.brain`. `validateVault` y la copia la aceptaban, pero `isEmptyVault` (Tu nube) seguía mirando solo las listas antiguas. Un dispositivo con solo recuerdos contaba como vacío y se podía sobrescribir al vincularlo. Lo encontró la autorrevisión, no una prueba.
+
+Regla: cada sección nueva del vault se añade, con prueba, a `validateVault`, `isEmptyVault`, la copia completa y la exportación que corresponda.
+
+### QAL-048 — Un borrador en la rama también pasa por las pruebas
+
+El commit WIP `bahia-svg.js` dejó roja la prueba `sw-shell` en la rama: el módulo no estaba en la caché del service worker. Nadie lo vio porque el borrador no tenía PR.
+
+Regla: un commit en una rama que se va a publicar ejecuta `npm test` aunque sea un borrador. Si un módulo no se usa todavía, se cachea igual o no se sube a `web/core`.

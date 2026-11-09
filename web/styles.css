@@ -792,3 +792,27 @@ pre.code { white-space: pre-wrap; word-break: break-word; max-height: 220px; ove
 .bz-new { border: 1px solid var(--accent); }
 .bz-place h2 { margin: 0; }
 .bz-proj { gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--line, rgba(255,255,255,.08)); }
+
+/* WEB-94: Memoria */
+.chip.ok { background: rgba(70,200,120,.16); color: #6fdc9b; }
+.chip.warn { background: rgba(255,190,70,.16); color: #ffc65c; }
+.chip.bad { background: rgba(255,95,95,.16); color: #ff8a8a; }
+.mem-stats, .mem-filters { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.mem-kicker { text-transform: uppercase; letter-spacing: .04em; font-weight: 700; margin: 0 0 4px; }
+.mem-q { font-size: 18px; font-weight: 600; margin: 2px 0 10px; text-wrap: balance; }
+.mem-prop .btns, .mem-hoy .btns { flex-wrap: wrap; }
+.mem-inline { width: 100%; gap: 8px; }
+.mem-inline input, .mem-inline select { flex: 1; min-width: 0; }
+.mem-prop .why summary { cursor: pointer; color: var(--muted); font-size: 13px; margin-top: 8px; }
+.mem-seg { grid-template-columns: repeat(3, 1fr); margin-bottom: 10px; }
+.mem-seg button { font-size: 13px; }
+.mem-dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin: 8px 0 12px; font-size: 14px; }
+.mem-dl dt { color: var(--muted); }
+.mem-dl dd { margin: 0; overflow-wrap: anywhere; }
+.mem-hist { padding-left: 20px; display: grid; gap: 6px; }
+.mem-hist li[aria-current="true"] b { color: var(--accent); }
+.mem-ex, .mem-rules { list-style: none; padding: 0; margin: 6px 0 10px; display: grid; gap: 8px; }
+.mem-ex li, .mem-rules li { display: flex; gap: 10px; align-items: center; }
+.mem-ex .grow, .mem-rules .grow { flex: 1; min-width: 0; }
+.mem-sample { background: rgba(255,255,255,.05); border-radius: 10px; padding: 8px 10px; }
+.mem-row .grow > span:first-child { overflow-wrap: anywhere; }

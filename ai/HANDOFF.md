@@ -2,6 +2,7 @@
 
 ## Próximo paso vigente
 
+0. **WEB-94 (Memoria):** PR en borrador de la misión nocturna del 2026-11-09. Manu lo prueba y decide si se fusiona y si la memoria debe quedar fuera de Tu nube. Informe en `NIGHT_SHIFT_REPORT.md`.
 1. **WEB-87:** Manu prueba en su iPhone la lista de la sección «WEB-87». Lo que falle se arregla en esa misma tarea, con su regresión.
 2. No se añaden funciones hasta cerrar WEB-87.
 3. La línea nativa (PR #7, #8 y #9) sigue en pausa.
@@ -9,6 +10,57 @@
 ## Estado
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
+
+## WEB-94 — Memoria: MANU BRAIN en la web (misión nocturna, 2026-11-09)
+
+Manu pide, mientras duerme, avanzar todo lo posible hacia un MANU que recuerde lo que él olvida, aprenda de sus correcciones, proponga sin decidir por él y tenga personalidad. Hay modelo de conocimiento (DATA_MODEL, ADR-0002) implementado solo en el núcleo Swift (BRAIN-01, nativo en pausa). En la web, la memoria era un perfil de texto libre más la búsqueda en «Tu archivo». Esta tarea lleva ese modelo a la web como una vertical completa. Rama `claude/magical-goodall-rf5qoo`, **PR en borrador, sin fusionar** (Manu: «no fusiones a main»).
+
+**Núcleo (puro, sin IA, ADR-0009):**
+
+| Módulo | Qué hace |
+|---|---|
+| `core/brain.js` | Claims con clasificación (FACT, PREFERENCE, DECISION, MEMORY, INFERENCE, HYPOTHESIS), estado (PROPOSED, ACTIVE, SUPERSEDED, CONTESTED, REJECTED, RETRACTED), tiempo de registro y validez, confianza y razón, procedencia y sensibilidad. Detalle en la lista siguiente. |
+| `core/learn.js` | Aprende de los rasgos de los gastos que Manu clasifica: noche, importe y fin de semana. Complementa a money.js, que ya aprende por comercio. Con 3 ejemplos y un 80 % de acuerdo *propone* una regla. Activa solo si Manu la acepta, y con confianza suavizada, nunca 1. Si Manu la corrige a menudo, se pausa sola. |
+| `core/proposals.js` | Reúne dudas, gastos desconocidos, patrones, deducciones, preguntas y vigencia, cada uno con su «por qué». `applyProposal` solo corre tras un toque de Manu. Registra el resultado (aceptada, rechazada, luego): un «no» no se repite. Presupuesto diario y silencio tras un «luego». |
+| `core/conocernos.js` | 17 preguntas por niveles, como mucho 3 al día. «Prefiero no responder» se respeta para siempre. Solo preguntas sobre Manu. |
+| `core/voice.js` | Humor 0–2 y franqueza 0–2 («zasca con fundamento»: cita las palabras y la fecha). Usa las expresiones de Manu tal cual y solo donde él diga. `describe` separa hechos, dudas y deducciones. |
+| `core/memchat.js` | Chat: «recuerda que…» (con fecha y lugar), «¿qué sabes de…?», «¿qué recuerdas de marzo de 2024?», «olvida lo de…» (pide confirmación). «Recuérdame» sigue siendo un recordatorio. |
+
+Reglas de `core/brain.js`:
+- Corregir sustituye y conserva el historial.
+- Valores distintos para lo mismo quedan en duda hasta que Manu elige; repetir lo mismo reconfirma.
+- Lo que deduce una regla entra como propuesta y nunca como hecho.
+- «Olvidar» borra el texto de todas las versiones y deja un evento sin contenido.
+- Vigencia: las preferencias, 180 días; los hechos, 365; los recuerdos, nunca. Nunca pregunta por terceros ni por lo sensible.
+- Búsqueda por palabras, lugar y fecha. «Relacionado» explica cada vínculo.
+
+**Interfaz:**
+- **Tú → Memoria:** propuestas, apuntar, buscar y filtrar, ficha con origen e historial, corregir, «ya no es así», olvidar, «Lo que he aprendido» y «Cómo te hablo».
+- **Hoy:** una sola propuesta, dentro del presupuesto diario.
+- **Dinero:** marca «deducción aprendida (N %)».
+- **Datos:** `vault.brain`, validado en `validateVault`. Viaja en la copia de seguridad y en Tu nube como el resto del vault.
+
+**Comandos y resultados:**
+- `npm test`: 300 de 300. Hay 24 pruebas nuevas en `tests/memoria.test.js`.
+- `node --check` sobre `app.js`, `sw.js` y `core/*.js`: correcto.
+- `node e2e/memoria.e2e.mjs`: 23 de 23 en Chromium con emulación de iPhone 14.
+- `node e2e/bahia.e2e.mjs`: sin regresión.
+
+**Hallazgos de la autorrevisión, corregidos:**
+- Repetir un dato lo duplicaba.
+- La etiqueta «aprendida» seguía tras una corrección de Manu.
+- `isEmptyVault` trataba como vacío un dispositivo con solo recuerdos, y Tu nube podía sobrescribirlo.
+- La prueba `sw-shell` ya fallaba en la rama por el borrador `bahia-svg.js` sin cachear.
+
+**Riesgos:**
+- La memoria es sensible y Tu nube la sube como el resto (RLS, sin cifrado de extremo a extremo, por la decisión de ADR-0017). Manu debe decidir si la quiere fuera de la nube.
+- El aprendizaje solo cubre gastos de momento.
+
+**NO_VERIFICADO:**
+- En Safari o en el iPhone real.
+- Con datos reales de Manu.
+- La sincronización de `vault.brain` entre dos dispositivos.
+- El aviso de CSP que da Google Identity al abrir Tú. Es previo y ajeno a esta tarea; ocurre también en `main`.
 
 ## WEB-92 — el personaje de Manu
 

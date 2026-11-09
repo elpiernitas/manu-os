@@ -4,7 +4,7 @@ Status: **IN_PROGRESS**
 
 ## Tarea activa
 
-WEB-92 — el personaje de Manu en Bahía 00 (`ai/HANDOFF.md`, «WEB-92»). Después, WEB-93: banco con Enable Banking y Supabase.
+WEB-94 — Memoria: MANU BRAIN en la web (`ai/HANDOFF.md`, «WEB-94»). Es la misión nocturna del 2026-11-09: PR en borrador, sin fusionar hasta que Manu lo pruebe. Antes, WEB-92 (el personaje de Manu en Bahía 00). Pendiente: WEB-93, banco con Enable Banking y Supabase.
 
 ## Autorización
 
@@ -44,6 +44,14 @@ WEB-92 — el personaje de Manu en Bahía 00 (`ai/HANDOFF.md`, «WEB-92»). Desp
 - 2026-10-03: Manu comparte un vídeo con 5 ideas para montar con Claude y responde «haz lo que tú veas» a la propuesta: repaso de la noche y semanal, documentos con vencimientos y biblioteca.
 - 2026-10-03: Manu pide el doble toque del iPhone para apuntar gastos e ingresos con categoría, como la app de un amigo, y analizar lo que se repite. El buzón en la nube necesita que Manu ejecute un SQL una vez (permiso de solo inserción para `anon`, ADR-0017, enmienda WEB-86).
 - 2026-11-05: Manu pide convertir MANU en un videojuego con su personaje (Stardew, Animal Crossing, Tomodachi Life, tycoons) y conectar el banco. Acepta Bahía 00 con 5 lugares, dibujo en código, sin el trabajo de RK y la bebida como pregunta suave. Autoriza Supabase y Enable Banking a coste 0 € («haz lo que te dé la gana mientras no pagues nada»). Hosting: se queda en GitHub Pages (Netlify gasta créditos por publicación).
+- 2026-11-09: Manu, antes de dormir, encarga la «misión nocturna»:
+  - MANU como extensión de su memoria: memoria a largo plazo consultable, corregible y borrable, con vigencia, confianza, procedencia y contradicciones;
+  - aprendizaje por confirmaciones y correcciones, sin confundir deducción con certeza;
+  - un motor de propuestas que no decide por él;
+  - personalidad configurable basada en sus ejemplos, sin inventar recuerdos;
+  - un conocimiento mutuo progresivo.
+
+  Reglas: MANU solo interactúa con él, sin recordatorios sentimentales aleatorios y con los datos de terceros protegidos. Autoriza a trabajar en una rama propia sin fusionar a `main`, sin servicios nuevos, costes ni datos reales. Se hace como WEB-94.
 - 2026-10-04: auditoría externa tras WEB-86: recomienda parar las funciones nuevas y probar en el iPhone real. Claude Code la verifica y abre WEB-87 (documentación al día, versión = número de tarea, excepción de cifrado de Tu nube escrita en el charter, ADR-0003 y threat model).
 - 2026-09-29: **cambio de gobernanza decidido por Manu.** El orquestador (ChatGPT/Codex) ya no revisa automáticamente, porque frenaba el avance. Claude Code fusiona los PR web cuando `npm test` y los dos workflows remotos están en verde y no hay conflictos. Cuando haga falta una revisión, Claude Code prepara un prompt, Manu se lo pasa a ChatGPT y le devuelve la respuesta; los defectos se corrigen en un PR nuevo con su regresión. Los PR #7, #8 y #9 siguen en borrador o pausa.
 

@@ -51,9 +51,16 @@ import { LIB_KINDS, STATUSES, newItem, setStatus, ideasPayload, parseIdeas, isLi
 import { PLACES as BZ_PLACES, NIGHT_OPTIONS, gameState, town, vitality, mood as bzMood, nightQuestion, lineFor, moveDays, projectMinutesByDay, setTreadmill, setRest, answerNight, startTimer, stopTimer, markSeen } from "./core/bahia.js";
 import { drawTown, SPOTS, W as BZ_W, H as BZ_H } from "./core/bahia-draw.js";
 import { cleanConcept, QUICK_SPEND, QUICK_INCOME, fixedIncomeStatus, commonSpends, recurringIncome } from "./core/quickmoney.js";
+import { emptyBrain, validateBrain, remember as memRemember, correct as memCorrect, confirm as memConfirm, expire as memExpire, reject as memReject, forget as memForget } from "./core/brain.js";
+import { proposals as memProposals, applyProposal, topProposal, applyLearned, recordOutcome } from "./core/proposals.js";
+import { answer as memAnswer, skip as memSkip } from "./core/conocernos.js";
+import { observe as memObserve, spendFeatures, setRuleStatus } from "./core/learn.js";
+import { addExample, removeExample } from "./core/voice.js";
+import { memCommand, runMemCommand } from "./core/memchat.js";
+import { memoriaPage, hoyMemCard } from "./core/memview.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "92"; // = número de la última tarea WEB publicada (desde WEB-87)
+export const APP_VERSION = "94"; // = número de la última tarea WEB publicada (desde WEB-87)
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -69,6 +76,9 @@ const loaded = store.load();
 let vault = loaded.vault;
 let tab = sessionStorage.getItem("manuos.tab") || "bahia"; // WEB-91: MANU opens on the town
 let sub = null; // Tú subpage
+// WEB-94: Memoria. The brain lives in the vault; the screen state does not.
+let memUi = { filter: "vigentes", query: "", open: null, correcting: null, choosing: null };
+const brain = () => { if (!vault.brain) { const v = validateBrain(undefined); vault.brain = v.brain; } return vault.brain; };
 let morningLaunch = false; // WEB-72: opened by the morning Shortcut
 let refuge = null; // Refugio lives only in memory
 let sheet = null; // quick add: { kind }
@@ -129,6 +139,8 @@ let restoring = false; // WEB-44: while a full copy is restored, nothing in memo
 function persist() {
   if (restoring) return;
   fileNewItems();
+  // WEB-94: accepted rules propose a category for new «Otros» spending (inferred, correctable).
+  if (vault.brain?.learn?.rules?.some((r) => r.status === "ACTIVE")) { const l = applyLearned(vault.brain, vault.spending); if (l.changed) vault.spending = l.spending; }
   if (vault.chat.length > 200) vault.chat = vault.chat.slice(-200);
   if (!store.save(vault)) toast("No he podido guardar en este dispositivo.");
   nubeChanged();
@@ -1302,6 +1314,7 @@ const screens = {
       <div class="stack">
       ${morningLaunch ? `<section class="card morning-hello"><h2>☀️ ${esc(greeting())}, Manu</h2><p class="muted small">Toca y te leo el día en voz alta.</p><div class="btns"><button class="btn" data-act="speak-day">🔊 Léemelo</button><button class="link small" data-act="morning-dismiss">Ahora no</button></div></section>` : ""}
       ${gentleCard()}
+      ${vault.brain || vault.spending.length ? hoyMemCard(topProposal(brain(), { spending: vault.spending, now: new Date() })) : ""}
       <button class="cmdk-pill glass" data-act="cmdk" aria-label="Comando rápido">⚡ <span>Haz algo rápido…</span></button>
       ${nowCard()}
       ${clockCard()}
@@ -1362,7 +1375,7 @@ const screens = {
       ${refuge ? "" : mailCards()}
       ${chips ? `<div class="suggest" aria-label="Sugerencias">${chips.map((s) => `<button data-say="${esc(s)}">${esc(s)}</button>`).join("")}</div>` : `<div class="quick-cards" aria-label="Sugerencias">${cards.map(([e, label, how, text]) => `<button class="qcard" ${how === "say" ? `data-say="${esc(text)}"` : `data-fill="${esc(text)}"`}><span class="qe" aria-hidden="true">${e}</span><span>${esc(label)}</span></button>`).join("")}</div>`}
       ${vault.chat.length && !refuge ? `<div class="chat-tools"><button class="link small" data-act="chat-new">＋ Nueva conversación</button></div>` : ""}
-      <div class="chat" id="chat" aria-live="polite">${(refuge ? refuge.messages : history).map((b) => `<div class="bubble ${b.from}${b.safety ? " safety" : ""}">${b.ai ? '<span class="ai-tag">IA</span>' : ""}${b.imageId ? `<img class="chat-img" data-img="${esc(b.imageId)}" alt="Captura">` : ""}${esc(b.text)}${b.url ? ` <a class="link small" href="${esc(safeHref(b.url))}" target="_blank" rel="noopener">Abrir</a>` : ""}${b.proposal ? `${b.proposal.state ? "" : `<p class="small proposal-what">Se enviará a Google solo tu frase: <b>«${esc(b.proposal.message)}»</b>, con las instrucciones fijas de MANU. Nada de tus datos.</p>`}<details><summary class="muted small">${b.proposal.state ? "Ver lo enviado" : "Ver detalles técnicos"}</summary><pre class="payload">${esc(shownPayload(b.proposal))}</pre></details>${b.proposal.state ? `<p class="muted small">${b.proposal.state === "sent" ? (b.proposal.auto ? "Enviado a Gemini sin preguntar (lo activaste en Tú → IA)." : "Enviado a Gemini.") : "No enviado."}</p>` : `<div class="btns"><button class="btn" data-act="ai-send" data-id="${esc(b.proposal.id)}">Enviar a Gemini</button><button class="btn ghost" data-act="ai-cancel" data-id="${esc(b.proposal.id)}">No</button></div><div class="btns"><button class="link small" data-act="ask-elsewhere" data-app="chatgpt" data-id="${esc(b.proposal.id)}">Preguntar en ChatGPT</button><button class="link small" data-act="ask-elsewhere" data-app="claude" data-id="${esc(b.proposal.id)}">Preguntar en Claude</button></div>`}` : ""}${b.action ? `<div class="btns"><a class="btn" href="${esc(safeHref(b.action.href))}">${esc(b.action.label)}</a></div>` : ""}${(b.calls ?? []).map((c, i) => callCard(b, c, i)).join("")}${b.mailUndo ? `<div class="btns"><button class="link small" data-act="mail-undo" data-at="${esc(b.at)}">Deshacer</button></div>` : ""}</div>`).join("")}</div>
+      <div class="chat" id="chat" aria-live="polite">${(refuge ? refuge.messages : history).map((b) => `<div class="bubble ${b.from}${b.safety ? " safety" : ""}">${b.ai ? '<span class="ai-tag">IA</span>' : ""}${b.imageId ? `<img class="chat-img" data-img="${esc(b.imageId)}" alt="Captura">` : ""}${esc(b.text)}${b.url ? ` <a class="link small" href="${esc(safeHref(b.url))}" target="_blank" rel="noopener">Abrir</a>` : ""}${b.proposal ? `${b.proposal.state ? "" : `<p class="small proposal-what">Se enviará a Google solo tu frase: <b>«${esc(b.proposal.message)}»</b>, con las instrucciones fijas de MANU. Nada de tus datos.</p>`}<details><summary class="muted small">${b.proposal.state ? "Ver lo enviado" : "Ver detalles técnicos"}</summary><pre class="payload">${esc(shownPayload(b.proposal))}</pre></details>${b.proposal.state ? `<p class="muted small">${b.proposal.state === "sent" ? (b.proposal.auto ? "Enviado a Gemini sin preguntar (lo activaste en Tú → IA)." : "Enviado a Gemini.") : "No enviado."}</p>` : `<div class="btns"><button class="btn" data-act="ai-send" data-id="${esc(b.proposal.id)}">Enviar a Gemini</button><button class="btn ghost" data-act="ai-cancel" data-id="${esc(b.proposal.id)}">No</button></div><div class="btns"><button class="link small" data-act="ask-elsewhere" data-app="chatgpt" data-id="${esc(b.proposal.id)}">Preguntar en ChatGPT</button><button class="link small" data-act="ask-elsewhere" data-app="claude" data-id="${esc(b.proposal.id)}">Preguntar en Claude</button></div>`}` : ""}${b.action ? `<div class="btns"><a class="btn" href="${esc(safeHref(b.action.href))}">${esc(b.action.label)}</a></div>` : ""}${(b.calls ?? []).map((c, i) => callCard(b, c, i)).join("")}${b.mailUndo ? `<div class="btns"><button class="link small" data-act="mail-undo" data-at="${esc(b.at)}">Deshacer</button></div>` : ""}${b.memForget ? (b.memForget.state ? `<p class="muted small">${b.memForget.state === "done" ? "Borrado para siempre." : "No borrado."}</p>` : `<div class="btns"><button class="btn" data-act="mem-chat-forget" data-at="${esc(b.at)}" data-yes="1">Sí, bórralo</button><button class="btn ghost" data-act="mem-chat-forget" data-at="${esc(b.at)}" data-yes="0">No</button></div>`) : ""}</div>`).join("")}</div>
       ${chatImage ? `<div class="chat-attach glass"><img src="${esc(chatImage)}" alt="Captura adjunta"><div class="grow small">${aiReady() ? "La captura se enviará a Google (Gemini) al pulsar «Enviar a Gemini». No uses capturas del banco o de salud si no quieres compartirlas." : '<button type="button" class="link small" data-act="gemini-guide">Activa la IA para que MANU lea la captura</button>'}</div><button type="button" class="qa-close" data-act="chat-image-remove" aria-label="Quitar captura">✕</button></div>` : ""}
       <form class="composer glass" id="composer">${refuge ? "" : '<label class="composer-attach" for="chatImage" role="button" tabindex="0" aria-label="Adjuntar captura">📎</label><input id="chatImage" type="file" accept="image/*" class="sr">'}<label for="msg" class="sr">Mensaje para MANU</label><input id="msg" autocomplete="off" enterkeyhint="send" placeholder="${refuge ? "Cuéntame" : chatImage ? "¿Qué quieres saber de la captura?" : "Escribe a MANU"}"><button class="btn" type="submit">${chatImage && aiReady() ? "Enviar a Gemini" : "Enviar"}</button></form>`;
   },
@@ -1396,7 +1409,7 @@ const screens = {
         ${imp ? `<p class="muted small">Última importación: ${imp.added} gastos nuevos, ${imp.duplicates} repetidos${imp.incomeAdded !== undefined ? `, ${imp.incomeAdded} ingresos nuevos${imp.incomeDuplicates ? ` (${imp.incomeDuplicates} ya estaban)` : ""}` : imp.income ? ` · ${imp.income} ingresos sin importar: vuelve a elegir el archivo para añadirlos` : ""}${imp.invalid ? `, ${imp.invalid} filas no reconocidas` : ""}.</p>` : ""}</section>
       ${moneyInsights()}
       ${sectionTitle("Movimientos", `${toReview ? `<button class="link small" data-act="money-filter">${moneyFilter === "review" ? "Ver todos" : `Por revisar (${toReview})`}</button>` : ""}${addLink("EXPENSE")}`)}
-      <section class="card">${entries.length ? entries.map((x) => `<div class="row"><span class="cat-emoji" aria-hidden="true">${CATEGORY_EMOJI[x.category] ?? "📦"}</span><div class="grow"><div>${esc(x.merchant ? cleanConcept(x.merchant) : "Sin concepto")}</div><div class="muted small">${new Date(x.at).toLocaleDateString("es-ES", { day: "numeric", month: "short" })}${x.sub ? ` · ${esc(x.sub)}` : ""}${x.source === "BANK" ? " · banco" : ""}${x.review ? ' · <b class="review">revisar</b>' : x.inferred ? " · categoría propuesta" : x.ruled ? " · según tus reglas" : ""}</div></div>
+      <section class="card">${entries.length ? entries.map((x) => `<div class="row"><span class="cat-emoji" aria-hidden="true">${CATEGORY_EMOJI[x.category] ?? "📦"}</span><div class="grow"><div>${esc(x.merchant ? cleanConcept(x.merchant) : "Sin concepto")}</div><div class="muted small">${new Date(x.at).toLocaleDateString("es-ES", { day: "numeric", month: "short" })}${x.sub ? ` · ${esc(x.sub)}` : ""}${x.source === "BANK" ? " · banco" : ""}${x.review ? ' · <b class="review">revisar</b>' : x.learned && x.inferred ? ` · deducción aprendida (${Math.round(x.learned.confidence * 100)} %)` : x.inferred ? " · categoría propuesta" : x.ruled ? " · según tus reglas" : ""}</div></div>
           <div class="stack"><span class="num">${euros(x.cents)}</span>${catEditing === x.id ? `<label class="sr" for="cat-${esc(x.id)}">Categoría</label><select id="cat-${esc(x.id)}" data-cat="${esc(x.id)}">${Object.keys(CATEGORIES).map((k) => `<option value="${k}"${k === x.category ? " selected" : ""}>${esc(catLabel(k))}</option>`).join("")}</select><button class="link small danger-link" data-act="spend-del" data-id="${esc(x.id)}">Borrar</button>` : `<button class="cat-chip" data-act="cat-edit" data-id="${esc(x.id)}" aria-label="Cambiar categoría: ${esc(CATEGORIES[x.category] ?? "Otros")}">${esc(catLabel(x.category))}</button>`}</div></div>`).join("")
         : '<p class="muted">Sin gastos. Escribe a MANU «gasté 12,50 en café» o importa el extracto del banco.</p>'}</section>
       ${incomeListSection()}
@@ -1430,6 +1443,7 @@ const screens = {
         ${mood === 1 ? '<button class="btn ghost" data-act="refuge">Abrir el Refugio</button>' : ""}</section>
       ${sectionTitle("Tu vida")}
       <div class="list">
+        ${item("memoria", "box", "purple", "Memoria", (() => { const n = (vault.brain?.claims ?? []).filter((c) => c.status === "ACTIVE").length; const p = vault.brain ? memProposals(vault.brain, { spending: vault.spending, now: new Date() }).length : 0; return p ? `${p} cosa${p === 1 ? "" : "s"} para ti · ${n} recuerdos` : n ? `${n} recuerdos` : "Lo que me cuentas, para que no se te olvide"; })())}
         ${item("capturas", "shots", "blue", "Bandeja de capturas", toReview(vault.captures).length ? `${toReview(vault.captures).length} por revisar` : "Suelta aquí tus capturas y MANU las ordena")}
         ${item("fichaje", "clock", "blue", "Fichaje", (() => { const r = monthReport(vault.clock, localDay().slice(0, 7), { targetMin: clockTarget(), now: today() }); return r.days || r.openDays ? r.balance : "Entradas, pausas y lo que te debe RK"; })())}
         ${item("repaso", "repeat", "purple", "Repaso", "Tu día y tu semana: lo que fue bien y el plan")}
@@ -1491,6 +1505,9 @@ const subpages = {
       <section class="card"><h2>Añadir</h2><div class="btns"><label class="btn" for="docFile" role="button" tabindex="0">📷 Foto o PDF</label><input id="docFile" type="file" accept="image/*,application/pdf" class="sr"><button class="btn ghost" data-act="doc-manual">✍️ A mano</button></div>
         <p class="muted small">Gemini lee la foto o el PDF (va a Google) y tú revisas. No guarda IBAN, tarjetas ni DNI.</p>${draft}</section>
       ${list.length ? `<div class="stack">${list.map(docRow).join("")}</div>` : '<p class="muted">Aún no hay documentos. Luego pregúntame «¿cuándo vence el seguro del coche?».</p>'}`;
+  },
+  memoria() {
+    return `${backBar("Memoria")}${memoriaPage(brain(), { spending: vault.spending, ui: memUi, now: new Date() })}`;
   },
   biblioteca() {
     const items = [...(vault.library ?? [])].filter((i) => libFilter === "todo" || i.status === libFilter).sort((a, b) => String(b.at).localeCompare(String(a.at)));
@@ -2033,7 +2050,7 @@ function render({ focus = false, enter = null } = {}) {
   $("screen").querySelectorAll("[data-c]").forEach((el) => { if (/^#[0-9a-f]{6}$/i.test(el.dataset.c)) el.style.setProperty("--ev", el.dataset.c); });
   hydrateImages($("screen"));
   if (tab === "bahia" && !sub && !overlay) paintBahia();
-  $("topTitle").textContent = sub ? { habitos: "Hábitos", salud: "Salud", comidas: "Comidas", personas: "Personas", tiempo: "Tiempo", avisos: "Avisos", datos: "Tus datos", gcal: "Google", correo: "Correo", archivo: "Tu archivo", capturas: "Capturas", ia: "IA", spotify: "Spotify", atajos: "Atajos", fichaje: "Fichaje", repaso: "Repaso", documentos: "Documentos", biblioteca: "Biblioteca" }[sub] : TABS.find(([id]) => id === tab)[1];
+  $("topTitle").textContent = sub ? { habitos: "Hábitos", salud: "Salud", comidas: "Comidas", personas: "Personas", tiempo: "Tiempo", avisos: "Avisos", datos: "Tus datos", gcal: "Google", correo: "Correo", archivo: "Tu archivo", capturas: "Capturas", ia: "IA", spotify: "Spotify", atajos: "Atajos", fichaje: "Fichaje", repaso: "Repaso", documentos: "Documentos", biblioteca: "Biblioteca", memoria: "Memoria" }[sub] : TABS.find(([id]) => id === tab)[1];
   const sheetKey = sheet ? sheet.kind : null;
   if (sheetKey !== renderedSheetKind || !sheet) {
     const wasOpen = Boolean($("sheetBg"));
@@ -2124,6 +2141,16 @@ function say(text) {
     refuge = { state: { phase: "HUMAN_HELP", turn: 0 }, messages: [{ from: "me", text: clean }, { from: "manu", text: reply(intent), safety: true }] };
     render();
     return;
+  }
+  // WEB-94: «recuerda que…», «¿qué sabes de…?», «olvida lo de…».
+  const mc = memCommand(clean);
+  if (mc) {
+    const r = runMemCommand(brain(), mc, { now, seed: variant++ });
+    vault.brain = r.brain;
+    // «¿Qué sabes de mí?» used to show the written profile (WEB-57): it is still part of the answer.
+    if (mc.kind === "about" && !mc.topic && vault.profile?.text) r.reply = `${r.reply}\n\nY tu perfil escrito (Tú → Tu archivo):\n${vault.profile.text.slice(0, 1500)}`;
+    vault.chat.push({ from: "me", text: clean, at }, { from: "manu", text: r.reply, at, ...(r.pending ? { memForget: { ids: r.pending, state: null } } : {}) });
+    persist(); render(); return;
   }
   // WEB-47: «pon un presupuesto de 150 para comer», «¿cómo voy de presupuesto?».
   const bc = budgetCommand(clean);
@@ -2995,6 +3022,68 @@ function updateItem(id, fn) {
   render();
 }
 
+// ---------- WEB-94: Memoria ----------
+// Every handler here is Manu's tap: the decision is his; the core only proposes.
+const MEM_FORMS = new Set(["memAnswerForm", "memCatForm", "memChangeForm", "memAddForm", "memSearchForm", "memCorrectForm", "memExampleForm"]);
+const memProposalByKey = (key) => memProposals(brain(), { spending: vault.spending, now: new Date() }).find((p) => p.key === key);
+function memSave(msg) { persist(); render(); if (msg) toast(msg); }
+function memTry(fn) { try { return fn(); } catch (err) { toast(err.message); return null; } }
+function memRunProposal(key, action, payload = {}) {
+  const p = memProposalByKey(key);
+  if (!p) { toast("Eso ya no está pendiente."); render(); return; }
+  const r = memTry(() => applyProposal({ brain: brain(), spending: vault.spending }, p, action, payload, { now: new Date() }));
+  if (!r) return;
+  vault.brain = r.brain; vault.spending = r.spending; memUi.choosing = null;
+  memSave(r.message);
+}
+function memAct(a) {
+  const d = a.dataset, now = new Date();
+  switch (d.act) {
+    case "mem-prop":
+      if ((d.action === "choose" || d.action === "change")) { memUi.choosing = d.key; render(); return; }
+      memRunProposal(d.key, d.action); return;
+    case "mem-choose": memUi.choosing = d.key || null; render(); return;
+    case "mem-answer": { const r = memTry(() => memAnswer(brain(), d.q, d.v, { now })); if (r) { vault.brain = recordOutcome(r.brain, `pregunta:${d.q}`, "ACCEPTED", "pregunta", { now }); memSave(r.claim ? "Guardado. Lo puedes corregir cuando quieras." : "Hecho, te hablaré así."); } return; }
+    case "mem-skip": vault.brain = memSkip(brain(), d.q, { now, forever: d.forever === "1" }); vault.brain = recordOutcome(vault.brain, `pregunta:${d.q}`, d.forever === "1" ? "REJECTED" : "LATER", "pregunta", { now }); memSave(d.forever === "1" ? "No te lo vuelvo a preguntar." : "Otro día."); return;
+    case "mem-filter": memUi.filter = d.f; memUi.query = ""; render(); return;
+    case "mem-open": memUi.open = d.id || null; memUi.correcting = null; render(); if (d.id) setTimeout(() => document.querySelector(".mem-detail")?.scrollIntoView({ block: "start", behavior: "smooth" }), 30); return;
+    case "mem-correct": memUi.correcting = d.id || null; render(); return;
+    case "mem-confirm": if (memTry(() => { vault.brain = memConfirm(brain(), d.id, { now }); return true; })) memSave("Confirmado."); return;
+    case "mem-reject": if (memTry(() => { vault.brain = memReject(brain(), d.id, { now }); return true; })) memSave("Descartado. No lo vuelvo a deducir."); return;
+    case "mem-expire": if (memTry(() => { vault.brain = memExpire(brain(), d.id, { now }); return true; })) memSave("Marcado como pasado. Sigue en el historial."); return;
+    case "mem-forget": {
+      const c = brain().claims.find((x) => x.id === d.id);
+      if (!c || !window.confirm(`¿Olvidar para siempre «${c.text.slice(0, 80)}»? Se borra el texto y todas sus versiones.`)) return;
+      vault.brain = memForget(brain(), d.id, { now }).brain; memUi.open = null; memSave("Olvidado. No queda el texto."); return;
+    }
+    case "mem-chat-forget": {
+      const b = vault.chat.find((x) => x.at === d.at && x.memForget && !x.memForget.state);
+      if (!b) return;
+      if (d.yes === "1") { let br = brain(); for (const cid of b.memForget.ids) br = memForget(br, cid, { now }).brain; vault.brain = br; b.memForget.state = "done"; }
+      else b.memForget.state = "kept";
+      memSave(d.yes === "1" ? "Olvidado." : null); return;
+    }
+    case "mem-voice": vault.brain = { ...brain(), voice: { ...brain().voice, [d.k]: Number(d.v) } }; memSave(); return;
+    case "mem-ex-del": vault.brain = { ...brain(), voice: removeExample(brain().voice, Number(d.i)) }; memSave("Quitada."); return;
+    case "mem-rule": vault.brain = { ...brain(), learn: setRuleStatus(brain().learn, d.id, d.s) }; memSave(d.s === "REJECTED" ? "Regla olvidada." : d.s === "PAUSED" ? "En pausa." : "Reactivada."); return;
+    default: return;
+  }
+}
+function memSubmit(form) {
+  const now = new Date(), f = form.id, val = (id) => ($(id)?.value ?? "").trim();
+  if (f === "memSearchForm") { memUi.query = val("memQuery"); render(); return; }
+  if (f === "memAnswerForm") { const q = form.dataset.q; const r = memTry(() => memAnswer(brain(), q, val("memAnswer"), { now })); if (r) { vault.brain = recordOutcome(r.brain, `pregunta:${q}`, "ACCEPTED", "pregunta", { now }); memSave("Guardado. Lo puedes corregir cuando quieras."); } return; }
+  if (f === "memCatForm") { memRunProposal(form.dataset.key, "choose", { category: val("memCat") }); return; }
+  if (f === "memChangeForm") { memRunProposal(form.dataset.key, "change", { text: val("memChange") }); return; }
+  if (f === "memCorrectForm") { const r = memTry(() => memCorrect(brain(), form.dataset.id, { text: val("memCorrectText") }, { now })); if (r) { vault.brain = r.brain; memUi.open = r.claim.id; memUi.correcting = null; memSave("Corregido. La versión anterior queda en el historial."); } return; }
+  if (f === "memExampleForm") { const v = memTry(() => addExample(brain().voice, val("memExText"), val("memExWhen"), { now })); if (v) { vault.brain = { ...brain(), voice: v }; memSave("Apuntada. La usaré de vez en cuando."); } return; }
+  if (f === "memAddForm") {
+    const text = val("memText"); if (!text) return;
+    const r = memTry(() => memRemember(brain(), { text, kind: val("memKind"), when: val("memWhen") || null, place: val("memPlace") || null, sensitive: $("memSensitive")?.checked, source: { kind: "manu" } }, { now }));
+    if (r) { vault.brain = r.brain; memUi.filter = "vigentes"; memSave("Recordado."); }
+  }
+}
+
 document.addEventListener("click", async (e) => {
   const t = e.target.closest("[data-tab]");
   if (t) { go(t.dataset.tab); return; }
@@ -3010,6 +3099,7 @@ document.addEventListener("click", async (e) => {
   const a = e.target.closest("[data-act]");
   if (!a) return;
   const id = a.dataset.id;
+  if (a.dataset.act.startsWith("mem-")) { memAct(a); return; }
   switch (a.dataset.act) {
     case "task": updateItem(id, (i) => confirm(i, "TASK")); toast("Guardada como tarea"); break;
     case "idea": updateItem(id, (i) => confirm(i, "IDEA")); toast("Guardada como idea"); break;
@@ -3316,6 +3406,7 @@ const num = (v) => { const n = Number(String(v).replace(",", ".")); return v !==
 document.addEventListener("submit", async (e) => {
   e.preventDefault();
   const f = e.target.id;
+  if (MEM_FORMS.has(f)) { memSubmit(e.target); return; }
   if (f === "nubeMail") { nubeMail($("nubeEmail").value.trim()); return; }
   if (f === "bzIdea") { // WEB-91: an idea goes straight to MANU as an idea, no questions
     const text = $("bzIdeaIn").value.trim().slice(0, 280); if (!text) return;
@@ -3575,6 +3666,8 @@ document.addEventListener("change", async (e) => {
   if (e.target.id === "workStart" && /^\d{2}:\d{2}$/.test(e.target.value)) { vault.settings.workStart = e.target.value; persist(); toast(`Entrada: ${e.target.value}`); return; }
   if (e.target.dataset.cat) {
     catEditing = null;
+    const before = vault.spending.find((x) => x.id === e.target.dataset.cat);
+    if (before) brain().learn = memObserve(brain().learn, spendFeatures(before), e.target.value);
     const r = learnCategory(vault.spending, vault.settings.categoryRules ?? {}, e.target.dataset.cat, e.target.value);
     vault.spending = r.entries; vault.settings.categoryRules = r.learned;
     if (r.applied) toast(`Aprendido: ${r.applied} movimiento${r.applied === 1 ? "" : "s"} más del mismo comercio`);
