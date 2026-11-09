@@ -51,6 +51,13 @@ Reglas que se mantienen:
 - un modelo o una regla solo crean `PROPOSED`, y una deducción nunca pasa a `FACT` sin Manu;
 - la contradicción queda `CONTESTED` hasta que Manu resuelve.
 
+Añadidos de WEB-95:
+- `brain.style` guarda contadores del estilo de Manu.
+- `brain.topics` guarda las palabras por proyecto.
+- `brain.voice.jokes` guarda sus chistes, literales y con fecha.
+
+Lo observado sobre su estilo no se guarda como Claim: es un recuento que solo cambia la voz de MANU cuando Manu lo acepta.
+
 Diferencias con el modelo de referencia:
 - No hay entidades separadas, UUIDv7 ni hash de fragmentos.
 - «Olvidar» borra el contenido de verdad, por decisión de Manu, y deja un evento sin texto.

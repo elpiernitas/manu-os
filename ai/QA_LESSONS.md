@@ -224,3 +224,9 @@ Regla: cada sección nueva del vault se añade, con prueba, a `validateVault`, `
 El commit WIP `bahia-svg.js` dejó roja la prueba `sw-shell` en la rama: el módulo no estaba en la caché del service worker. Nadie lo vio porque el borrador no tenía PR.
 
 Regla: un commit en una rama que se va a publicar ejecuta `npm test` aunque sea un borrador. Si un módulo no se usa todavía, se cachea igual o no se sube a `web/core`.
+
+### QAL-049 — Lee el formulario antes de cualquier función que repinte
+
+En WEB-95, el aprendizaje de una nota de proyecto leía `$("projText")` después de `updateProject()`, que guarda y vuelve a pintar la pantalla. El formulario ya no existía, la lectura fallaba dentro del `try` y no se aprendía nada, sin ningún error visible. Lo detectó la prueba de navegador; las pruebas unitarias del núcleo pasaban.
+
+Regla: en `app.js`, los valores de un formulario se leen a variables al principio del manejador, antes de `persist()`, `render()` o cualquier `update…()`. Cada aprendizaje conectado a la interfaz tiene una prueba e2e que comprueba que el dato llega a `localStorage`.

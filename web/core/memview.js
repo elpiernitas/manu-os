@@ -5,7 +5,8 @@ import { KIND_LABEL, STATUS_LABEL, SOURCES, current, history, related, search, s
 import { proposals } from "./proposals.js";
 import { QUESTIONS, progress } from "./conocernos.js";
 import { featureText } from "./learn.js";
-import { HUMOR_LABEL, FRANQUEZA_LABEL, WHEN, line } from "./voice.js";
+import { HUMOR_LABEL, FRANQUEZA_LABEL, WHEN, JOKE_KINDS, line } from "./voice.js";
+import { styleSummary } from "./style.js";
 import { CATEGORIES } from "./money.js";
 
 const ESC = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
@@ -82,6 +83,23 @@ function voiceCard(brain) {
     <form class="row" id="memExampleForm"><label class="sr" for="memExText">Expresión</label><input id="memExText" maxlength="140" placeholder="Una expresión tuya" required><label class="sr" for="memExWhen">Cuándo</label><select id="memExWhen">${Object.entries(WHEN).map(([k, l]) => `<option value="${k}">${esc(l)}</option>`).join("")}</select><button class="btn small" type="submit">Añadir</button></form></section>`;
 }
 
+// WEB-95: what MANU has observed about how Manu writes (counts only) and his saved jokes.
+function styleCard(brain) {
+  const s = styleSummary(brain.style);
+  const on = s ? s.on : true;
+  const jokes = brain.voice?.jokes ?? [];
+  const v = brain.voice ?? {};
+  const confirmed = [v.laugh ? `te ríes con «${v.laugh}»` : null, v.emoji === true ? "usas emojis" : v.emoji === false ? "prefieres sin emojis" : null].filter(Boolean);
+  return `<section class="card"><h2>Tu estilo</h2>
+    <p class="small muted">Aprendo de cómo escribes en MANU (chat e ideas): expresiones que repites, cómo te ríes y si usas emojis. Son recuentos, no certezas: no los uso hasta que me lo confirmas. No aprendo nombres, cifras ni temas sensibles, ni nada del Refugio.</p>
+    <label class="sw-row"><input type="checkbox" data-act="mem-style-on" ${on ? "checked" : ""}> Aprender de cómo escribo</label>
+    ${s && s.msgs ? `<ul class="mem-ex"><li><span class="grow">${s.msgs} mensajes en ${s.days} días · ${s.expressions} expresiones en observación</span></li>${s.laughs.length ? `<li><span class="grow">Risa: ${s.laughs.map(([k, n]) => `«${esc(k)}» ${n}`).join(" · ")}</span></li>` : ""}<li><span class="grow">Emojis en ${Math.round(s.emojiRate * 100)} % de tus mensajes${s.emojis.length ? ` (${s.emojis.map(([e]) => esc(e)).join(" ")})` : ""}</span></li></ul>
+      <button class="link small danger-link" data-act="mem-style-wipe">Olvidar lo observado</button>` : `<p class="small muted">Aún no he observado nada.</p>`}
+    ${confirmed.length ? `<p class="small">Confirmado por ti: ${esc(confirmed.join(", "))}.</p>` : ""}
+    <h3 class="small muted">Tus chistes y juegos de palabras</h3><p class="small muted">Escribe «guárdate esa» justo después de uno bueno y lo apunto tal cual. Te los recuerdo si me pides «cuéntame uno de mis chistes»; no me invento ninguno.</p>
+    ${jokes.length ? `<ul class="mem-ex">${jokes.map((j, i) => `<li><span class="grow">«${esc(j.text)}» <span class="muted small">${esc(JOKE_KINDS[j.kind] ?? "")} · ${day(j.at)}</span></span><button class="link small" data-act="mem-joke-del" data-i="${i}">Quitar</button></li>`).join("")}</ul>` : ""}</section>`;
+}
+
 function rulesCard(brain) {
   const rules = (brain.learn?.rules ?? []).filter((r) => r.status !== "REJECTED");
   if (!rules.length) return "";
@@ -92,9 +110,9 @@ function rulesCard(brain) {
 /**
  * The whole Memoria page. `ui`: { filter, query, open, correcting, choosing }.
  */
-export function memoriaPage(brain, { spending = [], ui = {}, now = new Date() } = {}) {
+export function memoriaPage(brain, { spending = [], projects = [], ui = {}, now = new Date() } = {}) {
   const s = stats(brain, now);
-  const props = proposals(brain, { spending, now });
+  const props = proposals(brain, { spending, projects, now });
   const pr = progress(brain);
   const items = list(brain, { filter: ui.filter ?? "vigentes", query: ui.query ?? "", now });
   return `<section class="card mem-hero"><p class="muted small">Tu memoria externa: lo que me cuentas, con su origen y su fecha. Lo puedes consultar, corregir y borrar. MANU propone; decides tú.</p>
@@ -112,11 +130,13 @@ export function memoriaPage(brain, { spending = [], ui = {}, now = new Date() } 
     ${items.length ? `<div class="list">${items.map((x) => claimRow(x.claim, x.why)).join("")}</div>` : `<p class="muted small">${ui.query ? "No encuentro nada con eso." : "Aquí no hay nada todavía."}</p>`}
     ${rulesCard(brain)}
     ${voiceCard(brain)}
+    ${styleCard(brain)}
     <p class="small muted">Se guarda en este dispositivo y en tu copia de seguridad. Si activas Tu nube, viaja con el resto de tus datos. No se envía a ninguna IA. Lo que olvidas se borra de verdad: solo queda que hubo un borrado, sin el texto.</p>`;
 }
 
 /** A short card for Hoy with the single most useful proposal, if the daily budget allows. */
 export function hoyMemCard(p) {
+  // WEB-95: style observations wait for the Memoria screen; Hoy only gets what is useful now.
   if (!p) return "";
   return `<section class="card mem-hoy"><p class="small muted mem-kicker">MANU · ${esc(p.title)}</p><p>${esc(p.body)}</p><div class="btns"><button class="btn small" data-sub-go="memoria">Responder</button><button class="link small" data-act="mem-prop" data-key="${esc(p.key)}" data-action="later">Luego</button></div></section>`;
 }

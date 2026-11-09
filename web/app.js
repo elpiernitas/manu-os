@@ -57,10 +57,13 @@ import { answer as memAnswer, skip as memSkip } from "./core/conocernos.js";
 import { observe as memObserve, spendFeatures, setRuleStatus } from "./core/learn.js";
 import { addExample, removeExample } from "./core/voice.js";
 import { memCommand, runMemCommand } from "./core/memchat.js";
+import { observeText, setLearning, wipeObserved } from "./core/style.js";
+import { observeFiling, observeMisfile } from "./core/topics.js";
+import { removeJoke } from "./core/voice.js";
 import { memoriaPage, hoyMemCard } from "./core/memview.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "94"; // = número de la última tarea WEB publicada (desde WEB-87)
+export const APP_VERSION = "95"; // = número de la última tarea WEB publicada (desde WEB-87)
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -1011,6 +1014,9 @@ async function addProjectSource() {
   const at = new Date().toISOString();
   try {
     if (projSourceKind === "note") {
+      // WEB-95: Manu's own filing teaches the project's words (read before the form re-renders).
+      const noteText = `${$("projTitle").value}. ${$("projText").value}`;
+      brain().topics = observeFiling(brain().topics, p.id, noteText);
       updateProject(p.id, (x) => addSource(x, { id: uid("src"), kind: "note", title: $("projTitle").value, text: $("projText").value, at }));
       toast("Nota añadida");
     } else if (projSourceKind === "link") {
@@ -1314,7 +1320,7 @@ const screens = {
       <div class="stack">
       ${morningLaunch ? `<section class="card morning-hello"><h2>☀️ ${esc(greeting())}, Manu</h2><p class="muted small">Toca y te leo el día en voz alta.</p><div class="btns"><button class="btn" data-act="speak-day">🔊 Léemelo</button><button class="link small" data-act="morning-dismiss">Ahora no</button></div></section>` : ""}
       ${gentleCard()}
-      ${vault.brain || vault.spending.length ? hoyMemCard(topProposal(brain(), { spending: vault.spending, now: new Date() })) : ""}
+      ${vault.brain || vault.spending.length ? hoyMemCard(topProposal(brain(), { spending: vault.spending, projects: vault.projects, now: new Date() })) : ""}
       <button class="cmdk-pill glass" data-act="cmdk" aria-label="Comando rápido">⚡ <span>Haz algo rápido…</span></button>
       ${nowCard()}
       ${clockCard()}
@@ -1375,7 +1381,7 @@ const screens = {
       ${refuge ? "" : mailCards()}
       ${chips ? `<div class="suggest" aria-label="Sugerencias">${chips.map((s) => `<button data-say="${esc(s)}">${esc(s)}</button>`).join("")}</div>` : `<div class="quick-cards" aria-label="Sugerencias">${cards.map(([e, label, how, text]) => `<button class="qcard" ${how === "say" ? `data-say="${esc(text)}"` : `data-fill="${esc(text)}"`}><span class="qe" aria-hidden="true">${e}</span><span>${esc(label)}</span></button>`).join("")}</div>`}
       ${vault.chat.length && !refuge ? `<div class="chat-tools"><button class="link small" data-act="chat-new">＋ Nueva conversación</button></div>` : ""}
-      <div class="chat" id="chat" aria-live="polite">${(refuge ? refuge.messages : history).map((b) => `<div class="bubble ${b.from}${b.safety ? " safety" : ""}">${b.ai ? '<span class="ai-tag">IA</span>' : ""}${b.imageId ? `<img class="chat-img" data-img="${esc(b.imageId)}" alt="Captura">` : ""}${esc(b.text)}${b.url ? ` <a class="link small" href="${esc(safeHref(b.url))}" target="_blank" rel="noopener">Abrir</a>` : ""}${b.proposal ? `${b.proposal.state ? "" : `<p class="small proposal-what">Se enviará a Google solo tu frase: <b>«${esc(b.proposal.message)}»</b>, con las instrucciones fijas de MANU. Nada de tus datos.</p>`}<details><summary class="muted small">${b.proposal.state ? "Ver lo enviado" : "Ver detalles técnicos"}</summary><pre class="payload">${esc(shownPayload(b.proposal))}</pre></details>${b.proposal.state ? `<p class="muted small">${b.proposal.state === "sent" ? (b.proposal.auto ? "Enviado a Gemini sin preguntar (lo activaste en Tú → IA)." : "Enviado a Gemini.") : "No enviado."}</p>` : `<div class="btns"><button class="btn" data-act="ai-send" data-id="${esc(b.proposal.id)}">Enviar a Gemini</button><button class="btn ghost" data-act="ai-cancel" data-id="${esc(b.proposal.id)}">No</button></div><div class="btns"><button class="link small" data-act="ask-elsewhere" data-app="chatgpt" data-id="${esc(b.proposal.id)}">Preguntar en ChatGPT</button><button class="link small" data-act="ask-elsewhere" data-app="claude" data-id="${esc(b.proposal.id)}">Preguntar en Claude</button></div>`}` : ""}${b.action ? `<div class="btns"><a class="btn" href="${esc(safeHref(b.action.href))}">${esc(b.action.label)}</a></div>` : ""}${(b.calls ?? []).map((c, i) => callCard(b, c, i)).join("")}${b.mailUndo ? `<div class="btns"><button class="link small" data-act="mail-undo" data-at="${esc(b.at)}">Deshacer</button></div>` : ""}${b.memForget ? (b.memForget.state ? `<p class="muted small">${b.memForget.state === "done" ? "Borrado para siempre." : "No borrado."}</p>` : `<div class="btns"><button class="btn" data-act="mem-chat-forget" data-at="${esc(b.at)}" data-yes="1">Sí, bórralo</button><button class="btn ghost" data-act="mem-chat-forget" data-at="${esc(b.at)}" data-yes="0">No</button></div>`) : ""}</div>`).join("")}</div>
+      <div class="chat" id="chat" aria-live="polite">${(refuge ? refuge.messages : history).map((b) => `<div class="bubble ${b.from}${b.safety ? " safety" : ""}">${b.ai ? '<span class="ai-tag">IA</span>' : ""}${b.imageId ? `<img class="chat-img" data-img="${esc(b.imageId)}" alt="Captura">` : ""}${esc(b.text)}${b.url ? ` <a class="link small" href="${esc(safeHref(b.url))}" target="_blank" rel="noopener">Abrir</a>` : ""}${b.proposal ? `${b.proposal.state ? "" : `<p class="small proposal-what">Se enviará a Google solo tu frase: <b>«${esc(b.proposal.message)}»</b>, con las instrucciones fijas de MANU. Nada de tus datos.</p>`}<details><summary class="muted small">${b.proposal.state ? "Ver lo enviado" : "Ver detalles técnicos"}</summary><pre class="payload">${esc(shownPayload(b.proposal))}</pre></details>${b.proposal.state ? `<p class="muted small">${b.proposal.state === "sent" ? (b.proposal.auto ? "Enviado a Gemini sin preguntar (lo activaste en Tú → IA)." : "Enviado a Gemini.") : "No enviado."}</p>` : `<div class="btns"><button class="btn" data-act="ai-send" data-id="${esc(b.proposal.id)}">Enviar a Gemini</button><button class="btn ghost" data-act="ai-cancel" data-id="${esc(b.proposal.id)}">No</button></div><div class="btns"><button class="link small" data-act="ask-elsewhere" data-app="chatgpt" data-id="${esc(b.proposal.id)}">Preguntar en ChatGPT</button><button class="link small" data-act="ask-elsewhere" data-app="claude" data-id="${esc(b.proposal.id)}">Preguntar en Claude</button></div>`}` : ""}${b.action ? `<div class="btns"><a class="btn" href="${esc(safeHref(b.action.href))}">${esc(b.action.label)}</a></div>` : ""}${(b.calls ?? []).map((c, i) => callCard(b, c, i)).join("")}${b.mailUndo ? `<div class="btns"><button class="link small" data-act="mail-undo" data-at="${esc(b.at)}">Deshacer</button></div>` : ""}${b.memDecision ? (b.memDecision.state ? `<p class="muted small">${b.memDecision.state === "done" ? "Guardada como decisión." : "No guardada."}</p>` : `<div class="btns"><button class="btn" data-act="mem-chat-decision" data-at="${esc(b.at)}" data-yes="1">Guardar decisión</button><button class="btn ghost" data-act="mem-chat-decision" data-at="${esc(b.at)}" data-yes="0">No</button></div>`) : ""}${b.memForget ? (b.memForget.state ? `<p class="muted small">${b.memForget.state === "done" ? "Borrado para siempre." : "No borrado."}</p>` : `<div class="btns"><button class="btn" data-act="mem-chat-forget" data-at="${esc(b.at)}" data-yes="1">Sí, bórralo</button><button class="btn ghost" data-act="mem-chat-forget" data-at="${esc(b.at)}" data-yes="0">No</button></div>`) : ""}</div>`).join("")}</div>
       ${chatImage ? `<div class="chat-attach glass"><img src="${esc(chatImage)}" alt="Captura adjunta"><div class="grow small">${aiReady() ? "La captura se enviará a Google (Gemini) al pulsar «Enviar a Gemini». No uses capturas del banco o de salud si no quieres compartirlas." : '<button type="button" class="link small" data-act="gemini-guide">Activa la IA para que MANU lea la captura</button>'}</div><button type="button" class="qa-close" data-act="chat-image-remove" aria-label="Quitar captura">✕</button></div>` : ""}
       <form class="composer glass" id="composer">${refuge ? "" : '<label class="composer-attach" for="chatImage" role="button" tabindex="0" aria-label="Adjuntar captura">📎</label><input id="chatImage" type="file" accept="image/*" class="sr">'}<label for="msg" class="sr">Mensaje para MANU</label><input id="msg" autocomplete="off" enterkeyhint="send" placeholder="${refuge ? "Cuéntame" : chatImage ? "¿Qué quieres saber de la captura?" : "Escribe a MANU"}"><button class="btn" type="submit">${chatImage && aiReady() ? "Enviar a Gemini" : "Enviar"}</button></form>`;
   },
@@ -1443,7 +1449,7 @@ const screens = {
         ${mood === 1 ? '<button class="btn ghost" data-act="refuge">Abrir el Refugio</button>' : ""}</section>
       ${sectionTitle("Tu vida")}
       <div class="list">
-        ${item("memoria", "box", "purple", "Memoria", (() => { const n = (vault.brain?.claims ?? []).filter((c) => c.status === "ACTIVE").length; const p = vault.brain ? memProposals(vault.brain, { spending: vault.spending, now: new Date() }).length : 0; return p ? `${p} cosa${p === 1 ? "" : "s"} para ti · ${n} recuerdos` : n ? `${n} recuerdos` : "Lo que me cuentas, para que no se te olvide"; })())}
+        ${item("memoria", "box", "purple", "Memoria", (() => { const n = (vault.brain?.claims ?? []).filter((c) => c.status === "ACTIVE").length; const p = vault.brain ? memProposals(vault.brain, { spending: vault.spending, projects: vault.projects, now: new Date() }).length : 0; return p ? `${p} cosa${p === 1 ? "" : "s"} para ti · ${n} recuerdos` : n ? `${n} recuerdos` : "Lo que me cuentas, para que no se te olvide"; })())}
         ${item("capturas", "shots", "blue", "Bandeja de capturas", toReview(vault.captures).length ? `${toReview(vault.captures).length} por revisar` : "Suelta aquí tus capturas y MANU las ordena")}
         ${item("fichaje", "clock", "blue", "Fichaje", (() => { const r = monthReport(vault.clock, localDay().slice(0, 7), { targetMin: clockTarget(), now: today() }); return r.days || r.openDays ? r.balance : "Entradas, pausas y lo que te debe RK"; })())}
         ${item("repaso", "repeat", "purple", "Repaso", "Tu día y tu semana: lo que fue bien y el plan")}
@@ -1507,7 +1513,7 @@ const subpages = {
       ${list.length ? `<div class="stack">${list.map(docRow).join("")}</div>` : '<p class="muted">Aún no hay documentos. Luego pregúntame «¿cuándo vence el seguro del coche?».</p>'}`;
   },
   memoria() {
-    return `${backBar("Memoria")}${memoriaPage(brain(), { spending: vault.spending, ui: memUi, now: new Date() })}`;
+    return `${backBar("Memoria")}${memoriaPage(brain(), { spending: vault.spending, projects: vault.projects, ui: memUi, now: new Date() })}`;
   },
   biblioteca() {
     const items = [...(vault.library ?? [])].filter((i) => libFilter === "todo" || i.status === libFilter).sort((a, b) => String(b.at).localeCompare(String(a.at)));
@@ -2142,11 +2148,17 @@ function say(text) {
     render();
     return;
   }
-  // WEB-94: «recuerda que…», «¿qué sabes de…?», «olvida lo de…».
+  // WEB-95: how Manu writes (counted on the device; off switch in Tú → Memoria). The Refugio
+  // and crisis paths returned above, so they are never observed. Commands are not his style.
   const mc = memCommand(clean);
+  // Orders to MANU (a spend, a reminder, a task, a budget) are not his way of talking.
+  if (!mc && !["expense", "reminder", "task"].includes(intent.kind) && !budgetCommand(clean)) brain().style = observeText(brain().style, clean, { now });
+  // WEB-94: «recuerda que…», «¿qué sabes de…?», «olvida lo de…»; WEB-95: «guárdate esa», decisiones.
   if (mc) {
-    const r = runMemCommand(brain(), mc, { now, seed: variant++ });
+    const previous = [...vault.chat].reverse().find((b) => b.from === "me")?.text ?? null;
+    const r = runMemCommand(brain(), mc, { now, seed: variant++, previous });
     vault.brain = r.brain;
+    if (r.offerDecision) { vault.chat.push({ from: "me", text: clean, at }, { from: "manu", text: r.reply, at, memDecision: { text: r.offerDecision, state: null } }); persist(); render(); return; }
     // «¿Qué sabes de mí?» used to show the written profile (WEB-57): it is still part of the answer.
     if (mc.kind === "about" && !mc.topic && vault.profile?.text) r.reply = `${r.reply}\n\nY tu perfil escrito (Tú → Tu archivo):\n${vault.profile.text.slice(0, 1500)}`;
     vault.chat.push({ from: "me", text: clean, at }, { from: "manu", text: r.reply, at, ...(r.pending ? { memForget: { ids: r.pending, state: null } } : {}) });
@@ -3025,15 +3037,15 @@ function updateItem(id, fn) {
 // ---------- WEB-94: Memoria ----------
 // Every handler here is Manu's tap: the decision is his; the core only proposes.
 const MEM_FORMS = new Set(["memAnswerForm", "memCatForm", "memChangeForm", "memAddForm", "memSearchForm", "memCorrectForm", "memExampleForm"]);
-const memProposalByKey = (key) => memProposals(brain(), { spending: vault.spending, now: new Date() }).find((p) => p.key === key);
+const memProposalByKey = (key) => memProposals(brain(), { spending: vault.spending, projects: vault.projects, now: new Date() }).find((p) => p.key === key);
 function memSave(msg) { persist(); render(); if (msg) toast(msg); }
 function memTry(fn) { try { return fn(); } catch (err) { toast(err.message); return null; } }
 function memRunProposal(key, action, payload = {}) {
   const p = memProposalByKey(key);
   if (!p) { toast("Eso ya no está pendiente."); render(); return; }
-  const r = memTry(() => applyProposal({ brain: brain(), spending: vault.spending }, p, action, payload, { now: new Date() }));
+  const r = memTry(() => applyProposal({ brain: brain(), spending: vault.spending, projects: vault.projects }, p, action, payload, { now: new Date() }));
   if (!r) return;
-  vault.brain = r.brain; vault.spending = r.spending; memUi.choosing = null;
+  vault.brain = r.brain; vault.spending = r.spending; if (r.projects) vault.projects = r.projects; memUi.choosing = null;
   memSave(r.message);
 }
 function memAct(a) {
@@ -3063,6 +3075,16 @@ function memAct(a) {
       else b.memForget.state = "kept";
       memSave(d.yes === "1" ? "Olvidado." : null); return;
     }
+    case "mem-chat-decision": {
+      const b = vault.chat.find((x) => x.at === d.at && x.memDecision && !x.memDecision.state);
+      if (!b) return;
+      if (d.yes === "1") { const r = memTry(() => memRemember(brain(), { text: b.memDecision.text.charAt(0).toUpperCase() + b.memDecision.text.slice(1), kind: "DECISION", source: { kind: "manu", excerpt: b.memDecision.text } }, { now })); if (!r) return; vault.brain = r.brain; b.memDecision.state = "done"; }
+      else b.memDecision.state = "no";
+      memSave(d.yes === "1" ? "Decisión guardada." : null); return;
+    }
+    case "mem-style-on": vault.brain = { ...brain(), style: setLearning(brain().style, a.checked) }; memSave(a.checked ? "Aprendo de cómo escribes." : "Dejo de aprender de cómo escribes."); return;
+    case "mem-style-wipe": if (!window.confirm("¿Olvidar todo lo observado sobre cómo escribes? Tus respuestas (sí/no) se mantienen.")) return; vault.brain = { ...brain(), style: wipeObserved(brain().style) }; memSave("Olvidado lo observado."); return;
+    case "mem-joke-del": vault.brain = { ...brain(), voice: removeJoke(brain().voice, Number(d.i)) }; memSave("Quitado."); return;
     case "mem-voice": vault.brain = { ...brain(), voice: { ...brain().voice, [d.k]: Number(d.v) } }; memSave(); return;
     case "mem-ex-del": vault.brain = { ...brain(), voice: removeExample(brain().voice, Number(d.i)) }; memSave("Quitada."); return;
     case "mem-rule": vault.brain = { ...brain(), learn: setRuleStatus(brain().learn, d.id, d.s) }; memSave(d.s === "REJECTED" ? "Regla olvidada." : d.s === "PAUSED" ? "En pausa." : "Reactivada."); return;
@@ -3137,7 +3159,12 @@ document.addEventListener("click", async (e) => {
     case "proj-open": openProject = a.dataset.id; projSourceKind = "note"; render({ focus: true, enter: "page" }); scrollTo(0, 0); break;
     case "proj-back": openProject = null; render({ focus: true, enter: "tab" }); scrollTo(0, 0); break;
     case "proj-kind": projSourceKind = a.dataset.kind; render(); break;
-    case "proj-del-source": updateProject(openProject, (p) => ({ ...p, sources: p.sources.filter((x) => x.id !== a.dataset.id) })); break;
+    case "proj-del-source": {
+      // WEB-95: removing something that was filed automatically is Manu's correction of the keywords.
+      const pr = vault.projects.find((x) => x.id === openProject); const src = pr?.sources.find((x) => x.id === a.dataset.id);
+      if (pr && src?.auto) brain().topics = observeMisfile(brain().topics, pr, `${src.title ?? ""} ${src.text ?? ""}`);
+      updateProject(openProject, (p) => ({ ...p, sources: p.sources.filter((x) => x.id !== a.dataset.id) })); break;
+    }
     case "proj-delete": if (a.dataset.confirm === "1") { vault.projects = (vault.projects ?? []).filter((p) => p.id !== openProject); openProject = null; persist(); render(); toast("Proyecto borrado"); } else { a.dataset.confirm = "1"; a.textContent = "Pulsa otra vez para borrarlo"; } break;
     case "proj-preset": askProject(PRESETS[a.dataset.p], a.dataset.label); break;
     case "proj-src-view": { const src = currentProject()?.sources.find((x) => x.id === a.dataset.id); if (src) toast(`[${a.dataset.n}] ${src.title}`); break; }
@@ -3411,6 +3438,7 @@ document.addEventListener("submit", async (e) => {
   if (f === "bzIdea") { // WEB-91: an idea goes straight to MANU as an idea, no questions
     const text = $("bzIdeaIn").value.trim().slice(0, 280); if (!text) return;
     vault.inbox.push({ ...capture({ id: uid("i"), text, at: new Date().toISOString() }), status: "IDEA" });
+    brain().style = observeText(brain().style, text); // WEB-95: his ideas are his words too
     persist(); render(); toast("Una servilleta más en el Café"); return;
   }
   if (f === "nubeForm") { nubeCodeSubmit($("nubeCode").value); return; }

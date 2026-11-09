@@ -26,7 +26,7 @@ const MAX_TEXT = 600;
 export const FRESH_DAYS = { FACT: 365, PREFERENCE: 180, DECISION: 120, INFERENCE: 90, HYPOTHESIS: 60, MEMORY: null };
 
 export function emptyBrain() {
-  return { schema: BRAIN_SCHEMA, claims: [], events: [], learn: { obs: {}, rules: [] }, outcomes: {}, answers: {}, voice: { humor: 1, franqueza: 1, examples: [] }, settings: { maxPerDay: 3 } };
+  return { schema: BRAIN_SCHEMA, claims: [], events: [], learn: { obs: {}, rules: [] }, outcomes: {}, answers: {}, voice: { humor: 1, franqueza: 1, examples: [], jokes: [] }, settings: { maxPerDay: 3 }, style: null, topics: null };
 }
 
 // Validates and fills a brain read from storage, a backup or the cloud.
