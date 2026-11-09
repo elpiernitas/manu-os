@@ -1,0 +1,36 @@
+/* Fable 5.1 design foundations, adapted to MANU OS. Additive: existing --bg/--fill variables keep their original behaviour. */
+:root {
+  --mo-bg: #050608;
+  --mo-surface: #111318;
+  --mo-surface-2: #171a21;
+  --mo-text: #F7F8FA;
+  --mo-text-2: #949AA6;
+  --mo-text-3: #5F6572;
+  --mo-blue: #246BFD;
+  --mo-blue-active: #4D8DFF;
+  --mo-blue-soft: rgba(36,107,253,.14);
+  --mo-line: rgba(255,255,255,.08);
+  --mo-line-strong: rgba(255,255,255,.14);
+  --mo-ok: #3DBE8B;
+  --mo-warn: #E0A64A;
+  --mo-danger: #E5574F;
+  --mo-glass: rgba(17,19,24,.72);
+  --mo-ease: cubic-bezier(.2,.8,.2,1);
+  --mo-t-fast: 160ms;
+  --mo-t-base: 220ms;
+  --mo-t-slow: 360ms;
+  --mo-s1: 4px; --mo-s2: 8px; --mo-s3: 12px; --mo-s4: 16px; --mo-s6: 24px;
+  --mo-r-s: 10px; --mo-r-m: 14px; --mo-r-l: 18px;
+  --mo-hit: 44px;
+}
+/* Phase 1 uses the original six-tab navigation (Bahía and Proyectos remain).
+   Icons inherit colour so existing selected/focus state and accessibility keep working. */
+.tab[data-fable="true"] > svg { width: 24px; height: 24px; transition: color var(--mo-t-fast), transform var(--mo-t-base) var(--mo-ease); }
+.tab[data-fable="true"][aria-selected="true"] > svg { color: var(--mo-blue-active); }
+.tab[data-fable="true"]:active > svg { transform: scale(.94); }
+.tab[data-fable="true"] .dot.fable-brand { width: 30px; height: 30px; border-radius: 11px; background: var(--mo-blue); }
+.tab[data-fable="true"] .dot.fable-brand svg { width: 23px; height: 23px; color: #fff; }
+@media (prefers-reduced-motion: reduce) {
+  .tab[data-fable="true"] > svg { transition: none; }
+  .tab[data-fable="true"]:active > svg { transform: none; }
+}
