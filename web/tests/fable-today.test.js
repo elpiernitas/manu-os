@@ -65,7 +65,7 @@ test("Main app uses Fable presentation fed by real cloud, push, weather, task st
   assert.match(app, /cloudState\.lastAt/);
   assert.match(app, /Boolean\(pushDev\.v\.endpoint\)/);
   assert.match(app, /const actualWeather = vault\.weather/);
-  assert.match(app, /bank: \{ connected: false, available: false \}/);
+  assert.match(app, /bank: \{ connected: bankAisUi\.checked && bankAisUi\.connected, available: bankAisUi\.checked \}/);
   assert.match(html, /design\/fable-today\.css/);
   for (const path of ["design/fable-today.js", "design/fable-today.css"]) assert.ok(sw.includes('"' + path + '"'));
 });
