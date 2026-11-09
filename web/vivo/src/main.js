@@ -56,7 +56,7 @@ function pinta() {
 function ir(vista, { foco = true } = {}) {
   if (!VISTAS[vista]) vista = "hoy";
   const cambia = () => { S.vista = vista; pinta(); scrollTo(0, 0); if (foco) main.focus({ preventScroll: true }); };
-  if (location.hash !== `#${vista}`) history.replaceState(null, "", `#${vista}`);
+  try { if (location.hash !== `#${vista}`) history.replaceState(null, "", `#${vista}`); } catch { /* marcos que no dejan tocar el historial */ }
   if (document.startViewTransition && !quieto()) document.startViewTransition(cambia); else cambia();
 }
 const cambia = (vault) => { S.vault = vault; pinta(); };
