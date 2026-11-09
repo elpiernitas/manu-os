@@ -50,7 +50,8 @@ export function spendingPattern(entries) {
     if (Number.isNaN(d.getTime())) continue;
     byWeekday[(d.getDay() + 6) % 7].cents += e.cents;
     byMonthPart[d.getDate() <= 10 ? 0 : d.getDate() <= 20 ? 1 : 2].cents += e.cents;
-    if (e.source !== "BANK") {
+    // The bank (Excel or Sabadell API) gives the day, not the time: no «mañana/tarde/noche» for them.
+    if (e.source !== "BANK" && e.source !== "SABADELL") {
       const h = d.getHours();
       byMoment[h >= 6 && h < 14 ? 0 : h >= 14 && h < 21 ? 1 : 2].cents += e.cents;
       timed++;
