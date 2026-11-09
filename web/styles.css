@@ -816,3 +816,4 @@ pre.code { white-space: pre-wrap; word-break: break-word; max-height: 220px; ove
 .mem-ex .grow, .mem-rules .grow { flex: 1; min-width: 0; }
 .mem-sample { background: rgba(255,255,255,.05); border-radius: 10px; padding: 8px 10px; }
 .mem-row .grow > span:first-child { overflow-wrap: anywhere; }
+.sw-row { display: flex; gap: 10px; align-items: center; margin: 8px 0; font-size: 14px; }

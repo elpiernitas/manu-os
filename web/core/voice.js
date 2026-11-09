@@ -37,7 +37,29 @@ const LINES = {
   forgot: [["Borrado."], ["Borrado del todo.", "Olvidado. No queda el texto en ningún sitio de MANU."], ["Borrado. Como si nunca me lo hubieras contado.", "Olvidado. Ni rastro (salvo que lo apuntes otra vez)."]],
   nothing: [["No tengo nada sobre eso."], ["No tengo nada guardado sobre eso.", "De eso no sé nada todavía."], ["Ahí tengo un hueco. Si quieres, cuéntamelo y lo apunto.", "Nada por aquí. O no me lo has contado o lo has borrado."]],
 };
-export function line(voice, kind, seed = 0) { return pickN(LINES[kind][level(voice?.humor)], seed); }
+// With humor on and a laugh Manu confirmed (his own way of writing it), MANU laughs now and then.
+export function line(voice, kind, seed = 0) {
+  const base = pickN(LINES[kind][level(voice?.humor)], seed);
+  return voice?.laugh && level(voice?.humor) >= 1 && kind === "saved" && seed % 4 === 2 ? `${base} ${voice.laugh}` : base;
+}
+
+// ---- Manu's jokes and wordplay: kept only when he says so, returned verbatim with their date ----
+export const JOKE_KINDS = { juego: "Juego de palabras", chiste: "Chiste", frase: "Frase tuya" };
+export function addJoke(voice, text, kind = "chiste", { now = new Date(), from = null } = {}) {
+  const t = String(text ?? "").replace(/\s+/g, " ").trim().slice(0, 280);
+  if (!t) throw new Error("No hay nada que guardar.");
+  const jokes = voice.jokes ?? [];
+  if (jokes.some((j) => j.text.toLowerCase() === t.toLowerCase())) return voice;
+  return { ...voice, jokes: [...jokes, { text: t, kind: JOKE_KINDS[kind] ? kind : "chiste", at: new Date(now).toISOString(), ...(from ? { from } : {}) }].slice(-100) };
+}
+export const removeJoke = (voice, i) => ({ ...voice, jokes: (voice.jokes ?? []).filter((_, k) => k !== i) });
+// «Cuéntame uno de mis chistes»: one of HIS, never made up.
+export function tellJoke(voice, seed = 0) {
+  const jokes = voice?.jokes ?? [];
+  if (!jokes.length) return "Aún no me has dejado ninguno. Cuando digas uno bueno, escribe «guárdate esa» y lo apunto tal cual.";
+  const j = pickN(jokes, seed);
+  return `Uno tuyo, del ${new Date(j.at).toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" })}:\n«${j.text}»`;
+}
 
 /**
  * When Manu says something that contradicts what he said before. The reply always cites the

@@ -9,7 +9,7 @@
 
 import { normalise } from "./text.js";
 import { remember, search, current, keyOf, dateFilter } from "./brain.js";
-import { describe, line, contradiction, own } from "./voice.js";
+import { describe, line, contradiction, own, addJoke, tellJoke } from "./voice.js";
 
 const MONTHS = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
 const lower = (s) => s.charAt(0).toLowerCase() + s.slice(1);
@@ -23,6 +23,14 @@ export function memCommand(text) {
   if (/^(que sabes de mi|que recuerdas de mi|que sabes sobre mi|que tienes de mi|mi memoria)$/.test(t)) return { kind: "about", topic: "" };
   if ((m = t.match(/^que (?:sabes|recuerdas|tienes apuntado) (?:de|del|de la|de los|de las|sobre|acerca de)\s+(.+)$/))) return { kind: "about", topic: m[1].replace(/^(el|la|los|las|mi|mis)\s+/, "") };
   if ((m = t.match(/^(?:olvida|olvidate de|borra (?:el recuerdo|de tu memoria))\s+(?:lo de\s+|lo del\s+|lo de la\s+|que\s+)?(.{2,})$/))) return { kind: "forget", topic: m[1] };
+  // WEB-95: Manu's humour, only when he marks it.
+  if ((m = t.match(/^(?:guardate|apuntate|guarda|apunta) (?:esa|ese|eso|esta|este)(?: (chiste|frase|juego de palabras|broma))?$/))) return { kind: "keepPrev", as: m[1] === "frase" ? "frase" : m[1] === "juego de palabras" ? "juego" : "chiste" };
+  if ((m = t.match(/^(?:eso|esa|ese) (?:es|era|ha sido|fue) (?:un |una )?(juego de palabras|chiste|broma|frase mia)$/))) return { kind: "keepPrev", as: m[1] === "juego de palabras" ? "juego" : m[1] === "frase mia" ? "frase" : "chiste" };
+  if (/^(?:cuentame|dime|recuerdame) (?:un|uno de mis|alguno de mis) (?:chistes?|juegos? de palabras)(?: mios?)?$|^mis (?:chistes|juegos de palabras)$/.test(t)) return { kind: "jokes" };
+  // Decisions: offered, never saved on a guess.
+  if ((m = raw.match(/^\s*((?:he|hemos) decidido|me he propuesto|a partir de ahora|voy a dejar de|ya no voy a)\b\s*(.{3,})$/i))) return { kind: "decision", text: raw.trim().replace(/[.]+$/, "") };
+  if ((m = t.match(/^(?:que decidi|que he decidido|que decisiones tome?) (?:sobre|de|con)\s+(.+)$/))) return { kind: "decisions", topic: m[1] };
+  if (/^(?:mis decisiones|que he decidido|que decidi)$/.test(t)) return { kind: "decisions", topic: "" };
   return null;
 }
 
@@ -70,7 +78,8 @@ export function extractPlace(text) {
  * `pending` (for «olvida») is a list of claim ids the UI asks Manu to confirm before deleting:
  * forgetting is never done on a vague match.
  */
-export function runMemCommand(brain, cmd, { now = new Date(), seed = 0, uid } = {}) {
+export function runMemCommand(brain, cmd, opts = {}) {
+  const { now = new Date(), seed = 0, uid } = opts;
   const voice = brain.voice ?? {};
   if (cmd.kind === "remember") {
     const f = extractFact(cmd.text);
@@ -84,6 +93,19 @@ export function runMemCommand(brain, cmd, { now = new Date(), seed = 0, uid } = 
   if (cmd.kind === "about") {
     const hits = cmd.topic ? search(brain, cmd.topic, { now }) : current(brain, { now }).filter((c) => c.subject === "Manu").map((claim) => ({ claim }));
     return { brain, reply: describe(voice, hits.slice(0, 15), { seed, topic: cmd.topic }) };
+  }
+  if (cmd.kind === "keepPrev") {
+    const prev = String(opts.previous ?? "").trim();
+    if (!prev || memCommand(prev)) return { brain, reply: "No sé cuál. Escribe la frase y después «guárdate esa»." };
+    const voice2 = addJoke(voice, prev, cmd.as, { now, from: "chat" });
+    return { brain: { ...brain, voice: voice2 }, reply: voice2 === voice ? "Esa ya la tenía." : `Guardada tal cual: «${prev.slice(0, 120)}». Te la puedo recordar cuando me pidas uno de tus chistes.` };
+  }
+  if (cmd.kind === "jokes") return { brain, reply: tellJoke(voice, seed) };
+  if (cmd.kind === "decision") return { brain, reply: "¿Lo guardo como decisión tuya? Así luego puedes preguntarme «¿qué decidí sobre…?».", offerDecision: cmd.text };
+  if (cmd.kind === "decisions") {
+    const pool = cmd.topic ? search(brain, cmd.topic, { now }).map((h) => h.claim) : current(brain, { now });
+    const ds = pool.filter((c) => c.kind === "DECISION" && c.status !== "PROPOSED");
+    return { brain, reply: ds.length ? `Tus decisiones${cmd.topic ? ` sobre «${cmd.topic}»` : ""}:\n${ds.slice(0, 10).map((c) => `• ${c.text} (${new Date(c.recordedAt).toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" })})`).join("\n")}` : `No tengo decisiones tuyas${cmd.topic ? ` sobre «${cmd.topic}»` : ""}.` };
   }
   if (cmd.kind === "forget") {
     const hits = search(brain, cmd.topic, { now }).filter((h) => h.score >= 1);

@@ -10,9 +10,13 @@ import { contested, staleClaims, proposed, confirm, reject, resolve, expire, cor
 import { ruleCandidates, decideRule, observe, predict, spendFeatures, featureText } from "./learn.js";
 import { nextQuestion } from "./conocernos.js";
 import { CATEGORIES, isConfirmed } from "./money.js";
+import { expressionCandidates, laughCandidate, emojiCandidate, decide as decideStyle } from "./style.js";
+import { keywordCandidates, keywordRemovals, decideTopic, applyKeyword } from "./topics.js";
+import { addExample } from "./voice.js";
 
 const DAY = 86400000;
-const LATER_DAYS = { pregunta: 3, vigencia: 30, gasto: 7, regla: 7, duda: 2, deduccion: 5 };
+const STYLE_KINDS = new Set(["expresion", "risa", "emoji"]);
+const LATER_DAYS = { pregunta: 3, vigencia: 30, gasto: 7, regla: 7, duda: 2, deduccion: 5, expresion: 7, risa: 14, emoji: 14, palabra: 7, palabraMal: 3 };
 const fmtDay = (d) => new Date(d).toLocaleDateString("es-ES", { day: "numeric", month: "long" });
 
 // The outcome log decides what may show again.
@@ -36,7 +40,7 @@ export function unknownSpends(spending = [], now = new Date()) {
  * Every proposal that applies right now, most useful first. `{ spending }` is the money list.
  * Each item: { key, kind, title, body, why, actions: [{ id, label, primary? }], ...data }.
  */
-export function proposals(brain, { spending = [], now = new Date() } = {}) {
+export function proposals(brain, { spending = [], projects = [], now = new Date() } = {}) {
   const out = [];
   // 1. Contradictions: two values for the same thing. Manu chooses; nothing is picked for him.
   const byKey = new Map();
@@ -61,12 +65,30 @@ export function proposals(brain, { spending = [], now = new Date() } = {}) {
     if (blocked(brain, key, now)) continue;
     out.push({ key, kind: "regla", candidate: c, title: "He visto un patrón", body: `Los gastos ${featureText(c.feature)} suelen ser ${CATEGORIES[c.label] ?? c.label}. ¿Te los propongo así a partir de ahora?`, why: `${c.why} Confianza ${Math.round(c.confidence * 100)} %. Seguirán marcados como deducción y podrás corregirlos.`, actions: [{ id: "accept", label: "Sí, propónmelos", primary: true }, { id: "reject", label: "No" }, { id: "later", label: "Luego" }] });
   }
+  // 3b. Ideas and projects: a keyword that keeps misfiling, then words his own filing taught.
+  for (const c of keywordRemovals(brain.topics, projects)) {
+    if (blocked(brain, c.key, now)) continue;
+    out.push({ key: c.key, kind: "palabraMal", topic: c, title: "Una palabra clave falla", body: `«${c.word}» ha metido en ${c.projectName} cosas que luego sacaste (${c.misfires} veces). ¿La quito de sus palabras?`, why: "Lo deduzco de lo que sacaste de ese proyecto después de que se archivara solo.", actions: [{ id: "accept", label: "Sí, quítala", primary: true }, { id: "reject", label: "No" }, { id: "later", label: "Luego" }] });
+  }
+  for (const c of keywordCandidates(brain.topics, projects)) {
+    if (blocked(brain, c.key, now)) continue;
+    out.push({ key: c.key, kind: "palabra", topic: c, title: "Para ordenar tus ideas", body: `Cuando apuntas algo de ${c.projectName} sueles usar «${c.word}». ¿La añado a sus palabras para que se archive solo?`, why: `${c.times} de ${c.total} veces que usaste «${c.word}» fue en cosas que metiste tú en ${c.projectName}.`, actions: [{ id: "accept", label: "Sí, añádela", primary: true }, { id: "reject", label: "No" }, { id: "later", label: "Luego" }] });
+  }
   // 4. Deductions waiting for Manu.
   for (const c of proposed(brain).slice(0, 3)) {
     const key = `deduccion:${c.id}`;
     if (blocked(brain, key, now)) continue;
     out.push({ key, kind: "deduccion", claim: c.id, title: "¿Es verdad esto?", body: c.text, why: `${KIND_LABEL[c.kind]} con ${Math.round((c.confidence ?? 0.5) * 100)} % de confianza: ${c.reason ?? "sin explicación"}. No lo trato como cierto hasta que lo confirmes.`, actions: [{ id: "confirm", label: "Sí", primary: true }, { id: "reject", label: "No" }, { id: "later", label: "Luego" }] });
   }
+  // 4b. How Manu writes: observations with counts, used only after he confirms them.
+  for (const c of expressionCandidates(brain.style, { limit: 1 })) {
+    if (blocked(brain, c.key, now)) continue;
+    out.push({ key: c.key, kind: "expresion", style: c, title: "Tu manera de hablar", body: `Escribes mucho «${c.text}» (${c.times} veces, en ${c.days} días distintos). ¿Es una expresión tuya que pueda usar contigo?`, why: `Lo he contado en tus mensajes e ideas dentro de MANU.${c.example ? ` Por ejemplo: «${c.example}».` : ""} No la uso hasta que digas que sí.`, actions: [{ id: "when:acierto", label: "Sí, cuando algo sale bien", primary: true }, { id: "when:cualquiera", label: "Sí, cuando sea" }, { id: "reject", label: "No es mía" }, { id: "later", label: "Luego" }] });
+  }
+  const lc = laughCandidate(brain.style);
+  if (lc && !blocked(brain, "estilo:risa", now)) out.push({ key: "estilo:risa", kind: "risa", style: lc, title: "Cómo te ríes", body: `Cuando algo te hace gracia escribes «${lc.laugh}». ¿Me río igual cuando toque?`, why: `Lo has escrito ${lc.times} veces y casi siempre de esa forma.`, actions: [{ id: "accept", label: "Sí", primary: true }, { id: "reject", label: "No" }, { id: "later", label: "Luego" }] });
+  const ec = emojiCandidate(brain.style);
+  if (ec && !blocked(brain, "estilo:emoji", now)) out.push({ key: "estilo:emoji", kind: "emoji", style: ec, title: "Emojis", body: ec.use ? `Usas emojis en ${Math.round(ec.rate * 100)} % de tus mensajes (${ec.top.join(" ")}). ¿Los uso yo también?` : "Casi nunca usas emojis. ¿Prefieres que yo tampoco los use?", why: "Es un recuento de tus mensajes en MANU, no una certeza sobre ti.", actions: [{ id: "accept", label: "Sí", primary: true }, { id: "reject", label: "No" }, { id: "later", label: "Luego" }] });
   // 5. The next getting-to-know-you question.
   const q = nextQuestion(brain, { now, perDay: brain.settings?.maxPerDay ?? 3 });
   if (q && !blocked(brain, `pregunta:${q.id}`, now)) out.push({ key: `pregunta:${q.id}`, kind: "pregunta", question: q.id, title: "Para conocernos", body: q.q, hint: q.hint ?? null, options: q.options ?? null, why: "Respondes solo si te apetece. Lo que digas queda en tu memoria y lo puedes corregir o borrar.", actions: [] });
@@ -87,18 +109,19 @@ export function topProposal(brain, opts = {}) {
   if (answeredToday >= (brain.settings?.maxPerDay ?? 3)) return null;
   const recentLater = Object.values(brain.outcomes ?? {}).some((o) => o.outcome === "LATER" && now - new Date(o.at) < 4 * 3600000);
   if (recentLater) return null;
-  return proposals(brain, opts)[0] ?? null;
+  // How Manu writes is asked about in Memoria, not on Hoy: it is never urgent.
+  return proposals(brain, opts).find((p) => !STYLE_KINDS.has(p.kind)) ?? null;
 }
 
 /**
  * Applies Manu's choice. Returns { brain, spending, message }. `payload` carries what he typed
  * or picked (a new value, a category). Unknown actions throw: nothing happens by accident.
  */
-export function applyProposal({ brain, spending = [] }, p, actionId, payload = {}, { now = new Date(), uid } = {}) {
+export function applyProposal({ brain, spending = [], projects = [] }, p, actionId, payload = {}, { now = new Date(), uid } = {}) {
   const ids = uid ? { uid } : {};
-  let b = brain, sp = spending, message = "Hecho.";
+  let b = brain, sp = spending, pj = projects, message = "Hecho.";
   const outcome = (o) => { b = recordOutcome(b, p.key, o, p.kind, { now }); };
-  if (actionId === "later") { outcome("LATER"); return { brain: b, spending: sp, message: "Vale, luego." }; }
+  if (actionId === "later") { outcome("LATER"); return { brain: b, spending: sp, projects: pj, message: "Vale, luego." }; }
   switch (p.kind) {
     case "duda": {
       if (!actionId.startsWith("keep:")) throw new Error("Acción desconocida.");
@@ -132,9 +155,34 @@ export function applyProposal({ brain, spending = [] }, p, actionId, payload = {
       else throw new Error("Acción desconocida.");
       outcome("ACCEPTED"); break;
     }
+    case "palabra": case "palabraMal": {
+      if (actionId !== "accept" && actionId !== "reject") throw new Error("Acción desconocida.");
+      const yes = actionId === "accept";
+      b = { ...b, topics: decideTopic(b.topics, p.topic.key, yes, { now }) };
+      if (yes) pj = applyKeyword(pj, p.topic, p.kind === "palabra");
+      outcome(yes ? "ACCEPTED" : "REJECTED");
+      message = !yes ? "Vale, la dejo como está." : p.kind === "palabra" ? `Añadida. Lo que lleve «${p.topic.word}» irá a ${p.topic.projectName}.` : `Quitada de ${p.topic.projectName}.`; break;
+    }
+    case "expresion": {
+      const yes = actionId.startsWith("when:");
+      if (!yes && actionId !== "reject") throw new Error("Acción desconocida.");
+      b = { ...b, style: decideStyle(b.style, p.style.key, yes, { now }) };
+      if (yes) b = { ...b, voice: addExample(b.voice, p.style.text, actionId.slice(5), { now }) };
+      outcome(yes ? "ACCEPTED" : "REJECTED");
+      message = yes ? `Apuntada «${p.style.text}». La usaré de vez en cuando, tal cual.` : "Entendido, no es tuya. No te lo vuelvo a preguntar."; break;
+    }
+    case "risa": case "emoji": {
+      if (actionId !== "accept" && actionId !== "reject") throw new Error("Acción desconocida.");
+      const yes = actionId === "accept";
+      b = { ...b, style: decideStyle(b.style, p.kind === "risa" ? "laugh" : "emoji", yes, { now }) };
+      if (p.kind === "risa") b = { ...b, voice: { ...b.voice, laugh: yes ? p.style.laugh : null } };
+      else b = { ...b, voice: { ...b.voice, emoji: yes ? p.style.use : !p.style.use } };
+      outcome(yes ? "ACCEPTED" : "REJECTED");
+      message = yes ? "Hecho, me adapto." : "Vale, lo dejo como estaba."; break;
+    }
     default: throw new Error("Esta propuesta se responde en su propio formulario.");
   }
-  return { brain: b, spending: sp, message };
+  return { brain: b, spending: sp, projects: pj, message };
 }
 
 /**
