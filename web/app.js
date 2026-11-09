@@ -50,6 +50,7 @@ import { buildBankShotsPayload, parseBankShots, alreadyThere, MAX_SHOTS } from "
 import { incomeKind } from "./core/bank.js";
 import { bankRequest, safeBankRedirect } from "./core/enablebanking.js";
 import { bankAisCard } from "./core/bank-ais-view.js";
+import { planImport, importRange, DAYS as BANK_IMPORT_DAYS } from "./core/bankimport.js";
 import { fableIcon, fableMark } from "./design/fable-icons.js";
 import { fableHoyIntro, fableHoyServices } from "./design/fable-today.js";
 import { nightReview, weekReview, nightDue, weekDue } from "./core/review.js";
@@ -70,7 +71,7 @@ import { removeJoke } from "./core/voice.js";
 import { memoriaPage, hoyMemCard } from "./core/memview.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "105"; // = número de la última tarea WEB publicada (desde WEB-87)
+export const APP_VERSION = "106"; // = número de la última tarea WEB publicada (desde WEB-87)
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -275,6 +276,34 @@ async function nubeSession() {
     try { s = await refreshSession(nubeCfg(), s); nube.session = s; } catch (err) { if (err.code === "expired") nube.session = null; throw err; }
   }
   return s;
+}
+
+// «Importar todo»: every booked movement of the last 90 days goes to Dinero (gastos e ingresos),
+// only when Manu asks and confirms. Repeating it adds nothing twice. Never to the memory.
+async function bankAisImport() {
+  if (!nubeOn() || !bankAisUi.connected) return;
+  if (!window.confirm(`¿Importar a Dinero todos los movimientos de los últimos ${BANK_IMPORT_DAYS} días de esta cuenta? Se guardan en MANU (y en Tu nube si la usas), con los conceptos tal como los da el banco. Los que ya tengas no se repiten.`)) return;
+  const index = Number(document.getElementById("bankAisAccount")?.value ?? bankAisUi.index ?? 0);
+  bankAisUi.busy = true; bankAisUi.error = null; render();
+  try {
+    const { from, to } = importRange(new Date());
+    const all = [];
+    let continuation = null, pages = 0;
+    do {
+      const data = await bankRequest(nubeCfg(), await nubeSession(), "transactions", { index, from, to, ...(continuation ? { continuation } : {}) });
+      all.push(...(data.transactions ?? []));
+      continuation = data.continuation ?? null;
+    } while (continuation && ++pages < 30);
+    const plan = planImport(all, vault);
+    if (plan.error) throw new Error(plan.error);
+    vault.spending.push(...plan.entries);
+    vault.income = [...(vault.income ?? []), ...plan.income];
+    vault.settings.lastBankApiImport = { at: new Date().toISOString(), from, to, added: plan.entries.length, incomeAdded: plan.income.length, duplicates: plan.duplicates + plan.incomeDuplicates, pending: plan.pending };
+    moneyMonth = latestMonthOffset();
+    persist();
+    toast(`${plan.entries.length} gastos y ${plan.income.length} ingresos importados${plan.duplicates + plan.incomeDuplicates ? ` · ${plan.duplicates + plan.incomeDuplicates} ya estaban` : ""}${plan.pending ? ` · ${plan.pending} pendientes sin importar` : ""}${continuation ? " · hay más: vuelve a importar" : ""}`);
+  } catch (err) { bankAisUi.error = String(err.message || "No se ha podido importar").slice(0, 180); }
+  finally { bankAisUi.busy = false; render(); }
 }
 
 async function bankAisAction(action) {
@@ -3406,6 +3435,7 @@ document.addEventListener("click", async (e) => {
     case "bank-ais-balances": bankAisAction("balances"); break;
     case "bank-ais-movements": bankAisAction("transactions"); break;
     case "bank-ais-disconnect": bankAisAction("disconnect"); break;
+    case "bank-ais-import": bankAisImport(); break;
     case "push-on": pushOn(); break;
     case "push-off-here": pushOffHere(); break;
     case "push-all-off": pushAllOff(); break;

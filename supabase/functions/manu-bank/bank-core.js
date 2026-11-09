@@ -101,7 +101,7 @@ export function balancesView(data) {
 }
 export function transactionsView(data) {
   return {
-    transactions: (Array.isArray(data?.transactions) ? data.transactions : []).slice(0, 100).map((t) => ({
+    transactions: (Array.isArray(data?.transactions) ? data.transactions : []).slice(0, 1000).map((t) => ({
       ref: String(t.entry_reference ?? "").slice(0, 100),
       date: String(t.booking_date ?? t.value_date ?? "").slice(0, 30),
       amount: String(t.transaction_amount?.amount ?? "").slice(0, 40),

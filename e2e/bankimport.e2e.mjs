@@ -1,0 +1,41 @@
+// Importar todo desde Sabadell (servidor manu-bank FALSO; nada sale a la red). Datos inventados.
+// Run: python3 -m http.server 8765 --directory web  &  node e2e/bankimport.e2e.mjs
+import { createRequire } from "module";
+const require = createRequire(import.meta.url);
+const { chromium, devices } = require(require("child_process").execSync("npm root -g").toString().trim() + "/playwright");
+let fails = 0;
+const ok = (l, v) => { console.log(v ? "PASS" : "FAIL", l); if (!v) { fails++; process.exitCode = 1; } };
+const browser = await chromium.launch();
+const ctx = await browser.newContext({ ...devices["iPhone 14"], timezoneId: "Europe/Madrid" });
+const page = await ctx.newPage(); const errors = []; const calls = [];
+page.on("pageerror", (e) => errors.push(String(e)));
+page.on("dialog", (d) => d.accept());
+await page.clock.install({ time: new Date("2026-11-09T15:00:00+01:00") });
+await page.route(/open-meteo\.com/, (r) => r.fulfill({ status: 503, body: "" }));
+await page.route(/supabase\.co\/rest\/v1\//, (r) => r.fulfill({ json: [] }));
+const page1 = [{ ref: "a", date: "2026-11-09", amount: "100.00", currency: "EUR", direction: "credit", description: "ABONO INVENTADO", status: "BOOK" }, { ref: "b", date: "2026-11-08", amount: "12.50", currency: "EUR", direction: "debit", description: "CAFETERIA INVENTADA", status: "BOOK" }];
+const page2 = [{ ref: "c", date: "2026-11-07", amount: "40.00", currency: "EUR", direction: "debit", description: "SUPERMERCADO INVENTADO", status: "BOOK" }, { ref: "d", date: "2026-11-09", amount: "3.00", currency: "EUR", direction: "debit", description: "PENDIENTE", status: "PDNG" }];
+await page.route(/functions\/v1\/manu-bank/, async (r) => {
+  const b = JSON.parse(r.request().postData() || "{}"); calls.push(b);
+  if (b.action === "status") return r.fulfill({ json: { server: { ready: true, active: true, production: true, ais: true, redirectRegistered: true }, connected: true, accounts: [{ index: 0, label: "Cuenta inventada", currency: "EUR" }], validUntil: "2026-11-10T14:00:00+00:00" } });
+  if (b.action === "transactions") return r.fulfill({ json: b.continuation ? { transactions: page2, continuation: null } : { transactions: page1, continuation: "pagina-2" } });
+  return r.fulfill({ status: 400, json: { error: "no" } });
+});
+await page.addInitScript(() => { if (sessionStorage.getItem("seeded")) return; sessionStorage.setItem("seeded", "1"); sessionStorage.setItem("manuos.tab", "dinero");
+  localStorage.setItem("manuos.vault", JSON.stringify({ schema: 1, settings: {}, inbox: [], chat: [], income: [], spending: [], projects: [] }));
+  localStorage.setItem("manuos.nube.token", JSON.stringify({ access: "falso", refresh: "falso", exp: Date.parse("2027-01-01") }));
+  localStorage.setItem("manuos.nube", JSON.stringify({ email: "prueba@example.invalid", lastRev: null })); });
+await page.goto("http://localhost:8765/"); await page.waitForTimeout(700);
+await page.click('[data-act="bank-ais-status"]'); await page.waitForTimeout(400);
+ok("connected card offers «Importar todo»", (await page.locator('[data-act="bank-ais-import"]').count()) === 1);
+await page.click('[data-act="bank-ais-import"]'); await page.waitForTimeout(800);
+const v = await page.evaluate(() => JSON.parse(localStorage.getItem("manuos.vault")));
+ok("follows every page (continuation) over 90 days", calls.filter((c) => c.action === "transactions").length === 2 && calls.find((c) => c.action === "transactions").from === "2026-08-12");
+ok("2 booked expenses and 1 income imported, the pending one not", v.spending.length === 2 && v.income.length === 1 && !JSON.stringify(v).includes("PENDIENTE"));
+ok("marked as coming from Sabadell", v.spending.every((e) => e.source === "SABADELL"));
+ok("nothing went to the memory", !v.brain || !(v.brain.claims ?? []).length);
+await page.click('[data-act="bank-ais-import"]'); await page.waitForTimeout(800);
+const v2 = await page.evaluate(() => JSON.parse(localStorage.getItem("manuos.vault")));
+ok("importing again adds nothing", v2.spending.length === 2 && v2.income.length === 1);
+ok("no page errors", errors.length === 0); if (errors.length) console.log(errors.join("\n"));
+await browser.close(); console.log(fails ? `${fails} FAIL` : "ALL PASS");
