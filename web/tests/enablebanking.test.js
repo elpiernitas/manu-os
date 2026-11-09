@@ -89,3 +89,44 @@ test("server pre-flight: ready only with an active PRODUCTION app, AIS and the e
   assert.equal(serverCheck({ ...app, services: ["PIS"] }, cb).ready, false);
   assert.deepEqual(Object.keys(serverCheck(app, cb)).sort(), ["active", "ais", "production", "ready", "redirectRegistered"], "no names, kid or URLs leak to the app");
 });
+
+test("private key formats: PKCS#8, PKCS#1 (wrapped in memory), escaped line breaks; report shows only booleans", async () => {
+  const { readPrivateKey, makeEnableJwt, configReport } = await import("../../supabase/functions/manu-bank/bank-core.js");
+  const { generateKeyPairSync } = await import("node:crypto");
+  const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+  const pkcs8 = privateKey.export({ type: "pkcs8", format: "pem" });
+  const pkcs1 = privateKey.export({ type: "pkcs1", format: "pem" });
+  const appId = "00000000-0000-4000-8000-0000000000aa";
+  for (const [label, pem] of [["pkcs8", pkcs8], ["pkcs1", pkcs1], ["pkcs1 con \\n escapados", pkcs1.replace(/\n/g, "\\n")], ["pkcs8 con CRLF", pkcs8.replace(/\n/g, "\r\n")]]) {
+    const jwt = await makeEnableJwt({ appId: `  ${appId}\n`, privatePem: pem, now: Date.parse("2026-11-09T12:00:00Z") });
+    const [h, p, sig] = jwt.split(".");
+    const pub = await crypto.subtle.importKey("spki", publicKey.export({ type: "spki", format: "der" }), { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["verify"]);
+    const ok = await crypto.subtle.verify("RSASSA-PKCS1-v1_5", pub, Buffer.from(sig, "base64url"), new TextEncoder().encode(`${h}.${p}`));
+    assert.ok(ok, `${label}: valid RS256 signature`);
+    assert.equal(JSON.parse(Buffer.from(h, "base64url")).kid, appId, `${label}: kid trimmed`);
+  }
+  assert.equal(readPrivateKey(pkcs1).type, "pkcs1");
+  assert.equal(readPrivateKey("-----BEGIN ENCRYPTED PRIVATE KEY-----\nAAAA\n-----END ENCRYPTED PRIVATE KEY-----").type, "encrypted");
+  assert.equal(readPrivateKey("").type, "missing");
+  assert.equal(readPrivateKey("-----BEGIN PUBLIC KEY-----\nAAAA\n-----END PUBLIC KEY-----").type, "other");
+  const env = { supabase: "https://xqsexjpuhvmwkclpnvjo.supabase.co", service: "x".repeat(40), public: "y".repeat(20), appId, privateKey: pkcs1, callback: "https://xqsexjpuhvmwkclpnvjo.supabase.co/functions/v1/manu-bank" };
+  const r = await configReport(env, { project: "xqsexjpuhvmwkclpnvjo" });
+  assert.equal(r.ok, true);
+  assert.ok(!JSON.stringify(r).includes(appId) && !JSON.stringify(r).includes("BEGIN"), "no values in the report");
+  const bad = await configReport({ ...env, privateKey: "-----BEGIN PRIVATE KEY-----\nbm90LWEta2V5\n-----END PRIVATE KEY-----", callback: "https://x/" }, { project: "xqsexjpuhvmwkclpnvjo" });
+  assert.deepEqual([bad.ok, bad.privateKeyType, bad.privateKeyImports, bad.callbackMatches], [false, "pkcs8", false, false]);
+});
+
+test("key read without PEM headers (base64 DER, base64 of a PEM file) and header kind reported without content", async () => {
+  const { readPrivateKey, makeEnableJwt, pemMarker } = await import("../../supabase/functions/manu-bank/bank-core.js");
+  const { generateKeyPairSync } = await import("node:crypto");
+  const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+  const appId = "00000000-0000-4000-8000-0000000000aa";
+  const der8 = privateKey.export({ type: "pkcs8", format: "der" }).toString("base64");
+  const der1 = privateKey.export({ type: "pkcs1", format: "der" }).toString("base64");
+  const pemB64 = Buffer.from(privateKey.export({ type: "pkcs8", format: "pem" })).toString("base64");
+  for (const v of [der8, der1, pemB64]) assert.ok((await makeEnableJwt({ appId, privatePem: v })).split(".").length === 3);
+  assert.equal(pemMarker("-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----"), "CERTIFICATE");
+  assert.equal(readPrivateKey("-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----").marker, "CERTIFICATE");
+  assert.equal(readPrivateKey("hola").marker, "none");
+});

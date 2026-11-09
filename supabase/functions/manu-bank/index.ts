@@ -3,15 +3,16 @@
 // Docs: https://enablebanking.com/docs/api/reference/
 import {
   newOAuthState, hashState, makeEnableJwt, validState, validAccountId, validIsoDate,
-  sabadellFromAspsps, sanitizeAccounts, balancesView, transactionsView, serverCheck,
+  sabadellFromAspsps, sanitizeAccounts, balancesView, transactionsView, serverCheck, configReport, cleanAppId,
 } from "./bank-core.js";
 
 const SUPABASE = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? (() => { try { return JSON.parse(Deno.env.get("SUPABASE_SECRET_KEYS") ?? "{}").default ?? ""; } catch { return ""; } })();
 const PUBLIC = Deno.env.get("SUPABASE_ANON_KEY") ?? Deno.env.get("SUPABASE_PUBLISHABLE_KEY") ?? "";
-const APP_ID = Deno.env.get("ENBANK_APP_ID") ?? "";
-const PRIVATE_KEY = (Deno.env.get("ENBANK_PRIVATE_KEY") ?? "").replace(/\\n/g, "\n");
-const CALLBACK = Deno.env.get("MANU_BANK_CALLBACK_URL") ?? "";
+const APP_ID = cleanAppId(Deno.env.get("ENBANK_APP_ID"));
+const PRIVATE_KEY = Deno.env.get("ENBANK_PRIVATE_KEY") ?? "";
+const PROJECT = "xqsexjpuhvmwkclpnvjo";
+const CALLBACK = `https://${PROJECT}.supabase.co/functions/v1/manu-bank`; // must equal MANU_BANK_CALLBACK_URL and the URL registered in Enable Banking
 const APP_ORIGIN = "https://elpiernitas.github.io";
 const APP_HOME = APP_ORIGIN + "/manu-os/";
 const API = "https://api.enablebanking.com";
@@ -67,10 +68,11 @@ async function enable(path, options = {}) {
   const text = await res.text();
   return text ? JSON.parse(text) : {};
 }
-function configured() {
-  return SUPABASE.startsWith("https://") && SERVICE.length > 20 && PUBLIC.length > 10 &&
-    /^[a-f0-9-]{36}$/i.test(APP_ID) && PRIVATE_KEY.includes("-----BEGIN PRIVATE KEY-----") &&
-    CALLBACK === SUPABASE + "/functions/v1/manu-bank";
+// Computed once per instance: which checks pass (booleans only, see configReport).
+let report: Record<string, unknown> | null = null;
+async function configured() {
+  report ??= await configReport({ supabase: SUPABASE, service: SERVICE, public: PUBLIC, appId: APP_ID, privateKey: PRIVATE_KEY, callback: Deno.env.get("MANU_BANK_CALLBACK_URL") }, { project: PROJECT });
+  return report.ok === true;
 }
 const bounce = (result) => new Response(null, { status: 303, headers: { Location: APP_HOME + "#banco=" + result, "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" } });
 async function callback(url) {
@@ -92,7 +94,11 @@ async function callback(url) {
 const linked = (row) => Boolean(row?.session_id) && (!row.consent_until || Date.parse(row.consent_until) > Date.now());
 async function route(req) {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
-  if (!configured()) return safeFail(503, "Conexión bancaria todavía no configurada");
+  if (!(await configured())) {
+    // Says WHICH check fails (true/false and the key type), never a value: enough to fix it.
+    const { ok, ...checks } = report ?? {};
+    return reply({ error: "Conexión bancaria todavía no configurada", checks }, 503);
+  }
   const url = new URL(req.url);
   if (req.method === "GET" && url.pathname.endsWith("/manu-bank")) return callback(url);
   if (req.method !== "POST") return safeFail(405, "Método no permitido");

@@ -12,12 +12,60 @@ export async function hashState(state, cryptoImpl = crypto) {
   if (!validState(state)) throw new Error("Invalid OAuth state");
   return Array.from(new Uint8Array(await cryptoImpl.subtle.digest("SHA-256", utf8(state)))).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
+// The key as stored in the secret: PKCS#8 («BEGIN PRIVATE KEY») or PKCS#1 («BEGIN RSA PRIVATE
+// KEY»), with real or escaped («\n») line breaks. PKCS#1 is wrapped into PKCS#8 in memory (the
+// secret itself is never changed). Returns { type, der } or { type: "missing"|"other"|"encrypted" }.
+export function readPrivateKey(raw) {
+  const pem = String(raw ?? "").replace(/\\n/g, "\n").replace(/\r/g, "").trim();
+  if (!pem) return { type: "missing" };
+  if (/BEGIN ENCRYPTED PRIVATE KEY/.test(pem)) return { type: "encrypted" };
+  const m = /-----BEGIN (RSA )?PRIVATE KEY-----([\s\S]+?)-----END \1?PRIVATE KEY-----/.exec(pem);
+  if (!m) {
+    // No PEM block: maybe the base64 body alone (DER), or a whole PEM file encoded in base64.
+    const b64 = pem.replace(/\s/g, "");
+    if (/^[A-Za-z0-9+/=_-]{300,}$/.test(b64)) {
+      let bytes;
+      try { bytes = Uint8Array.from(atob(b64.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0)); } catch { return { type: "other", marker: "none" }; }
+      const text = new TextDecoder().decode(bytes);
+      if (/-----BEGIN/.test(text)) return readPrivateKey(text);
+      if (bytes[0] === 0x30) return { type: "der", der: bytes, alt: pkcs1ToPkcs8(bytes) };
+    }
+    return { type: "other", marker: pemMarker(pem) };
+  }
+  let der;
+  try { der = Uint8Array.from(atob(m[2].replace(/\s/g, "")), (c) => c.charCodeAt(0)); } catch { return { type: "other", marker: "bad-base64" }; }
+  return m[1] ? { type: "pkcs1", der: pkcs1ToPkcs8(der) } : { type: "pkcs8", der };
+}
+// Only the KIND of the first PEM header (a fixed list), never any content.
+const MARKERS = ["CERTIFICATE", "PUBLIC KEY", "RSA PUBLIC KEY", "PRIVATE KEY", "RSA PRIVATE KEY", "EC PRIVATE KEY", "OPENSSH PRIVATE KEY", "CERTIFICATE REQUEST"];
+export function pemMarker(text) {
+  const m = /-----BEGIN ([A-Z ]{3,40})-----/.exec(String(text ?? ""));
+  if (!m) return /BEGIN/i.test(String(text)) ? "malformed-header" : "none";
+  return MARKERS.includes(m[1]) ? m[1] : "unknown";
+}
+// Imports the key whatever the accepted format (raw DER may be PKCS#8 or PKCS#1).
+export async function importSigningKey(k, cryptoImpl = crypto) {
+  const alg = { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" };
+  try { return await cryptoImpl.subtle.importKey("pkcs8", k.der, alg, false, ["sign"]); }
+  catch (e) { if (k.alt) return cryptoImpl.subtle.importKey("pkcs8", k.alt, alg, false, ["sign"]); throw e; }
+}
+const derLen = (n) => (n < 128 ? [n] : n < 256 ? [0x81, n] : n < 65536 ? [0x82, n >> 8, n & 255] : [0x83, n >> 16, (n >> 8) & 255, n & 255]);
+export function pkcs1ToPkcs8(pkcs1) {
+  // PrivateKeyInfo ::= SEQUENCE { INTEGER 0, AlgorithmIdentifier { rsaEncryption, NULL }, OCTET STRING pkcs1 }
+  const algo = [0x30, 0x0d, 0x06, 0x09, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x01, 0x05, 0x00];
+  const octet = [0x04, ...derLen(pkcs1.length)];
+  const body = [0x02, 0x01, 0x00, ...algo, ...octet];
+  const total = body.length + pkcs1.length;
+  const out = new Uint8Array([0x30, ...derLen(total), ...body, ...pkcs1]);
+  return out;
+}
+export const cleanAppId = (s) => String(s ?? "").trim();
 export async function makeEnableJwt({ appId, privatePem, now = Date.now(), cryptoImpl = crypto }) {
+  appId = cleanAppId(appId);
   if (!validAccountId(appId)) throw new Error("Invalid application ID");
-  if (typeof privatePem !== "string" || !privatePem.includes("-----BEGIN PRIVATE KEY-----")) throw new Error("Require a PKCS#8 private key stored as a server secret");
-  const data = privatePem.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\s/g, "");
-  const binary = atob(data);
-  const key = await cryptoImpl.subtle.importKey("pkcs8", Uint8Array.from(binary, (c) => c.charCodeAt(0)), { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["sign"]);
+  const k = readPrivateKey(privatePem);
+  if (!k.der) throw new Error("Require an RSA private key (PKCS#8 or PKCS#1) stored as a server secret");
+  const key = await importSigningKey(k, cryptoImpl);
   const issued = Math.floor(now / 1000);
   const h = b64url(utf8(JSON.stringify({ typ: "JWT", alg: "RS256", kid: appId })));
   const p = b64url(utf8(JSON.stringify({ iss: "enablebanking.com", aud: "api.enablebanking.com", iat: issued, exp: issued + 600 })));
@@ -78,4 +126,24 @@ export function serverCheck(app, callback) {
   };
   out.ready = out.active && out.production && out.ais && out.redirectRegistered;
   return out;
+}
+
+// Which configuration checks pass. Booleans and a key TYPE only: never a value, length or prefix.
+export async function configReport(env, { project, cryptoImpl = crypto } = {}) {
+  const k = readPrivateKey(env.privateKey);
+  let keyImports = false;
+  if (k.der) { try { await importSigningKey(k, cryptoImpl); keyImports = true; } catch {} }
+  const expected = `https://${project}.supabase.co/functions/v1/manu-bank`;
+  const r = {
+    supabaseUrl: /^https:\/\//.test(env.supabase ?? ""),
+    serviceKey: (env.service ?? "").length > 20,
+    publicKey: (env.public ?? "").length > 10,
+    appIdFormat: validAccountId(cleanAppId(env.appId)),
+    privateKeyType: k.type,
+    ...(k.marker ? { privateKeyHeader: k.marker } : {}),
+    privateKeyImports: keyImports,
+    callbackMatches: String(env.callback ?? "").trim() === expected,
+  };
+  r.ok = r.supabaseUrl && r.serviceKey && r.publicKey && r.appIdFormat && r.privateKeyImports && r.callbackMatches;
+  return r;
 }
