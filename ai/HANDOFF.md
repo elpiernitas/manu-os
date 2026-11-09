@@ -2,7 +2,8 @@
 
 ## Próximo paso vigente
 
-0. **WEB-95 (aprender de ideas, decisiones y conversaciones):** PR en borrador. Informe en `INFORME_WEB-95.md`. WEB-94 (Memoria) ya está fusionada (PR #97). Sigue pendiente de Manu si la memoria debe quedar fuera de Tu nube.
+0. **WEB-97 (Centro de permisos y conexiones, integración con iOS):** PR en borrador. Informe en `INFORME_WEB-97.md`; auditoría con fuentes en `docs/integrations/IOS_CAPABILITIES.md`. WEB-95 ya está fusionada (PR #98).
+- (Anterior) **WEB-95 (aprender de ideas, decisiones y conversaciones):** PR en borrador. Informe en `INFORME_WEB-95.md`. WEB-94 (Memoria) ya está fusionada (PR #97). Sigue pendiente de Manu si la memoria debe quedar fuera de Tu nube.
 1. **WEB-87:** Manu prueba en su iPhone la lista de la sección «WEB-87». Lo que falle se arregla en esa misma tarea, con su regresión.
 2. No se añaden funciones hasta cerrar WEB-87.
 3. La línea nativa (PR #7, #8 y #9) sigue en pausa.
@@ -10,6 +11,33 @@
 ## Estado
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
+
+## WEB-97 — Centro de permisos y conexiones (integración con iOS, 2026-11-09)
+
+Manu pide auditar qué puede usar MANU del iPhone (contactos, calendario, salud, ubicación, fotos, avisos, Bluetooth, casa, Atajos…) y montar un centro de permisos gestionable desde el móvil. Condiciones: sin permisos decorativos, sin ATT, y MANU nunca contacta a otras personas. Rama `claude/magical-goodall-rf5qoo`, reiniciada desde `main` (`71ce710`, con WEB-95 fusionada).
+
+**Qué se ha hecho:**
+
+| Pieza | Qué hace |
+|---|---|
+| `docs/integrations/IOS_CAPABILITIES.md` | La auditoría, con fuentes públicas. Separa web, Atajos, servicio externo, solo app nativa y no permitido. |
+| `core/capabilities.js` | Catálogo de unas 30 entradas: función, qué sale del móvil, estado real y dónde quitarlo. `probe()` lee el estado sin pedir nada. También `locateOnce()` (una vez, redondeada a 0,1°), `requestPersist()`, `setBadge()` y `badgeCount()`. |
+| Tú → «Permisos y conexiones» | Las entradas en 4 grupos, con su estado, sus detalles y botones solo donde la web puede actuar de verdad. |
+| Capacidades nuevas | «Guardar sin que se borre» (`storage.persist`). «Tiempo aquí» (ubicación puntual para el tiempo). «Número en el icono»: el globo con los recordatorios que quedan hoy, opcional y desactivado por defecto. |
+| `sw.js` y `APP_VERSION` | 97. |
+
+**Deliberadamente no pedido:** sensores de movimiento, micrófono web, Contact Picker, Web Bluetooth y Wake Lock. Ninguna función los necesita, o Safari no los da.
+
+**Comandos y resultados:**
+- `npm test`: 323 de 323, con 10 pruebas nuevas en `tests/capacidades.test.js`.
+- `node --check`: correcto.
+- `node e2e/permisos.e2e.mjs`: 18 de 18.
+- `memoria` y `estilo`: sin regresión.
+- Todo en Chromium con emulación de iPhone 14.
+
+**NO_VERIFICADO:**
+- Safari y el iPhone real: respuesta de `persist()`, globo, aviso de ubicación, rutas de Ajustes.
+- Push con MANU cerrada: no se ha hecho, necesita servidor.
 
 ## WEB-95 — aprender de ideas, decisiones, correcciones y conversaciones (2026-11-09)
 

@@ -6,6 +6,7 @@ import { capture, confirm, markUnclassified, pending, tasks, ideas, toggleDone }
 import { initialRefuge, refugeReply } from "./core/refuge.js";
 import { LocalStore, emptyVault, validateVault, wipeDeviceKeys, storageUse } from "./core/storage.js";
 import { notificationStatus, isInstalled, enableNotifications, testNotification } from "./core/notify.js";
+import { probe as capProbeRead, catalog as capCatalog, summary as capSummary, GROUPS as CAP_GROUPS, ROUTES as CAP_ROUTES, STATES as CAP_STATES, badgeCount, locateOnce, requestPersist, setBadge } from "./core/capabilities.js";
 import { launchParams, parseEvents, nextEvent, localDay } from "./core/intake.js";
 import { fetchForecast, searchCities, advice, WEATHER_TTL_MS } from "./core/weather.js";
 import { importStatement, importStatementRows, classifiedFromRows, dropCrossSource } from "./core/bank.js";
@@ -63,7 +64,7 @@ import { removeJoke } from "./core/voice.js";
 import { memoriaPage, hoyMemCard } from "./core/memview.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "95"; // = número de la última tarea WEB publicada (desde WEB-87)
+export const APP_VERSION = "97"; // = número de la última tarea WEB publicada (desde WEB-87)
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -147,6 +148,24 @@ function persist() {
   if (vault.chat.length > 200) vault.chat = vault.chat.slice(-200);
   if (!store.save(vault)) toast("No he podido guardar en este dispositivo.");
   nubeChanged();
+  syncBadge();
+}
+
+// ---------- Centro de permisos y conexiones (WEB-97) ----------
+// capProbe: the real state read from the browser (never prompts). Refreshed when the page opens.
+let capProbe = null;
+async function refreshCaps() {
+  try { capProbe = await capProbeRead(); } catch { capProbe = {}; }
+  if (tab === "tu" && sub === "permisos" && !document.activeElement?.matches("input, textarea")) render();
+}
+const capItems = () => capCatalog({ probe: capProbe ?? {}, settings: vault.settings, google: vault.settings.google ?? {}, ai: aiReady(), spotify: Boolean(spotifyStore.tokens), nube: nubeOn(), shortcutsDone: vault.settings.shortcutsDone ?? {}, style: vault.brain?.style?.on !== false });
+// The icon badge: only the count of reminders left today, only if Manu turned it on.
+let lastBadge = 0; // nothing to clear until MANU has set one
+function syncBadge() {
+  const n = vault.settings.badge === true ? badgeCount(vault.reminders, new Date()) : 0;
+  if (n === lastBadge) return;
+  lastBadge = n;
+  setBadge(n);
 }
 
 // ---------- Tu nube (WEB-64, WEB-67): the vault in Manu's Supabase ----------
@@ -1464,6 +1483,7 @@ const screens = {
       </div>
       ${sectionTitle("Ajustes")}
       <div class="list">
+        ${item("permisos", "bolt", "teal", "Permisos y conexiones", capProbe ? capSummary(capItems()) : "Qué usa MANU del iPhone y de fuera")}
         ${item("tiempo", "pin", "blue", "Tiempo y ciudades", `Casa: ${(vault.settings.homeCity ?? CITIES.GIJON).name}`)}
         ${item("gcal", "google", "blue", "Google", isClientId(gClientId()) ? "Calendar, Tasks, Contactos, Drive y Gmail" : "Conectar tus servicios de Google")}
         ${item("correo", "mail", "red", "Correo", googleOn("gmail") ? (vault.mail ? `${vault.mail.senders.length} remitentes masivos · ${vault.mail.important.length} importantes` : "Conectado: toca «Actualizar»") : "Conectar Gmail")}
@@ -1495,6 +1515,20 @@ const profileForm = (text) => `<form id="profileForm" class="stack"><label for="
 const backBar = (title) => `<button class="link" data-act="back">${I.back} Tú</button><h1>${title}</h1>`;
 
 const subpages = {
+  permisos() {
+    if (!capProbe) refreshCaps();
+    const items = capItems();
+    const pill = (st) => `<span class="cap-state" data-state="${st}">${esc(CAP_STATES[st] ?? st)}</span>`;
+    const row = (x) => `<div class="cap-row" data-cap="${esc(x.id)}"><div class="row"><div class="grow"><div><b>${esc(x.title)}</b> <span class="cap-route muted small">${esc(CAP_ROUTES[x.route].label)}</span></div><div class="small">${esc(x.what)}</div></div>${pill(x.state)}</div>
+      <details class="cap-more"><summary class="muted small">Detalles</summary><p class="muted small">${esc(x.detail)}</p><p class="muted small"><b>Qué sale del móvil:</b> ${esc(x.data)}</p><p class="muted small"><b>Para quitarlo:</b> ${esc(x.settings)}</p></details>
+      ${x.action || x.sub || x.shortcut ? `<div class="btns">${x.action ? `<button class="btn small-btn" data-act="${esc(x.action.act)}">${esc(x.action.label)}</button>` : ""}${x.sub ? `<button class="btn ghost small-btn" data-sub-go="${esc(x.sub)}">Abrir</button>` : ""}${x.shortcut ? `<button class="btn ghost small-btn" data-sub-go="atajos">Ver atajo</button>` : ""}</div>` : ""}</div>`;
+    return `${backBar("Permisos y conexiones")}
+      <section class="card"><p class="small">Cada permiso tiene una función concreta, se pide solo cuando la usas y se quita cuando quieras. El estado es el real de este dispositivo${capProbe?.installed ? " (abierta desde el icono)" : capProbe ? " (abierta en Safari: algunas cosas solo van desde el icono de inicio)" : ""}.</p>
+        <ul class="muted small"><li>MANU solo habla contigo: nunca escribe ni llama a nadie por su cuenta.</li><li>Sin rastreo publicitario, ni ahora ni nunca.</li><li>Lo que aprende de ti se queda en tu dispositivo (y en Tu nube si la usas) y lo ves en Memoria.</li></ul>
+        <button class="btn ghost small-btn" data-act="cap-refresh">Volver a comprobar</button></section>
+      ${CAP_GROUPS.map(([g, title]) => { const xs = items.filter((x) => x.group === g); return xs.length ? `${sectionTitle(title)}<section class="card cap-list">${xs.map(row).join("")}</section>` : ""; }).join("")}
+      <p class="muted small">Los ajustes de iOS cambian de nombre entre versiones: si una ruta no coincide, busca «MANU» en Ajustes.</p>`;
+  },
   repaso() {
     const n = tonightReview(), w = lastWeekReview();
     const notes = [...(vault.reviews ?? [])].sort((a, b) => b.day.localeCompare(a.day)).slice(0, 14);
@@ -2056,7 +2090,7 @@ function render({ focus = false, enter = null } = {}) {
   $("screen").querySelectorAll("[data-c]").forEach((el) => { if (/^#[0-9a-f]{6}$/i.test(el.dataset.c)) el.style.setProperty("--ev", el.dataset.c); });
   hydrateImages($("screen"));
   if (tab === "bahia" && !sub && !overlay) paintBahia();
-  $("topTitle").textContent = sub ? { habitos: "Hábitos", salud: "Salud", comidas: "Comidas", personas: "Personas", tiempo: "Tiempo", avisos: "Avisos", datos: "Tus datos", gcal: "Google", correo: "Correo", archivo: "Tu archivo", capturas: "Capturas", ia: "IA", spotify: "Spotify", atajos: "Atajos", fichaje: "Fichaje", repaso: "Repaso", documentos: "Documentos", biblioteca: "Biblioteca", memoria: "Memoria" }[sub] : TABS.find(([id]) => id === tab)[1];
+  $("topTitle").textContent = sub ? { habitos: "Hábitos", salud: "Salud", comidas: "Comidas", personas: "Personas", tiempo: "Tiempo", avisos: "Avisos", datos: "Tus datos", gcal: "Google", correo: "Correo", archivo: "Tu archivo", capturas: "Capturas", ia: "IA", spotify: "Spotify", atajos: "Atajos", fichaje: "Fichaje", repaso: "Repaso", documentos: "Documentos", biblioteca: "Biblioteca", memoria: "Memoria", permisos: "Permisos" }[sub] : TABS.find(([id]) => id === tab)[1];
   const sheetKey = sheet ? sheet.kind : null;
   if (sheetKey !== renderedSheetKind || !sheet) {
     const wasOpen = Boolean($("sheetBg"));
@@ -3302,7 +3336,23 @@ document.addEventListener("click", async (e) => {
       persist(); render(); break;
     }
     case "tomorrow-reset": vault.settings.tomorrow = null; persist(); render(); break;
-    case "notify-on": await enableNotifications(); render(); break;
+    case "notify-on": await enableNotifications(); await refreshCaps(); render(); break;
+    case "cap-refresh": await refreshCaps(); toast("Comprobado"); break;
+    case "cap-persist": { const r = await requestPersist(); await refreshCaps(); toast(r === true ? "iOS guardará tus datos de forma persistente." : r === false ? "iOS no lo ha concedido ahora. Ábreme desde el icono y vuelve a intentarlo." : "Este navegador no deja pedirlo."); break; }
+    case "cap-badge": {
+      if (vault.settings.badge === true) { vault.settings.badge = false; persist(); await setBadge(0); toast("Número del icono quitado"); }
+      else { if (notificationStatus() === "default") await enableNotifications(); vault.settings.badge = true; lastBadge = null; persist(); toast(notificationStatus() === "granted" ? "El icono mostrará los recordatorios que te quedan hoy." : "Activado, pero iOS necesita el permiso de avisos para mostrarlo."); }
+      await refreshCaps(); break;
+    }
+    case "cap-here": {
+      try {
+        const c = await locateOnce();
+        await refreshCaps();
+        tab = "hoy"; sub = null; showCity({ name: "Donde estás", region: "", latitude: c.latitude, longitude: c.longitude, here: true });
+        toast("El tiempo de donde estás, solo por hoy");
+      } catch (err) { await refreshCaps(); toast(err.message); }
+      break;
+    }
     case "cmdk": openCmdk(); break;
     case "inbox-setup": await setupInbox(); nubeInbox(); break;
     case "copy-text": try { await navigator.clipboard.writeText(a.dataset.text ?? ""); toast("Copiado"); } catch { toast("No he podido copiarlo"); } break;

@@ -821,3 +821,17 @@ pre.code { white-space: pre-wrap; word-break: break-word; max-height: 220px; ove
 #memExampleForm input { flex: 1 1 100%; }
 #memExampleForm select { flex: 1; min-width: 0; }
 #memExampleForm .btn { white-space: nowrap; }
+
+/* WEB-97: Permisos y conexiones */
+.cap-list { display: grid; gap: 0; }
+.cap-row { padding: 10px 0; border-bottom: 1px solid var(--line); }
+.cap-row:last-child { border-bottom: 0; }
+.cap-row .row { align-items: flex-start; gap: 10px; }
+.cap-route { white-space: nowrap; }
+.cap-state { flex: none; font-size: 12px; padding: 3px 8px; border-radius: 999px; background: var(--surface-2); color: var(--muted); white-space: nowrap; }
+.cap-state[data-state="on"] { color: var(--ok); }
+.cap-state[data-state="manual"] { color: var(--accent); }
+.cap-state[data-state="denied"] { color: var(--danger); }
+.cap-state[data-state="ask"], .cap-state[data-state="pending"] { color: var(--warm); }
+.cap-more summary { cursor: pointer; margin-top: 4px; }
+.cap-row .btns { margin-top: 6px; }
