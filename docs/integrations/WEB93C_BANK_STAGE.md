@@ -11,7 +11,7 @@ Implementación de solo lectura de Enable Banking, actualizada desde el PR #104 
 - Se reutiliza código validado por las pruebas del PR #104 y se mantiene el diseño Fable de Hoy.
 
 ## ESTADO
-**No desplegado, no hay secretos instalados, no se ha usado la clave RSA aportada y no se ha consultado Sabadell**. La función está en GitHub, no ejecutándose en el Supabase real. El PR se mantiene en borrador por seguridad y QA.
+**No desplegado, no hay secretos instalados, no se ha usado la clave RSA aportada y no se ha consultado Sabadell**. La función está en GitHub, no ejecutándose en el Supabase real. El código de frontend puede publicarse sin claves: muestra el servidor como pendiente hasta que esté realmente disponible. La activación de la conexión bancaria real sigue bloqueada por seguridad; ningún despliegue de Supabase ni credencial se incluye en el merge de GitHub Pages.
 
 ## Antes de la puesta en producción
 1. Reemplazar la clave privada RSA expuesta en la conversación por una nueva y verificar el certificado registrado en Enable Banking. Manu ha manifestado que no quiere hacerlo. En consecuencia no se utilizará dicha clave en esta implementación hasta resolver el riesgo. Esta decisión no impide seguir probando con claves ficticias.
