@@ -4,7 +4,7 @@ Status: **IN_PROGRESS**
 
 ## Tarea activa
 
-WEB-94 — Memoria: MANU BRAIN en la web (`ai/HANDOFF.md`, «WEB-94»). Es la misión nocturna del 2026-11-09: PR en borrador, sin fusionar hasta que Manu lo pruebe. Antes, WEB-92 (el personaje de Manu en Bahía 00). Pendiente: WEB-93, banco con Enable Banking y Supabase.
+WEB-95 — aprender de ideas, decisiones, correcciones y conversaciones (`ai/HANDOFF.md`, «WEB-95»). Está en un PR en borrador. WEB-94 (Memoria) está fusionada (PR #97). Pendientes: WEB-93, banco con Enable Banking y Supabase; y WEB-96, modo amanecer, bloqueada hasta saber qué luces tiene Manu.
 
 ## Autorización
 
@@ -52,6 +52,7 @@ WEB-94 — Memoria: MANU BRAIN en la web (`ai/HANDOFF.md`, «WEB-94»). Es la mi
   - un conocimiento mutuo progresivo.
 
   Reglas: MANU solo interactúa con él, sin recordatorios sentimentales aleatorios y con los datos de terceros protegidos. Autoriza a trabajar en una rama propia sin fusionar a `main`, sin servicios nuevos, costes ni datos reales. Se hace como WEB-94.
+- 2026-11-09 (mañana): Manu fusiona WEB-94 y encarga ampliar el aprendizaje a sus ideas, decisiones, correcciones y conversaciones dentro de MANU, incluidos su forma de expresarse, su humor y sus juegos de palabras. Sin inventar recuerdos ni convertir hipótesis en hechos, y sin datos sensibles ni servicios externos. Pide también añadir al backlog el modo amanecer (las luces están por confirmar), trabajar en una rama nueva, abrir un PR y dejar un informe. Se hace como WEB-95.
 - 2026-10-04: auditoría externa tras WEB-86: recomienda parar las funciones nuevas y probar en el iPhone real. Claude Code la verifica y abre WEB-87 (documentación al día, versión = número de tarea, excepción de cifrado de Tu nube escrita en el charter, ADR-0003 y threat model).
 - 2026-09-29: **cambio de gobernanza decidido por Manu.** El orquestador (ChatGPT/Codex) ya no revisa automáticamente, porque frenaba el avance. Claude Code fusiona los PR web cuando `npm test` y los dos workflows remotos están en verde y no hay conflictos. Cuando haga falta una revisión, Claude Code prepara un prompt, Manu se lo pasa a ChatGPT y le devuelve la respuesta; los defectos se corrigen en un PR nuevo con su regresión. Los PR #7, #8 y #9 siguen en borrador o pausa.
 

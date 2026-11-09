@@ -31,6 +31,46 @@ Solo puede existir una tarea de implementación `IN_PROGRESS`. Una fase no empie
 | BRAIN-20 | Laboratorio | BRAIN-02 | sí | BLOCKED |
 | BRAIN-21 | mantenimiento operativo semanal | servidor accesible | no | BLOCKED |
 
+## Backlog de la línea web
+
+Tareas candidatas de la app web (ADR-0012). Ninguna empieza sin cumplir sus dependencias.
+
+### WEB-96 (candidata) — Modo amanecer
+
+**Estado:** `BLOCKED`, a la espera de que Manu confirme qué luces LED y qué app usa. Añadida a petición de Manu el 2026-11-09.
+
+**Qué quiere Manu:** luces LED que suben poco a poco de intensidad antes de su alarma y se adaptan a la hora de esa alarma.
+
+**Qué hay ya en MANU:**
+- `proposeAlarm` (`core/night.js`) calcula la alarma de mañana según su primera cita.
+- El atajo «MANU Alarma» la pone en el iPhone. La hora es conocida la noche anterior.
+
+**Diseño propuesto, por confirmar:**
+1. Cuando MANU pone la alarma (HH:MM), calcula el amanecer: empieza N minutos antes (30 por defecto, ajustable) y llega al 100 % a la hora de la alarma.
+   - La curva es suave: poco brillo al principio y más hacia el final.
+   - El color pasa de cálido a neutro si la luz lo admite.
+2. Ese plan se entrega a quien maneja las luces, y solo hay dos caminos posibles:
+   - **(a) La rutina de despertar de la propia app de las luces**, si existe y se puede programar desde Atajos con una hora variable.
+   - **(b) Un atajo «MANU Amanecer»** que sube el brillo por pasos con esperas entre ellos, lanzado a la hora de inicio.
+3. Si Manu pospone o apaga la alarma, el amanecer no continúa más allá del 100 %. Nunca se encienden luces de madrugada sin una alarma puesta.
+4. Sin servidor ni coste (ADR-0004, ADR-0012). Si hiciera falta un puente de pago o una cuenta nueva, se le pregunta antes a Manu.
+
+**Preguntas abiertas para Manu (bloquean la tarea):**
+- ¿Qué marca y modelo son las luces, y con qué app las controlas? Por ejemplo Apple Casa (HomeKit), Philips Hue, Govee, Tuya o Smart Life, o una tira con mando.
+- ¿Aparecen en la app Casa del iPhone o en las acciones de Atajos?
+- ¿Cuántos minutos de amanecer quieres?
+- ¿Solo entre semana o todos los días con alarma?
+
+**Viabilidad:** todo está `NO_VERIFICADO`, porque depende de las luces concretas de Manu.
+- Lanzar un atajo a una hora que cambia cada día es `TEÓRICAMENTE_POSIBLE`. Las automatizaciones personales de Atajos se configuran a mano con hora fija. Hay que comprobar si una automatización puede programarse con la hora que calcula MANU o si hace falta otro disparador.
+- Que una rutina de despertar con amanecer gradual pueda programarse desde Atajos también está por verificar con la app de las luces.
+
+**Hecho cuando** (criterios de aceptación):
+- Con la alarma puesta desde MANU, las luces empiezan a subir N minutos antes y llegan al máximo a la hora de la alarma.
+- Cambiar la alarma cambia el amanecer.
+- Funciona sin abrir MANU por la mañana.
+- Lo comprueba Manu en su dormitorio.
+
 ## Gates transversales
 
 - **G-01 Restore**: no cloud sync antes de restauración probada.

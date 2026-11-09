@@ -51,14 +51,15 @@ await shot("01-chat");
 // 3. Memoria proposes what it observed, with counts; Manu decides.
 await page.click('[data-tab="tu"]'); await page.click('[data-sub="memoria"]'); await page.waitForTimeout(250);
 const expr = page.locator('.mem-prop[data-kind="expresion"]');
-ok("an expression is proposed with its count", (await expr.count()) === 1 && /«que maquina» \(3 veces, en 2 días/.test(await expr.textContent()));
+ok("an expression is proposed with its count", (await expr.count()) === 1 && /«qué máquina» \(3 veces, en 2 días/.test(await expr.textContent()));
 await expr.locator('[data-action="when:acierto"]').click(); await page.waitForTimeout(150);
 const risa = page.locator('.mem-prop[data-kind="risa"]');
 ok("his laugh is proposed", (await risa.count()) === 1 && /«jajaja»/.test(await risa.textContent()));
 await risa.locator('[data-action="accept"]').click(); await page.waitForTimeout(150);
 v = await vault();
-ok("adopted only after his yes", v.brain.voice.examples.some((e) => e.text === "que maquina" && e.when === "acierto") && v.brain.voice.laugh === "jajaja");
+ok("adopted only after his yes", v.brain.voice.examples.some((e) => e.text === "qué máquina" && e.when === "acierto") && v.brain.voice.laugh === "jajaja");
 ok("«Tu estilo» shows counts and his saved joke", /Tu estilo/.test(await page.textContent("#screen")) && /wifi del bus/.test(await page.textContent("#screen")));
+await page.locator("h2", { hasText: "Tu estilo" }).scrollIntoViewIfNeeded(); await page.waitForTimeout(200);
 await shot("02-tu-estilo");
 await page.locator('[data-act="mem-style-on"]').click(); await page.waitForTimeout(150);
 ok("learning can be switched off", (await vault()).brain.style.on === false);

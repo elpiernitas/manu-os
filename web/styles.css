@@ -817,3 +817,7 @@ pre.code { white-space: pre-wrap; word-break: break-word; max-height: 220px; ove
 .mem-sample { background: rgba(255,255,255,.05); border-radius: 10px; padding: 8px 10px; }
 .mem-row .grow > span:first-child { overflow-wrap: anywhere; }
 .sw-row { display: flex; gap: 10px; align-items: center; margin: 8px 0; font-size: 14px; }
+#memExampleForm { flex-wrap: wrap; }
+#memExampleForm input { flex: 1 1 100%; }
+#memExampleForm select { flex: 1; min-width: 0; }
+#memExampleForm .btn { white-space: nowrap; }

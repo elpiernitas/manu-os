@@ -36,7 +36,7 @@ test("an expression is proposed after 3 times on 2+ days, with a literal example
   assert.equal(expressionCandidates(s).length, 0, "three times on a single day is not a habit");
   s = feed(s, [["qué máquina el café de hoy", 2]]);
   const c = expressionCandidates(s)[0];
-  assert.equal(c.text, "que maquina"); assert.equal(c.times, 4); assert.equal(c.days, 2); assert.match(c.example, /máquina/);
+  assert.equal(c.text, "qué máquina", "as he writes it, with accents"); assert.equal(c.key, "expr:que maquina"); assert.equal(c.times, 4); assert.equal(c.days, 2); assert.match(c.example, /máquina/);
   s = decide(s, c.key, false);
   assert.equal(expressionCandidates(s).length, 0, "a «no» is final");
 });
@@ -81,7 +81,7 @@ test("style proposals: only in Memoria, adopted only when Manu says yes, verbati
   assert.ok(!["expresion", "risa", "emoji"].includes(topProposal(brain, { now: NOW })?.kind), "Hoy is not for style");
   assert.equal(brain.voice.examples.length, 0, "nothing adopted yet");
   brain = applyProposal({ brain }, ex, "when:acierto", {}, { now: NOW }).brain;
-  assert.deepEqual(brain.voice.examples.map((e) => [e.text, e.when]), [["que maquina", "acierto"]]);
+  assert.deepEqual(brain.voice.examples.map((e) => [e.text, e.when]), [["qué máquina", "acierto"]]);
   const risa = proposals(brain, { now: NOW }).find((p) => p.kind === "risa");
   brain = applyProposal({ brain }, risa, "accept", {}, { now: NOW }).brain;
   assert.equal(brain.voice.laugh, "jajaja");

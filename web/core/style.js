@@ -90,6 +90,17 @@ export function observeText(style, text, { now = new Date() } = {}) {
   return next;
 }
 
+// The expression as Manu writes it (accents, ñ), taken from his own example; else the plain form.
+export function surfaceForm(example, gram) {
+  if (!example) return gram;
+  const words = String(example).split(/\s+/).map((w) => w.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, "")).filter(Boolean);
+  const target = gram.split(" ");
+  for (let i = 0; i + target.length <= words.length; i++) {
+    if (target.every((t, k) => normalise(words[i + k]) === t)) { const s = words.slice(i, i + target.length).join(" "); return s.charAt(0).toLowerCase() + s.slice(1); }
+  }
+  return gram;
+}
+
 /**
  * Expressions worth asking about: repeated, on several days, not already decided. A longer
  * expression hides the shorter ones inside it with the same count («que maquina» vs «que maquina tio»).
@@ -99,7 +110,7 @@ export function expressionCandidates(style, { limit = 3 } = {}) {
   const decided = style.decided ?? {};
   const xs = Object.entries(style.grams).filter(([g, v]) => v.n >= MIN_TIMES && v.days.length >= MIN_DAYS && !decided[`expr:${g}`]);
   const kept = xs.filter(([g, v]) => !xs.some(([h, w]) => h !== g && h.includes(g) && w.n >= v.n));
-  return kept.sort((a, b) => b[1].n - a[1].n || b[1].days.length - a[1].days.length).slice(0, limit).map(([g, v]) => ({ key: `expr:${g}`, text: g, times: v.n, days: v.days.length, example: v.ex ?? null }));
+  return kept.sort((a, b) => b[1].n - a[1].n || b[1].days.length - a[1].days.length).slice(0, limit).map(([g, v]) => ({ key: `expr:${g}`, text: surfaceForm(v.ex, g), times: v.n, days: v.days.length, example: v.ex ?? null }));
 }
 
 // How Manu laughs, if one way clearly dominates (≥ 3 times and ≥ 70 %).

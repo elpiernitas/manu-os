@@ -2,7 +2,7 @@
 
 ## Próximo paso vigente
 
-0. **WEB-94 (Memoria):** PR en borrador de la misión nocturna del 2026-11-09. Manu lo prueba y decide si se fusiona y si la memoria debe quedar fuera de Tu nube. Informe en `NIGHT_SHIFT_REPORT.md`.
+0. **WEB-95 (aprender de ideas, decisiones y conversaciones):** PR en borrador. Informe en `INFORME_WEB-95.md`. WEB-94 (Memoria) ya está fusionada (PR #97). Sigue pendiente de Manu si la memoria debe quedar fuera de Tu nube.
 1. **WEB-87:** Manu prueba en su iPhone la lista de la sección «WEB-87». Lo que falle se arregla en esa misma tarea, con su regresión.
 2. No se añaden funciones hasta cerrar WEB-87.
 3. La línea nativa (PR #7, #8 y #9) sigue en pausa.
@@ -10,6 +10,48 @@
 ## Estado
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
+
+## WEB-95 — aprender de ideas, decisiones, correcciones y conversaciones (2026-11-09)
+
+WEB-94 está fusionada (PR #97). Manu pide ampliar el aprendizaje más allá de los gastos: sus ideas, decisiones, correcciones y conversaciones dentro de MANU, y su manera de expresarse, su humor y sus juegos de palabras. Todo sin inventar recuerdos ni convertir hipótesis en hechos. También pide añadir al backlog el modo amanecer. Rama `claude/magical-goodall-rf5qoo`, reiniciada desde `main`.
+
+**Qué se ha hecho:**
+
+| Pieza | Qué hace |
+|---|---|
+| `core/style.js` | Cuenta, en el dispositivo, cómo escribe Manu en el chat y en sus ideas: expresiones de 2 a 4 palabras, cómo se ríe y si usa emojis. Detalle en la lista siguiente. |
+| `core/topics.js` | Aprende palabras clave de proyecto a partir de las notas que Manu mete él mismo. Lo que saca tras un archivado automático cuenta en contra. Propone añadir o quitar palabras; las palabras del nombre del proyecto nunca se quitan. Así mejora `autofile.js` (WEB-60). |
+| Chat | «guárdate esa» o «eso es un juego de palabras» guarda su mensaje anterior tal cual y con fecha. «Cuéntame uno de mis chistes» devuelve uno suyo, nunca uno inventado. «He decidido…» y «a partir de ahora…» *ofrecen* guardarlo como decisión (botón). «¿Qué decidí sobre…?» las busca. |
+| `proposals.js` | Tipos nuevos: `expresion`, `risa`, `emoji`, `palabra` y `palabraMal`. Las de estilo no salen en Hoy, solo en Memoria. |
+| Voz | Tras su sí, MANU usa su expresión en el momento elegido, se ríe como él de vez en cuando y respeta su preferencia de emojis. |
+| Tú → Memoria → «Tu estilo» | Muestra solo recuentos, el interruptor «Aprender de cómo escribo», «Olvidar lo observado» y sus chistes guardados. |
+| Backlog | WEB-96 «Modo amanecer», `BLOCKED` hasta saber qué luces y qué app tiene Manu. |
+
+Reglas de `core/style.js`:
+- No observa órdenes (gastos, recordatorios, tareas, presupuestos), comandos, el Refugio ni las crisis.
+- Corta en lo que parece un nombre, en las cifras, los enlaces y los correos.
+- Descarta temas sensibles.
+- Guarda contadores y un ejemplo corto por expresión, nunca la lista de mensajes.
+- Una expresión candidata necesita 3 apariciones en 2 días o más. La risa necesita 3 apariciones y un 70 % de las veces escrita igual. Los emojis necesitan 20 mensajes como mínimo.
+- MANU no usa nada hasta que Manu dice sí, y un «no» es definitivo.
+
+**Comandos y resultados:**
+- `npm test`: 313 de 313. Hay 13 pruebas nuevas en `tests/estilo.test.js`.
+- `node --check`: correcto.
+- `node e2e/estilo.e2e.mjs`: 16 de 16.
+- `node e2e/memoria.e2e.mjs` y `node e2e/bahia.e2e.mjs`: sin regresión.
+- Todo en Chromium con emulación de iPhone 14.
+
+**Fallo encontrado por la prueba de navegador y corregido:** la nota de proyecto se aprendía *después* de que la pantalla se volviera a pintar, así que el formulario ya no existía y no se guardaba nada (QAL-049).
+
+**Riesgos:**
+- El filtro de nombres se basa en las mayúsculas. Un nombre escrito en minúscula podría entrar en una expresión candidata, pero solo como propuesta que Manu ve y puede rechazar.
+- Los juegos de palabras no se detectan solos: es intencionado, para no inventar.
+
+**NO_VERIFICADO:**
+- Safari y el iPhone real.
+- Datos reales de Manu.
+- Todo el modo amanecer.
 
 ## WEB-94 — Memoria: MANU BRAIN en la web (misión nocturna, 2026-11-09)
 
