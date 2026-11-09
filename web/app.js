@@ -70,7 +70,7 @@ import { removeJoke } from "./core/voice.js";
 import { memoriaPage, hoyMemCard } from "./core/memview.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "103"; // = número de la última tarea WEB publicada (desde WEB-87)
+export const APP_VERSION = "104"; // = número de la última tarea WEB publicada (desde WEB-87)
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -1544,7 +1544,12 @@ const screens = {
     const cards = [["💸", "Apuntar gasto", "fill", "gasté "], ["⏰", "Crear alarma", "fill", "pon una alarma a las "], ["🔔", "Recordatorio", "fill", "recuérdame "], ["💡", "Guardar idea", "fill", "apunta idea: "], ["🗓️", "¿Qué tengo hoy?", "say", "qué tengo hoy"], ["🌿", "Refugio", "say", "refugio"]];
     const thinking = vault.chat.at(-1)?.text === "Pensando…";
     const empty = !vault.chat.length && !refuge;
-    const history = vault.chat.length ? vault.chat : [{ from: "manu", text: "Hola, Manu. Puedo apuntar gastos, ideas y tareas, crear recordatorios y alarmas, y acompañarte en el Refugio. Aún funciono sin IA: habla claro y corto." }];
+    const intro = aiReady() && aiMode().on
+      ? "Hola, Manu. Gemini está activado para conversar contigo. También puedo apuntar gastos, ideas y tareas, y ayudarte con tus recordatorios. Tú decides siempre."
+      : aiReady()
+        ? "Hola, Manu. Puedo apuntar gastos, ideas y tareas y crear recordatorios y alarmas. La IA está disponible, pero ahora está desactivada."
+        : "Hola, Manu. Puedo apuntar gastos, ideas y tareas, crear recordatorios y alarmas, y acompañarte en el Refugio. Aún funciono sin IA: habla claro y corto.";
+    const history = vault.chat.length ? vault.chat : [{ from: "manu", text: intro }];
     return `<div class="manu-head${empty ? " big" : ""}"><div class="orb${thinking ? " thinking" : ""}" id="orb" aria-hidden="true"><span>M</span></div><div><h1>MANU</h1><p class="subtitle">${aiReady() && aiMode().on ? "Gemini integrado · conversación" : `Tu asistente · ${aiReady() ? "IA disponible, siempre con tu confirmación" : '<button class="link small" data-act="gemini-guide">activar IA</button>'}`}</p></div></div>
       ${refuge ? `<div class="refuge-bar"><span>Refugio · no se guarda</span><button class="link" data-act="leave-refuge">Salir</button></div>` : ""}
       ${aiReady() && !aiMode().on && !refuge ? `<section class="card ai-offer"><b>💬 ¿Hablamos como con Gemini?</b><p class="muted small">MANU conversa contigo, sabe lo que elijas de tu vida y gestiona tus cosas. Lo que escribas irá a Google.</p><div class="btns"><button class="btn" data-act="ai-mode" data-v="full">Activar con todo</button><button class="btn ghost" data-act="ai-mode" data-v="basic">Solo lo básico</button></div><button class="link small" data-sub-go="ia">Elegir qué sabe</button></section>` : ""}
@@ -1571,6 +1576,7 @@ const screens = {
       <div class="stack">
       ${bankAisCard(bankAisUi, nubeOn())}
       <section class="card hero money-hero">${celebrateMoney ? moneyRain() : ""}<div class="row cal-head"><button class="link" data-act="money-prev" aria-label="Mes anterior">${I.back}</button><h2>${moneyMonth === 0 ? "Gastado este mes" : `Gastado en ${esc(monthName.replace(/ de \d{4}$/, ""))}`}</h2><button class="link" data-act="money-next" aria-label="Mes siguiente"${moneyMonth === 0 ? " disabled" : ""}>${I.chev}</button></div><div class="big-money" data-count-money="${month.total}">${euros(month.total)}</div>
+        <p class="muted small">Gastos registrados en MANU, no es el saldo de Sabadell.</p>
         ${cats.map(([c, v]) => { const lim = moneyMonth === 0 ? vault.settings.budgets?.[c] : null; return `<div class="stack"><div class="row"><span>${esc(catLabel(c))}</span><span class="num">${euros(v)}${lim ? `<span class="muted small"> / ${euros(lim)}</span>` : ""}</span></div><div class="bar${lim && v > lim ? " over" : lim && v >= lim * 0.8 ? " warn" : ""}"><i data-w="${Math.max(3, Math.round((v / (lim ? Math.max(lim, v) : max)) * 100))}"></i></div></div>`; }).join("")}</section>
       ${moneyMonth === 0 ? `${splitAskCard()}${addMoneyCard()}${fixedIncomeCard()}${debtsCard()}` : ""}
       ${moneyMonth === 0 ? budgetCard() : ""}
