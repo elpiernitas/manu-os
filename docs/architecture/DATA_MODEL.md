@@ -35,6 +35,26 @@ MANU BRAIN no guarda «Miguel vive en Vigo» como un texto suelto. Guarda una af
 
 El diseño se inspira en W3C PROV —entidades, actividades y agentes— sin convertir el producto en un sistema RDF.
 
+## Implementación web (WEB-94)
+
+La línea web guarda este modelo, simplificado, en `vault.brain` (`web/core/brain.js`):
+
+| Concepto | Cómo se guarda en la web |
+|---|---|
+| Claim | Recuerdo con `kind`, `status`, `key` y `value` (para detectar sustituciones y contradicciones), `recordedAt`, `validFrom` y `validUntil`, `confirmedAt`, `confidence` y `reason`, `sensitive` y `thirdParty`. |
+| Procedencia | Va dentro de cada claim (`source.kind`: manu, pregunta, corrección, regla, deducción o importado; más `ref` y `excerpt`), en vez de tablas Source, Fragment y EvidenceLink. |
+| Sustitución | Mediante `supersedes` y `supersededBy`. |
+| Suggestion | Se corresponde con `brain.outcomes`. |
+| Agente que aprende | Se corresponde con `brain.learn`. |
+
+Reglas que se mantienen:
+- un modelo o una regla solo crean `PROPOSED`, y una deducción nunca pasa a `FACT` sin Manu;
+- la contradicción queda `CONTESTED` hasta que Manu resuelve.
+
+Diferencias con el modelo de referencia:
+- No hay entidades separadas, UUIDv7 ni hash de fragmentos.
+- «Olvidar» borra el contenido de verdad, por decisión de Manu, y deja un evento sin texto.
+
 ## Clasificación obligatoria
 
 `FACT | INFERENCE | PREFERENCE | DECISION | MEMORY | HYPOTHESIS`
