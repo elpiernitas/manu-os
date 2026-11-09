@@ -1,5 +1,14 @@
 # HANDOFF
 
+## WEB-93c · Sabadell solo lectura preparado (ChatGPT, 2026-11-09)
+
+Rama `chatgpt/web-93c-bank-staging`, basada en Fable fase 2 ya fusionada. Integra el código servidor de Enable Banking AIS desde #104 y su vista optativa en Dinero, sin borrar el nuevo Hoy de Fable. La sesión bancaria y el state permanecen en backend; las vistas de Hoy/Dinero solo afirman conexión cuando el servidor la confirme. Sin pagos, sin importación automática, sin uso de claves reales, sin despliegue Supabase ni fusión por ahora.
+
+**Seguridad:** la clave RSA descargada se adjuntó previamente en una conversación. Manu no desea rotarla. Por ello no se instalará ni usará como secreto de producción desde este trabajo. La integración de datos reales queda bloqueada hasta resolver ese riesgo y realizar pruebas del backend con consentimientos oficiales. Ver `docs/integrations/WEB93C_BANK_STAGE.md`.
+
+**NO_VERIFICADO:** despliegue Deno/Supabase, auth real, saldo Sabadell, callback real e iPhone Safari.
+
+
 ## WEB · Fable 5.1 fase 2 (ChatGPT, 2026-11-09)
 
 Rama `chatgpt/fable-phase2-hoy-services`. Rediseño editorial de Hoy con los datos reales de fecha, contexto, Open-Meteo, próximo evento, tareas y recordatorios. Se mantiene la propuesta del motor de MANU y todas las acciones de los módulos existentes. Nuevo bloque de estados de Tu nube/Supabase y notificaciones configuradas en este dispositivo, con entradas a sus pantallas. Banco Sabadell aparece como **integración pendiente**, sin afirmar que esté conectado por API (PR #104 independiente, sin desplegar).
