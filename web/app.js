@@ -48,6 +48,7 @@ import { parseCommand, suggest } from "./core/commands.js";
 import { toAsk, equalSplit, detailSplit, debts, settleAll, debtLine, reminderText } from "./core/split.js";
 import { buildBankShotsPayload, parseBankShots, alreadyThere, MAX_SHOTS } from "./core/bankshot.js";
 import { incomeKind } from "./core/bank.js";
+import { fableIcon, fableMark } from "./design/fable-icons.js";
 import { nightReview, weekReview, nightDue, weekDue } from "./core/review.js";
 import { KINDS as DOC_KINDS, daysLeft, expiringSoon, leftText, buildDocPayload, parseDocReply, isDocQuestion, answerDoc, DOC_LIMIT } from "./core/docs.js";
 import { LIB_KINDS, STATUSES, newItem, setStatus, ideasPayload, parseIdeas, isLibraryQuestion, answerLibrary } from "./core/library.js";
@@ -66,7 +67,7 @@ import { removeJoke } from "./core/voice.js";
 import { memoriaPage, hoyMemCard } from "./core/memview.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "100"; // = número de la última tarea WEB publicada (desde WEB-87)
+export const APP_VERSION = "101"; // = número de la última tarea WEB publicada (desde WEB-87)
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -2074,7 +2075,7 @@ let renderedSheetKind = null;
 function renderTabs() {
   const nav = $("tabs");
   if (!nav.querySelector(".tab")) {
-    nav.innerHTML = `<span class="tab-pill" aria-hidden="true"></span>` + TABS.map(([id, label]) => `<button class="tab" role="tab" data-tab="${id}">${id === "manu" ? '<span class="dot" aria-hidden="true">M</span>' : I[id]}<span>${label}</span></button>`).join("");
+    nav.innerHTML = `<span class="tab-pill" aria-hidden="true"></span>` + TABS.map(([id, label]) => `<button class="tab" role="tab" data-fable="true" data-tab="${id}">${id === "manu" ? `<span class="dot fable-brand" aria-hidden="true">${fableMark(24)}</span>` : fableIcon(id)}<span>${label}</span></button>`).join("");
   }
   const index = TABS.findIndex(([id]) => id === tab);
   nav.querySelectorAll(".tab").forEach((b, i) => b.setAttribute("aria-selected", String(i === index)));

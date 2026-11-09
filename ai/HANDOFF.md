@@ -1,5 +1,12 @@
 # HANDOFF
 
+## Fable 5.1 · fase 1 de identidad (ChatGPT, 2026-11-09)
+
+Rama `chatgpt/fable-phase1-identity` (independiente de WEB-93b / PR #104). Integra los tokens de Fable, su familia de 31 iconos vectoriales más una adaptación de Bahía, la marca M modular para el navegador y la nueva iconografía en las seis pestañas reales. Mantiene toda la lógica existente, los PNG de la PWA instalada, los permisos, datos, conectores y el banco sin cambios. El ZIP original lo ha proporcionado Manu. Pruebas adicionales en `web/tests/fable-icons.test.js`; guía en `docs/design/FABLE_PHASE1.md`.
+
+**NO_VERIFICADO:** QA visual en Safari instalado y Mac; una posterior integración del layout de Hoy no está incluida aquí.
+
+
 ## Próximo paso vigente
 
 0. **WEB-93a (preparar Enable Banking):** rutas públicas `banco/vuelta/` (callback: limpia la URL, comprueba un `state` de un solo uso y deja el código solo en la pestaña, como mucho 10 min, para un canje en servidor que está pendiente), `privacidad/` y `condiciones/`. El service worker ya no cachea ni sirve como app páginas que no sean la app. No se ha registrado nada en Enable Banking ni conectado Sabadell. Límite conocido: en el iPhone, la vuelta del banco se abre en Safari y no en el icono; el `state` tendrá que iniciarse en el mismo navegador o guardarse en el servidor (diseño de WEB-93).
