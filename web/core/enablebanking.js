@@ -13,9 +13,17 @@ export async function bankRequest(cfg, session, action, params = {}, fetchImpl =
       headers: { apikey: cfg.key, authorization: "Bearer " + session.access, "Content-Type": "application/json" },
       body: JSON.stringify({ action, ...params }),
     });
-  } catch { throw new Error("No se puede contactar con el servidor bancario"); }
+  } catch { throw new Error("No se puede contactar con el servidor de MANU. Sabadell no se ha consultado."); }
   const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(String(body?.error ?? "Error de conexión bancaria").slice(0, 180));
+  if (!response.ok) {
+    // Function not installed ≠ bank failure. The frontend can be published before the backend.
+    const known = {
+      401: "Tu sesión de Tu nube ha caducado. Vuelve a iniciar sesión.",
+      404: "El servidor bancario de MANU todavía no está publicado en Supabase. No se ha consultado Sabadell.",
+      503: "El servidor bancario todavía no está configurado. No se ha consultado Sabadell.",
+    };
+    throw new Error(known[response.status] ?? String(body?.error ?? "No se pudo completar la solicitud al servidor bancario").slice(0, 180));
+  }
   return body;
 }
 export function safeBankRedirect(url) {
