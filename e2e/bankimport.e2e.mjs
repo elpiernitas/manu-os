@@ -13,7 +13,7 @@ page.on("dialog", (d) => d.accept());
 await page.clock.install({ time: new Date("2026-11-09T15:00:00+01:00") });
 await page.route(/open-meteo\.com/, (r) => r.fulfill({ status: 503, body: "" }));
 await page.route(/supabase\.co\/rest\/v1\//, (r) => r.fulfill({ json: [] }));
-const page1 = [{ ref: "a", date: "2026-11-09", amount: "100.00", currency: "EUR", direction: "credit", description: "ABONO INVENTADO", status: "BOOK" }, { ref: "b", date: "2026-11-08", amount: "12.50", currency: "EUR", direction: "debit", description: "CAFETERIA INVENTADA", status: "BOOK" }];
+const page1 = [{ ref: "a", date: "2026-11-09", amount: "100.00", currency: "EUR", direction: "credit", description: "ABONO INVENTADO", status: "BOOK" }, { ref: "b", date: "2026-11-08", amount: "12.50", currency: "EUR", direction: "debit", description: "COMPRA TARJ. 5402XXXXXXXX0000 CAFETERIA INVENTADA-GIJON/XIXON", status: "BOOK" }];
 const page2 = [{ ref: "c", date: "2026-11-07", amount: "40.00", currency: "EUR", direction: "debit", description: "SUPERMERCADO INVENTADO", status: "BOOK" }, { ref: "d", date: "2026-11-09", amount: "3.00", currency: "EUR", direction: "debit", description: "PENDIENTE", status: "PDNG" }];
 await page.route(/functions\/v1\/manu-bank/, async (r) => {
   const b = JSON.parse(r.request().postData() || "{}"); calls.push(b);
@@ -33,6 +33,7 @@ const v = await page.evaluate(() => JSON.parse(localStorage.getItem("manuos.vaul
 ok("follows every page (continuation) over 90 days", calls.filter((c) => c.action === "transactions").length === 2 && calls.find((c) => c.action === "transactions").from === "2026-08-12");
 ok("2 booked expenses and 1 income imported, the pending one not", v.spending.length === 2 && v.income.length === 1 && !JSON.stringify(v).includes("PENDIENTE"));
 ok("marked as coming from Sabadell", v.spending.every((e) => e.source === "SABADELL"));
+ok("«Dónde gastas» shows the shop with its city", /Cafeteria Inventada/.test(await page.textContent("#placesCard").catch(() => "")) && /Gijón/.test(await page.textContent("#placesCard").catch(() => "")));
 ok("nothing went to the memory", !v.brain || !(v.brain.claims ?? []).length);
 await page.click('[data-act="bank-ais-import"]'); await page.waitForTimeout(800);
 const v2 = await page.evaluate(() => JSON.parse(localStorage.getItem("manuos.vault")));

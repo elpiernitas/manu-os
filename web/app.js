@@ -51,6 +51,7 @@ import { incomeKind } from "./core/bank.js";
 import { bankRequest, safeBankRedirect } from "./core/enablebanking.js";
 import { bankAisCard } from "./core/bank-ais-view.js";
 import { planImport, importRange, DAYS as BANK_IMPORT_DAYS } from "./core/bankimport.js";
+import { wherePlaces } from "./core/places.js";
 import { fableIcon, fableMark } from "./design/fable-icons.js";
 import { fableHoyIntro, fableHoyServices } from "./design/fable-today.js";
 import { nightReview, weekReview, nightDue, weekDue } from "./core/review.js";
@@ -71,7 +72,7 @@ import { removeJoke } from "./core/voice.js";
 import { memoriaPage, hoyMemCard } from "./core/memview.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "106"; // = número de la última tarea WEB publicada (desde WEB-87)
+export const APP_VERSION = "107"; // = número de la última tarea WEB publicada (desde WEB-87)
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -1313,6 +1314,17 @@ function incomeListSection() {
   return `${sectionTitle("Ingresos")}<section class="card">${list.map((x) => `<div class="row"><div class="grow"><div>${esc(cleanConcept(x.concept) || "Ingreso")}</div><div class="muted small">${new Date(x.at).toLocaleDateString("es-ES", { day: "numeric", month: "short" })}</div></div><div class="stack"><b class="num pos">+${esc(euros(x.cents))}</b><button class="link small danger-link" data-act="income-del" data-id="${esc(x.id)}" aria-label="Borrar ingreso">Borrar</button></div></div>`).join("")}</section>`;
 }
 
+// WEB-106: «Dónde gastas»: shops and cities from the bank concepts (last 90 days).
+function placesCard() {
+  const p = wherePlaces(vault.spending, { now: new Date() });
+  if (!p.shops.length) return "";
+  const max = Math.max(1, ...p.shops.map((x) => x.cents));
+  return `<section class="card" id="placesCard"><h2>Dónde gastas · 90 días</h2>
+    ${p.shops.map((x) => `<div class="row"><span class="cat-emoji" aria-hidden="true">${CATEGORY_EMOJI[x.category] ?? "📦"}</span><span class="grow">${esc(x.name)}<br><span class="muted small">${x.count} ${x.count === 1 ? "vez" : "veces"}${x.city ? ` · ${esc(x.city)}` : ""}</span><span class="bar" aria-hidden="true"><i data-w="${Math.max(2, Math.round((x.cents / max) * 100))}"></i></span></span><b class="num">${esc(euros(x.cents))}</b></div>`).join("")}
+    ${p.cities.length ? `<p class="small muted review-h">Por ciudad</p>${p.cities.map((c) => `<div class="row"><span class="grow">📍 ${esc(c.city)}<br><span class="muted small">${c.count} ${c.count === 1 ? "pago" : "pagos"}</span></span><b class="num">${esc(euros(c.cents))}</b></div>`).join("")}` : ""}
+    <p class="muted small">Sin Bizum, transferencias ni efectivo. La ciudad sale del concepto del banco cuando la trae.</p></section>`;
+}
+
 function repeatsCard() {
   const common = commonSpends(vault.spending, today(), 90, CATEGORIES);
   const inc = recurringIncome(vault.income, today());
@@ -1621,8 +1633,9 @@ const screens = {
         ${rulesCount && !vault.spending.length ? '<p class="small"><b>Las reglas solas no son gastos.</b> Importa el extracto del banco o vuelve a elegir el Excel de ChatGPT, que trae la hoja «Gastos clasificados», y verás aquí tus números.</p>' : ""}
         ${imp ? `<p class="muted small">Última importación: ${imp.added} gastos nuevos, ${imp.duplicates} repetidos${imp.incomeAdded !== undefined ? `, ${imp.incomeAdded} ingresos nuevos${imp.incomeDuplicates ? ` (${imp.incomeDuplicates} ya estaban)` : ""}` : imp.income ? ` · ${imp.income} ingresos sin importar: vuelve a elegir el archivo para añadirlos` : ""}${imp.invalid ? `, ${imp.invalid} filas no reconocidas` : ""}.</p>` : ""}</section>
       ${moneyInsights()}
+      ${placesCard()}
       ${sectionTitle("Movimientos", `${toReview ? `<button class="link small" data-act="money-filter">${moneyFilter === "review" ? "Ver todos" : `Por revisar (${toReview})`}</button>` : ""}${addLink("EXPENSE")}`)}
-      <section class="card">${entries.length ? entries.map((x) => `<div class="row"><span class="cat-emoji" aria-hidden="true">${CATEGORY_EMOJI[x.category] ?? "📦"}</span><div class="grow"><div>${esc(x.merchant ? cleanConcept(x.merchant) : "Sin concepto")}</div><div class="muted small">${new Date(x.at).toLocaleDateString("es-ES", { day: "numeric", month: "short" })}${x.sub ? ` · ${esc(x.sub)}` : ""}${x.source === "BANK" ? " · banco" : ""}${x.review ? ' · <b class="review">revisar</b>' : x.learned && x.inferred ? ` · deducción aprendida (${Math.round(x.learned.confidence * 100)} %)` : x.inferred ? " · categoría propuesta" : x.ruled ? " · según tus reglas" : ""}</div></div>
+      <section class="card">${entries.length ? entries.map((x) => `<div class="row"><span class="cat-emoji" aria-hidden="true">${CATEGORY_EMOJI[x.category] ?? "📦"}</span><div class="grow"><div>${esc(x.merchant ? cleanConcept(x.merchant) : "Sin concepto")}</div><div class="muted small">${new Date(x.at).toLocaleDateString("es-ES", { day: "numeric", month: "short" })}${x.sub ? ` · ${esc(x.sub)}` : ""}${x.source === "BANK" ? " · banco" : x.source === "SABADELL" ? " · Sabadell" : ""}${x.review ? ' · <b class="review">revisar</b>' : x.learned && x.inferred ? ` · deducción aprendida (${Math.round(x.learned.confidence * 100)} %)` : x.inferred ? " · categoría propuesta" : x.ruled ? " · según tus reglas" : ""}</div></div>
           <div class="stack"><span class="num">${euros(x.cents)}</span>${catEditing === x.id ? `<label class="sr" for="cat-${esc(x.id)}">Categoría</label><select id="cat-${esc(x.id)}" data-cat="${esc(x.id)}">${Object.keys(CATEGORIES).map((k) => `<option value="${k}"${k === x.category ? " selected" : ""}>${esc(catLabel(k))}</option>`).join("")}</select><button class="link small danger-link" data-act="spend-del" data-id="${esc(x.id)}">Borrar</button>` : `<button class="cat-chip" data-act="cat-edit" data-id="${esc(x.id)}" aria-label="Cambiar categoría: ${esc(CATEGORIES[x.category] ?? "Otros")}">${esc(catLabel(x.category))}</button>`}</div></div>`).join("")
         : '<p class="muted">Sin gastos. Escribe a MANU «gasté 12,50 en café» o importa el extracto del banco.</p>'}</section>
       ${incomeListSection()}
