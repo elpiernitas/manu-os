@@ -8,6 +8,7 @@ import { QUESTIONS, nextQuestion, answer, skip, progress } from "../core/conocer
 import { addExample, own, contradiction, describe } from "../core/voice.js";
 import { memCommand, runMemCommand, extractWhen, extractFact } from "../core/memchat.js";
 import { validateVault, emptyVault } from "../core/storage.js";
+import { isEmptyVault } from "../core/sync.js";
 
 const NOW = new Date("2026-11-09T10:00:00+01:00");
 const ids = () => { let n = 0; return () => `c${++n}`; };
@@ -23,14 +24,19 @@ test("remember: Manu's words are ACTIVE with provenance; a rule's are only PROPO
   assert.throws(() => rem(brain, { text: "   " }), /texto/);
 });
 
+test("repeating the same thing confirms it instead of duplicating it", () => {
+  const uid = ids();
+  let b = rem(emptyBrain(), { text: "Vivo en Gijón", kind: "FACT", key: "donde vivo", value: "Gijón" }, { uid }).brain;
+  const r = remember(b, { text: "vivo en gijón", kind: "FACT", key: "donde vivo", value: "gijón" }, { now: days(30), uid });
+  assert.equal(r.repeated, true); assert.equal(r.brain.claims.length, 1); assert.equal(r.claim.confirmedAt, days(30).toISOString());
+});
+
 test("contradictions are never resolved silently: both become CONTESTED, Manu resolves", () => {
   const uid = ids();
   let b = rem(emptyBrain(), { text: "Vivo en Gijón", kind: "FACT", key: "donde vivo", value: "Gijón" }, { uid }).brain;
   const r = rem(b, { text: "Vivo en Oviedo", kind: "FACT", key: "donde vivo", value: "Oviedo" }, { uid });
   assert.equal(r.conflict.length, 1);
   assert.deepEqual(r.brain.claims.map((c) => c.status), ["CONTESTED", "CONTESTED"]);
-  const same = rem(r.brain, { text: "vivo en oviedo", kind: "FACT", key: "donde vivo", value: "oviedo" }, { uid });
-  assert.equal(same.conflict.length, 1, "repeating one side still conflicts with the other");
   b = resolve(r.brain, "c2", { now: NOW });
   assert.equal(b.claims.find((c) => c.id === "c2").status, "ACTIVE");
   assert.equal(b.claims.find((c) => c.id === "c1").status, "SUPERSEDED");
@@ -312,4 +318,10 @@ test("chat: facts get keys, memories get dates and places, contradictions are fl
   const f = runMemCommand(r.brain, memCommand("olvida lo del concierto"), { now: NOW });
   assert.deepEqual(f.pending, ["c1"]); assert.equal(f.brain, r.brain, "forget only proposes; nothing is deleted yet");
   assert.match(runMemCommand(r.brain, memCommand("olvida lo de xilófono"), { now: NOW }).reply, /No encuentro/);
+});
+
+test("Tu nube: a device with only memories is not «empty»", () => {
+  const b = rem(emptyBrain(), { text: "Algo que no quiero perder" }).brain;
+  assert.equal(isEmptyVault({ ...emptyVault(), brain: emptyBrain() }), true);
+  assert.equal(isEmptyVault({ ...emptyVault(), brain: b }), false);
 });

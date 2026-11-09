@@ -74,6 +74,12 @@ export function remember(brain, input, { now = new Date(), uid = defaultId } = {
   const kind = KINDS.includes(input.kind) ? input.kind : "MEMORY";
   const source = { kind: SOURCES[input.source?.kind] ? input.source.kind : "manu", ...(input.source?.ref ? { ref: String(input.source.ref).slice(0, 120) } : {}), ...(input.source?.excerpt ? { excerpt: clean(input.source.excerpt) } : {}) };
   const fromManu = FROM_MANU.has(source.kind);
+  // Saying the same thing again is a confirmation, not a second memory.
+  if (fromManu && input.key && !input.supersedes) {
+    const k = keyOf(input.key), v = keyOf(input.value ?? text), subj = normalise(clean(input.subject) || "Manu");
+    const same = brain.claims.find((c) => c.key === k && c.status === "ACTIVE" && normalise(c.subject) === subj && keyOf(c.value) === v);
+    if (same) { const next = confirm(brain, same.id, { now }); return { brain: next, claim: next.claims.find((c) => c.id === same.id), conflict: [], repeated: true }; }
+  }
   // ADR-0002: what a rule or a model deduces is only proposed, and never becomes a FACT on its own.
   const finalKind = !fromManu && (kind === "FACT" || kind === "MEMORY") ? "INFERENCE" : kind;
   const needsConfidence = finalKind === "INFERENCE" || finalKind === "HYPOTHESIS";

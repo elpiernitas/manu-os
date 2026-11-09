@@ -170,7 +170,8 @@ export function decide({ lastRev = null, dirty = false, remote = null, localEmpt
 export function isEmptyVault(v) {
   if (!v) return true;
   const lists = ["inbox", "spending", "income", "projects", "reminders", "habits", "people", "meals", "health", "moods", "places", "captures"];
-  return lists.every((k) => !(v[k] ?? []).length) && !v.profile?.text;
+  // WEB-94: a device that only has memories is not empty (it must not be overwritten on linking).
+  return lists.every((k) => !(v[k] ?? []).length) && !v.profile?.text && !(v.brain?.claims ?? []).length;
 }
 
 export function syncErrorText(err) {
