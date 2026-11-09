@@ -3,7 +3,7 @@
 // Docs: https://enablebanking.com/docs/api/reference/
 import {
   newOAuthState, hashState, makeEnableJwt, validState, validAccountId, validIsoDate,
-  sabadellFromAspsps, sanitizeAccounts, balancesView, transactionsView,
+  sabadellFromAspsps, sanitizeAccounts, balancesView, transactionsView, serverCheck,
 } from "./bank-core.js";
 
 const SUPABASE = Deno.env.get("SUPABASE_URL") ?? "";
@@ -102,8 +102,16 @@ async function route(req) {
   const body = await req.json().catch(() => ({}));
   const action = body?.action;
   const row = await rowFor(user);
-  if (action === "status") return reply({ connected: linked(row), pending: Boolean(row?.state_hash), accounts: linked(row) ? (row.accounts ?? []).map((x, i) => ({ index: i, label: x.label, currency: x.currency })) : [], validUntil: row?.consent_until ?? null });
+  if (action === "status") {
+    // Real pre-flight against Enable Banking (GET /application), so a wrong key, an inactive or
+    // sandbox app or an unregistered callback shows up before Manu goes to the bank.
+    let server;
+    try { server = serverCheck(await enable("/application"), CALLBACK); } catch { server = { ready: false, reachable: false }; }
+    return reply({ server, connected: linked(row), pending: Boolean(row?.state_hash), accounts: linked(row) ? (row.accounts ?? []).map((x, i) => ({ index: i, label: x.label, currency: x.currency })) : [], validUntil: row?.consent_until ?? null });
+  }
   if (action === "start") {
+    const pre = serverCheck(await enable("/application"), CALLBACK);
+    if (!pre.ready) return safeFail(409, "La aplicación de Enable Banking no está lista (activa, en producción, con AIS y con la URL de vuelta registrada). No se ha iniciado nada.");
     const aspsps = await enable("/aspsps");
     const bank = sabadellFromAspsps(aspsps);
     const seconds = aspsps.aspsps.find((x) => x.country === bank.country && x.name === bank.name)?.maximum_consent_validity;
