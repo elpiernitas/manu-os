@@ -62,8 +62,27 @@ export function grams(text) {
 }
 
 const dayOf = (d) => new Date(d).toISOString().slice(0, 10);
+// WEB-98: the example travels to Tu nube with the rest of the memory, so what looks like another
+// person's name, a number, a link or an email is masked («…»): only Manu's own words remain.
+// Conservative: a capitalised word at the start of a sentence is masked too unless it is a
+// function word, because names often start sentences («Pelayo dice…»).
+export function maskExample(text) {
+  let sentenceStart = true;
+  return String(text ?? "").replace(/https?:\/\/\S+|\S+@\S+/g, "…").split(/(\s+)/).map((raw) => {
+    if (/^\s+$/.test(raw) || !raw) return raw;
+    const w = raw.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, "");
+    const start = sentenceStart;
+    sentenceStart = /[.!?¡¿]$/.test(raw);
+    if (!w) return raw;
+    // A capital inside a sentence is a name; at its start too, unless it is a common word («Qué…»).
+    if (/\d/.test(w) || (/^\p{Lu}/u.test(w) && (!start || !FUNC.has(normalise(w))))) return raw.replace(w, "…");
+    return raw;
+  }).join("").replace(/\s+/g, " ").trim().slice(0, 120);
+}
 // A short literal example, for «de dónde sale esto». Only if the message itself is not sensitive.
-const example = (text) => (SENSITIVE.test(normalise(text)) ? null : String(text).replace(/\s+/g, " ").trim().slice(0, 120));
+const example = (text) => (SENSITIVE.test(normalise(text)) ? null : maskExample(text));
+// Older examples (WEB-95) were kept unmasked: masked again before they leave the device.
+export const scrubStyle = (style) => (style?.grams ? { ...style, grams: Object.fromEntries(Object.entries(style.grams).map(([g, v]) => [g, v.ex ? { ...v, ex: maskExample(v.ex) } : v])) } : style);
 
 /** Manu wrote `text` (chat or idea). Updates the counters. Returns the new style model. */
 export function observeText(style, text, { now = new Date() } = {}) {

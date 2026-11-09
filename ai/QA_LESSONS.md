@@ -236,3 +236,9 @@ Regla: en `app.js`, los valores de un formulario se leen a variables al principi
 En WEB-97, `Notification.permission` devolvía `denied` en Chromium sin interfaz incluso con `grantPermissions(["notifications"])`. Además, `grantPermissions` *sustituye* los permisos concedidos: tras conceder solo avisos, la geolocalización pasó a `denied` y desapareció su botón. La prueba fallaba por el entorno, no por la app.
 
 Regla: en las e2e, el aviso de permisos de iOS se simula de forma explícita y comentada (un `Notification` falso cuyo `requestPermission()` concede). `grantPermissions` se llama con la lista completa de permisos que deben seguir concedidos. Un estado de permiso del navegador de pruebas nunca se presenta como el de Safari: queda NO_VERIFICADO.
+
+### QAL-051 — Excluir algo de una sincronización de documento entero exige fusionar al bajar
+
+Tu nube sube y baja el vault como un único JSON. En WEB-98, dejar la memoria fuera de la subida sin más habría hecho que el otro dispositivo, al bajar esa copia sin `brain`, perdiera la suya. Lo mismo con «vaciar la nube»: una copia vacía aplicada como descarga normal habría borrado el otro dispositivo.
+
+Regla: toda exclusión o vaciado de una parte del documento sincronizado va en pareja con una regla de bajada (`applyRemote`, `isErased`). Cada una tiene una prueba e2e con dos dispositivos simulados que comprueba que los datos del otro dispositivo siguen intactos.

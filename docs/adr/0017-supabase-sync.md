@@ -61,3 +61,26 @@ El atajo del doble toque no puede abrir la app instalada. Por eso deja su línea
 - **Riesgo aceptado:** quien tenga la clave publishable, que es pública, podría llenar la tabla de líneas. Nadie las leería sin el código, y cada línea está limitada a 300 caracteres.
 - **Cómo se activa:** el SQL está en `web/core/sync.js` (`INBOX_SQL`) y Manu lo ejecuta una vez en el SQL Editor. Sin él, el atajo puede escribir en `MANU-buzon.txt`.
 - **Comprobado (2026-10-05):** Manu ejecutó el SQL y un gasto enviado desde el atajo llegó a MANU una sola vez. El atajo se genera con `tools/shortcuts/atajos.py` (sin el código, que pide el iPhone).
+
+## Enmienda WEB-98 (2026-11-09): memoria y estilo en Tu nube, revisión de seguridad y borrado
+
+**Decisión de Manu (2026-11-09):** la memoria (`brain`) y el estilo viajan en Tu nube. Ya lo hacían desde WEB-94, porque se sube el vault entero; ahora es una decisión explícita y se puede revertir desde el iPhone.
+
+- **Qué protege y qué no:**
+  - RLS por usuario: solo la sesión de Manu lee la fila.
+  - TLS en el camino.
+  - Cifrado en reposo del proveedor, que Supabase declara AES-256 en su página de seguridad (no verificado por nosotros).
+  - **No hay cifrado de extremo a extremo:** Supabase como empresa, o quien entre en el panel del proyecto, podría leer la fila.
+- **Minimización:**
+  - Los ejemplos del estilo se guardan enmascarados: nombres, cifras, enlaces y correos salen como «…». Los antiguos se enmascaran antes de subir (`scrubStyle`).
+  - Los recuerdos sobre terceros viajan con el resto. Se muestran contados en Tu nube para que Manu los revise.
+- **Interruptor «Memoria y estilo en Tu nube»** (`settings.cloudBrain`, activado por defecto):
+  - Al apagarlo, la siguiente subida va sin `brain`, y eso la quita de la fila.
+  - Al bajar una copia sin memoria, cada dispositivo conserva la suya (`applyRemote`).
+- **Borrado:**
+  - Lo olvidado en Memoria desaparece de la fila en la siguiente subida, porque se reemplaza el JSON entero.
+  - La tabla no concede `DELETE`. «Vaciar mi nube» reemplaza el contenido por un vault vacío marcado (`erased`). Ningún dispositivo aplica esa copia sobre sus datos: se desconecta y avisa.
+  - Según la página de precios de Supabase, el plan gratuito no hace copias automáticas ni PITR. Que no haya copias en este proyecto queda NO_VERIFICADO.
+  - Postgres puede conservar versiones antiguas de la fila hasta que se compactan (MVCC/vacuum). Es TEÓRICAMENTE_POSIBLE y no es accesible por la API.
+  - La cuenta de Supabase (correo) solo se borra desde el panel.
+- **Riesgo aceptado:** en un conflicto, elegir «Quedarme con este» en un dispositivo que aún tenía algo olvidado lo vuelve a subir.

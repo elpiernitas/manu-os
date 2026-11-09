@@ -2,7 +2,8 @@
 
 ## Próximo paso vigente
 
-0. **WEB-97 (Centro de permisos y conexiones, integración con iOS):** PR en borrador. Informe en `INFORME_WEB-97.md`; auditoría con fuentes en `docs/integrations/IOS_CAPABILITIES.md`. WEB-95 ya está fusionada (PR #98).
+0. **WEB-98 (memoria y estilo en Tu nube, revisión de seguridad y borrado; investigación de avisos push):** PR abierto sin fusionar. Informe en `INFORME_WEB-98.md`. La propuesta de push (`docs/integrations/PUSH.md`) espera la autorización de Manu.
+- (Anterior) **WEB-97 (Centro de permisos y conexiones, integración con iOS):** fusionada (PR #99). Informe en `INFORME_WEB-97.md`; auditoría con fuentes en `docs/integrations/IOS_CAPABILITIES.md`. WEB-95 ya está fusionada (PR #98).
 - (Anterior) **WEB-95 (aprender de ideas, decisiones y conversaciones):** PR en borrador. Informe en `INFORME_WEB-95.md`. WEB-94 (Memoria) ya está fusionada (PR #97). Sigue pendiente de Manu si la memoria debe quedar fuera de Tu nube.
 1. **WEB-87:** Manu prueba en su iPhone la lista de la sección «WEB-87». Lo que falle se arregla en esa misma tarea, con su regresión.
 2. No se añaden funciones hasta cerrar WEB-87.
@@ -11,6 +12,33 @@
 ## Estado
 
 BRAIN-00 está fusionado en `main` mediante el PR #1. BRAIN-01 está **COMPLETED Y FUSIONADO** en `main` mediante el PR #2, squash commit `a6a93e0`, tras revisión externa y revisión del orquestador.
+
+## WEB-98 — Memoria y estilo en Tu nube; avisos con MANU cerrada (2026-11-09)
+
+Manu decide que la memoria y el estilo se sincronicen por Tu nube, pero pide antes comprobar la seguridad, el borrado y los riesgos. También pide investigar los avisos push con la app cerrada reutilizando lo que ya existe, sin activar servicios sin su autorización.
+
+**Hallazgo:** desde WEB-94 la memoria **ya** viajaba en Tu nube, porque se sube el vault entero. Además, los ejemplos del estilo (WEB-95) guardaban el mensaje literal, que podía incluir nombres de otras personas.
+
+**Qué se ha hecho:**
+
+| Pieza | Qué hace |
+|---|---|
+| `core/style.js` | `maskExample()`: nombres, cifras, enlaces y correos salen como «…»; las mayúsculas al inicio de frase también, salvo las palabras comunes. `scrubStyle()` enmascara los ejemplos antiguos. |
+| `core/cloudprivacy.js` | `cloudPayload` (qué sube), `applyRemote` (qué baja; respeta la memoria local si no viaja), `erasedVault` e `isErased` («Vaciar mi nube») y `cloudInventory` (solo recuentos). |
+| Tu nube | Tarjetas «Tu memoria en la nube» (recuentos, cuántos recuerdos son de terceros, interruptor) y «Seguridad y borrado» (sin extremo a extremo, copias del proveedor, conflictos, cuenta), con el botón «Vaciar mi nube…» y doble confirmación. |
+| Sincronización | Sube `cloudPayload(vault)`. Una copia marcada como vaciada nunca se aplica: el dispositivo se desconecta y avisa. |
+| Permisos | `probe().push` detecta si el dispositivo admite push; la entrada «Avisos con MANU cerrada» lo dice y remite a `PUSH.md`. |
+| Documentos | `docs/integrations/PUSH.md` (opciones y propuesta, sin implementar) y una enmienda WEB-98 a ADR-0017. |
+
+**Comandos y resultados:**
+- `npm test`: 329 de 329, con 6 pruebas nuevas en `tests/nube-privacidad.test.js`.
+- `node e2e/nube.e2e.mjs`: 16 de 16, contra un Supabase **falso** hecho con rutas de Playwright; nada sale a la red.
+- `permisos`, `memoria` y `estilo`: sin regresión.
+
+**NO_VERIFICADO:**
+- El Supabase real de Manu y el iPhone.
+- Si hay copias del proveedor en su proyecto.
+- Que el panel de Supabase permita desplegar la Edge Function desde el iPhone.
 
 ## WEB-97 — Centro de permisos y conexiones (integración con iOS, 2026-11-09)
 
