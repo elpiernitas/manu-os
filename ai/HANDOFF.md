@@ -2,6 +2,7 @@
 
 ## Próximo paso vigente
 
+0. **WEB-93a (preparar Enable Banking):** rutas públicas `banco/vuelta/` (callback: limpia la URL, comprueba un `state` de un solo uso y deja el código solo en la pestaña, como mucho 10 min, para un canje en servidor que está pendiente), `privacidad/` y `condiciones/`. El service worker ya no cachea ni sirve como app páginas que no sean la app. No se ha registrado nada en Enable Banking ni conectado Sabadell. Límite conocido: en el iPhone, la vuelta del banco se abre en Safari y no en el icono; el `state` tendrá que iniciarse en el mismo navegador o guardarse en el servidor (diseño de WEB-93).
 0. **WEB-99b:** los avisos push están **activados en el servidor** (proyecto reactivado, función v2, cron y verificación real en `docs/integrations/PUSH.md` §6). Falta que Manu active la suscripción en su iPhone y confirme un aviso real. El PR añade reintentos controlados y arregla el 500 de las respuestas vacías.
 - (Anterior) **WEB-98 (memoria y estilo en Tu nube, revisión de seguridad y borrado; investigación de avisos push):** PR abierto sin fusionar. Informe en `INFORME_WEB-98.md`. La propuesta de push (`docs/integrations/PUSH.md`) espera la autorización de Manu.
 - (Anterior) **WEB-97 (Centro de permisos y conexiones, integración con iOS):** fusionada (PR #99). Informe en `INFORME_WEB-97.md`; auditoría con fuentes en `docs/integrations/IOS_CAPABILITIES.md`. WEB-95 ya está fusionada (PR #98).

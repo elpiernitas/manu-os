@@ -1,9 +1,9 @@
 // Offline shell: every file of the app is cached.
-const VERSION = "manuos-v99";
+const VERSION = "manuos-v100";
 const SHELL = [
   "./", "index.html", "styles.css", "app.js", "manifest.webmanifest",
   "core/text.js", "core/money.js", "core/modes.js", "core/assistant.js",
-  "core/inbox.js", "core/refuge.js", "core/storage.js", "core/notify.js", "core/intake.js", "core/weather.js", "core/bank.js", "core/night.js", "core/life.js", "core/gcal.js", "core/google.js", "core/ai.js", "core/crypto.js", "core/spotify.js", "core/hub.js", "core/insights.js", "core/converse.js", "core/imagestore.js", "core/links.js", "core/projects.js", "core/scene.js", "core/gmail.js", "core/archive.js", "core/archivestore.js", "core/recall.js", "core/diary.js", "core/buzon.js", "core/backup-manager.js", "core/briefing.js", "core/budget.js", "core/find.js", "core/now.js", "core/captures.js", "core/autofile.js", "core/zipwrite.js", "core/contacts.js", "core/closing.js", "core/lowmode.js", "core/clock.js", "core/sync.js", "core/nudges.js", "core/commands.js", "core/split.js", "core/bankshot.js", "core/review.js", "core/docs.js", "core/library.js", "core/quickmoney.js", "core/bahia.js", "core/bahia-draw.js", "core/bahia-svg.js", "core/brain.js", "core/learn.js", "core/proposals.js", "core/conocernos.js", "core/voice.js", "core/memchat.js", "core/memview.js", "core/style.js", "core/topics.js", "core/capabilities.js", "core/cloudprivacy.js", "core/push.js",
+  "core/inbox.js", "core/refuge.js", "core/storage.js", "core/notify.js", "core/intake.js", "core/weather.js", "core/bank.js", "core/night.js", "core/life.js", "core/gcal.js", "core/google.js", "core/ai.js", "core/crypto.js", "core/spotify.js", "core/hub.js", "core/insights.js", "core/converse.js", "core/imagestore.js", "core/links.js", "core/projects.js", "core/scene.js", "core/gmail.js", "core/archive.js", "core/archivestore.js", "core/recall.js", "core/diary.js", "core/buzon.js", "core/backup-manager.js", "core/briefing.js", "core/budget.js", "core/find.js", "core/now.js", "core/captures.js", "core/autofile.js", "core/zipwrite.js", "core/contacts.js", "core/closing.js", "core/lowmode.js", "core/clock.js", "core/sync.js", "core/nudges.js", "core/commands.js", "core/split.js", "core/bankshot.js", "core/review.js", "core/docs.js", "core/library.js", "core/quickmoney.js", "core/bahia.js", "core/bahia-draw.js", "core/bahia-svg.js", "core/brain.js", "core/learn.js", "core/proposals.js", "core/conocernos.js", "core/voice.js", "core/memchat.js", "core/memview.js", "core/style.js", "core/topics.js", "core/capabilities.js", "core/cloudprivacy.js", "core/push.js", "core/bankcallback.js",
   "icons/icon-180.png", "icons/icon-192.png", "icons/icon-512.png",
 ];
 
@@ -34,6 +34,11 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(req.url);
   if (req.method !== "GET" || url.origin !== self.location.origin) return;
   const page = req.mode === "navigate";
+  // Only the app itself is cached as a page. Other pages (the bank's return with ?code=, the
+  // legal pages) go straight to the network: never stored, never served as the app.
+  const scope = new URL(self.registration.scope).pathname;
+  if (page && url.pathname !== scope && url.pathname !== `${scope}index.html`) return;
+  if (url.pathname.startsWith(`${scope}banco/`)) return;
   const key = page ? "index.html" : url.search ? null : req;
   event.respondWith(
     // «no-cache»: always ask the server (a cheap 304 if nothing changed), so

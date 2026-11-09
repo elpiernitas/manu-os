@@ -66,7 +66,7 @@ import { removeJoke } from "./core/voice.js";
 import { memoriaPage, hoyMemCard } from "./core/memview.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "99"; // = número de la última tarea WEB publicada (desde WEB-87)
+export const APP_VERSION = "100"; // = número de la última tarea WEB publicada (desde WEB-87)
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -423,8 +423,10 @@ async function nubeErase() {
     const head = await remoteHead(nubeCfg(), s);
     if (head) await remotePut(nubeCfg(), s, { data: erasedVault({ device: deviceName() }), baseRev: head.rev, device: deviceName() });
     // WEB-99: emptying the cloud also removes push subscriptions and pending notices.
-    try { await pushDropAll(nubeCfg(), s); } catch {}
-    await pushUnsubscribe(); pushDev.v = null;
+    if (pushPrefs().on || pushDev.v.endpoint) {
+      try { await pushDropAll(nubeCfg(), s); } catch {}
+      await Promise.race([pushUnsubscribe(), new Promise((r) => setTimeout(r, 3000))]); pushDev.v = null;
+    }
     await nubeLeave();
     nube.patch({ erasedNotice: { at: new Date().toISOString(), device: deviceName(), self: true } });
     render(); toast("Tu nube está vacía. Este dispositivo conserva sus datos y se ha desconectado.");
