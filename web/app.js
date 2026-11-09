@@ -48,6 +48,8 @@ import { parseCommand, suggest } from "./core/commands.js";
 import { toAsk, equalSplit, detailSplit, debts, settleAll, debtLine, reminderText } from "./core/split.js";
 import { buildBankShotsPayload, parseBankShots, alreadyThere, MAX_SHOTS } from "./core/bankshot.js";
 import { incomeKind } from "./core/bank.js";
+import { bankRequest, safeBankRedirect } from "./core/enablebanking.js";
+import { bankAisCard } from "./core/bank-ais-view.js";
 import { nightReview, weekReview, nightDue, weekDue } from "./core/review.js";
 import { KINDS as DOC_KINDS, daysLeft, expiringSoon, leftText, buildDocPayload, parseDocReply, isDocQuestion, answerDoc, DOC_LIMIT } from "./core/docs.js";
 import { LIB_KINDS, STATUSES, newItem, setStatus, ideasPayload, parseIdeas, isLibraryQuestion, answerLibrary } from "./core/library.js";
@@ -66,7 +68,7 @@ import { removeJoke } from "./core/voice.js";
 import { memoriaPage, hoyMemCard } from "./core/memview.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "100"; // = número de la última tarea WEB publicada (desde WEB-87)
+export const APP_VERSION = "101"; // = número de la última tarea WEB publicada (desde WEB-87)
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -91,6 +93,8 @@ let sheet = null; // quick add: { kind }
 let confirmWipe = false;
 let cityResults = null;
 let moneyFilter = null; // "review"
+// Bank data is ephemeral; never stored in the vault, Tu nube, backups or chat.
+const bankAisUi = { checked: false, connected: false, busy: false, accounts: [], index: 0, balances: [], transactions: [], continuation: null, validUntil: null, error: null };
 let seriesPick = null; // month tapped in the income vs spending chart
 let moneyMonth = 0; // months back from the current one in Dinero
 let calView = null; // { y, m } month shown in Agenda
@@ -269,6 +273,36 @@ async function nubeSession() {
     try { s = await refreshSession(nubeCfg(), s); nube.session = s; } catch (err) { if (err.code === "expired") nube.session = null; throw err; }
   }
   return s;
+}
+
+async function bankAisAction(action) {
+  if (!nubeOn()) { toast("Conecta primero Tu nube para identificarte ante el servidor bancario"); return; }
+  if (action === "disconnect" && !window.confirm("¿Revocar la conexión de lectura con Banco Sabadell?")) return;
+  const index = Number(document.getElementById("bankAisAccount")?.value ?? bankAisUi.index ?? 0);
+  bankAisUi.index = Number.isInteger(index) ? index : 0;
+  bankAisUi.busy = true; bankAisUi.error = null; render();
+  try {
+    let params = {};
+    if (action === "balances" || action === "transactions") params.index = bankAisUi.index;
+    if (action === "transactions") {
+      const date = new Date(), from = new Date(date); from.setDate(date.getDate() - 30);
+      params.from = from.toISOString().slice(0, 10); params.to = date.toISOString().slice(0, 10);
+    }
+    const data = await bankRequest(nubeCfg(), await nubeSession(), action, params);
+    if (action === "start") { location.assign(safeBankRedirect(data.url)); return; }
+    if (action === "status") {
+      bankAisUi.checked = true; bankAisUi.connected = Boolean(data.connected); bankAisUi.accounts = data.accounts ?? [];
+      bankAisUi.validUntil = data.validUntil ?? null;
+      if (!data.connected) { bankAisUi.balances = []; bankAisUi.transactions = []; }
+    }
+    if (action === "balances") bankAisUi.balances = data.balances ?? [];
+    if (action === "transactions") { bankAisUi.transactions = data.transactions ?? []; bankAisUi.continuation = data.continuation ?? null; }
+    if (action === "disconnect") {
+      bankAisUi.checked = true; bankAisUi.connected = false; bankAisUi.accounts = []; bankAisUi.balances = []; bankAisUi.transactions = []; bankAisUi.continuation = null;
+      toast("Acceso bancario revocado");
+    }
+  } catch (err) { bankAisUi.error = String(err.message || "No se ha podido consultar el banco").slice(0, 160); }
+  finally { bankAisUi.busy = false; render(); }
 }
 
 function nubeChanged() {
@@ -1519,6 +1553,7 @@ const screens = {
     const imp = vault.settings.lastImport;
     return `<h1>Dinero</h1><p class="subtitle">${esc(cap(monthName))}</p>
       <div class="stack">
+      ${bankAisCard(bankAisUi, nubeOn())}
       <section class="card hero money-hero">${celebrateMoney ? moneyRain() : ""}<div class="row cal-head"><button class="link" data-act="money-prev" aria-label="Mes anterior">${I.back}</button><h2>${moneyMonth === 0 ? "Gastado este mes" : `Gastado en ${esc(monthName.replace(/ de \d{4}$/, ""))}`}</h2><button class="link" data-act="money-next" aria-label="Mes siguiente"${moneyMonth === 0 ? " disabled" : ""}>${I.chev}</button></div><div class="big-money" data-count-money="${month.total}">${euros(month.total)}</div>
         ${cats.map(([c, v]) => { const lim = moneyMonth === 0 ? vault.settings.budgets?.[c] : null; return `<div class="stack"><div class="row"><span>${esc(catLabel(c))}</span><span class="num">${euros(v)}${lim ? `<span class="muted small"> / ${euros(lim)}</span>` : ""}</span></div><div class="bar${lim && v > lim ? " over" : lim && v >= lim * 0.8 ? " warn" : ""}"><i data-w="${Math.max(3, Math.round((v / (lim ? Math.max(lim, v) : max)) * 100))}"></i></div></div>`; }).join("")}</section>
       ${moneyMonth === 0 ? `${splitAskCard()}${addMoneyCard()}${fixedIncomeCard()}${debtsCard()}` : ""}
@@ -3343,6 +3378,11 @@ document.addEventListener("click", async (e) => {
       break;
     }
     case "nube-erase": nubeErase(); break;
+    case "bank-ais-status": bankAisAction("status"); break;
+    case "bank-ais-start": bankAisAction("start"); break;
+    case "bank-ais-balances": bankAisAction("balances"); break;
+    case "bank-ais-movements": bankAisAction("transactions"); break;
+    case "bank-ais-disconnect": bankAisAction("disconnect"); break;
     case "push-on": pushOn(); break;
     case "push-off-here": pushOffHere(); break;
     case "push-all-off": pushAllOff(); break;
