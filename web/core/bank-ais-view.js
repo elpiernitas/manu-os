@@ -7,7 +7,7 @@ export function bankAisCard(state, online) {
   let body = "";
   if (!online) body = '<p class="muted small">Para conectar el banco, entra primero en Tú → Tu nube. Ninguna clave del banco se guarda en MANU.</p>';
   else if (busy) body = '<p class="muted small">Consultando tu banco…</p>';
-  else if (!s.checked) body = `<p class="muted small">Consulta tu saldo y movimientos reales sin autorizar pagos. Los datos solo se muestran al pedirlos y no se guardan automáticamente.</p>${btn("bank-ais-status", "Comprobar conexión", true)}`;
+  else if (!s.checked) body = `<p class="muted small">Estamos preparando la conexión bancaria de solo lectura. Primero comprueba si el servidor está disponible; no se accede a tus cuentas automáticamente.</p>${btn("bank-ais-status", "Comprobar servidor", true)}`;
   else if (!s.connected) body = `<p class="muted small">Todavía no hay una sesión de lectura activa. Conectar te llevará al consentimiento oficial del banco.</p>${btn("bank-ais-start", "Conectar Sabadell", true)} ${btn("bank-ais-status", "Actualizar estado")}`;
   else {
     const accounts = (s.accounts ?? []).map((a) => `<option value="${Number(a.index)}"${a.index === s.index ? " selected" : ""}>${esc(a.label || "Cuenta")} (${esc(a.currency || "EUR")})</option>`).join("");
