@@ -70,7 +70,7 @@ import { removeJoke } from "./core/voice.js";
 import { memoriaPage, hoyMemCard } from "./core/memview.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "104"; // = número de la última tarea WEB publicada (desde WEB-87)
+export const APP_VERSION = "105"; // = número de la última tarea WEB publicada (desde WEB-87)
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";

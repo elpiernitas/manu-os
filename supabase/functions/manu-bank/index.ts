@@ -64,7 +64,12 @@ async function enable(path, options = {}) {
     ...(options.body ? { body: JSON.stringify(options.body) } : {}),
     signal: AbortSignal.timeout(12000),
   });
-  if (!res.ok) throw new Error("Enable Banking returned HTTP " + res.status);
+  if (!res.ok) {
+    // Enable Banking's ErrorResponse carries a generic code/message (no personal data): kept, cut short.
+    let info = "";
+    try { const e = JSON.parse(await res.text()); info = [e.code, e.error, e.message, e.detail].filter((x) => typeof x === "string" || typeof x === "number").join(" · ").slice(0, 200); } catch {}
+    throw Object.assign(new Error("Enable Banking " + (options.method ?? "GET") + " " + path.split("?")[0].replace(/[0-9a-f-]{36}/gi, ":id") + " → HTTP " + res.status + (info ? " · " + info : "")), { safe: true });
+  }
   const text = await res.text();
   return text ? JSON.parse(text) : {};
 }
@@ -128,7 +133,12 @@ async function route(req) {
       access: { valid_until: new Date(Date.now() + validity * 1000).toISOString(), balances: true, transactions: true },
       aspsp: bank, psu_type: "personal", state, redirect_url: CALLBACK, language: "es",
     } });
-    if (typeof auth.url !== "string" || !auth.url.startsWith("https://auth.enablebanking.com/")) throw new Error("Unexpected authorization destination");
+    // Enable Banking's own hosts only (Tilisy is its former brand; GET /auth returns tilisy.enablebanking.com).
+    const okHost = (() => { try { const u = new URL(auth.url); return u.protocol === "https:" && !u.username && !u.password && ["auth.enablebanking.com", "tilisy.enablebanking.com"].includes(u.hostname); } catch { return false; } })();
+    if (typeof auth.url !== "string" || !okHost) {
+      let host = "no-url"; try { host = new URL(auth.url).host; } catch {}
+      throw new Error("Unexpected authorization destination: " + host.slice(0, 80));
+    }
     return reply({ url: auth.url });
   }
   if (action === "disconnect") {
@@ -158,8 +168,10 @@ async function route(req) {
 Deno.serve(async (req) => {
   try { return await route(req); }
   catch (err) {
-    // Do not log raw bank response, authorization code, IBAN or private key.
-    console.error("manu-bank request failed", err instanceof Error ? err.name : "Unknown");
-    return safeFail(502, "El banco o el servicio no están disponibles. Vuelve a intentarlo.");
+    // Only errors built to be safe (step, HTTP status, provider's generic message) are shown;
+    // never the raw bank response, an authorization code, an IBAN or the private key.
+    const safe = err instanceof Error && ((err as { safe?: boolean }).safe || /^Banco Sabadell no aparece|^Unexpected authorization destination|^Bank state was not stored|^Backend request failed/.test(err.message));
+    console.error("manu-bank request failed:", safe ? (err as Error).message : (err instanceof Error ? err.name : "Unknown"));
+    return safeFail(502, safe ? "No se pudo completar: " + (err as Error).message : "El banco o el servicio no están disponibles. Vuelve a intentarlo.");
   }
 });

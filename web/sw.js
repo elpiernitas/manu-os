@@ -1,5 +1,5 @@
 // Offline shell: every file of the app is cached.
-const VERSION = "manuos-v104";
+const VERSION = "manuos-v105";
 const SHELL = [
   "./", "index.html", "styles.css", "app.js", "manifest.webmanifest",
   "design/fable-tokens.css", "design/fable-icons.js", "design/fable-mark.svg",

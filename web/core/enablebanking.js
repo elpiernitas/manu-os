@@ -28,6 +28,7 @@ export async function bankRequest(cfg, session, action, params = {}, fetchImpl =
 }
 export function safeBankRedirect(url) {
   const u = new URL(url);
-  if (u.protocol !== "https:" || u.hostname !== "auth.enablebanking.com" || u.username || u.password) throw new Error("Dirección bancaria inesperada");
+  // Only Enable Banking's own consent hosts (tilisy.* is its former brand, still returned by POST /auth).
+  if (u.protocol !== "https:" || !["auth.enablebanking.com", "tilisy.enablebanking.com"].includes(u.hostname) || u.username || u.password || u.port) throw new Error("Dirección bancaria inesperada");
   return u.href;
 }
