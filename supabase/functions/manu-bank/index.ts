@@ -133,7 +133,9 @@ async function route(req) {
       access: { valid_until: new Date(Date.now() + validity * 1000).toISOString(), balances: true, transactions: true },
       aspsp: bank, psu_type: "personal", state, redirect_url: CALLBACK, language: "es",
     } });
-    if (typeof auth.url !== "string" || !auth.url.startsWith("https://auth.enablebanking.com/")) {
+    // Enable Banking's own hosts only (Tilisy is its former brand; GET /auth returns tilisy.enablebanking.com).
+    const okHost = (() => { try { const u = new URL(auth.url); return u.protocol === "https:" && !u.username && !u.password && ["auth.enablebanking.com", "tilisy.enablebanking.com"].includes(u.hostname); } catch { return false; } })();
+    if (typeof auth.url !== "string" || !okHost) {
       let host = "no-url"; try { host = new URL(auth.url).host; } catch {}
       throw new Error("Unexpected authorization destination: " + host.slice(0, 80));
     }

@@ -130,3 +130,9 @@ test("key read without PEM headers (base64 DER, base64 of a PEM file) and header
   assert.equal(readPrivateKey("-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----").marker, "CERTIFICATE");
   assert.equal(readPrivateKey("hola").marker, "none");
 });
+
+test("consent redirect: only Enable Banking's own hosts (auth.* and tilisy.*), nothing else", async () => {
+  const { safeBankRedirect } = await import("../core/enablebanking.js");
+  for (const ok of ["https://auth.enablebanking.com/x?y=1", "https://tilisy.enablebanking.com/welcome?sessionid=abc"]) assert.equal(safeBankRedirect(ok), new URL(ok).href);
+  for (const bad of ["http://tilisy.enablebanking.com/x", "https://tilisy.enablebanking.com.evil.example/x", "https://evil.example/tilisy.enablebanking.com", "https://user:pw@tilisy.enablebanking.com/", "https://tilisy.enablebanking.com:8443/", "https://enablebanking.com.evil/"]) assert.throws(() => safeBankRedirect(bad), /inesperada/, bad);
+});
