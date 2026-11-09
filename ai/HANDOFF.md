@@ -2,7 +2,7 @@
 
 ## WEB-93c · Sabadell solo lectura preparado (ChatGPT, 2026-11-09)
 
-Rama `chatgpt/web-93c-bank-staging`, basada en Fable fase 2 ya fusionada. Integra el código servidor de Enable Banking AIS desde #104 y su vista optativa en Dinero, sin borrar el nuevo Hoy de Fable. La sesión bancaria y el state permanecen en backend; las vistas de Hoy/Dinero solo afirman conexión cuando el servidor la confirme. Sin pagos, sin importación automática, sin uso de claves reales, sin despliegue Supabase ni fusión por ahora.
+Rama `chatgpt/web-93c-bank-staging`, basada en Fable fase 2 ya fusionada. Integra el código servidor de Enable Banking AIS desde #104 y su vista optativa en Dinero, sin borrar el nuevo Hoy de Fable. La sesión bancaria y el state permanecen en backend; las vistas de Hoy/Dinero solo afirman conexión cuando el servidor la confirme. Sin pagos, sin importación automática, sin uso de claves reales, sin despliegue Supabase ni activación bancaria; la publicación del frontend sin claves se puede fusionar por separado.
 
 **Seguridad:** la clave RSA descargada se adjuntó previamente en una conversación. Manu no desea rotarla. Por ello no se instalará ni usará como secreto de producción desde este trabajo. La integración de datos reales queda bloqueada hasta resolver ese riesgo y realizar pruebas del backend con consentimientos oficiales. Ver `docs/integrations/WEB93C_BANK_STAGE.md`.
 
