@@ -72,7 +72,7 @@ function configured() {
     /^[a-f0-9-]{36}$/i.test(APP_ID) && PRIVATE_KEY.includes("-----BEGIN PRIVATE KEY-----") &&
     CALLBACK === SUPABASE + "/functions/v1/manu-bank";
 }
-const bounce = (result) => Response.redirect(APP_HOME + "#banco=" + result, 303);
+const bounce = (result) => new Response(null, { status: 303, headers: { Location: APP_HOME + "#banco=" + result, "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" } });
 async function callback(url) {
   const state = url.searchParams.get("state"), code = url.searchParams.get("code");
   if (!validState(state)) return bounce("error");
