@@ -7,6 +7,16 @@
 - URL de callback que debe constar en Enable Banking:
   `https://xqsexjpuhvmwkclpnvjo.supabase.co/functions/v1/manu-bank`
 
+## Estado real (2026-11-09, verificado por la API de gestión de Supabase)
+- Proyecto `manu-os` (`xqsexjpuhvmwkclpnvjo`): `ACTIVE_HEALTHY`, plan `free`, sin complementos.
+- Desplegado: migración `20261109140000_bank_ais.sql`, con RLS en `manu_bank_ais`, sin permisos para `anon`/`authenticated`; auditoría sin hallazgos. También `manu-bank` (v2, `verify_jwt=false`) y el secreto `MANU_BANK_CALLBACK_URL`.
+- Desde fuera, con la clave pública, `manu_bank_ais` responde *permission denied*. La función responde 503 («todavía no configurada») a todo mientras falten `ENBANK_APP_ID` y `ENBANK_PRIVATE_KEY`. Esos dos los introduce el titular en Supabase → Edge Functions → Secrets.
+- Correcciones de la auditoría:
+  - `AccountResource.name` es el **nombre del titular**: ya no se guarda; la etiqueta es la descripción o `Cuenta ···1234`.
+  - `status` y `start` comprueban `GET /application` (activa, `PRODUCTION`, AIS y callback registrado) antes de ir al banco.
+  - La app atiende `#banco=connected|error`.
+- Riesgo no resuelto: la clave RSA se compartió y el titular decidió no rotarla. Quien la tenga puede firmar peticiones como la aplicación. Sin el `session_id`, que solo está en el servidor, no puede leer cuentas, pero la conexión **no debe considerarse segura** mientras no se rote. El consentimiento se limita a 24 h para acotar ese riesgo.
+
 ## Corrección de callback implementada
 El banco redirige por GET con `?code=...&state=...` sin JWT de Supabase. Dejar el valor por defecto `verify_jwt = true` hace que la plataforma bloquee esa vuelta antes de ejecutar la función. El archivo `supabase/config.toml` aplica `verify_jwt = false` **solo a manu-bank**.
 

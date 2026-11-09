@@ -68,3 +68,24 @@ test("bank UI escapes bank-provided text, does not claim an unverified connectio
   assert.doesNotMatch(html, /<script>|<img/);
   assert.match(html, /&lt;script&gt;/);
 });
+
+test("the account holder's name (AccountResource.name) is never stored; label = description or last 4 of the IBAN", () => {
+  const uid = "00000000-0000-4000-8000-000000000002";
+  const [a] = sanitizeAccounts([{ uid, name: "Titular Inventado Pérez", account_id: { iban: "ES9100810000000000001234" }, currency: "EUR" }]);
+  assert.deepEqual(a, { uid, label: "Cuenta ···1234", currency: "EUR" });
+  assert.doesNotMatch(JSON.stringify(a), /Titular|ES91/);
+  assert.equal(sanitizeAccounts([{ uid, name: "Titular Inventado", details: "Cuenta Online", currency: "EUR" }])[0].label, "Cuenta Online");
+  assert.equal(sanitizeAccounts([{ uid, name: "Titular Inventado" }])[0].label, "Cuenta");
+});
+
+test("server pre-flight: ready only with an active PRODUCTION app, AIS and the exact callback registered", async () => {
+  const { serverCheck } = await import("../../supabase/functions/manu-bank/bank-core.js");
+  const cb = "https://xqsexjpuhvmwkclpnvjo.supabase.co/functions/v1/manu-bank";
+  const app = { name: "MANU", kid: "x", environment: "PRODUCTION", redirect_urls: [cb], active: true, countries: ["ES"], services: ["AIS"] };
+  assert.equal(serverCheck(app, cb).ready, true);
+  assert.equal(serverCheck({ ...app, redirect_urls: ["https://elpiernitas.github.io/manu-os/banco/vuelta/"] }, cb).redirectRegistered, false);
+  assert.equal(serverCheck({ ...app, environment: "SANDBOX" }, cb).ready, false);
+  assert.equal(serverCheck({ ...app, active: false }, cb).ready, false);
+  assert.equal(serverCheck({ ...app, services: ["PIS"] }, cb).ready, false);
+  assert.deepEqual(Object.keys(serverCheck(app, cb)).sort(), ["active", "ais", "production", "ready", "redirectRegistered"], "no names, kid or URLs leak to the app");
+});

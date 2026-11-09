@@ -33,7 +33,15 @@ export function sabadellFromAspsps(data) {
 }
 export function sanitizeAccounts(raw) {
   const all = Array.isArray(raw) ? raw : [];
-  return all.filter((a) => validAccountId(a?.uid)).slice(0, 5).map((a) => ({ uid: a.uid, label: String(a.name ?? "Cuenta").slice(0, 50), currency: String(a.currency ?? "EUR").slice(0, 3) }));
+  // In Enable Banking, `name` is the account HOLDER's name (AccountResource): never stored.
+  // The label is the account description, or «Cuenta ···1234» from the IBAN's last 4 digits.
+  const label = (a) => {
+    const d = typeof a.details === "string" ? a.details.trim() : typeof a.product === "string" ? a.product.trim() : "";
+    if (d) return d.slice(0, 50);
+    const iban = String(a.account_id?.iban ?? "").replace(/\s/g, "");
+    return iban.length >= 4 ? "Cuenta ···" + iban.slice(-4) : "Cuenta";
+  };
+  return all.filter((a) => validAccountId(a?.uid)).slice(0, 5).map((a) => ({ uid: a.uid, label: label(a), currency: String(a.currency ?? "EUR").slice(0, 3) }));
 }
 export function balancesView(data) {
   return (Array.isArray(data?.balances) ? data.balances : []).slice(0, 12).map((b) => ({
@@ -56,4 +64,18 @@ export function transactionsView(data) {
     })),
     continuation: typeof data?.continuation_key === "string" ? data.continuation_key.slice(0, 500) : null,
   };
+}
+
+// Pre-flight from GET /application (GetApplicationResponse): only flags, never secrets or names.
+export function serverCheck(app, callback) {
+  const urls = Array.isArray(app?.redirect_urls) ? app.redirect_urls : [];
+  const services = Array.isArray(app?.services) ? app.services : [];
+  const out = {
+    active: app?.active === true,
+    production: app?.environment === "PRODUCTION",
+    ais: services.includes("AIS"),
+    redirectRegistered: typeof callback === "string" && urls.includes(callback),
+  };
+  out.ready = out.active && out.production && out.ais && out.redirectRegistered;
+  return out;
 }

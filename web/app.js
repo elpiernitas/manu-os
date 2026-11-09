@@ -294,6 +294,7 @@ async function bankAisAction(action) {
     if (action === "start") { location.assign(safeBankRedirect(data.url)); return; }
     if (action === "status") {
       bankAisUi.checked = true; bankAisUi.connected = Boolean(data.connected); bankAisUi.accounts = data.accounts ?? [];
+      bankAisUi.server = data.server ?? null;
       bankAisUi.validUntil = data.validUntil ?? null;
       if (!data.connected) { bankAisUi.balances = []; bankAisUi.transactions = []; }
     }
@@ -4480,6 +4481,18 @@ function applyIr() {
   return goTo(ir[1]);
 }
 applyIr();
+// Return from the bank (manu-bank redirects to «#banco=connected|error»): clean the URL, go to
+// Dinero and ask the server for the real state. Nothing from the bank travels in this hash.
+function applyBankReturn() {
+  const m = /^#banco=(connected|error)$/.exec(location.hash);
+  if (!m) return false;
+  history.replaceState(null, "", location.pathname);
+  tab = "dinero"; sub = null;
+  toast(m[1] === "connected" ? "Sabadell ha respondido: compruebo la conexión…" : "La autorización no se completó. No se ha compartido nada.");
+  setTimeout(() => { if (nubeOn()) bankAisAction("status"); }, 300);
+  return true;
+}
+applyBankReturn();
 // ---------- Repaso, documentos y biblioteca (WEB-83..85) ----------
 let reviewNote = false;  // the «Apuntar algo» box on tonight's card
 let docDraft = null;     // { busy } while Gemini reads; { fields, fileData?, fileType?, editId? } to review

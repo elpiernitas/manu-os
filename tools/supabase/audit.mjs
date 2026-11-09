@@ -9,7 +9,7 @@ export const AUDIT_SQL = {
 // What anon (the public key in the app) may do: only leave a line in the Shortcut's inbox.
 const ANON_ALLOWED = new Set(["manu_inbox:INSERT"]);
 // Tables only the server (service_role) may touch.
-const SERVER_ONLY = new Set(["manu_push_keys", "manu_push_cron"]);
+const SERVER_ONLY = new Set(["manu_push_keys", "manu_push_cron", "manu_bank_ais"]);
 const OWNED = ["manu_sync", "manu_push_subs", "manu_push_queue", "manu_inbox_owner"];
 
 /** Returns { ok, findings: [{ level: "error"|"warn", text }] }. */
