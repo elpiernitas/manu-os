@@ -1,5 +1,19 @@
 # HANDOFF
 
+## WEB-108 · HORIZONTE, prototipo del rediseño (Claude, 2026-11-09)
+
+Rama `claude/magical-goodall-rf5qoo`. Manu pidió reinventar la experiencia entera. Se entrega un **prototipo aparte** en `web/vivo/` (no cambia `web/app.js`, `web/core/`, `web/sw.js` ni Supabase). Solo datos inventados (`web/vivo/src/demo.js`); no lee `manuos.vault` ni hace peticiones de red (lo comprueba el e2e).
+
+**Idea:** un único horizonte. El cielo real de Gijón (sol calculado, tiempo) decide la luz y el tema; debajo, papel y tinta. Siete vistas (Hoy, Agenda, MANU, Dinero, Bahía, Astillero, Bitácora) y nueve inventos (dial del día, botella, constelación, zasca con recibo, noche en pagos, botadura, sonda, retrato en prosa).
+
+**Documentos:** `web/vivo/README.md`, `docs/SISTEMA.md`, `docs/ADAPTADORES.md`, `docs/MIGRACION.md`, `docs/INFORME.md`.
+
+**Pruebas:** `npm test` 401/401 (13 nuevas); `node e2e/vivo.e2e.mjs` 68/68.
+
+**Ojo:** al fusionar, `web/vivo/` se publica en GitHub Pages (`/manu-os/vivo/`). Manu pidió no fusionar sin revisión.
+
+**NO_VERIFICADO:** iPhone real y Safari, VoiceOver, datos reales, citas de Google y tiempo real conectados, modo sin conexión. **Decisión pendiente de Manu:** si Horizonte sustituye al diseño actual o conviven como temas (fase 1 de `MIGRACION.md`).
+
 ## Activación Sabadell · callback Edge Function y proyecto Supabase incorrecto (2026-11-09)
 
 Rama `chatgpt/sabadell-callback-hardening`. Tras la orden de activar Sabadell, la cuenta de Enable Banking continúa vinculada en modo producción restringido, pero la Edge Function bancaria **NO se ha desplegado**. La conexión Supabase disponible en este chat devuelve otros proyectos y **no incluye** `manu-os` (`xqsexjpuhvmwkclpnvjo`); es peligroso desplegar en un proyecto distinto. Requiere conectar la cuenta/organización correctas antes de operar.

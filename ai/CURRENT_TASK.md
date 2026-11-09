@@ -4,7 +4,7 @@ Status: **IN_PROGRESS**
 
 ## Tarea activa
 
-WEB-99 — avisos push con MANU cerrada, sincronización selectiva y lápidas (`ai/HANDOFF.md`, «WEB-99»). PR abierto sin fusionar. La activación espera a que se reactive el proyecto Supabase, que está pausado. WEB-98 está fusionada (PR #100). Pendientes: WEB-93, banco con Enable Banking y Supabase; y WEB-96, modo amanecer, bloqueada hasta saber qué luces tiene Manu.
+WEB-108 — HORIZONTE, prototipo del rediseño en `web/vivo/` (`ai/HANDOFF.md`, «WEB-108»). PR abierto **sin fusionar**: Manu lo revisa antes. Anteriores ya fusionadas: Sabadell en solo lectura (#110–#112), «Importar todo (90 días)» (#113) y «Dónde gastas» (#114); falta que Manu confirme la importación real.
 
 ## Autorización
 

@@ -248,3 +248,9 @@ Regla: toda exclusión o vaciado de una parte del documento sincronizado va en p
 En WEB-99, la API de gestión mostró que el proyecto Supabase de Tu nube llevaba un tiempo **pausado**: el plan gratuito pausa tras 1 semana sin actividad. Los documentos de WEB-98 daban por hecho que estaba activo por el uso diario (NO_VERIFICADO). Además, el `fetch` de Node ignora el proxy HTTPS del entorno salvo con `NODE_USE_ENV_PROXY=1`: sin él, la primera comprobación pareció un fallo de credenciales.
 
 Regla: antes de diseñar o activar algo sobre un servicio externo, se lee su estado real con una herramienta de solo lectura (plan, estado, complementos, copias) y se apunta el resultado con fecha. Las herramientas de despliegue se detienen solas si el estado no es el esperado.
+
+### QAL-053 — Una disposición generada necesita una prueba de que nada se pisa
+
+En WEB-108, la constelación colocaba cada recuerdo con una fórmula. Dos estrellas cayeron casi en el mismo punto: se veían bien en la captura, pero una tapaba a la otra y no se podía tocar. Lo detectó la prueba e2e al intentar pulsarla, no la revisión visual.
+
+Regla: cuando la posición de elementos tocables sale de un cálculo (mapas, gráficos, constelaciones), se añade un paso que garantice una separación mínima y una prueba unitaria que la mida entre todos los pares. Las capturas no bastan.
