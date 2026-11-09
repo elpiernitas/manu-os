@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<title>MANU OS · Política de privacidad</title>
+<link rel="stylesheet" href="../legal.css">
+</head>
+<body>
+<main>
+<h1>Política de privacidad de MANU OS</h1>
+<p class="muted">Versión 1 · 9 de noviembre de 2026</p>
+
+<h2>1. Qué es MANU OS y quién lo usa</h2>
+<p>MANU OS es una aplicación web personal. La ha creado su propietario (titular del repositorio público <code>elpiernitas/manu-os</code> en GitHub) <b>para su uso exclusivo</b>. No se ofrece al público ni admite registros de otras personas. El propietario es a la vez el responsable de los datos y la única persona usuaria.</p>
+<p>Contacto para protección de datos: la dirección de correo facilitada a Enable Banking al registrar la aplicación.</p>
+
+<h2>2. Conexión bancaria: qué datos se consultarían</h2>
+<p>La conexión con el banco (Banco Sabadell) se hace a través de <b>Enable Banking</b>, proveedor de acceso a cuentas, y es <b>solo de lectura</b>: MANU OS no puede ordenar pagos ni transferencias. Con la autorización del propietario se consultarían únicamente sus propias cuentas:</p>
+<table>
+<tr><th>Dato</th><th>Para qué</th></tr>
+<tr><td>Identificación de la cuenta (IBAN o identificador, nombre y moneda)</td><td>Saber a qué cuenta pertenece cada movimiento.</td></tr>
+<tr><td>Saldos</td><td>Mostrar cuánto hay disponible.</td></tr>
+<tr><td>Movimientos: fecha, importe, concepto y, si el banco lo incluye, el nombre del ordenante o beneficiario</td><td>Apuntar y clasificar los gastos e ingresos del propietario.</td></tr>
+</table>
+<p>Los movimientos pueden incluir nombres de terceros (comercios o personas con las que el propietario ha hecho operaciones). Se tratan solo como parte del historial del propietario: no se usan para contactar con nadie ni para elaborar perfiles de esas personas.</p>
+
+<h2>3. Dónde se guardarían</h2>
+<ul>
+<li><b>En el dispositivo del propietario</b> (iPhone o Mac), en el almacenamiento del navegador.</li>
+<li><b>En «Tu nube»</b>, si el propietario la tiene activada: una base de datos Supabase propia, en la región UE (Irlanda). El acceso está restringido a la cuenta del propietario mediante reglas de seguridad por usuario (RLS) y viaja cifrado (HTTPS).</li>
+<li><b>En un servidor para el canje de la autorización</b>: el código que devuelve el banco solo puede convertirse en una sesión con la clave privada de la aplicación. Ese paso se hará en una función de servidor del mismo proyecto Supabase, y la clave privada no estará nunca en el navegador ni en el repositorio. <b>A fecha de esta versión, ese paso no está construido y no se ha consultado ningún dato bancario.</b></li>
+</ul>
+<p>La página de vuelta del banco borra el código de la barra de direcciones y del historial al cargarse. Solo lo guarda en la pestaña, y como mucho 10 minutos. No se registra en analíticas: MANU OS no usa analíticas ni publicidad.</p>
+
+<h2>4. Con quién se comparten</h2>
+<ul>
+<li><b>Banco Sabadell y Enable Banking</b>, para prestar el acceso de lectura que el propietario autoriza. Sus tratamientos se rigen por sus propias políticas.</li>
+<li><b>Supabase</b>, como proveedor de almacenamiento de «Tu nube» y de la función de servidor.</li>
+<li><b>GitHub Pages</b> sirve la web. Como cualquier servidor web, puede registrar datos técnicos de acceso (por ejemplo, la dirección IP).</li>
+</ul>
+<p>No se venden datos, no se ceden a terceros con otros fines ni se usan para publicidad o seguimiento entre aplicaciones.</p>
+
+<h2>5. Cuánto tiempo</h2>
+<p>El acceso dura lo que el propietario autorice al banco, con el máximo que permita el banco, y se puede revocar antes en cualquier momento. Los datos ya descargados se conservan hasta que el propietario los borra.</p>
+
+<h2>6. Cómo revocar el acceso y borrar los datos</h2>
+<ul>
+<li>Revocar la autorización desde la banca de Banco Sabadell o desde el aviso de consentimiento de Enable Banking. Cuando exista, también desde MANU OS («Desconectar banco»).</li>
+<li>Borrar los datos del dispositivo: MANU OS → Tú → Tus datos → «Borrar todos los datos».</li>
+<li>Borrar la copia de «Tu nube»: MANU OS → Tú → Tu nube → «Vaciar mi nube».</li>
+</ul>
+
+<h2>7. Limitaciones de seguridad actuales</h2>
+<ul>
+<li>«Tu nube» <b>no tiene cifrado de extremo a extremo</b>: Supabase, como proveedor, técnicamente podría leer los datos guardados.</li>
+<li>Según el panel del proyecto, el proveedor no guarda copias de seguridad en el plan gratuito, así que lo borrado no se recupera.</li>
+<li>Los datos del dispositivo están en el almacenamiento del navegador, accesible a cualquier código que se ejecute en el origen de la web. La web usa una política de seguridad de contenidos (CSP) restrictiva, que reduce ese riesgo pero no lo elimina.</li>
+<li>El código es público y no ha pasado una auditoría de seguridad independiente.</li>
+<li>El servicio gratuito de Supabase se pausa tras una semana sin actividad. Si se pausa, la sincronización se detiene hasta reactivarlo.</li>
+</ul>
+
+<h2>8. Cambios</h2>
+<p>Esta política se actualizará cuando cambie el tratamiento. La versión vigente es siempre la publicada en esta dirección.</p>
+<p><a href="../condiciones/">Condiciones de uso</a> · <a href="../">MANU OS</a></p>
+</main>
+</body>
+</html>
