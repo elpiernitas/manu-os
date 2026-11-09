@@ -1,8 +1,7 @@
 # Avisos con MANU cerrada (push) — investigación WEB-98
 
-Estado (WEB-99): **IMPLEMENTADO y probado en local; PENDIENTE DE ACTIVAR.**
-- Manu lo autorizó el 2026-11-09, siempre que fuera en el plan gratuito, sin costes y dentro de cuota. Ver la sección 0.
-- El proyecto de Supabase está **pausado**, y reactivarlo requiere un permiso que el entorno de Claude no concedió automáticamente.
+Estado (2026-11-09, WEB-99b): **ACTIVADO en el servidor** (proyecto reactivado, migraciones, función `manu-push` v2 y cron).
+- Falta que Manu active la suscripción en su iPhone y confirme la llegada de un aviso real.
 
 Etiquetas: VERIFICADO, TEÓRICAMENTE_POSIBLE, NO_VERIFICADO, DECIDIDO. Nada de esto se ha probado en el iPhone de Manu.
 
@@ -109,3 +108,25 @@ Objetivo: lo mínimo y desde el iPhone si se puede, pero hay pasos que hoy exige
 - **Pausa por inactividad del plan gratuito:** si Tu nube no se usa en una semana, los avisos dejan de salir. Con el uso diario de MANU no debería pasar (NO_VERIFICADO).
 - **Hora:** `pg_cron` cada minuto da hasta un minuto de retraso.
 - **Apple puede limitar o descartar avisos** sin dar el motivo. Los atajos siguen como red de seguridad.
+
+## 6. Operación (WEB-99b)
+
+**Verificado el 2026-11-09 tras el despliegue:**
+- Proyecto `ACTIVE_HEALTHY`, plan `free`, sin complementos de pago.
+- Auditoría: 7 tablas con RLS y sin hallazgos.
+- `manu-push` desplegada con `verify_jwt=false`. Se protege con su propio token: sin token o con uno falso responde 401.
+- Con la clave pública, todas las tablas y la RPC devuelven *permission denied*.
+- Cron `* * * * *` activo. Claves VAPID creadas en el servidor.
+- Una fila de prueba sin suscripciones fue reclamada en unos 20 s, con respuesta 200 y `rows: 1`.
+
+**Reintentos:** un 429, un 5xx o un error de red vuelven a la cola **solo para ese dispositivo**, tras 1 y 4 minutos, con un máximo de 3 intentos. Después se da por fallido y quedan los Recordatorios de iOS. La app no borra esas filas (`attempts > 0`).
+
+**Volver a desplegar:** `node tools/supabase/desplegar.mjs --aplicar`. En la nube de Claude, con `NODE_USE_ENV_PROXY=1 NODE_EXTRA_CA_CERTS=/root/.ccr/ca-bundle.crt`.
+
+| Situación | Qué hacer |
+|---|---|
+| **Revocar el token temporal** | supabase.com → avatar → *Account preferences* → *Access Tokens* → *Revoke* en el token de MANU. Si se guardó en el entorno de Claude Code: entorno → *Edit* → *Network secrets* → quitar `api.supabase.com`. |
+| **Verificación en dos pasos** | supabase.com → avatar → *Account preferences* → *Security* → *Multi-factor authentication* → añadir una app de códigos (por ejemplo, Contraseñas de iOS). |
+| **Ver las cuotas** | supabase.com → organización «Manu» → *Usage*. Límite: 500.000 invocaciones de funciones al mes. MANU usa una invocación por aviso. |
+| **Si Supabase se vuelve a pausar** (1 semana sin actividad en el plan gratuito; que el cron cuente como actividad está NO_VERIFICADO) | Los avisos y Tu nube se paran; los Recordatorios de iOS siguen. Para volver: panel de Supabase → proyecto `manu-os` → *Restore project*, o `node tools/supabase/desplegar.mjs --aplicar --restaurar`. Los datos se conservan. |
+| **Desactivar todo** | MANU → Tú → Avisos → «Desactivar en todos mis dispositivos»: borra las suscripciones y la cola. Para apagar también el servidor: `select cron.unschedule('manu-push');`, o pedírselo a Claude. |

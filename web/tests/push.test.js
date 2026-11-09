@@ -48,6 +48,7 @@ function fakeDb(rows, subs, keys = null) {
     saveKeys: async (k) => { db.keysV = k; db.saved++; },
     claim: async (nowIso) => { const due = db.rows.filter((r) => r.at <= nowIso); db.rows = db.rows.filter((r) => r.at > nowIso); return due; },
     subs: async (users) => db.list.filter((s) => users.includes(s.user_id)),
+    requeue: async (r) => { db.rows.push(r); },
     dropSub: async (s) => { db.dropped.push(s.id); db.list = db.list.filter((x) => x.id !== s.id); },
   });
 }
@@ -92,7 +93,7 @@ test("app adapters: replace the queue (upsert + delete the rest), switch everyth
   const r = fakeRest(() => res(201, null));
   await replaceQueue(cfg, ses, [{ id: "r_a_1", at: at(5), body: null }, { id: "r_b_2", at: at(9), body: null }], r.fetch);
   assert.equal(r.log[0].method, "POST"); assert.match(r.log[0].url, /on_conflict=user_id,id/); assert.match(r.log[0].headers.Prefer, /merge-duplicates/);
-  assert.equal(r.log[1].method, "DELETE"); assert.match(r.log[1].url, /id=not\.in\.\(r_a_1,r_b_2\)/);
+  assert.equal(r.log[1].method, "DELETE"); assert.match(r.log[1].url, /attempts=eq\.0&id=not\.in\.\(r_a_1,r_b_2\)/, "server retries are never deleted by the app");
   const e = fakeRest(() => res(204, null));
   await replaceQueue(cfg, ses, [], e.fetch);
   assert.equal(e.log.length, 1); assert.match(e.log[0].url, /id=not\.is\.null/, "empty queue: delete all of Manu's rows (RLS limits it to his)");
@@ -125,4 +126,31 @@ test("migrations: RLS on every table, private keys and cron token closed to the 
   assert.doesNotMatch(push, /sb_secret|service_role_key|eyJ/, "no secret in the repository");
   const base = readFileSync(new URL("../../supabase/migrations/20261109000000_base.sql", import.meta.url), "utf8");
   assert.ok(base.includes(SUPABASE_SQL), "the base migration is the same SQL the app shows");
+});
+
+test("server: a temporary provider failure is retried for that device only, without duplicates", async () => {
+  const db = fakeDb([{ user_id: "u1", id: "r_1", at: at(-1), body: null }],
+    [{ id: "okdevice", user_id: "u1", endpoint: "https://web.push.apple.com/ok", ...SUB }, { id: "flaky", user_id: "u1", endpoint: "https://web.push.apple.com/flaky", ...SUB }]);
+  const sends = [];
+  let flakyFails = 2;
+  const send = async (endpoint) => { sends.push(endpoint); if (endpoint.endsWith("flaky") && flakyFails-- > 0) return 503; return 201; };
+  const site = "https://x.invalid/";
+  let t = NOW.getTime();
+  let out = await runDue({ db, send, now: t, site });
+  assert.deepEqual([out.sent, out.retried], [1, 1]);
+  assert.equal(db.rows.length, 1); assert.equal(db.rows[0].sub_id, "flaky"); assert.equal(db.rows[0].attempts, 1);
+  out = await runDue({ db, send, now: t + 30000, site });
+  assert.equal(out.rows, 0, "not before its retry time");
+  out = await runDue({ db, send, now: t + 61000, site });
+  assert.deepEqual([out.sent, out.retried], [0, 1], "second failure: retried again");
+  out = await runDue({ db, send, now: t + 61000 + 4 * 60000 + 1000, site });
+  assert.equal(out.sent, 1, "third try works");
+  assert.equal(sends.filter((e) => e.endsWith("/ok")).length, 1, "the device that got it is never sent it again");
+  assert.equal(db.rows.length, 0);
+  // Network error, and the retry limit.
+  const db2 = fakeDb([{ user_id: "u1", id: "r_2", at: at(-1), body: null }], [{ id: "down", user_id: "u1", endpoint: "https://web.push.apple.com/down", ...SUB }]);
+  const boom = async () => { throw new Error("network"); };
+  let total = { retried: 0, failed: 0 };
+  for (let i = 0; i < 6; i++) { const o = await runDue({ db: db2, send: boom, now: t + i * 20 * 60000, site }); total.retried += o.retried ?? 0; total.failed += o.failed ?? 0; }
+  assert.deepEqual(total, { retried: 2, failed: 1 }, "3 tries in total, then it stops (iOS Reminders remain the fallback)");
 });

@@ -82,7 +82,8 @@ export async function replaceQueue(cfg, s, rows, fetchImpl = fetch) {
     if (!res.ok) throw await err(res, "Subir los avisos");
   }
   const keep = rows.map((r) => r.id).join(",");
-  const res = await fetchImpl(`${cfg.url}/rest/v1/manu_push_queue?${keep ? `id=not.in.(${keep})` : "id=not.is.null"}`, { method: "DELETE", headers: H(cfg, s) });
+  // Retries queued by the server (attempts > 0) are left alone.
+  const res = await fetchImpl(`${cfg.url}/rest/v1/manu_push_queue?attempts=eq.0&${keep ? `id=not.in.(${keep})` : "id=not.is.null"}`, { method: "DELETE", headers: H(cfg, s) });
   if (!res.ok) throw await err(res, "Limpiar los avisos");
 }
 /** «Desactivar todo»: every subscription and every queued notice of Manu's account. */

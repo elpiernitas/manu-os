@@ -2,7 +2,7 @@
 
 ## Próximo paso vigente
 
-0. **WEB-99 (avisos push; sincronización selectiva; lápidas):** PR abierto sin fusionar. Informe en `INFORME_WEB-99.md`. **Para activar los avisos falta un paso:** reactivar el proyecto Supabase, que está pausado. El entorno de Claude bloqueó esa acción y hace falta el permiso explícito de Manu. Después, `node tools/supabase/desplegar.mjs --aplicar --restaurar`.
+0. **WEB-99b:** los avisos push están **activados en el servidor** (proyecto reactivado, función v2, cron y verificación real en `docs/integrations/PUSH.md` §6). Falta que Manu active la suscripción en su iPhone y confirme un aviso real. El PR añade reintentos controlados y arregla el 500 de las respuestas vacías.
 - (Anterior) **WEB-98 (memoria y estilo en Tu nube, revisión de seguridad y borrado; investigación de avisos push):** PR abierto sin fusionar. Informe en `INFORME_WEB-98.md`. La propuesta de push (`docs/integrations/PUSH.md`) espera la autorización de Manu.
 - (Anterior) **WEB-97 (Centro de permisos y conexiones, integración con iOS):** fusionada (PR #99). Informe en `INFORME_WEB-97.md`; auditoría con fuentes en `docs/integrations/IOS_CAPABILITIES.md`. WEB-95 ya está fusionada (PR #98).
 - (Anterior) **WEB-95 (aprender de ideas, decisiones y conversaciones):** PR en borrador. Informe en `INFORME_WEB-95.md`. WEB-94 (Memoria) ya está fusionada (PR #97). Sigue pendiente de Manu si la memoria debe quedar fuera de Tu nube.

@@ -79,7 +79,7 @@ for (const f of readdirSync(dir).filter((x) => x.endsWith(".sql")).sort()) {
 
 // The function: deployed with the Supabase CLI (server-side bundling, no Docker).
 say("→ Función manu-push");
-execFileSync("npx", ["-y", "supabase@2", "functions", "deploy", "manu-push", "--project-ref", REF, "--no-verify-jwt", "--use-api"], { stdio: "inherit", env: { ...process.env, SUPABASE_ACCESS_TOKEN: token } });
+execFileSync("npx", ["-y", "supabase@2", "functions", "deploy", "manu-push", "--project-ref", REF, "--no-verify-jwt", "--use-api"], { stdio: "inherit", cwd: new URL("../../", import.meta.url).pathname, env: { ...process.env, SUPABASE_ACCESS_TOKEN: process.env.SUPABASE_ACCESS_TOKEN ?? `sbp_${"0".repeat(40)}` /* placeholder: the proxy injects the real one */, ...(process.env.NODE_EXTRA_CA_CERTS ? { SSL_CERT_FILE: process.env.NODE_EXTRA_CA_CERTS } : {}) } });
 
 const after = await audit("después");
 if (!after.ok) stop("La auditoría posterior ha fallado: revisa los hallazgos (los avisos no se usan hasta corregirlo).");
