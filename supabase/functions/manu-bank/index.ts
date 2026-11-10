@@ -4,6 +4,7 @@
 import {
   newOAuthState, hashState, makeEnableJwt, validState, validAccountId, validIsoDate,
   sabadellFromAspsps, sanitizeAccounts, balancesView, transactionsView, serverCheck, configReport, cleanAppId,
+  MAX_CONTINUATION,
 } from "./bank-core.js";
 
 const SUPABASE = Deno.env.get("SUPABASE_URL") ?? "";
@@ -160,7 +161,7 @@ async function route(req) {
   if (!validIsoDate(from) || !validIsoDate(to) || from > to || (Date.parse(to) - Date.parse(from)) > 90 * 86400000) return safeFail(400, "Selecciona un periodo válido de hasta 90 días");
   const q = new URLSearchParams({ date_from: from, date_to: to });
   if (body.continuation !== undefined && body.continuation !== null) {
-    if (typeof body.continuation !== "string" || body.continuation.length > 500) return safeFail(400, "Página no válida");
+    if (typeof body.continuation !== "string" || !body.continuation || body.continuation.length > MAX_CONTINUATION) return safeFail(400, "Página no válida");
     q.set("continuation_key", body.continuation);
   }
   return reply(transactionsView(await enable("/accounts/" + uid + "/transactions?" + q)));

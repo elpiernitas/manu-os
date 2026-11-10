@@ -1,5 +1,11 @@
 # HANDOFF
 
+## Sabadell · «Importar todo» fallaba en la segunda página (Claude, 2026-11-10)
+
+Captura de Manu: `GET /accounts/:id/transactions → HTTP 422 · WRONG_REQUEST_PARAMETERS · continuation_key parameter is invalid`. Causa en nuestro código: `transactionsView` recortaba la clave de página a 500 caracteres y el servidor rechazaba claves más largas. Ahora la clave vuelve intacta (hasta 8.192; si fuera más larga, error claro). Prueba de regresión en `tests/enablebanking.test.js`. La importación es de todo o nada: no se guardó nada a medias.
+
+**Desplegado** el 2026-11-10 con autorización expresa de Manu («despliega manu-bank»): `manu-bank` versión 9, activa; sin sesión responde 401 como debe. **NO_VERIFICADO:** que la importación real complete en su iPhone (pendiente de su captura). No he comprobado la longitud real de las claves de Sabadell (no se registran).
+
 ## WEB-108b · Horizonte integrado como tema principal (Claude, 2026-11-10)
 
 Rama `claude/magical-goodall-rf5qoo`, PR #115. Manu autorizó implementar, fusionar y publicar Horizonte con datos reales, conservando el diseño anterior como tema Clásico.
