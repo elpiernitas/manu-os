@@ -254,3 +254,9 @@ Regla: antes de diseñar o activar algo sobre un servicio externo, se lee su est
 En WEB-108, la constelación colocaba cada recuerdo con una fórmula. Dos estrellas cayeron casi en el mismo punto: se veían bien en la captura, pero una tapaba a la otra y no se podía tocar. Lo detectó la prueba e2e al intentar pulsarla, no la revisión visual.
 
 Regla: cuando la posición de elementos tocables sale de un cálculo (mapas, gráficos, constelaciones), se añade un paso que garantice una separación mínima y una prueba unitaria que la mida entre todos los pares. Las capturas no bastan.
+
+### QAL-054 — Un filtro de red en una prueba e2e debe anclarse al dominio
+
+En WEB-108, la prueba bloqueaba las llamadas externas con `/…|enablebanking/`. Esa expresión también atrapaba el archivo local `core/enablebanking.js`: el módulo no cargaba y la app salía en blanco, sin ningún error en consola (solo un 503 que la prueba filtraba como ruido). Parecía un fallo de la app.
+
+Regla: los filtros de red de las pruebas se anclan al esquema y al dominio (`^https://([^/]*\.)?dominio\.com/`) y nunca se silencian los errores de carga de archivos propios del origen.

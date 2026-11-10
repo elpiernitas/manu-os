@@ -69,10 +69,12 @@ import { memCommand, runMemCommand } from "./core/memchat.js";
 import { observeText, setLearning, wipeObserved } from "./core/style.js";
 import { observeFiling, observeMisfile } from "./core/topics.js";
 import { removeJoke } from "./core/voice.js";
-import { memoriaPage, hoyMemCard } from "./core/memview.js";
+import { memoriaPage, hoyMemCard, claimDetail } from "./core/memview.js";
+import { SKINS, skinOf, cielo as hzCielo, variables as hzVars, tiempoDe, portada as hzPortadaData, mareas as hzMareasData, constelacion as hzConsData, retrato as hzRetrato, barco as hzBarco, addPieza, marcarPieza, quitarPieza, botar as hzBotarP, varar as hzVarar } from "./core/horizonte.js";
+import { hzCara, hzPortada, hzBotella, hzMareas, hzConstelacion, hzAstillero, hzBarcoCarta, hzBotadura, hzBitacora, hzApariencia } from "./design/horizonte.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "107"; // = número de la última tarea WEB publicada (desde WEB-87)
+export const APP_VERSION = "108"; // = número de la última tarea WEB publicada (desde WEB-87)
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -86,6 +88,40 @@ const DEFAULT_SPOTIFY_CLIENT_ID = "f5a3acb0124f45179c0d1d0b54e66f3b";
 const store = new LocalStore(globalThis.localStorage ?? { getItem: () => null, setItem: () => { throw new Error("no storage"); } });
 const loaded = store.load();
 let vault = loaded.vault;
+// ---------- Horizonte (WEB-108): tema por defecto; «Clásico» en Tú → Apariencia ----------
+// La elección vive en vault.settings.skin (viaja con Tu nube). Cambiarla solo repinta: no recarga,
+// no cierra sesiones ni toca datos.
+const skin = () => skinOf(vault.settings);
+const hz = () => skin() === "horizonte";
+const hzUi = { minutos: null, manu: "hablar", botar: null };
+let hzSky = null;
+const META_CLASICO = { theme: "#050608", scheme: "dark" };
+function dialDate() { const d = new Date(); if (hzUi.minutos != null) d.setHours(Math.floor(hzUi.minutos / 60), hzUi.minutos % 60, 0, 0); return d; }
+function hzTiempoAhora(when) {
+  const w = currentWeather()?.data;
+  if (!w?.now) return null;
+  // Con el dial en otra hora de hoy, el tiempo previsto para esa hora si lo hay; si no, el de ahora.
+  if (hzUi.minutos != null) { const hh = String(when.getHours()).padStart(2, "0"); const h = (w.hours ?? []).find((x) => x.time === hh); if (h?.icon) return h.icon; }
+  return w.now.icon;
+}
+function applySkin() {
+  const r = document.documentElement, s = skin();
+  if (r.dataset.skin !== s) { r.dataset.skin = s; const nav = $("tabs"); if (nav) nav.innerHTML = ""; }
+  try { localStorage.setItem("manuos.skin", s); } catch { /* sin almacenamiento: no pasa nada */ }
+  const mt = document.querySelector('meta[name="theme-color"]'), ms = document.querySelector('meta[name="color-scheme"]');
+  if (s !== "horizonte") {
+    delete r.dataset.tema; delete r.dataset.astro; hzSky = null;
+    for (const k of ["--cielo-1", "--cielo-2", "--mar", "--astro-x", "--astro-y"]) r.style.removeProperty(k);
+    if (mt) mt.content = META_CLASICO.theme; if (ms) ms.content = META_CLASICO.scheme;
+    return;
+  }
+  const when = dialDate(), icon = hzTiempoAhora(when);
+  hzSky = hzCielo(when, icon ? tiempoDe(icon) : "despejado", activeCity());
+  for (const [k, v] of Object.entries(hzVars(hzSky))) r.style.setProperty(k, v);
+  r.dataset.tema = hzSky.oscuro ? "noche" : "dia"; r.dataset.astro = hzSky.astro.tipo;
+  if (mt) mt.content = hzSky.colores.arriba; if (ms) ms.content = hzSky.oscuro ? "dark" : "light";
+}
+try { document.documentElement.dataset.skin = skinOf(vault?.settings); } catch { /* el primer render lo pone */ }
 let tab = sessionStorage.getItem("manuos.tab") || "bahia"; // WEB-91: MANU opens on the town
 let sub = null; // Tú subpage
 // WEB-94: Memoria. The brain lives in the vault; the screen state does not.
@@ -1175,6 +1211,7 @@ function projectPage(p) {
   return `<button class="link" data-act="proj-back">${I.back} Proyectos</button>
     <div class="proj-head"><span class="proj-e big" aria-hidden="true">${esc(p.emoji)}</span><div><h1>${esc(p.name)}</h1><p class="subtitle">${p.sources.length} fuente${p.sources.length === 1 ? "" : "s"}</p></div></div>
     <div class="stack">
+    ${hz() ? hzAstillero(hzBarco(p), hzUi) : ""}
     <section class="card"><h2>Pregunta al proyecto</h2>
       ${ai ? `<div class="suggest">${[["resumen", "📄 Resumen"], ["claves", "🔑 Puntos clave"], ["preguntas", "❓ Preguntas de repaso"]].map(([k, l]) => `<button type="button" data-act="proj-preset" data-p="${k}" data-label="${esc(l)}"${p.sources.length ? "" : " disabled"}>${l}</button>`).join("")}</div>
       <form id="projAsk" class="composer-inline"><label for="projQ" class="sr">Pregunta</label><input id="projQ" maxlength="2000" placeholder="¿Qué quieres saber?"${p.sources.length ? "" : " disabled"}><button class="btn" type="submit"${p.sources.length ? "" : " disabled"}>Preguntar</button></form>
@@ -1518,7 +1555,7 @@ const screens = {
     const actualWeather = vault.weather?.city?.name === city.name ? vault.weather.data : null;
     const cloudState = nube.state;
     return `<div class="fable-hoy">
-      ${fableHoyIntro({
+      ${hz() ? hzPortada({ p: hzPortadaData({ agenda: agendaToday(), reminders: vault.reminders, ahora: dialDate(), real: new Date() }), c: hzSky, w: actualWeather, ciudad: city.name, fecha: new Date(), minutos: hzUi.minutos, modo: MODE_TITLES[m.mode] }) : fableHoyIntro({
         greeting: greeting(), date: longDate(), mode: MODE_TITLES[m.mode],
         city: city.name, weather: actualWeather,
         next: next ? { time: next.time, title: next.title } : null,
@@ -1527,7 +1564,7 @@ const screens = {
       <div class="ft-work stack">
       ${morningLaunch ? `<section class="card morning-hello"><h2>☀️ ${esc(greeting())}, Manu</h2><p class="muted small">Toca y te leo el día en voz alta.</p><div class="btns"><button class="btn" data-act="speak-day">🔊 Léemelo</button><button class="link small" data-act="morning-dismiss">Ahora no</button></div></section>` : ""}
       ${gentleCard()}
-      ${vault.brain || vault.spending.length ? hoyMemCard(topProposal(brain(), { spending: vault.spending, projects: vault.projects, now: new Date() })) : ""}
+      ${vault.brain || vault.spending.length ? (hz() ? hzBotella : hoyMemCard)(topProposal(brain(), { spending: vault.spending, projects: vault.projects, now: new Date() })) : ""}
       <button class="cmdk-pill glass" data-act="cmdk" aria-label="Comando rápido">⚡ <span>Haz algo rápido…</span></button>
       ${nowCard()}
       ${fableHoyServices({
@@ -1592,7 +1629,9 @@ const screens = {
         ? "Hola, Manu. Puedo apuntar gastos, ideas y tareas y crear recordatorios y alarmas. La IA está disponible, pero ahora está desactivada."
         : "Hola, Manu. Puedo apuntar gastos, ideas y tareas, crear recordatorios y alarmas, y acompañarte en el Refugio. Aún funciono sin IA: habla claro y corto.";
     const history = vault.chat.length ? vault.chat : [{ from: "manu", text: intro }];
-    return `<div class="manu-head${empty ? " big" : ""}"><div class="orb${thinking ? " thinking" : ""}" id="orb" aria-hidden="true"><span>M</span></div><div><h1>MANU</h1><p class="subtitle">${aiReady() && aiMode().on ? "Gemini integrado · conversación" : `Tu asistente · ${aiReady() ? "IA disponible, siempre con tu confirmación" : '<button class="link small" data-act="gemini-guide">activar IA</button>'}`}</p></div></div>
+    // WEB-108: la Constelación son tus recuerdos reales; tocar una estrella abre su ficha de Memoria.
+    if (hz() && hzUi.manu === "cielo" && !refuge) return `<div class="manu-head"><div class="orb hz-orb" aria-hidden="true">${hzCara("calma")}</div><div><h1>MANU</h1><p class="subtitle">Constelación de tu memoria</p></div></div>${hzModos()}${hzConstelacion(hzConsData(brain(), { ahora: new Date() }), { sel: memUi.open, detalle: memUi.open ? claimDetail(brain(), memUi.open, memUi, new Date()) : "" })}`;
+    return `<div class="manu-head${empty ? " big" : ""}"><div class="orb${hz() ? " hz-orb" : ""}${thinking ? " thinking" : ""}" id="orb" aria-hidden="true">${hz() ? hzCara(thinking ? "piensa" : "calma") : "<span>M</span>"}</div><div><h1>MANU</h1><p class="subtitle">${aiReady() && aiMode().on ? "Gemini integrado · conversación" : `Tu asistente · ${aiReady() ? "IA disponible, siempre con tu confirmación" : '<button class="link small" data-act="gemini-guide">activar IA</button>'}`}</p></div></div>${hz() && !refuge ? hzModos() : ""}
       ${refuge ? `<div class="refuge-bar"><span>Refugio · no se guarda</span><button class="link" data-act="leave-refuge">Salir</button></div>` : ""}
       ${aiReady() && !aiMode().on && !refuge ? `<section class="card ai-offer"><b>💬 ¿Hablamos como con Gemini?</b><p class="muted small">MANU conversa contigo, sabe lo que elijas de tu vida y gestiona tus cosas. Lo que escribas irá a Google.</p><div class="btns"><button class="btn" data-act="ai-mode" data-v="full">Activar con todo</button><button class="btn ghost" data-act="ai-mode" data-v="basic">Solo lo básico</button></div><button class="link small" data-sub-go="ia">Elegir qué sabe</button></section>` : ""}
       ${refuge ? "" : mailCards()}
@@ -1617,6 +1656,7 @@ const screens = {
     return `<h1>Dinero</h1><p class="subtitle">${esc(cap(monthName))}</p>
       <div class="stack">
       ${bankAisCard(bankAisUi, nubeOn())}
+      ${hz() && moneyMonth === 0 ? hzMareas(hzMareasData({ spending: vault.spending, income: vault.income }), { respuestas: vault.settings.hzNoches ?? {} }) : ""}
       <section class="card hero money-hero">${celebrateMoney ? moneyRain() : ""}<div class="row cal-head"><button class="link" data-act="money-prev" aria-label="Mes anterior">${I.back}</button><h2>${moneyMonth === 0 ? "Gastado este mes" : `Gastado en ${esc(monthName.replace(/ de \d{4}$/, ""))}`}</h2><button class="link" data-act="money-next" aria-label="Mes siguiente"${moneyMonth === 0 ? " disabled" : ""}>${I.chev}</button></div><div class="big-money" data-count-money="${month.total}">${euros(month.total)}</div>
         <p class="muted small">Gastos registrados en MANU, no es el saldo de Sabadell.</p>
         ${cats.map(([c, v]) => { const lim = moneyMonth === 0 ? vault.settings.budgets?.[c] : null; return `<div class="stack"><div class="row"><span>${esc(catLabel(c))}</span><span class="num">${euros(v)}${lim ? `<span class="muted small"> / ${euros(lim)}</span>` : ""}</span></div><div class="bar${lim && v > lim ? " over" : lim && v >= lim * 0.8 ? " warn" : ""}"><i data-w="${Math.max(3, Math.round((v / (lim ? Math.max(lim, v) : max)) * 100))}"></i></div></div>`; }).join("")}</section>
@@ -1647,7 +1687,7 @@ const screens = {
     if (p) return projectPage(p);
     return `<h1>Proyectos</h1><p class="subtitle">Cuadernos con tus fuentes: MANU responde solo con lo que metas en cada uno.</p>
       <div class="stack">
-      ${list.length ? `<div class="proj-grid">${list.map((x) => `<button class="proj-card" data-act="proj-open" data-id="${esc(x.id)}"><span class="proj-e" aria-hidden="true">${esc(x.emoji)}</span><b>${esc(x.name)}</b><span class="muted small">${x.sources.length} fuente${x.sources.length === 1 ? "" : "s"}</span></button>`).join("")}</div>` : '<section class="card"><p class="muted">Aún no tienes proyectos. Crea uno para un viaje, un estudio, una reforma, recetas… y mete notas, capturas y vídeos.</p></section>'}
+      ${list.length ? `<div class="proj-grid">${list.map((x) => hz() ? hzBarcoCarta(hzBarco(x)) : `<button class="proj-card" data-act="proj-open" data-id="${esc(x.id)}"><span class="proj-e" aria-hidden="true">${esc(x.emoji)}</span><b>${esc(x.name)}</b><span class="muted small">${x.sources.length} fuente${x.sources.length === 1 ? "" : "s"}</span></button>`).join("")}</div>` : '<section class="card"><p class="muted">Aún no tienes proyectos. Crea uno para un viaje, un estudio, una reforma, recetas… y mete notas, capturas y vídeos.</p></section>'}
       ${suggestCard()}
       <section class="card"><h2>Nuevo proyecto</h2><form id="projForm" class="proj-new"><label for="projEmoji" class="sr">Emoji</label><input id="projEmoji" maxlength="4" value="📁" aria-label="Emoji"><label for="projName" class="sr">Nombre</label><input id="projName" maxlength="60" placeholder="Viaje a Lisboa" required><button class="btn" type="submit">Crear</button></form></section>
       </div>`;
@@ -1663,6 +1703,7 @@ const screens = {
     return `<div class="row"><div class="avatar" aria-hidden="true">M</div><div class="grow"><h1>Manu</h1><p class="muted">${esc(longDate())}</p></div></div>
       ${findCard()}
       ${setupCard()}
+      ${hz() ? hzBitacora(hzRetrato(brain(), { ahora: new Date() })) : ""}
       ${sectionTitle("¿Cómo estás hoy?")}
       <section class="card"><div class="mood">${MOODS.map((m) => `<button data-act="mood" data-v="${m.value}" aria-pressed="${mood === m.value}" aria-label="${m.label}"><b class="mood-e" aria-hidden="true">${m.emoji}</b>${m.label}</button>`).join("")}</div>
         <div class="row"><span class="muted small">Últimos 7 días</span><span class="dots">${week.map((v) => `<i data-v="${v}" title="${v ? MOODS[v - 1].label : "Sin dato"}"></i>`).join("")}</span></div>
@@ -1693,6 +1734,7 @@ const screens = {
         ${item("atajos", "bolt", "orange", "Atajos del iPhone", shortcutsPending() ? `${shortcutsPending()} pendientes de crear` : "Todos creados")}
         ${item("avisos", "bell", "red", "Avisos", "Notificaciones de MANU")}
         ${item("nube", "box", "blue", "Tu nube", nubeOn() ? (nube.state.conflict ? "Elige con qué datos te quedas" : nube.state.error ? "Revisar" : `Sincronizada${nube.state.lastAt ? ` · ${new Date(nube.state.lastAt).toLocaleString("es-ES", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}` : ""}`) : "iPhone y Mac con los mismos datos (sin fotos ni «Tu archivo»)")}
+        ${item("apariencia", "leaf", "gray", "Apariencia", `Tema: ${SKINS[skin()]}`)}
         ${item("datos", "box", "gray", "Tus datos", "Copia, restaurar y borrar")}
       </div>
       <p class="muted small">MANU OS web · versión ${APP_VERSION} · ${nubeOn() ? "sincronizado con tu nube" : "datos solo en este dispositivo"}</p>`;
@@ -1759,6 +1801,7 @@ function pushCard() {
 }
 
 const subpages = {
+  apariencia() { return `${backBar("Apariencia")}${hzApariencia(skin())}`; },
   permisos() {
     if (!capProbe) refreshCaps();
     const items = capItems();
@@ -2174,7 +2217,7 @@ let renderedSheetKind = null;
 function renderTabs() {
   const nav = $("tabs");
   if (!nav.querySelector(".tab")) {
-    nav.innerHTML = `<span class="tab-pill" aria-hidden="true"></span>` + TABS.map(([id, label]) => `<button class="tab" role="tab" data-fable="true" data-tab="${id}">${id === "manu" ? `<span class="dot fable-brand" aria-hidden="true">${fableMark(24)}</span>` : fableIcon(id)}<span>${label}</span></button>`).join("");
+    nav.innerHTML = `<span class="tab-pill" aria-hidden="true"></span>` + TABS.map(([id, label]) => `<button class="tab" role="tab" data-fable="true" data-tab="${id}">${id === "manu" ? (hz() ? `<span class="dot" aria-hidden="true">${hzCara()}</span>` : `<span class="dot fable-brand" aria-hidden="true">${fableMark(24)}</span>`) : fableIcon(id)}<span>${label}</span></button>`).join("");
   }
   const index = TABS.findIndex(([id]) => id === tab);
   nav.querySelectorAll(".tab").forEach((b, i) => b.setAttribute("aria-selected", String(i === index)));
@@ -2298,6 +2341,7 @@ function closeSheet() {
 
 function render({ focus = false, enter = null } = {}) {
   setSensitiveOk(vault?.settings?.aiSensitive === true);
+  applySkin();
   celebrateMoney = Boolean(enter) && tab === "dinero" && !overlay && !reduceMotion();
   const w = currentWeather();
   if (w?.data?.now) document.body.dataset.wx = sceneFor(w.data.now.icon, w.data.today); else delete document.body.dataset.wx;
@@ -2338,7 +2382,7 @@ function render({ focus = false, enter = null } = {}) {
   $("screen").querySelectorAll("[data-c]").forEach((el) => { if (/^#[0-9a-f]{6}$/i.test(el.dataset.c)) el.style.setProperty("--ev", el.dataset.c); });
   hydrateImages($("screen"));
   if (tab === "bahia" && !sub && !overlay) paintBahia();
-  $("topTitle").textContent = sub ? { habitos: "Hábitos", salud: "Salud", comidas: "Comidas", personas: "Personas", tiempo: "Tiempo", avisos: "Avisos", datos: "Tus datos", gcal: "Google", correo: "Correo", archivo: "Tu archivo", capturas: "Capturas", ia: "IA", spotify: "Spotify", atajos: "Atajos", fichaje: "Fichaje", repaso: "Repaso", documentos: "Documentos", biblioteca: "Biblioteca", memoria: "Memoria", permisos: "Permisos" }[sub] : TABS.find(([id]) => id === tab)[1];
+  $("topTitle").textContent = sub ? { habitos: "Hábitos", salud: "Salud", comidas: "Comidas", personas: "Personas", tiempo: "Tiempo", avisos: "Avisos", datos: "Tus datos", gcal: "Google", correo: "Correo", archivo: "Tu archivo", capturas: "Capturas", ia: "IA", spotify: "Spotify", atajos: "Atajos", fichaje: "Fichaje", repaso: "Repaso", documentos: "Documentos", biblioteca: "Biblioteca", memoria: "Memoria", permisos: "Permisos", apariencia: "Apariencia" }[sub] : TABS.find(([id]) => id === tab)[1];
   const sheetKey = sheet ? sheet.kind : null;
   if (sheetKey !== renderedSheetKind || !sheet) {
     const wasOpen = Boolean($("sheetBg"));
@@ -3178,6 +3222,7 @@ document.addEventListener("click", (e) => {
   (c.birthday ? $("pNotes") : $("pBDay"))?.focus();
 });
 document.addEventListener("input", (e) => {
+  if (e.target.id === "hzDial") { hzDial(e.target.value); return; }
   if (e.target.id === "fullPass") { full.pass = e.target.value; return; }
   // WEB-80: the split card. Searching redraws only the matches (the keyboard stays).
   if (e.target.id === "splitQ") {
@@ -3320,6 +3365,71 @@ function updateItem(id, fn) {
 // Every handler here is Manu's tap: the decision is his; the core only proposes.
 const MEM_FORMS = new Set(["memAnswerForm", "memCatForm", "memChangeForm", "memAddForm", "memSearchForm", "memCorrectForm", "memExampleForm"]);
 const memProposalByKey = (key) => memProposals(brain(), { spending: vault.spending, projects: vault.projects, now: new Date() }).find((p) => p.key === key);
+// ---------- Horizonte: acciones (WEB-108) ----------
+const hzModos = () => `<div class="hz-modos" role="group" aria-label="Vista de MANU"><button data-act="hz-manu" data-v="hablar" aria-pressed="${hzUi.manu !== "cielo"}">Hablar</button><button data-act="hz-manu" data-v="cielo" aria-pressed="${hzUi.manu === "cielo"}">Constelación</button></div>`;
+// El dial mueve el cielo y la portada sin repintar la pantalla (el dedo no suelta el control).
+function hzDial(v) {
+  hzUi.minutos = Math.max(0, Math.min(1439, Number(v) || 0));
+  applySkin();
+  const when = dialDate(), p = hzPortadaData({ agenda: agendaToday(), reminders: vault.reminders, ahora: when, real: new Date() });
+  const out = $("hzDialOut"); if (out) out.textContent = hhmm(when);
+  const t = $("hzTitular"); if (t) t.textContent = p.titular;
+  document.querySelectorAll(".hz-linea li").forEach((li) => { const m = /^(\d\d):(\d\d)/.exec(li.querySelector("time")?.textContent ?? ""); if (m) li.classList.toggle("hz-pasado", Number(m[1]) * 60 + Number(m[2]) <= when.getHours() * 60 + when.getMinutes()); });
+}
+// Cambia el proyecto abierto con una función pura de core/horizonte.js.
+function hzProyecto(fn, msg, clearInput = false) {
+  const i = (vault.projects ?? []).findIndex((x) => x.id === openProject);
+  if (i < 0) return;
+  try { vault.projects[i] = fn(vault.projects[i]); } catch (err) { toast(err.message); return; }
+  persist(); render();
+  if (clearInput) $("hzPieza")?.focus();
+  if (msg) toast(msg);
+}
+function hzAct(a) {
+  const d = a.dataset;
+  switch (d.act) {
+    case "hz-skin":
+      if (!SKINS[d.v]) return;
+      vault.settings.skin = d.v; persist(); render(); toast(d.v === "horizonte" ? "Horizonte activado." : "Tema Clásico activado."); return;
+    case "hz-dial-ahora": hzUi.minutos = null; render(); return;
+    case "hz-manu": hzUi.manu = d.v === "cielo" ? "cielo" : "hablar"; memUi.open = null; memUi.correcting = null; render(); return;
+    case "hz-estrella":
+      memUi.open = memUi.open === d.id ? null : d.id; memUi.correcting = null; render();
+      document.querySelector(`.hz-estrella[data-id="${CSS.escape(d.id)}"]`)?.focus({ preventScroll: true });
+      return;
+    case "hz-frase": memUi.open = d.id; memUi.correcting = null; tab = "tu"; sub = "memoria"; render({ focus: true }); setTimeout(() => document.querySelector(".mem-detail")?.scrollIntoView({ block: "start" }), 30); return;
+    case "hz-noche": {
+      const n = hzMareasData({ spending: vault.spending, income: vault.income }).noches.find((x) => x.id === d.id);
+      if (!n) { render(); return; }
+      const resp = { ...(vault.settings.hzNoches ?? {}) };
+      if (d.v === "si") {
+        const f = new Date(n.inicio);
+        const r = memTry(() => memRemember(brain(), { text: `Salí de fiesta la noche del ${f.toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" })}`, kind: "MEMORY", source: { kind: "manu" }, when: dayKey(f), tags: ["noche", "fiesta"] }, { now: new Date() }));
+        if (!r) return;
+        vault.brain = r.brain;
+      }
+      resp[d.id] = d.v === "si" ? "si" : "no";
+      // Solo las 60 respuestas más recientes: lo justo para no volver a preguntar.
+      vault.settings.hzNoches = Object.fromEntries(Object.entries(resp).slice(-60));
+      memSave(d.v === "si" ? "Apuntado en tu memoria porque tú lo has dicho." : "Vale. No te lo vuelvo a preguntar de esa noche."); return;
+    }
+    case "hz-pieza": hzProyecto((p) => marcarPieza(p, d.id)); return;
+    case "hz-pieza-del": hzProyecto((p) => quitarPieza(p, d.id)); return;
+    case "hz-botar": hzUi.botar = openProject; render(); return;
+    case "hz-botar-no": hzUi.botar = null; render(); return;
+    case "hz-botar-si": {
+      hzUi.botar = null;
+      const p = (vault.projects ?? []).find((x) => x.id === openProject);
+      if (!p || !hzBarco(p).listo) { render(); return; }
+      hzProyecto((x) => hzBotarP(x, new Date()));
+      document.body.insertAdjacentHTML("beforeend", hzBotadura(hzBarco((vault.projects ?? []).find((x) => x.id === openProject))));
+      document.querySelector(".hz-botadura .btn")?.focus();
+      return;
+    }
+    case "hz-botadura-fin": document.querySelector(".hz-botadura")?.remove(); $("screen")?.focus({ preventScroll: true }); return;
+    case "hz-varar": hzProyecto(hzVarar, "De vuelta al astillero."); return;
+  }
+}
 function memSave(msg) { persist(); render(); if (msg) toast(msg); }
 function memTry(fn) { try { return fn(); } catch (err) { toast(err.message); return null; } }
 function memRunProposal(key, action, payload = {}) {
@@ -3405,6 +3515,7 @@ document.addEventListener("click", async (e) => {
   if (!a) return;
   const id = a.dataset.id;
   if (a.dataset.act.startsWith("mem-")) { memAct(a); return; }
+  if (a.dataset.act.startsWith("hz-")) { hzAct(a); return; }
   switch (a.dataset.act) {
     case "task": updateItem(id, (i) => confirm(i, "TASK")); toast("Guardada como tarea"); break;
     case "idea": updateItem(id, (i) => confirm(i, "IDEA")); toast("Guardada como idea"); break;
@@ -3736,6 +3847,8 @@ document.addEventListener("click", async (e) => {
 document.addEventListener("keydown", (e) => {
   if (e.target.id === "qText" && e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); $("quickAdd")?.requestSubmit(); return; }
   if ((e.key === "Enter" || e.key === " ") && e.target.matches("label[for]") && e.target.getAttribute("role") === "button") { e.preventDefault(); $(e.target.getAttribute("for"))?.click(); }
+  // WEB-108: las estrellas de la Constelación (SVG con role="button") se activan con Intro o espacio.
+  if ((e.key === "Enter" || e.key === " ") && e.target.matches?.('g[role="button"][data-act]')) { e.preventDefault(); e.target.dispatchEvent(new MouseEvent("click", { bubbles: true })); }
   if (e.key === "Escape" && sheet) { sheet = null; render(); }
 });
 
@@ -3753,6 +3866,7 @@ document.addEventListener("submit", async (e) => {
   e.preventDefault();
   const f = e.target.id;
   if (MEM_FORMS.has(f)) { memSubmit(e.target); return; }
+  if (f === "hzPiezaForm") { hzProyecto((p) => addPieza(p, $("hzPieza").value, uid("pz")), null, true); return; }
   if (f === "nubeMail") { nubeMail($("nubeEmail").value.trim()); return; }
   if (f === "bzIdea") { // WEB-91: an idea goes straight to MANU as an idea, no questions
     const text = $("bzIdeaIn").value.trim().slice(0, 280); if (!text) return;
@@ -3992,6 +4106,7 @@ document.addEventListener("input", (e) => {
 });
 
 document.addEventListener("change", async (e) => {
+  if (e.target.id === "hzDial") { render(); $("hzDial")?.focus({ preventScroll: true }); return; }
   if (e.target.id === "chatImage" && e.target.files?.[0]) {
     try { chatImage = await compressImage(e.target.files[0]); render(); $("msg")?.focus(); } catch (err) { toast(err.message); }
     return;

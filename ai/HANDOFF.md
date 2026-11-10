@@ -1,5 +1,17 @@
 # HANDOFF
 
+## WEB-108b · Horizonte integrado como tema principal (Claude, 2026-11-10)
+
+Rama `claude/magical-goodall-rf5qoo`, PR #115. Manu autorizó implementar, fusionar y publicar Horizonte con datos reales, conservando el diseño anterior como tema Clásico.
+
+**Hecho:** Horizonte es una piel con componentes propios dentro de la app real (no se sustituye por el prototipo). Conectado de verdad: cielo con el sol y el tiempo reales, portada de Hoy con agenda y recordatorios de hoy, botella con el motor de propuestas, chat real, Constelación y Bitácora sobre el cerebro real (acciones de Memoria de siempre), mareas de Dinero sobre los movimientos reales (HECHO / HIPÓTESIS / PENDIENTE), Sabadell sin cambios, Astillero con piezas y botadura confirmada. Tú → Apariencia cambia entre Horizonte y Clásico sin recargar. Versión 108. Detalle: `docs/HORIZONTE.md`.
+
+**Respaldo:** rama `respaldo/clasico-v107` (= v107 publicada). Las etiquetas de Git no se pueden subir desde este entorno (403).
+
+**Pruebas:** `npm test` 412/412 (11 nuevas; estables en 5 zonas horarias). `e2e/horizonte.e2e.mjs` 99/99. Sin regresión en `push` 18, `nube` 25, `permisos` 18, `banco` 11, `memoria` 23, `estilo` 16, `bankimport` 8 y `bahia`. `memoria.e2e` acepta ahora la botella además de la tarjeta clásica.
+
+**NO_VERIFICADO:** Safari e iPhone reales, VoiceOver, rendimiento en dispositivo, el aspecto con los datos reales de Manu (no los he visto), Bahía mostrando proyectos botados (no implementado).
+
 ## WEB-108 · HORIZONTE, prototipo del rediseño (Claude, 2026-11-09)
 
 Rama `claude/magical-goodall-rf5qoo`. Manu pidió reinventar la experiencia entera. Se entrega un **prototipo aparte** en `web/vivo/` (no cambia `web/app.js`, `web/core/`, `web/sw.js` ni Supabase). Solo datos inventados (`web/vivo/src/demo.js`); no lee `manuos.vault` ni hace peticiones de red (lo comprueba el e2e).

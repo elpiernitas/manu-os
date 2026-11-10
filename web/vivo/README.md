@@ -48,3 +48,6 @@ Parámetros para probar: `?hora=17:50&tiempo=lluvia` (tiempos: despejado, nubes,
 - `css/tokens.css` · tokens · `base.css` · cielo y armazón · `piezas.css` · componentes · `mundos.css` · secciones
 - `fonts/` · Fraunces (licencia SIL OFL 1.1, incluida)
 - `docs/` · sistema de diseño, adaptadores, migración e informe de pruebas · `capturas/` · iPhone y Mac
+
+> **2026-11-10:** Horizonte ya está integrado en la app real con datos reales (`docs/HORIZONTE.md`).
+> Esta carpeta queda como demo aislada con datos inventados.

@@ -4,7 +4,7 @@ Status: **IN_PROGRESS**
 
 ## Tarea activa
 
-WEB-108 — HORIZONTE, prototipo del rediseño en `web/vivo/` (`ai/HANDOFF.md`, «WEB-108»). PR abierto **sin fusionar**: Manu lo revisa antes. Anteriores ya fusionadas: Sabadell en solo lectura (#110–#112), «Importar todo (90 días)» (#113) y «Dónde gastas» (#114); falta que Manu confirme la importación real.
+WEB-108b — Horizonte como tema principal de la app real, con Clásico seleccionable (`ai/HANDOFF.md`, «WEB-108b»; `docs/HORIZONTE.md`). Manu autorizó fusionar y publicar (2026-11-10). Pendiente de Manu: probarlo en su iPhone.
 
 ## Autorización
 

@@ -146,3 +146,6 @@ export function hoyMemCard(p) {
 }
 
 export const QUESTION_IDS = QUESTIONS.map((q) => q.id);
+
+/** WEB-108: the same detail card as Memoria (origin, dates, confirm/correct/expire/forget), for Horizonte. */
+export const claimDetail = (brain, id, ui = {}, now = new Date()) => detail(brain, id, ui, now);
