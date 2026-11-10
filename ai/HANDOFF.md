@@ -1,5 +1,16 @@
 # HANDOFF
 
+## WEB-109 · recuperar la propuesta original de Claude Design (ChatGPT, 2026-11-10)
+
+**Decisión actual de Manu:** Horizonte no le gusta y quiere el diseño original creado con Claude Design. Fuente recuperada: archivo facilitado por Manu `MANU OS en revisión.zip` del 9/11/2026, con sistema negro / blanco / azul eléctrico, 31 iconos y composición editorial.
+
+Se implementó `design` como tercera piel, con los tokens y fundamentos visuales de aquella propuesta, predeterminada cuando no existía elección expresa. `clasico` y `horizonte` siguen disponibles en Tú → Apariencia. No se ha sustituido el núcleo ni importado el prototipo con datos ficticios. `web/design/claude-design.css`, `web/core/horizonte.js`, `web/design/horizonte.js`, CSS precargado, versión 109, pruebas unitarias/e2e. No equivale a una integración píxel a píxel del prototipo original: el layout de las pantallas reales se conserva, salvo ajustes estilísticos.
+
+**Sin cambios en** Tu nube, memoria, importación bancaria de 90 días, push, Google, Spotify, permisos, Bahía o datos del vault.
+
+**NO_VERIFICADO:** apariencia final en Safari/iPhone real, y equivalencia visual exacta con el prototipo (esta fase es adaptación de diseño). Ver `docs/design/CLAUDE_DESIGN_RESTORE.md`.
+
+
 ## Sabadell · «Importar todo» fallaba en la segunda página (Claude, 2026-11-10)
 
 Captura de Manu: `GET /accounts/:id/transactions → HTTP 422 · WRONG_REQUEST_PARAMETERS · continuation_key parameter is invalid`. Causa en nuestro código: `transactionsView` recortaba la clave de página a 500 caracteres y el servidor rechazaba claves más largas. Ahora la clave vuelve intacta (hasta 8.192; si fuera más larga, error claro). Prueba de regresión en `tests/enablebanking.test.js`. La importación es de todo o nada: no se guardó nada a medias.

@@ -1,0 +1,232 @@
+/* CLAUDE DESIGN — recovered from Manu's original 2026-11-09 design pack:
+   MANU OS en revisión.zip / DESIGN_SYSTEM.md / src/styles/*
+   Only visuals; real core, vault, banking and permissions stay untouched.
+   The source demo (MANU OS.dc.html) and its invented data are NOT used. */
+html[data-skin="design"] {
+  --bg: #050608;
+  --surface: #111318;
+  --surface-2: #171a21;
+  --text: #F7F8FA;
+  --muted: #949AA6;
+  --fill: #246BFD;
+  --accent: #4D8DFF;
+  --line: rgba(255,255,255,.08);
+  --glass: rgba(17,19,24,.72);
+  --glass-strong: rgba(17,19,24,.92);
+  --glass-edge: rgba(255,255,255,.14);
+  --glass-hi: rgba(255,255,255,.04);
+  --ambient-1: transparent;
+  --ambient-2: transparent;
+  --display: -apple-system,BlinkMacSystemFont,"SF Pro Display","Helvetica Neue",Arial,sans-serif;
+  --font: -apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Arial,sans-serif;
+  color-scheme: dark;
+}
+html[data-skin="design"] body {
+  color: var(--text);
+  background: #050608;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+html[data-skin="design"] .ambient {
+  background: #050608;
+}
+html[data-skin="design"] .ambient .blob { display: none; }
+html[data-skin="design"] .app {
+  max-width: 600px;
+  padding-inline: 20px;
+}
+html[data-skin="design"] h1 {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: clamp(32px, 8vw, 42px);
+  letter-spacing: -.035em;
+  line-height: 1.1;
+  text-wrap: pretty;
+}
+html[data-skin="design"] h2,
+html[data-skin="design"] .section-title h2 {
+  font-size: 11px;
+  line-height: 1.25;
+  font-weight: 600;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+}
+html[data-skin="design"] .subtitle { font-size: 14px; line-height: 1.5; margin-bottom: 22px; }
+html[data-skin="design"] .card {
+  background: #111318;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 18px;
+  box-shadow: 0 1px 0 rgba(255,255,255,.03) inset;
+  padding: 18px;
+  gap: 12px;
+}
+html[data-skin="design"] .hero {
+  background: #111318;
+  box-shadow: none;
+}
+html[data-skin="design"] .money-hero { background: #111318; }
+html[data-skin="design"] .big-money { font-size: clamp(37px,10vw,56px); font-weight: 500; letter-spacing: -.045em; }
+html[data-skin="design"] .list { border-radius: 18px; background: #111318; box-shadow: none; }
+html[data-skin="design"] .item { border-bottom: 1px solid rgba(255,255,255,.08); }
+html[data-skin="design"] .chip {
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 10px;
+  background: rgba(255,255,255,.04);
+  color: #b9c0ce;
+  font-size: 12px;
+  font-weight: 500;
+}
+html[data-skin="design"] .btn {
+  min-height: 44px;
+  border-radius: 12px;
+  padding: 10px 16px;
+  font-size: 14px;
+  background: #246BFD;
+  color: #fff;
+  box-shadow: none;
+}
+html[data-skin="design"] .btn.ghost {
+  background: rgba(255,255,255,.06);
+  color: #F7F8FA;
+  border: 1px solid rgba(255,255,255,.14);
+}
+html[data-skin="design"] .btn.danger {
+  background: rgba(229,87,79,.14);
+  border-color: rgba(229,87,79,.28);
+  color: #F08A84;
+}
+html[data-skin="design"] input[type=text],
+html[data-skin="design"] input[type=search],
+html[data-skin="design"] input:not([type]),
+html[data-skin="design"] textarea,
+html[data-skin="design"] select {
+  background: #171a21;
+  border: 1px solid rgba(255,255,255,.14);
+  border-radius: 14px;
+}
+/* Claude Design's original nav is an edge-to-edge, flat tab bar; six real sections remain. */
+html[data-skin="design"] .tabbar {
+  --tabbar-h: 68px;
+  position: fixed;
+  z-index: 10;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  transform: none;
+  width: 100%;
+  height: calc(68px + env(safe-area-inset-bottom, 0px));
+  padding: 8px 8px calc(8px + env(safe-area-inset-bottom, 0px));
+  display: grid;
+  grid-template-columns: repeat(6,minmax(0,1fr));
+  gap: 0;
+  border: 0;
+  border-top: 1px solid rgba(255,255,255,.12);
+  border-radius: 0;
+  background: rgba(17,19,24,.90);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  backdrop-filter: blur(20px) saturate(140%);
+  box-shadow: 0 -4px 28px rgba(0,0,0,.18);
+}
+html[data-skin="design"] .tabbar .tab-pill { display: none; }
+html[data-skin="design"] .tab {
+  color: #949AA6;
+  border-radius: 8px;
+  font-weight: 500;
+}
+html[data-skin="design"] .tab[aria-selected="true"] { color: #4D8DFF; background: rgba(255,255,255,.05); }
+html[data-skin="design"] .tab[data-tab="manu"] { color: #fff; }
+html[data-skin="design"] .tab[data-tab="manu"] .dot.fable-brand {
+  background: #246BFD;
+  border-radius: 50%;
+  width: 42px;
+  height: 42px;
+}
+/* The sixth original quick-action remains reachable ABOVE the navigation, never over tabs. */
+html[data-skin="design"] .fab {
+  right: 14px;
+  bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+}
+html[data-skin="design"] .app { padding-bottom: calc(146px + env(safe-area-inset-bottom, 0px)); }
+html[data-skin="design"] .topbar.show {
+  background: rgba(5,6,8,.98);
+  color: #F7F8FA;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+html[data-skin="design"] .ft-intro { padding-top: 20px; }
+html[data-skin="design"] .ft-greeting { font-size: clamp(36px,9vw,56px); font-weight: 600; letter-spacing: -.04em; }
+html[data-skin="design"] .ft-dot { color: #4D8DFF; }
+html[data-skin="design"] .ft-weather { border-bottom-color: rgba(255,255,255,.08); }
+html[data-skin="design"] .ft-temp { font-weight: 500; }
+html[data-skin="design"] .ft-next { border-bottom-color: rgba(255,255,255,.08); }
+html[data-skin="design"] .ft-work .mem-hoy {
+  background: linear-gradient(165deg,rgba(36,107,253,.12),rgba(17,19,24,.92) 70%);
+  border: 1px solid rgba(77,141,255,.22);
+  border-radius: 18px;
+}
+html[data-skin="design"] .ft-service-icon {
+  background: rgba(36,107,253,.13);
+  color: #4D8DFF;
+  border-radius: 12px;
+}
+html[data-skin="design"] .ft-service { border-bottom-color: rgba(255,255,255,.08); }
+html[data-skin="design"] :focus-visible { outline: 2px solid #4D8DFF; outline-offset: 2px; }
+/* Matches the original Claude Design desktop sidebar without rewriting app routing. */
+@media (min-width: 900px) {
+  html[data-skin="design"] .app {
+    max-width: 1040px;
+    margin: 0 0 0 236px;
+    padding: 44px 40px 80px;
+  }
+  html[data-skin="design"] .tabbar {
+    left: 0;
+    top: 0;
+    right: auto;
+    bottom: 0;
+    width: 220px;
+    max-width: none;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    justify-content: start;
+    gap: 6px;
+    padding: 70px 12px 82px;
+    border: 0;
+    border-right: 1px solid rgba(255,255,255,.10);
+    border-radius: 0;
+    box-shadow: none;
+  }
+  html[data-skin="design"] .tab {
+    min-height: 48px;
+    width: 100%;
+    display: flex;
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 12px;
+    padding: 8px 12px;
+    text-align: left;
+    font-size: 14px;
+    border-radius: 12px;
+  }
+  html[data-skin="design"] .tab[data-tab="manu"] .dot.fable-brand {
+    width: 28px;
+    height: 28px;
+    border-radius: 9px;
+  }
+  html[data-skin="design"] .fab {
+    left: 20px; right: auto; bottom: 20px;
+    width: 52px; height: 52px;
+  }
+}
+@media (max-width: 374px) {
+  html[data-skin="design"] .app { padding-inline: 16px; }
+  html[data-skin="design"] .tabbar { width: 100%; }
+  html[data-skin="design"] .ft-greeting { font-size: 32px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-skin="design"] .tab svg,
+  html[data-skin="design"] .btn { transition: none; }
+}

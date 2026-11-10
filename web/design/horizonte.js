@@ -150,6 +150,6 @@ export function hzBitacora(grupos) {
 }
 export function hzApariencia(skin) {
   const op = (id, t, d) => `<button class="hz-tema" data-act="hz-skin" data-v="${id}" aria-pressed="${skin === id}"><span class="hz-tema-m hz-tema-${id}" aria-hidden="true"></span><span class="grow"><b>${t}</b><br><span class="muted small">${d}</span></span>${skin === id ? '<span class="hz-mini">en uso</span>' : ""}</button>`;
-  return `<section class="card"><h2>Apariencia</h2><div class="stack">${op("horizonte", "Horizonte", "Papel y tinta bajo el cielo real de tu ciudad. El color cambia con la hora y el tiempo.")}${op("clasico", "Clásico", "La interfaz azul y negra de siempre.")}</div>
+  return `<section class="card"><h2>Apariencia</h2><div class="stack">${op("design", "Claude Design · original", "El diseño negro, blanco y azul eléctrico del primer prototipo. Es ahora el principal.")}${op("clasico", "Clásico", "La interfaz azul y negra anterior, con sus tarjetas.")}${op("horizonte", "Horizonte", "El diseño marítimo de papel y tinta, disponible como alternativa.")}</div>
     <p class="muted small">Cambiar de tema no borra nada ni cierra ninguna sesión. La elección se guarda en este dispositivo y viaja con Tu nube si la usas.</p></section>`;
 }

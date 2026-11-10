@@ -74,7 +74,7 @@ import { SKINS, skinOf, cielo as hzCielo, variables as hzVars, tiempoDe, portada
 import { hzCara, hzPortada, hzBotella, hzMareas, hzConstelacion, hzAstillero, hzBarcoCarta, hzBotadura, hzBitacora, hzApariencia } from "./design/horizonte.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "108"; // = número de la última tarea WEB publicada (desde WEB-87)
+export const APP_VERSION = "109"; // = número de la última tarea WEB publicada (desde WEB-87)
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -88,7 +88,7 @@ const DEFAULT_SPOTIFY_CLIENT_ID = "f5a3acb0124f45179c0d1d0b54e66f3b";
 const store = new LocalStore(globalThis.localStorage ?? { getItem: () => null, setItem: () => { throw new Error("no storage"); } });
 const loaded = store.load();
 let vault = loaded.vault;
-// ---------- Horizonte (WEB-108): tema por defecto; «Clásico» en Tú → Apariencia ----------
+// ---------- Temas: Claude Design (predeterminado), Clásico y Horizonte ----------
 // La elección vive en vault.settings.skin (viaja con Tu nube). Cambiarla solo repinta: no recarga,
 // no cierra sesiones ni toca datos.
 const skin = () => skinOf(vault.settings);
