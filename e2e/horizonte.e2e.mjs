@@ -42,7 +42,7 @@ function seed({ skin } = {}) {
       data: { now: { temp: 14, icon: "rain", label: "Lluvia" }, today: { max: 15, min: 9, sunrise: "08:21", sunset: "18:05", icon: "rain", rain: 80 }, tomorrow: null, offset: 3600, days: [], hours: [{ time: "Ahora", icon: "rain" }, { time: "20", icon: "cloud-moon" }] } },
     brain };
 }
-const ctxFor = async (opts, v, { at = "2026-11-09T10:00:00+01:00", tab = "hoy" } = {}) => {
+const ctxFor = async (opts, v, { at = "2026-11-09T10:00:00+01:00", tab = "hoy", preserveSkin = false } = {}) => {
   const ctx = await browser.newContext({ timezoneId: "Europe/Madrid", ...opts });
   const page = await ctx.newPage(); const errors = [];
   page.on("pageerror", (e) => errors.push(String(e)));
@@ -50,7 +50,8 @@ const ctxFor = async (opts, v, { at = "2026-11-09T10:00:00+01:00", tab = "hoy" }
   page.on("dialog", (d) => d.accept());
   await page.clock.install({ time: new Date(at) });
   await page.route(/^https:\/\/([^/]*\.)?(open-meteo\.com|supabase\.co|googleapis\.com|google\.com|spotify\.com|enablebanking\.com)\//, (r) => r.fulfill({ status: 503, body: "" }));
-  await page.addInitScript(([vv, t]) => { if (sessionStorage.getItem("seeded")) return; sessionStorage.setItem("seeded", "1"); sessionStorage.setItem("manuos.tab", t); localStorage.setItem("manuos.nudged", JSON.stringify({ day: "x", ids: [] })); if (vv) localStorage.setItem("manuos.vault", JSON.stringify(vv)); }, [v, tab]);
+  const testVault = v && !preserveSkin && !v.settings?.skin ? { ...v, settings: { ...v.settings, skin: "horizonte" } } : v;
+  await page.addInitScript(([vv, t]) => { if (sessionStorage.getItem("seeded")) return; sessionStorage.setItem("seeded", "1"); sessionStorage.setItem("manuos.tab", t); localStorage.setItem("manuos.nudged", JSON.stringify({ day: "x", ids: [] })); if (vv) localStorage.setItem("manuos.vault", JSON.stringify(vv)); }, [testVault, tab]);
   await page.goto(B); await page.waitForTimeout(700);
   return { ctx, page, errors };
 };
@@ -59,10 +60,21 @@ const shot = async (page, name) => { if (out) { await page.waitForTimeout(450); 
 const overflow = (page) => page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1);
 const go = async (page, t) => { await page.click(`#tabs [data-tab="${t}"]`); await page.waitForTimeout(250); };
 
-// 1. Por defecto, Horizonte. Datos reales del vault, nada inventado.
+// 0. Nueva elección predeterminada: Claude Design original, sin datos inventados.
+{
+  const { ctx, page, errors } = await ctxFor(iphone, seed(), { preserveSkin: true });
+  ok("tema por defecto: Claude Design", (await page.getAttribute("html", "data-skin")) === "design");
+  await go(page, "hoy");
+  ok("Claude Design: Hoy real sin portada de Horizonte", (await page.locator(".fable-hoy").count()) === 1 && (await page.locator(".hz-portada").count()) === 0);
+  ok("Claude Design: no inyecta datos demo", !/DEMO · DATOS INVENTADOS/i.test(await page.locator("#screen").innerText()));
+  ok(`Claude Design sin errores (${errors.join(" | ")})`, errors.length === 0);
+  await ctx.close();
+}
+
+// 1. Horizonte se prueba seleccionándolo explícitamente, sin ser tema por defecto.
 {
   const { ctx, page, errors } = await ctxFor(iphone, seed());
-  ok("tema por defecto: horizonte", (await page.getAttribute("html", "data-skin")) === "horizonte");
+  ok("Horizonte explícito sigue funcionando", (await page.getAttribute("html", "data-skin")) === "horizonte");
   ok("a las 10:00 en Gijón es de día", (await page.getAttribute("html", "data-tema")) === "dia");
   const hoy = await page.locator("#screen").innerText();
   ok("portada con la cita real siguiente", /12:00 · Presentar rutas de logo/.test(hoy));
@@ -188,8 +200,8 @@ const go = async (page, t) => { await page.click(`#tabs [data-tab="${t}"]`); awa
 
 // 6. Vault vacío (instalación nueva): estados vacíos, nada inventado.
 {
-  const { ctx, page, errors } = await ctxFor(iphone, null);
-  ok("vacío: horizonte", (await page.getAttribute("html", "data-skin")) === "horizonte");
+  const { ctx, page, errors } = await ctxFor(iphone, { schema: 1, settings: { skin: "horizonte" }, inbox: [], spending: [], chat: [] });
+  ok("vacío: horizonte elegido", (await page.getAttribute("html", "data-skin")) === "horizonte");
   ok("vacío: portada sin citas", /Nada en la agenda de hoy/.test(await page.locator("#screen").innerText()));
   await shot(page, "vacio-hoy");
   await go(page, "dinero"); ok("vacío: mar en calma", /Mar en calma/.test(await page.locator("#screen").innerText()));
