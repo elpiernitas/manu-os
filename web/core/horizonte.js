@@ -10,9 +10,10 @@ const DIA = 864e5;
 const RAD = Math.PI / 180;
 
 // ---------- Temas ----------
-export const SKINS = { horizonte: "Horizonte", clasico: "Clásico" };
-/** El tema elegido. Sin elegir (vault antiguo), Horizonte. Un valor desconocido no rompe nada. */
-export const skinOf = (settings) => (settings?.skin === "clasico" ? "clasico" : "horizonte");
+export const SKINS = { design: "Claude Design", clasico: "Clásico", horizonte: "Horizonte" };
+/** El diseño original de Claude Design es el predeterminado.
+ *  Respeta las elecciones explícitas de otros temas y nunca toca el vault. */
+export const skinOf = (settings) => (settings?.skin === "horizonte" || settings?.skin === "clasico" || settings?.skin === "design" ? settings.skin : "design");
 
 // ---------- Cielo ----------
 export const GIJON = { latitude: 43.53573, longitude: -5.66152 };
