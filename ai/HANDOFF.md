@@ -4,7 +4,7 @@
 
 Captura de Manu: `GET /accounts/:id/transactions → HTTP 422 · WRONG_REQUEST_PARAMETERS · continuation_key parameter is invalid`. Causa en nuestro código: `transactionsView` recortaba la clave de página a 500 caracteres y el servidor rechazaba claves más largas. Ahora la clave vuelve intacta (hasta 8.192; si fuera más larga, error claro). Prueba de regresión en `tests/enablebanking.test.js`. La importación es de todo o nada: no se guardó nada a medias.
 
-**NO_VERIFICADO / BLOQUEADO:** la función `manu-bank` corregida **no está desplegada**: el despliegue a producción necesita la autorización expresa de Manu. Sin desplegar, el error sigue en su iPhone. No he comprobado la longitud real de las claves de Sabadell (no se registran).
+**Desplegado** el 2026-11-10 con autorización expresa de Manu («despliega manu-bank»): `manu-bank` versión 9, activa; sin sesión responde 401 como debe. **NO_VERIFICADO:** que la importación real complete en su iPhone (pendiente de su captura). No he comprobado la longitud real de las claves de Sabadell (no se registran).
 
 ## WEB-108b · Horizonte integrado como tema principal (Claude, 2026-11-10)
 
