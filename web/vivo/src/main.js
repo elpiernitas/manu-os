@@ -42,7 +42,7 @@ function pintaCielo() {
   const r = document.documentElement;
   for (const [k, v] of Object.entries(variables(S.cielo))) r.style.setProperty(k, v);
   r.dataset.tema = S.cielo.oscuro ? "noche" : "dia"; r.dataset.tiempo = S.cielo.tiempo; r.dataset.fase = S.cielo.fase; r.dataset.astro = S.cielo.astro.tipo;
-  document.querySelector('meta[name="theme-color"]').content = S.cielo.colores.arriba;
+  const meta = document.querySelector('meta[name="theme-color"]'); if (meta) meta.content = S.cielo.colores.arriba;
 }
 function pintaDique() {
   dique.innerHTML = NAV.map(([id, n]) => `<a href="#${id}" data-ir="${id}" class="${id === "manu" ? "nav-manu" : ""}"${S.vista === id ? ' aria-current="page"' : ""}>${id === "manu" ? cara(S.ui.pensando ? "piensa" : "calma") : icono(id)}<span>${n}</span></a>`).join("")
