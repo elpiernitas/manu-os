@@ -106,9 +106,10 @@ html[data-skin="design"] select {
 }
 html[data-skin="design"] .tabbar {
   --tabbar-h: 68px;
-  width: min(calc(100% - 28px), 480px);
-  left: 50%;
-  transform: translateX(-50%);
+  /* Preserve the separate quick-action FAB slot: expanding to full width covers it. */
+  width: min(calc(100% - 24px - var(--tabbar-h) - 10px), 446px);
+  left: max(12px, calc(50% - 260px));
+  transform: none;
   bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);
   background: rgba(17,19,24,.90);
   -webkit-backdrop-filter: blur(20px) saturate(140%);
@@ -161,11 +162,11 @@ html[data-skin="design"] .ft-service { border-bottom-color: rgba(255,255,255,.08
 html[data-skin="design"] :focus-visible { outline: 2px solid #4D8DFF; outline-offset: 2px; }
 @media (min-width: 900px) {
   html[data-skin="design"] .app { max-width: 900px; padding-inline: 32px; }
-  html[data-skin="design"] .tabbar { max-width: 600px; }
+  html[data-skin="design"] .tabbar { max-width: 446px; }
 }
 @media (max-width: 374px) {
   html[data-skin="design"] .app { padding-inline: 16px; }
-  html[data-skin="design"] .tabbar { width: calc(100% - 16px); }
+  html[data-skin="design"] .tabbar { width: calc(100% - var(--tabbar-h) - 26px); }
   html[data-skin="design"] .ft-greeting { font-size: 32px; }
 }
 @media (prefers-reduced-motion: reduce) {
