@@ -1,0 +1,32 @@
+/* HORIZONTE · tokens. Todo el sistema sale de aquí. Papel y tinta: sin sombras, sin esquinas
+   redondas, una sola tinta de acento (la boya) y un cielo que cambia con la hora real. */
+@font-face { font-family: "Fraunces"; src: url("../fonts/fraunces.woff2") format("woff2"); font-weight: 100 900; font-style: normal; font-display: swap; }
+@font-face { font-family: "Fraunces"; src: url("../fonts/fraunces-italic.woff2") format("woff2"); font-weight: 100 900; font-style: italic; font-display: swap; }
+@property --cielo-1 { syntax: "<color>"; inherits: true; initial-value: #3d8bef; }
+@property --cielo-2 { syntax: "<color>"; inherits: true; initial-value: #cde7ff; }
+@property --mar { syntax: "<color>"; inherits: true; initial-value: #1f6fa8; }
+
+:root {
+  /* Color · día (los pares se prueban en tests/vivo-cielo.test.js) */
+  --papel: #f3eee3; --papel-2: #e9e2d3; --tinta: #15120e; --tinta-2: #5a5348;
+  --boya: #ff4b1f; --boya-tinta: #b02a07; --sobre-boya: #15120e;
+  --raya: color-mix(in srgb, var(--tinta) 22%, transparent);
+  --cielo-1: #3d8bef; --cielo-2: #cde7ff; --mar: #1f6fa8; --astro-x: .5; --astro-y: .6;
+  /* Tipografía */
+  --f-titular: "Fraunces", ui-serif, "New York", Georgia, serif;
+  --f-texto: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --f-dato: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --t-ante: .72rem; --t-nota: .875rem; --t-texto: 1rem; --t-2: clamp(1.45rem, 1.1rem + 1.6vw, 2.1rem);
+  --t-titular: clamp(2.3rem, 1.1rem + 6vw, 4.8rem); --t-cabecera: clamp(5.5rem, 33vw, 17rem);
+  /* Espacio (base 4) */
+  --e1: 4px; --e2: 8px; --e3: 12px; --e4: 16px; --e5: 24px; --e6: 40px; --e7: 64px;
+  --borde: 1.5px; --toque: 44px; --dique: 64px; --ancho: 1120px;
+  /* Movimiento */
+  --d1: 140ms; --d2: 320ms; --d3: 700ms; --curva: cubic-bezier(.2, .8, .2, 1); --rebote: cubic-bezier(.3, 1.5, .5, 1);
+  color-scheme: light;
+}
+:root[data-tema="noche"] {
+  --papel: #0a0f1e; --papel-2: #141b30; --tinta: #eef0f6; --tinta-2: #a3abc2;
+  --boya: #ff6a3d; --boya-tinta: #ff8a66; --sobre-boya: #15120e;
+  color-scheme: dark;
+}

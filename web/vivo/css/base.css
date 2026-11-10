@@ -1,0 +1,75 @@
+/* Base, cielo vivo, armazón y navegación. */
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; scroll-padding-bottom: 96px; }
+body { margin: 0; background: var(--papel); color: var(--tinta); font: 400 var(--t-texto)/1.5 var(--f-texto); -webkit-font-smoothing: antialiased; overflow-x: hidden; transition: background var(--d3), color var(--d3); }
+h1, h2, h3, p, ul, ol, figure { margin: 0; padding: 0; } ul, ol { list-style: none; }
+button, input, select { font: inherit; color: inherit; } button { cursor: pointer; }
+a { color: inherit; }
+:focus-visible { outline: 3px solid var(--boya); outline-offset: 2px; }
+.oculto { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.salto { position: fixed; top: -80px; left: 8px; z-index: 99; background: var(--tinta); color: var(--papel); padding: 12px 16px; } .salto:focus { top: calc(8px + env(safe-area-inset-top)); }
+.ico { width: 24px; height: 24px; flex: none; }
+.arranque { padding: 40vh 24px; text-align: center; font-family: var(--f-dato); }
+
+/* ---- El cielo: una sola capa fija detrás de todo. Su color es la hora real. ---- */
+#cielo { position: fixed; inset: 0 0 auto 0; height: 78vh; z-index: 0; overflow: hidden; background: linear-gradient(var(--cielo-1), var(--cielo-2) 86%, var(--mar)); transition: --cielo-1 var(--d3), --cielo-2 var(--d3), --mar var(--d3); }
+.astro { position: absolute; width: 68px; height: 68px; border-radius: 50%; left: calc(var(--astro-x) * 100% - 34px); top: calc((1 - var(--astro-y)) * 30vh + 5vh + env(safe-area-inset-top)); background: var(--boya); box-shadow: 0 0 0 14px color-mix(in srgb, var(--boya) 22%, transparent), 0 0 0 34px color-mix(in srgb, var(--boya) 10%, transparent); transition: left var(--d2) var(--curva), top var(--d2) var(--curva), background var(--d3); }
+[data-astro="luna"] .astro { background: #f4f1e6; box-shadow: inset -14px -6px 0 0 #c9c6bb, 0 0 0 16px rgba(244, 241, 230, .08); }
+.nube { position: absolute; height: 26px; border-radius: 26px; background: rgba(255, 255, 255, .7); opacity: 0; transition: opacity var(--d3); animation: deriva 70s linear infinite; }
+.nube-1 { width: 180px; top: 12vh; left: -10%; } .nube-2 { width: 120px; top: 22vh; left: 40%; animation-duration: 95s; }
+[data-tiempo="nubes"] .nube, [data-tiempo="lluvia"] .nube { opacity: .75; } [data-tema="noche"] .nube { background: rgba(160, 172, 200, .28); }
+.lluvia, .niebla { position: absolute; inset: 0; opacity: 0; transition: opacity var(--d3); pointer-events: none; }
+.lluvia { inset: -40px 0 0 -40px; background: repeating-linear-gradient(104deg, transparent 0 22px, rgba(255, 255, 255, .42) 22px 23px, transparent 23px 37px); background-size: 152px 152px; animation: llueve .7s linear infinite; }
+[data-tiempo="lluvia"] .lluvia { opacity: 1; }
+.niebla { background: linear-gradient(transparent, rgba(255, 255, 255, .55) 40%, rgba(255, 255, 255, .25) 60%, rgba(255, 255, 255, .6)); background-size: 100% 200%; animation: bruma 18s ease-in-out infinite alternate; }
+[data-tiempo="niebla"] .niebla { opacity: .9; } [data-tema="noche"] .niebla { filter: brightness(.45); }
+@keyframes llueve { to { background-position: -38px 152px; } }
+@keyframes bruma { to { background-position: 0 100%; } }
+@keyframes deriva { to { transform: translateX(120vw); } }
+
+/* ---- Armazón: portada sobre el cielo, olas, y el papel debajo ---- */
+#app { position: relative; z-index: 1; }
+main:focus { outline: none; }
+.portada { min-height: 27vh; padding: calc(var(--e5) + env(safe-area-inset-top)) max(var(--e4), env(safe-area-inset-right)) var(--e3) max(var(--e4), env(safe-area-inset-left)); display: flex; flex-direction: column; justify-content: flex-end; gap: var(--e3); max-width: var(--ancho); margin: 0 auto; }
+.portada-hoy { min-height: 44vh; }
+.cabecera { font: italic 900 var(--t-cabecera)/.74 var(--f-titular); font-variation-settings: "opsz" 144, "SOFT" 100, "WONK" 1; letter-spacing: -.055em; margin-left: -.05em; color: var(--tinta); mix-blend-mode: multiply; }
+[data-tema="noche"] .cabecera { mix-blend-mode: screen; opacity: .96; }
+.rotulo { font: italic 800 clamp(3rem, 15vw, 7rem)/.85 var(--f-titular); font-variation-settings: "opsz" 144, "SOFT" 100, "WONK" 1; letter-spacing: -.04em; }
+.tira { display: flex; flex-wrap: wrap; gap: var(--e2); }
+.chapa { font: 500 var(--t-ante)/1 var(--f-dato); letter-spacing: .04em; text-transform: uppercase; padding: 7px 10px; background: var(--papel); color: var(--tinta); border: var(--borde) solid var(--tinta); }
+.chapa-boton { min-height: 32px; }
+.olas { display: block; width: 100%; height: 22px; margin-bottom: -1px; } .olas-mar { fill: var(--mar); transition: fill var(--d3); } .olas-papel { fill: var(--papel); transition: fill var(--d3); }
+.fondo { background: var(--papel); transition: background var(--d3); padding: var(--e4) max(var(--e4), env(safe-area-inset-right)) calc(var(--dique) + var(--e7) + env(safe-area-inset-bottom)) max(var(--e4), env(safe-area-inset-left)); min-height: 62vh; }
+.fondo > * { max-width: var(--ancho); margin-inline: auto; }
+.fondo > * + * { margin-top: var(--e5); }
+.rejilla { display: grid; gap: var(--e5); }
+.rejilla > * { min-width: 0; }
+
+/* ---- El dique: la navegación. MANU asoma los ojos por encima de la línea. ---- */
+#dique { position: fixed; z-index: 5; inset: auto 0 0 0; display: grid; grid-template-columns: repeat(6, 1fr); background: color-mix(in srgb, var(--papel) 97%, transparent); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); border-top: var(--borde) solid var(--tinta); padding-bottom: env(safe-area-inset-bottom); transition: background var(--d3); }
+#dique a, #dique button { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-height: var(--dique); padding: 6px 0; background: none; border: 0; text-decoration: none; color: var(--tinta-2); font: 500 .6rem/1 var(--f-dato); letter-spacing: .04em; text-transform: uppercase; transition: color var(--d1); }
+#dique [aria-current="page"] { color: var(--tinta); }
+#dique [aria-current="page"]::before { content: ""; position: absolute; top: -6px; width: 10px; height: 10px; border-radius: 50%; background: var(--boya); border: var(--borde) solid var(--tinta); animation: boya 2.8s ease-in-out infinite; }
+#dique .nav-manu { color: var(--tinta); } #dique .nav-manu .cara { width: 46px; margin-top: -24px; background: var(--papel); border-radius: 50% 50% 0 0; padding: 4px 4px 0; }
+#dique .nav-manu[aria-current="page"]::before { display: none; }
+#dique .solo-mac { display: none; }
+@keyframes boya { 50% { transform: translateY(-3px) rotate(8deg); } }
+
+/* ---- Mac: el dique se vuelve muelle lateral y el papel, un escritorio a dos columnas ---- */
+@media (min-width: 960px) {
+  #dique { inset: 0 auto 0 0; width: 216px; grid-template-columns: 1fr; align-content: start; gap: 2px; padding: var(--e5) var(--e3); border-top: 0; border-right: var(--borde) solid var(--tinta); }
+  #dique a, #dique button { flex-direction: row; justify-content: flex-start; gap: var(--e3); min-height: 48px; padding: 0 var(--e3); font-size: .78rem; width: 100%; }
+  #dique [aria-current="page"] { background: var(--tinta); color: var(--papel); } #dique [aria-current="page"]::before { position: static; order: 2; margin-left: auto; }
+  #dique .nav-manu { order: -1; min-height: 84px; margin-bottom: var(--e4); border-bottom: var(--borde) solid var(--tinta); } #dique .nav-manu .cara { width: 64px; margin: 0; background: none; padding: 0; }
+  #dique .nav-manu[aria-current="page"] { background: none; color: var(--tinta); }
+  #dique .solo-mac { display: flex; } #dique kbd { margin-left: auto; font: inherit; opacity: .7; }
+  #app { margin-left: 216px; } #cielo { left: 216px; }
+  .portada, .fondo { padding-inline: var(--e6); } .fondo { padding-bottom: var(--e7); }
+  .rejilla { grid-template-columns: 1fr 1fr; gap: var(--e6); }
+  .portada-hoy { min-height: 50vh; } .cabecera { font-size: clamp(9rem, 22vw, 19rem); }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+@media (prefers-reduced-motion: no-preference) {
+  ::view-transition-old(root) { animation: hunde var(--d2) var(--curva) both; } ::view-transition-new(root) { animation: emerge var(--d2) var(--curva) both; }
+}
+@keyframes hunde { to { opacity: 0; transform: translateY(18px); } } @keyframes emerge { from { opacity: 0; transform: translateY(-18px); } }

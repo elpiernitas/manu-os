@@ -31,7 +31,8 @@ const shot = async (n) => { if (out) await page.screenshot({ path: `${out}/${n}.
 const goMemoria = async () => { await page.click('[data-tab="tu"]'); await page.click('[data-sub="memoria"]'); await page.waitForTimeout(250); };
 
 // 1. Hoy offers a single proposal (the most useful one), with «Luego».
-const hoyCard = page.locator(".mem-hoy");
+// WEB-108: con Horizonte (tema por defecto) la misma propuesta llega como «botella».
+const hoyCard = page.locator(".mem-hoy, .hz-botella");
 ok("Hoy shows one Memoria proposal", (await hoyCard.count()) === 1);
 ok("…the most useful first: an unknown expense", /¿Qué es este gasto\?/i.test(await hoyCard.textContent()));
 await shot("01-hoy");

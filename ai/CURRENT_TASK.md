@@ -4,7 +4,7 @@ Status: **IN_PROGRESS**
 
 ## Tarea activa
 
-WEB-99 — avisos push con MANU cerrada, sincronización selectiva y lápidas (`ai/HANDOFF.md`, «WEB-99»). PR abierto sin fusionar. La activación espera a que se reactive el proyecto Supabase, que está pausado. WEB-98 está fusionada (PR #100). Pendientes: WEB-93, banco con Enable Banking y Supabase; y WEB-96, modo amanecer, bloqueada hasta saber qué luces tiene Manu.
+WEB-108b — Horizonte como tema principal de la app real, con Clásico seleccionable (`ai/HANDOFF.md`, «WEB-108b»; `docs/HORIZONTE.md`). Manu autorizó fusionar y publicar (2026-11-10). Pendiente de Manu: probarlo en su iPhone.
 
 ## Autorización
 
