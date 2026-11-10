@@ -136,3 +136,14 @@ test("consent redirect: only Enable Banking's own hosts (auth.* and tilisy.*), n
   for (const ok of ["https://auth.enablebanking.com/x?y=1", "https://tilisy.enablebanking.com/welcome?sessionid=abc"]) assert.equal(safeBankRedirect(ok), new URL(ok).href);
   for (const bad of ["http://tilisy.enablebanking.com/x", "https://tilisy.enablebanking.com.evil.example/x", "https://evil.example/tilisy.enablebanking.com", "https://user:pw@tilisy.enablebanking.com/", "https://tilisy.enablebanking.com:8443/", "https://enablebanking.com.evil/"]) assert.throws(() => safeBankRedirect(bad), /inesperada/, bad);
 });
+
+// Regresión (2026-11-10, Sabadell): una clave de página recortada daba 422 «continuation_key
+// parameter is invalid». La clave vuelve tal cual; si fuera desmesurada, error claro, nunca recorte.
+test("la clave de la página siguiente vuelve intacta", async () => {
+  const { transactionsView, MAX_CONTINUATION } = await import("../../supabase/functions/manu-bank/bank-core.js");
+  const larga = "eyJ" + "a".repeat(1500) + "==";
+  assert.equal(transactionsView({ transactions: [], continuation_key: larga }).continuation, larga);
+  assert.equal(transactionsView({ transactions: [] }).continuation, null);
+  assert.equal(transactionsView({ transactions: [], continuation_key: "" }).continuation, null);
+  assert.throws(() => transactionsView({ transactions: [], continuation_key: "x".repeat(MAX_CONTINUATION + 1) }), /demasiado larga/);
+});

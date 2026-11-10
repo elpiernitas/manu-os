@@ -110,8 +110,19 @@ export function transactionsView(data) {
       description: String((Array.isArray(t.remittance_information) ? t.remittance_information.join(" ") : t.remittance_information) ?? t.additional_information ?? "").slice(0, 160),
       status: String(t.status ?? "").slice(0, 20),
     })),
-    continuation: typeof data?.continuation_key === "string" ? data.continuation_key.slice(0, 500) : null,
+    continuation: continuationOf(data),
   };
+}
+
+// The bank's «next page» key goes back exactly as it came: a cut key is rejected by Enable
+// Banking (422 «continuation_key parameter is invalid», seen 2026-11-10 with Sabadell). If one were
+// ever longer than the limit, stop with a clear error instead of skipping pages silently.
+export const MAX_CONTINUATION = 8192;
+export function continuationOf(data) {
+  const k = data?.continuation_key;
+  if (typeof k !== "string" || !k) return null;
+  if (k.length > MAX_CONTINUATION) throw Object.assign(new Error("La siguiente página de movimientos es demasiado larga para pedirla"), { safe: true });
+  return k;
 }
 
 // Pre-flight from GET /application (GetApplicationResponse): only flags, never secrets or names.
