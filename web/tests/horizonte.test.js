@@ -10,11 +10,13 @@ import { remember, emptyBrain } from "../core/brain.js";
 const AHORA = new Date("2026-11-09T10:00:00+01:00");
 const iso = (s) => new Date(s).toISOString();
 
-test("tema: Horizonte por defecto, Clásico si se elige, nada raro rompe", () => {
-  assert.equal(H.skinOf(undefined), "horizonte");
-  assert.equal(H.skinOf({}), "horizonte", "un vault antiguo sin elección abre en Horizonte");
+test("tema: Claude Design predeterminado y los otros dos disponibles", () => {
+  assert.equal(H.skinOf(undefined), "design");
+  assert.equal(H.skinOf({}), "design", "un vault antiguo sin elección abre Claude Design");
+  assert.equal(H.skinOf({ skin: "design" }), "design");
   assert.equal(H.skinOf({ skin: "clasico" }), "clasico");
-  assert.equal(H.skinOf({ skin: "<script>" }), "horizonte");
+  assert.equal(H.skinOf({ skin: "horizonte" }), "horizonte");
+  assert.equal(H.skinOf({ skin: "<script>" }), "design");
 });
 
 test("la elección y los campos nuevos sobreviven a la validación y viajan con Tu nube", () => {
