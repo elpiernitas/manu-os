@@ -28,7 +28,9 @@ test("Theme follows the original design system tokens", () => {
   assert.match(css, /html\[data-skin="design"\]/);
   assert.match(css, /\.tabbar/);
   assert.match(css, /prefers-reduced-motion: reduce/);
-  assert.match(css, /quick-action FAB slot/);
+  assert.match(css, /quick-action remains reachable/);
+  assert.match(css, /\.tabbar \.tab-pill \{ display: none; \}/);
+  assert.match(css, /width: 220px;/);
 });
 
 test("PWA loads and precaches design skin without removing existing bank modules", () => {
