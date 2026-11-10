@@ -4,7 +4,7 @@ Status: **IN_PROGRESS**
 
 ## Tarea activa
 
-WEB-108b — Horizonte como tema principal de la app real, con Clásico seleccionable (`ai/HANDOFF.md`, «WEB-108b»; `docs/HORIZONTE.md`). Manu autorizó fusionar y publicar (2026-11-10). Pendiente de Manu: probarlo en su iPhone.
+WEB-109 — Restaurar la dirección de diseño original de Claude Design, solicitada expresamente por Manu tras ver Horizonte en el iPhone. Tema `design` como predeterminado y anteriores como alternativas. No alterar datos, banco ni servicios. QA y publicación pendientes. Ver `docs/design/CLAUDE_DESIGN_RESTORE.md`.
 
 ## Autorización
 
