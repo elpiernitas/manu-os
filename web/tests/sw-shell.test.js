@@ -2,11 +2,19 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 
-// Offline start needs every module in the install cache (WEB-29: five were missing).
-test("service worker caches every core module", () => {
+// Offline start needs every ACTIVE module. WEB-110 retired the Bahía game from
+// app.js (not merely hidden its tab), so caching its 3 modules would be wasteful.
+const ARCHIVED_GAME = new Set(["bahia.js", "bahia-draw.js", "bahia-svg.js"]);
+test("service worker caches every active core module but not the retired game", () => {
   const sw = readFileSync(new URL("../sw.js", import.meta.url), "utf8");
-  const missing = readdirSync(new URL("../core/", import.meta.url)).filter((f) => f.endsWith(".js") && !sw.includes(`"core/${f}"`));
+  const app = readFileSync(new URL("../app.js", import.meta.url), "utf8");
+  const missing = readdirSync(new URL("../core/", import.meta.url))
+    .filter((f) => f.endsWith(".js") && !ARCHIVED_GAME.has(f) && !sw.includes(`"core/${f}"`));
   assert.deepEqual(missing, []);
+  for (const file of ARCHIVED_GAME) {
+    assert.doesNotMatch(sw, new RegExp(`"core/${file.replaceAll(".", "\\.")}"`));
+    assert.ok(!app.includes(`"./core/${file}"`), `${file} must not load in the active app`);
+  }
 });
 
 // The page shows APP_VERSION; the cache name must move with it or an update is not picked up.
