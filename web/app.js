@@ -74,7 +74,7 @@ import { SKINS, skinOf, cielo as hzCielo, variables as hzVars, tiempoDe, portada
 import { hzCara, hzPortada, hzBotella, hzMareas, hzConstelacion, hzAstillero, hzBarcoCarta, hzBotadura, hzBitacora, hzApariencia } from "./design/horizonte.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "109"; // = número de la última tarea WEB publicada (desde WEB-87)
+export const APP_VERSION = "110"; // = número de la última tarea WEB publicada (desde WEB-87)
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -122,7 +122,9 @@ function applySkin() {
   if (mt) mt.content = hzSky.colores.arriba; if (ms) ms.content = hzSky.oscuro ? "dark" : "light";
 }
 try { document.documentElement.dataset.skin = skinOf(vault?.settings); } catch { /* el primer render lo pone */ }
-let tab = sessionStorage.getItem("manuos.tab") || "bahia"; // WEB-91: MANU opens on the town
+// WEB-110: Bahía retired. Old sessions (including "bahia") now open Hoy.
+const restoredTab = sessionStorage.getItem("manuos.tab");
+let tab = ["hoy", "agenda", "manu", "dinero", "proyectos", "tu"].includes(restoredTab) ? restoredTab : "hoy";
 let sub = null; // Tú subpage
 // WEB-94: Memoria. The brain lives in the vault; the screen state does not.
 let memUi = { filter: "vigentes", query: "", open: null, correcting: null, choosing: null };
@@ -619,7 +621,7 @@ const I = {
   alarm: svg('<circle cx="12" cy="13" r="7"/><path d="M12 9v4l2.5 2M4 4l3 2.5M20 4l-3 2.5"/>'),
 };
 
-const TABS = [["bahia", "Bahía"], ["hoy", "Hoy"], ["manu", "MANU"], ["dinero", "Dinero"], ["proyectos", "Proyectos"], ["tu", "Tú"]];
+const TABS = [["hoy", "Hoy"], ["agenda", "Agenda"], ["manu", "MANU"], ["dinero", "Dinero"], ["proyectos", "Proyectos"], ["tu", "Tú"]];
 
 function latestMonthOffset() {
   const last = vault.spending.reduce((m, x) => (x.at > m ? x.at : m), "");
@@ -2428,7 +2430,8 @@ function paintBahia() {
 const saveGame = (game) => { vault.settings.game = game; persist(); render(); };
 
 function go(newTab) {
-  tab = newTab;
+  // Retired tabs cannot reappear via stale shortcuts, saved navigation or old links.
+  tab = TABS.some(([id]) => id === newTab) ? newTab : "hoy";
   sub = null;
   overlay = null;
   sessionStorage.setItem("manuos.tab", tab);
