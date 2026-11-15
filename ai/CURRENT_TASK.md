@@ -4,7 +4,7 @@ Status: **IN_PROGRESS**
 
 ## Tarea activa
 
-WEB-109 — Restaurar la dirección de diseño original de Claude Design, solicitada expresamente por Manu tras ver Horizonte en el iPhone. Tema `design` como predeterminado y anteriores como alternativas. No alterar datos, banco ni servicios. QA y publicación pendientes. Ver `docs/design/CLAUDE_DESIGN_RESTORE.md`.
+WEB-110 — Simplificar MANU OS a petición de Manu (2026-11-16). Retirar Bahía como función activa, recuperar Agenda como pestaña, dejar Hoy como portada y conservar todos los datos. Implementar en rama/PR; pruebas y publicación según `AGENTS.md`. Documentación: `docs/product/LEAN_MANU_OS.md`.
 
 ## Autorización
 
