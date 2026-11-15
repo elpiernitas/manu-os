@@ -91,7 +91,7 @@ const go = async (page, t) => { await page.click(`#tabs [data-tab="${t}"]`); awa
   await page.click('[data-act="hz-dial-ahora"]');
   ok("vuelta a ahora", (await page.getAttribute("html", "data-tema")) === "dia");
   // Navegación por todas las secciones, sin desbordes.
-  for (const t of ["bahia", "manu", "dinero", "proyectos", "tu", "hoy"]) { await go(page, t); ok(`sección ${t} sin desbordar`, !(await overflow(page))); }
+  for (const t of ["agenda", "manu", "dinero", "proyectos", "tu", "hoy"]) { await go(page, t); ok(`sección ${t} sin desbordar`, !(await overflow(page))); }
   ok(`sin errores de consola (${errors.join(" | ")})`, errors.length === 0);
   await ctx.close();
 }
@@ -220,7 +220,7 @@ const go = async (page, t) => { await page.click(`#tabs [data-tab="${t}"]`); awa
 }
 for (const w of [320, 375, 390, 430]) {
   const { ctx, page } = await ctxFor({ viewport: { width: w, height: 760 }, hasTouch: true, isMobile: true, deviceScaleFactor: 1 }, seed());
-  for (const t of ["hoy", "bahia", "manu", "dinero", "proyectos", "tu"]) { await go(page, t); ok(`${w}px ${t}: sin desbordar`, !(await overflow(page))); }
+  for (const t of ["hoy", "agenda", "manu", "dinero", "proyectos", "tu"]) { await go(page, t); ok(`${w}px ${t}: sin desbordar`, !(await overflow(page))); }
   // Lo último de la página queda por encima de la barra.
   await page.evaluate(() => scrollTo(0, document.body.scrollHeight)); await page.waitForTimeout(150);
   const last = await page.evaluate(() => { const els = [...document.querySelectorAll("#screen > *, #screen .stack > *")].filter((e) => e.offsetHeight); const r = els.at(-1).getBoundingClientRect(); return r.bottom; });
