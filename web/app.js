@@ -15,6 +15,7 @@ import { importStatement, importStatementRows, classifiedFromRows, dropCrossSour
 import { CITIES, oviedoTrip, proposeAlarm, shouldAskTomorrow, shortcutUrl, guessCity } from "./core/night.js";
 import { birthdayEventBody, isClientId, listEvents, createEvent, newEventBody, monthGrid, listCalendars, mergeDays } from "./core/gcal.js";
 import { detectRecurring, upcomingRecurring, spendingPattern, monthStats, monthlySeries } from "./core/insights.js";
+import { TRIAGE, TRIAGE_KINDS, ACTIONABLE as MAIL_ACTIONABLE, triageList, pendingMail, keepForTriage, triageStateOf, markReviewed as mailMarkReviewed, fixKind as mailFixKind, pruneTriage } from "./core/mailtriage.js";
 import { fetchSnapshot, summarize as mailSummary, mailSuggestions, findSender, mailOrder, idsFrom, archive as mailArchive, unarchive as mailUnarchive, trash as mailTrash, untrash as mailUntrash, ensureLabel, addLabel, removeLabel, messageUrl } from "./core/gmail.js";
 import { SCOPE, runServices, planTaskSync, listOpenTasks, insertTask, completeTask, contactBirthdays, setContactBirthday, mergePeople, saveBackup, loadBackup } from "./core/google.js";
 import { detectLink, linkInfo, PROVIDER_NAME, safeHref } from "./core/links.js";
@@ -1876,9 +1877,9 @@ const subpages = {
       <div class="btns"><button class="btn ghost" data-act="gcal-sync">${gcal.busy ? "Actualizando…" : "Actualizar"}</button></div><p class="muted small">${when ? `Leído a las ${when} · últimos 30 días` : "Aún sin leer: toca «Actualizar»."}</p>
       ${gmailErrorCard()}
       ${mailCards()}
-      ${m ? `${sectionTitle("Importantes sin leer")}<section class="card">${m.important.length ? m.important.map((x) => `<a class="row" href="${esc(messageUrl(x.id))}" target="_blank" rel="noopener"><div class="grow"><div>${esc(x.name)}</div><div class="muted small">${esc(x.subject || "(sin asunto)")}</div></div><span class="chev">${I.chev}</span></a>`).join("") : '<p class="muted">Nada importante sin leer en los últimos 3 días. 🌿</p>'}</section>
-      ${sectionTitle("Quién te escribe más")}<section class="card">${m.senders.length ? m.senders.slice(0, 15).map((x) => `<div class="stack mail-sender"><div class="row"><div class="grow"><div>${esc(x.name)}</div><div class="muted small">${esc(x.email)} · ${x.count} en 30 días${x.unread ? ` · ${x.unread} sin leer` : ""}</div></div></div><div class="btns">${x.unsub ? `<button class="btn small-btn" data-act="mail-do" data-kind="unsub" data-email="${esc(x.email)}">Baja</button>` : ""}<button class="btn ghost small-btn" data-act="mail-do" data-kind="archive" data-email="${esc(x.email)}">Archivar</button><button class="btn ghost small-btn" data-act="mail-do" data-kind="label" data-email="${esc(x.email)}">Etiquetar</button><button class="btn ghost small-btn" data-act="mail-do" data-kind="trash" data-email="${esc(x.email)}">Papelera</button></div></div>`).join("") : '<p class="muted">Sin newsletters ni avisos masivos.</p>'}</section>
-      <p class="muted small">En el móvil solo se guarda este resumen (remitentes, asuntos y recuentos), nunca el texto de los correos. Archivar, etiquetar y papelera se pueden deshacer desde el chat.</p>` : ""}`;
+      ${m ? `${mailTriageSection()}
+      <details class="card"><summary>Quién te escribe más (para darte de baja o archivar, siempre a mano)</summary>${m.senders.length ? m.senders.slice(0, 15).map((x) => `<div class="stack mail-sender"><div class="row"><div class="grow"><div>${esc(x.name)}</div><div class="muted small">${esc(x.email)} · ${x.count} en 30 días${x.unread ? ` · ${x.unread} sin leer` : ""}</div></div></div><div class="btns">${x.unsub ? `<button class="btn small-btn" data-act="mail-do" data-kind="unsub" data-email="${esc(x.email)}">Baja</button>` : ""}<button class="btn ghost small-btn" data-act="mail-do" data-kind="archive" data-email="${esc(x.email)}">Archivar</button><button class="btn ghost small-btn" data-act="mail-do" data-kind="label" data-email="${esc(x.email)}">Etiquetar</button><button class="btn ghost small-btn" data-act="mail-do" data-kind="trash" data-email="${esc(x.email)}">Papelera</button></div></div>`).join("") : '<p class="muted">Sin newsletters ni avisos masivos.</p>'}</details>
+      <p class="muted small">En este dispositivo solo se guarda este resumen (remitentes, asuntos y recuentos), nunca el texto de los correos, y no sube a Tu nube. Sí viajan tus correcciones y lo que marcas como revisado. Archivar, etiquetar y papelera se pueden deshacer desde el chat.</p>` : ""}`;
   },
   habitos() {
     const t = localDay();
@@ -3258,6 +3259,54 @@ function gmailErrorCard() {
 }
 const mailSeen = () => vault.settings.mailSeen ?? [];
 function markMailSeen(key) { if (key) vault.settings.mailSeen = [...new Set([...mailSeen(), key])].slice(-300); }
+function mailSubmit(form) {
+  const x = mailItems().find((i) => i.id === form.dataset.id); if (!x) return;
+  const at = new Date().toISOString(), url = messageUrl(x.id);
+  let st = triageStateOf(vault), msg = "";
+  if (form.id === "mailTaskForm") {
+    const text = $("mailTaskText").value.trim().slice(0, 140); if (!text) return;
+    vault.inbox.push({ ...capture({ id: uid("c"), text, at }), status: "TASK", link: url, from: "mail" });
+    st = mailMarkReviewed(st, x.id); msg = "Tarea creada";
+  } else if (form.id === "mailProjForm") {
+    const p = (vault.projects ?? []).find((q) => q.id === $("mailProj").value); if (!p) return;
+    try { Object.assign(p, addSource(p, { id: uid("src"), kind: "link", title: `✉️ ${x.subject || "Correo"} · ${x.name}`.slice(0, 140), url, at })); } catch (err) { toast(err.message); return; }
+    msg = `Guardado en «${p.name}»`;
+  } else if (form.id === "mailDateForm") {
+    const when = new Date($("mailDate").value); if (Number.isNaN(when.getTime())) return;
+    vault.reminders.push({ id: uid("r"), text: `Correo de ${x.name}: ${x.subject}`.slice(0, 140), at: when.toISOString(), done: false, notified: false, link: url });
+    msg = "Recordatorio creado";
+  } else if (form.id === "mailFixForm") {
+    st = mailFixKind(st, x, $("mailFixKind").value, { sender: Boolean($("mailFixSender")?.checked) }); msg = "Corregido: lo recordaré";
+  }
+  vault.mailTriage = st; mailUi = { ...mailUi, open: null, mode: null }; persist(); render(); toast(msg);
+}
+// ---------- Triaje del correo (local, sin IA, sin acciones automáticas) ----------
+let mailUi = { open: null, mode: null, showAll: false };
+function mailItems() {
+  if (!vault.mail?.triage) return [];
+  return triageList(vault.mail.triage, { now: Date.now(), projects: vault.projects ?? [], state: triageStateOf(vault) });
+}
+const mailWhen = (at) => { const d = new Date(at); return dayKey(d) === localDay() ? hhmm(d) : d.toLocaleDateString("es-ES", { weekday: "short", day: "numeric" }); };
+function mailRow(x) {
+  const t = TRIAGE[x.kind], open = mailUi.open === x.id;
+  const tools = !open ? "" : mailUi.mode === "task" ? `<form class="mail-tool" id="mailTaskForm" data-id="${esc(x.id)}"><label for="mailTaskText" class="small muted">Tarea (se crea al confirmar)</label><input id="mailTaskText" maxlength="140" value="${esc(`${x.kind === "REPLY" ? "Responder a" : "Revisar correo de"} ${x.name}: ${x.subject}`.slice(0, 140))}"><div class="btns"><button class="btn" type="submit">Crear tarea</button><button class="btn ghost" type="button" data-act="mail-mode" data-m="">Cancelar</button></div></form>`
+    : mailUi.mode === "project" ? ((vault.projects ?? []).length ? `<form class="mail-tool" id="mailProjForm" data-id="${esc(x.id)}"><label for="mailProj" class="small muted">Guardar el enlace al correo en</label><select id="mailProj">${vault.projects.map((p) => `<option value="${esc(p.id)}"${x.project === p.id ? " selected" : ""}>${esc(p.emoji ?? "📁")} ${esc(p.name)}</option>`).join("")}</select><p class="muted small">Se guarda el asunto y el enlace a Gmail, no el texto del correo.</p><div class="btns"><button class="btn" type="submit">Guardar</button><button class="btn ghost" type="button" data-act="mail-mode" data-m="">Cancelar</button></div></form>` : `<p class="muted small">Aún no tienes proyectos. Créalo en Proyectos.</p>`)
+    : mailUi.mode === "date" ? `<form class="mail-tool" id="mailDateForm" data-id="${esc(x.id)}"><label for="mailDate" class="small muted">Recordármelo el</label><input id="mailDate" type="datetime-local" required><div class="btns"><button class="btn" type="submit">Crear recordatorio</button><button class="btn ghost" type="button" data-act="mail-mode" data-m="">Cancelar</button></div></form>`
+    : mailUi.mode === "fix" ? `<form class="mail-tool" id="mailFixForm" data-id="${esc(x.id)}"><label for="mailFixKind" class="small muted">En realidad es</label><select id="mailFixKind">${TRIAGE_KINDS.map((k) => `<option value="${k}"${k === x.kind ? " selected" : ""}>${TRIAGE[k].icon} ${esc(TRIAGE[k].label)}</option>`).join("")}</select>${x.email ? `<label class="row small"><input type="checkbox" id="mailFixSender"> Todo lo que llegue de ${esc(x.name)}</label>` : ""}<div class="btns"><button class="btn" type="submit">Guardar</button><button class="btn ghost" type="button" data-act="mail-mode" data-m="">Cancelar</button></div></form>`
+    : `<p class="small mail-why"><b>${x.sure ? "Por qué" : "Por qué lo creo"}:</b> ${esc(x.why.join(" · "))}${x.sure ? "" : ". Es una suposición de MANU por el remitente y el asunto: no he leído el correo."}${x.replied ? " Ya escribiste en este hilo." : ""}</p>
+      <div class="btns mail-acts"><a class="btn small-btn" href="${esc(messageUrl(x.id))}" target="_blank" rel="noopener">Abrir en Gmail</a><button class="btn ghost small-btn" data-act="mail-reviewed" data-id="${esc(x.id)}">${x.reviewed ? "No revisado" : "Revisado"}</button><button class="btn ghost small-btn" data-act="mail-mode" data-m="task">Tarea</button><button class="btn ghost small-btn" data-act="mail-mode" data-m="project">A un proyecto</button><button class="btn ghost small-btn" data-act="mail-mode" data-m="date">Con fecha</button><button class="btn ghost small-btn" data-act="mail-mode" data-m="fix">Corregir</button></div>`;
+  return `<div class="mail-item${x.reviewed ? " is-reviewed" : ""}${open ? " is-open" : ""}"><button class="row mail-head" data-act="mail-open" data-id="${esc(x.id)}" aria-expanded="${open}"><span class="mail-kind" aria-hidden="true">${t.icon}</span><div class="grow"><div class="mail-top"><b>${esc(x.name)}</b><span class="muted small">${esc(mailWhen(x.at))}</span></div><div class="small mail-subj">${esc(x.subject || "(sin asunto)")}</div><div class="muted small">${esc(t.short)}${x.reviewed ? " · revisado" : ""}${x.unread ? " · sin leer" : ""}</div></div></button>${tools}</div>`;
+}
+function mailTriageSection() {
+  const items = mailItems();
+  if (!vault.mail?.triage) return `<section class="card"><p class="muted">Toca «Actualizar» para que MANU clasifique tu correo de los últimos 7 días.</p></section>`;
+  const pend = pendingMail(items), done = items.filter((x) => MAIL_ACTIONABLE.has(x.kind) && x.reviewed), info = items.filter((x) => x.kind === "INFO"), bulk = items.filter((x) => x.kind === "BULK");
+  return `${sectionTitle("Para ti")}<section class="card mail-list">${pend.length ? pend.map(mailRow).join("") : '<p class="muted">Nada que parezca pedirte algo en los últimos 7 días. 🌿</p>'}</section>
+    ${done.length ? `<details class="card"><summary>${done.length} revisado${done.length === 1 ? "" : "s"}</summary><div class="mail-list">${done.map(mailRow).join("")}</div></details>` : ""}
+    ${info.length ? `<details class="card"><summary>${info.length} informativo${info.length === 1 ? "" : "s"}</summary><div class="mail-list">${info.map(mailRow).join("")}</div></details>` : ""}
+    ${bulk.length ? `<details class="card"><summary>${bulk.length} de publicidad o repetitivos</summary><div class="mail-list">${bulk.map(mailRow).join("")}</div></details>` : ""}
+    <p class="muted small">Clasifico solo por el remitente, el asunto y si ya contestaste en el hilo; no leo el texto de los correos ni lo mando a ninguna IA. Que algo esté sin leer no lo hace importante. Nunca archivo, borro, respondo ni doy de baja nada sin que tú lo pidas.</p>`;
+}
 const senderName = (email) => vault.mail?.senders?.find((s) => s.email === email)?.name ?? email;
 
 // What MANU raises by itself: ChatGPT's export arrived, a sender that writes too much.
@@ -3749,6 +3798,9 @@ document.addEventListener("click", async (e) => {
     case "mail-reconnect": delete gcal.tokens[SCOPE.gmail]; gcal.consentError = null; vault.settings.google = { ...(vault.settings.google ?? {}), gmail: true }; persist(); syncGoogle(); break;
     case "mail-connect": vault.settings.google = { ...(vault.settings.google ?? {}), gmail: true }; persist(); syncGoogle(); break;
     case "mail-seen": markMailSeen(a.dataset.k); persist(); render(); break;
+    case "mail-open": mailUi = { ...mailUi, open: mailUi.open === a.dataset.id ? null : a.dataset.id, mode: null }; render(); break;
+    case "mail-mode": mailUi.mode = a.dataset.m || null; render(); break;
+    case "mail-reviewed": { const st = triageStateOf(vault), on = !st.reviewed[a.dataset.id]; vault.mailTriage = mailMarkReviewed(st, a.dataset.id, new Date(), on); mailUi.open = null; persist(); render(); toast(on ? "Marcado como revisado (solo en MANU; Gmail no cambia)" : "Vuelve a estar pendiente"); break; }
     case "mail-do": {
       const email = a.dataset.email, kind = a.dataset.kind;
       // WEB-69: a card can move under the finger (another one disappears
@@ -3974,6 +4026,7 @@ document.addEventListener("submit", async (e) => {
   const f = e.target.id;
   if (MEM_FORMS.has(f)) { memSubmit(e.target); return; }
   if (f === "mvForm") { lgSave(); return; }
+  if (["mailTaskForm", "mailProjForm", "mailDateForm", "mailFixForm"].includes(f)) { mailSubmit(e.target); return; }
   if (f === "lgDebtForm") { lgDebtSubmit(); return; }
   if (f === "hzPiezaForm") { hzProyecto((p) => addPieza(p, $("hzPieza").value, uid("pz")), null, true); return; }
   if (f === "nubeMail") { nubeMail($("nubeEmail").value.trim()); return; }
@@ -4473,9 +4526,12 @@ async function syncGoogle({ silent = false, quiet = false } = {}) {
       return `${fromGoogle.total} leídos · ${fromGoogle.people.length} con cumpleaños · ${merged.added} nuevos${fromGoogle.complete ? "" : " (lista incompleta)"}`;
     } },
     { key: "gmail", scope: SCOPE.gmail, run: async (token) => {
-      const s = mailSummary(await fetchSnapshot(token), Date.now());
-      vault.mail = { ...s, syncedAt: new Date().toISOString() };
-      return `${s.total} correos (30 días) · ${s.senders.length} remitentes masivos · ${s.important.length} importantes`;
+      const msgs = await fetchSnapshot(token);
+      const s = mailSummary(msgs, Date.now());
+      vault.mail = { ...s, triage: keepForTriage(msgs, Date.now()), syncedAt: new Date().toISOString() };
+      vault.mailTriage = pruneTriage(triageStateOf(vault), vault.mail.triage);
+      const pend = pendingMail(mailItems()).length;
+      return `${s.total} correos (30 días) · ${pend} para ti · ${s.senders.length} remitentes masivos`;
     } },
   ];
   const enabled = Object.fromEntries(["calendar", "tasks", "contacts", "gmail"].map((k) => [k, googleOn(k)]));
