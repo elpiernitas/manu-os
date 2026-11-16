@@ -37,6 +37,7 @@ import { autoFile, projectKeys, parseKeywords, buildSuggestPayload, parseSuggest
 import { newCapture, toReview, pendingCaptures, groupCaptures, buildCapturesPayload, parseCapturesReply, applyReading, keepCapture, dropCapture, trimCaptures, BATCH } from "./core/captures.js";
 import { budgetStatus, budgetLine, budgetCommand } from "./core/budget.js";
 import { findInVault, findCommand } from "./core/find.js";
+import { controlItems, freshness, LEVELS as CONTROL_LEVELS } from "./core/control.js";
 import { propose as saveProposal, searchSaved, SAVE_LIMITS } from "./core/saveitem.js";
 import { weatherEmoji, sceneFor, PARTICLES, SHAPES, MONEY_EMOJI, dayPhase, cityMinutes } from "./core/scene.js";
 import { buildImagePayload, buildLinkPayload, isGeminiKey, mayGo, setSensitiveOk, sensitiveAllowed, pickModel, backupModel, listModels, buildActionPayload, askWithActions, issueUrl, aiErrorText } from "./core/ai.js";
@@ -1483,7 +1484,7 @@ function calendarCard(canCreate) {
       ${d0(selected) ? "" : `<button class="link small" data-act="cal-today">Hoy</button>`}
     </section>
     ${sectionTitle(esc(cap(selDate.toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" }))), canCreate ? addLink("EVENT", "Nuevo evento") : "")}
-    <section class="card">${events.length || tasksDue.length ? events.map((ev) => `<div class="row event"><span class="ev-bar" data-c="${esc(ev.color ?? "")}"></span><div class="grow"><div>${esc(ev.title)}</div><div class="muted small">${esc(ev.time ? ev.time + (ev.end ? " – " + ev.end : "") : "Todo el día")}${ev.location ? ` · ${esc(ev.location)}` : ""}${ev.calendar ? ` · ${esc(ev.calendar)}` : ""}</div></div></div>`).join("") + tasksDue.map(reminderRow).join("")
+    <section class="card">${events.length || tasksDue.length ? events.map((ev) => `<div class="row event"><span class="ev-bar" data-c="${esc(ev.color ?? "")}"></span><div class="grow"><div>${esc(ev.title)}</div><div class="muted small">${esc(ev.time ? ev.time + (ev.end ? " – " + ev.end : "") : "Todo el día")}${ev.location ? ` · ${esc(ev.location)}` : ""}${(ev.calendars ?? [ev.calendar]).filter(Boolean).length ? ` · ${esc((ev.calendars ?? [ev.calendar]).filter(Boolean).join(" y "))}` : ""}</div></div></div>`).join("") + tasksDue.map(reminderRow).join("")
       : `<p class="muted">${vault.calendar ? "Nada este día." : "Conecta Google para ver tu calendario completo."}</p>`}</section>`;
 }
 const d0 = (day) => day === localDay() && (!calView || (calView.y === today().getFullYear() && calView.m === today().getMonth()));
@@ -1549,6 +1550,7 @@ const screens = {
       })}
       <div class="ft-work stack">
       ${morningLaunch ? `<section class="card morning-hello"><h2>☀️ ${esc(greeting())}, Manu</h2><p class="muted small">Toca y te leo el día en voz alta.</p><div class="btns"><button class="btn" data-act="speak-day">🔊 Léemelo</button><button class="link small" data-act="morning-dismiss">Ahora no</button></div></section>` : ""}
+      ${controlCard()}
       ${gentleCard()}
       ${vault.brain || vault.spending.length ? (hz() ? hzBotella : hoyMemCard)(topProposal(brain(), { spending: vault.spending, projects: vault.projects, now: new Date() })) : ""}
       <button class="cmdk-pill glass" data-act="cmdk" aria-label="Comando rápido">⚡ <span>Haz algo rápido…</span></button>
@@ -1566,19 +1568,14 @@ const screens = {
       ${closingCard()}
       ${weekReviewCard()}
       ${nightReviewCard()}
-      ${docsSoonCard()}
-      ${briefingCard()}
       ${nightCard()}
       ${backupNudge()}
       ${mailCards()}
-      ${(() => { if (!googleOn("gmail") || !vault.mail?.triage) return ""; const pend = pendingMail(mailItems()); return pend.length ? `<section class="card"><h2>${I.mail} Correo que parece pedirte algo</h2>${pend.slice(0, 3).map((x) => `<button class="row" data-sub-go="correo"><span aria-hidden="true">${TRIAGE[x.kind].icon}</span><div class="grow"><div>${esc(x.name)}</div><div class="muted small">${esc(TRIAGE[x.kind].short)} · ${esc(x.subject || "(sin asunto)")}</div></div><span class="chev">${I.chev}</span></button>`).join("")}<button class="link small" data-sub-go="correo">${pend.length > 3 ? `Ver los ${pend.length}` : "Ir al correo"}</button></section>` : ""; })()}
-      ${rems.length ? `<section class="card"><h2>${I.bell} Recordatorios de hoy</h2>${rems.map(reminderRow).join("")}</section>` : ""}
       ${inbox.length ? `<section class="card"><h2>Bandeja · ${inbox.length}</h2>${inbox.map((c) => `<div class="stack"><div>${esc(c.text)}</div><div class="btns">
           <button class="btn" data-act="task" data-id="${esc(c.id)}">Tarea</button><button class="btn ghost" data-act="idea" data-id="${esc(c.id)}">Idea</button><button class="btn ghost" data-act="forget" data-id="${esc(c.id)}">No recuerdo</button></div></div>`).join("")}</section>` : ""}
       ${hubCard(m.mode)}
       <section class="card"><div class="row"><h2>Tareas</h2>${addLink("TASK")}</div>${open.length ? open.slice(0, 5).map(taskRow).join("") + (open.length > 5 ? `<p class="muted small">Y ${open.length - 5} más en Agenda.</p>` : "") : '<p class="muted">Nada pendiente. Toca «Añadir» o díselo a MANU.</p>'}</section>
       ${bdays.length ? `<section class="card"><h2>${I.people} Cumpleaños</h2>${bdays.map((b) => { const wa = b.days === 0 ? whatsappUrl(b.person.phone, `¡Feliz cumpleaños, ${b.person.name.split(" ")[0]}! 🎉`) : null; return `<div class="row"><span class="grow">${esc(b.person.name)}</span>${wa ? `<a class="btn" href="${esc(safeHref(wa))}" target="_blank" rel="noopener">Felicitar por WhatsApp</a>` : `<span class="muted">${b.days === 0 ? "¡Hoy!" : b.days === 1 ? "Mañana" : (b.days === 1 ? "Mañana" : `En ${b.days} días`)}</span>`}</div>`; }).join("")}</section>` : ""}
-      <section class="card"><div class="row"><h2>Este mes</h2><button class="link small" data-tab="dinero">Ver dinero</button></div><div class="big-money">${euros(month.total)}</div></section>
       </div></div>`;
   },
   agenda() {
@@ -3284,6 +3281,28 @@ function mailSubmit(form) {
   }
   vault.mailTriage = st; mailUi = { ...mailUi, open: null, mode: null }; persist(); render(); toast(msg);
 }
+// ---------- Hoy: centro de control (misión «asistente real») ----------
+function controlCard() {
+  const [s, e] = monthRange();
+  const items = controlItems({
+    now: new Date(), events: agendaToday()?.events ?? [], tomorrow: vault.agendaTomorrow?.day === tomorrowKey() ? vault.agendaTomorrow.events : [],
+    reminders: vault.reminders, mail: googleOn("gmail") ? pendingMail(mailItems()) : [], docs: expiringSoon(vault.docs, today(), 30),
+    money: (vault.spending.length || (vault.income ?? []).length) ? lgSummary(vault, { from: s, to: e }) : null, euros, mailLabel: (k) => TRIAGE[k]?.short ?? k,
+  });
+  const fresh = freshness([
+    { name: "Agenda", on: googleOn("calendar"), at: vault.calendar?.syncedAt ?? null },
+    { name: "Correo", on: googleOn("gmail"), at: vault.mail?.syncedAt ?? null },
+    { name: "Tiempo", on: true, at: vault.weather?.at ?? null, maxAgeH: 3 },
+  ]);
+  const goAttr = (g) => (g.sub ? `data-sub-go="${esc(g.sub)}"` : `data-tab="${esc(g.tab)}"`);
+  const row = (x) => `<button class="row ctl-row ctl-${x.level.toLowerCase()}" ${goAttr(x.go)}><span class="ctl-icon" aria-hidden="true">${x.icon}</span><div class="grow"><div class="ctl-title">${esc(x.title)}</div><div class="muted small">${esc(x.detail)}${x.detail ? " · " : ""}${esc(x.source)}</div><div class="muted small ctl-why">${esc(x.why)}</div></div><span class="chev">${I.chev}</span></button>`;
+  const group = (lv) => { const xs = items.filter((x) => x.level === lv); return xs.length ? `<div class="ctl-group"><h3 class="ctl-h ctl-h-${lv.toLowerCase()}">${CONTROL_LEVELS[lv]} <span class="muted small">· ${xs.length}</span></h3>${xs.map(row).join("")}</div>` : ""; };
+  const info = items.filter((x) => x.level === "INFO");
+  return `<section class="card ctl" aria-labelledby="ctlT"><div class="row"><h2 id="ctlT">Lo de hoy</h2><span class="btns ctl-tools">${"speechSynthesis" in globalThis ? '<button class="link small" data-act="speak-day" aria-label="Leer el día en voz alta">🔊</button>' : ""}<button class="link small" data-sub-go="biblioteca">＋ Guardar en MANU</button></span></div>
+    ${items.some((x) => x.level !== "INFO") ? `${group("URGENT")}${group("IMPORTANT")}` : '<p class="muted">Nada urgente ni pendiente para hoy con lo que sé. 🌿</p>'}
+    ${info.length ? `<details class="ctl-group"><summary class="ctl-h">${CONTROL_LEVELS.INFO} <span class="muted small">· ${info.length}</span></summary>${info.map(row).join("")}</details>` : ""}
+    <p class="muted small ctl-fresh">${fresh.map((f) => `${esc(f.name)} ${esc(f.text)}${f.stale ? " (antiguo)" : ""}`).join(" · ")}${fresh.length ? ". " : ""}Se actualiza al abrir MANU; con la app cerrada no se actualiza nada.</p></section>`;
+}
 // ---------- Triaje del correo (local, sin IA, sin acciones automáticas) ----------
 let mailUi = { open: null, mode: null, showAll: false };
 let libFilter = "todo", libQ = "", libOpen = null;
@@ -4522,7 +4541,7 @@ async function syncGoogle({ silent = false, quiet = false } = {}) {
       const calToken = await cachedToken(SCOPE.calendar);
       const listToken = await cachedToken(SCOPE.calendarList).catch(() => null);
       const calendars = listToken ? await listCalendars(listToken).catch(() => []) : [];
-      const sources = calendars.length ? calendars : [{ id: "primary", color: null, name: null }];
+      const sources = calendars.length ? [...calendars].sort((a, b) => Number(b.primary) - Number(a.primary)) : [{ id: "primary", color: null, name: null }];
       const days = mergeDays(await Promise.all(sources.map((c) => listEvents(calToken, start, end, fetch, { calendarId: c.id, color: c.color, calendar: c.name }).catch(() => new Map()))));
       vault.calendar = { from: localDay(start), to: localDay(end), days: Object.fromEntries(days), syncedAt: new Date().toISOString() };
       const t = localDay(); const tk = tomorrowKey();

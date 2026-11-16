@@ -34,6 +34,8 @@ export function groupByDay(json, meta = {}) {
     if (ev.status === "cancelled") continue;
     const base = {
       id: String(ev.id ?? `${ev.summary}-${ev.start?.dateTime ?? ev.start?.date}`),
+      // La identidad del evento entre calendarios (una invitación aparece en el tuyo y en el compartido).
+      uid: ev.iCalUID ? String(ev.iCalUID).slice(0, 200) : null,
       title: String(ev.summary ?? "(Sin título)").slice(0, 120),
       location: ev.location ? String(ev.location).slice(0, 120) : null,
       color: safeColor(meta.color),
@@ -65,9 +67,23 @@ export function groupByDay(json, meta = {}) {
   return byDay;
 }
 
+/**
+ * Une los días de varios calendarios. Un evento que está en dos calendarios sale una sola vez,
+ * pero solo si Google dice que es el mismo (mismo iCalUID, o mismo id) y empieza igual. Dos
+ * eventos que solo se parecen (mismo título y hora, de personas distintas) siguen siendo dos.
+ * El primero manda en el color (pon el calendario principal delante); se recuerdan todos.
+ */
 export function mergeDays(maps) {
   const out = new Map();
-  for (const m of maps) for (const [day, list] of m) out.set(day, [...(out.get(day) ?? []), ...list]);
+  for (const m of maps) for (const [day, list] of m) {
+    const cur = out.get(day) ?? [];
+    for (const ev of list) {
+      const same = cur.find((x) => ((ev.uid && x.uid === ev.uid) || x.id === ev.id) && x.time === ev.time && x.allDay === ev.allDay && x.first === ev.first);
+      if (same) { const cals = new Set([...(same.calendars ?? [same.calendar].filter(Boolean)), ev.calendar].filter(Boolean)); same.calendars = [...cals]; continue; }
+      cur.push({ ...ev });
+    }
+    out.set(day, cur);
+  }
   for (const list of out.values()) list.sort((a, b) => (Number(b.multi) - Number(a.multi)) || (Number(b.allDay) - Number(a.allDay)) || ((a.time ?? "") < (b.time ?? "") ? -1 : 1));
   return out;
 }

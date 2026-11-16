@@ -93,3 +93,18 @@ test("calendar list keeps visible calendars with safe colours; WhatsApp access o
   assert.deepEqual(cals.map((c) => [c.name, c.color]), [["Personal", "#4285f4"], ["Equipo", null]]);
   assert.equal(APPS.whatsapp.url, "whatsapp://");
 });
+
+test("agenda: el mismo evento en dos calendarios sale una vez; dos parecidos siguen siendo dos", () => {
+  const vac = (id, uid) => ({ id, iCalUID: uid, summary: "Vacaciones", start: { date: "2026-12-22" }, end: { date: "2026-12-27" } });
+  const mio = groupByDay({ items: [vac("a1", "uid-vac@google.test")] }, { calendar: "Personal", color: "#1a73e8" });
+  const compartido = groupByDay({ items: [vac("b7", "uid-vac@google.test")] }, { calendar: "Familia", color: "#e67c73" });
+  const otraPersona = groupByDay({ items: [vac("c3", "uid-otra@google.test")] }, { calendar: "Familia", color: "#e67c73" });
+  const m = mergeDays([mio, compartido]);
+  assert.equal(m.get("2026-12-22").length, 1, "una sola vez");
+  assert.equal(m.get("2026-12-22")[0].color, "#1a73e8", "con el color del primero (el principal)");
+  assert.deepEqual(m.get("2026-12-22")[0].calendars, ["Personal", "Familia"]);
+  assert.equal(m.get("2026-12-26").length, 1, "también los días siguientes");
+  assert.equal(mergeDays([mio, otraPersona]).get("2026-12-22").length, 2, "mismo título, distinto evento: no se juntan");
+  const t = (id, uid, time) => groupByDay({ items: [{ id, iCalUID: uid, summary: "Reunión", start: { dateTime: `2026-12-01T${time}:00+01:00` }, end: { dateTime: `2026-12-01T${time === "10:00" ? "11" : "13"}:00:00+01:00` } }] }, { calendar: "Trabajo" });
+  assert.equal(mergeDays([t("r1", "u-rec", "10:00"), t("r1", "u-rec", "12:00")]).get("2026-12-01").length, 2, "misma serie a otra hora: dos");
+});
