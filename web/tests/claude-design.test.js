@@ -41,8 +41,8 @@ test("PWA loads and precaches design skin without removing existing bank modules
   assert.match(sw, /"design\/claude-design\.css"/);
   assert.match(sw, /core\/enablebanking\.js/);
   assert.match(sw, /design\/horizonte\.css/);
-  assert.match(sw, /const VERSION = "manuos-v110"/);
-  assert.match(app, /APP_VERSION = "110"/);
+  assert.match(sw, /const VERSION = "manuos-v\d+"/); // el número exacto lo vigila sw-shell.test.js
+  assert.match(app, /APP_VERSION = "\d+"/);
   assert.match(app, /const skin = \(\) => skinOf\(vault\.settings\)/);
   assert.match(app, /bankAisImport/);
 });

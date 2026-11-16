@@ -1,5 +1,21 @@
 # HANDOFF
 
+## WEB-111 · Dinero 2.0: entender el dinero de verdad (Claude, 2026-11-16)
+
+Rama `claude/magical-goodall-rf5qoo`, PR #119. **Fusionado y publicado** con autorización expresa de Manu (misión «de prototipo a asistente personal real», 2026-11-16). Copia recuperable: la rama `respaldo/pre-dinero2-v108` (= main antes del cambio).
+
+**Hecho:** los movimientos del banco ya no se modifican. Las correcciones van en `vault.ledger` (anotaciones con historial, relaciones confirmadas, deudas a mano y marcas de borrado), que se fusiona en Tu nube. Hay 8 tipos de movimiento, la ficha del movimiento, relaciones sugeridas (nunca automáticas), dinero de otras personas (con € o %), gastos compartidos y deudas, corrección múltiple con revisión previa, y un resumen que separa banco, consumo, ingresos propios, dinero de otros, neutro y pendiente. Los consejos se suspenden si lo pendiente supera el 5 %. El reparto antiguo anota en vez de escribir en el movimiento, y se corrige el nombre en vertical. Versión 111.
+
+**Correcciones antes de fusionar (A–D de la misión):**
+- **Una sola fuente de verdad.** Usan el consumo personal las revisiones de la noche y de la semana (`reviewData` → `money().spend` y `moneyReliable`), la respuesta local de MANU a «¿cuánto he gastado?» (con su fiabilidad y su fuente), el contexto de Gemini y las mareas de Horizonte.
+- **Fallo latente corregido:** en la rama, `lifeSnapshot` leía `month.byCategory` de un objeto que no lo tenía y habría roto el contexto de dinero de la IA.
+- **Devoluciones sin relacionar:** rebajan las compras anteriores de su categoría (90 días), así que resumen, categorías, serie y patrones suman igual. Lo que no encuentra compra sale como «Devoluciones sin compra».
+- **Niveles de confianza** en `summary` y en el resumen: confirmada, interpretada, provisional y sin datos.
+
+**Pruebas:** `npm test` 437/437 (19 en `tests/ledger.test.js`, una nueva en `review.test.js`); `e2e/dinero2.e2e.mjs` 53/53 (incluye MANU). Sin regresión en bankimport, banco, nube, push, permisos, memoria, estilo, horizonte (103/103) y vivo (68/68).
+
+**NO_VERIFICADO:** Safari e iPhone reales; con los movimientos reales de Manu (no los he visto); reglas automáticas por comercio (no implementadas).
+
 ## WEB-110 · simplificar MANU OS: Bahía retirada y Agenda en la navegación (2026-11-16)
 
 Manu dice que Bahía fue un calentón y quiere eliminar de la app las funciones que no le resultan útiles. En una rama aislada, se retiró la UI de Bahía, sus interacciones y las importaciones del juego; **los datos de `vault.settings.game` no se borraron**. Hoy abre de forma predeterminada y las sesiones anteriores guardadas en Bahía se redirigen a Hoy. Agenda ocupa su pestaña. La PWA y tests se actualizan a v110. Se mantienen memoria, proyectos, Sabadell, Tu nube, IA, Google, Spotify y push intactos.

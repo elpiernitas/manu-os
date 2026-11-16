@@ -20,6 +20,7 @@
 // camino y el cifrado en reposo del proveedor. Supabase, como empresa, técnicamente podría leerlo.
 import { scrubStyle } from "./style.js";
 import { normalise } from "./text.js";
+import { mergeLedger } from "./ledger.js";
 
 export const brainInCloud = (vault) => vault?.settings?.cloudBrain !== false;
 
@@ -65,6 +66,9 @@ export function cloudPayload(vault) {
 /** What comes down, merged with what this device keeps for itself. */
 export function applyRemote(remote, local) {
   const out = { ...remote };
+  // WEB-111: las correcciones de Dinero de los dos dispositivos se unen (gana la más reciente de
+  // cada movimiento; lo deshecho no resucita). Ninguna se pierde por elegir una versión.
+  if (remote?.ledger || local?.ledger) out.ledger = mergeLedger(remote?.ledger, local?.ledger);
   // Conversations never travel: this device's stay.
   out.chat = Array.isArray(local?.chat) ? local.chat : [];
   if (Array.isArray(out.projects)) { const mine = new Map((local?.projects ?? []).map((p) => [p.id, p.chat])); out.projects = out.projects.map((p) => ({ ...p, chat: mine.get(p.id) ?? p.chat ?? [] })); }

@@ -1,6 +1,6 @@
 import { normalise } from "./core/text.js";
 import { parse, reply, quickDetect, amountCents } from "./core/assistant.js";
-import { CATEGORIES, CATEGORY_EMOJI, euros, newEntry, learnCategory, summary, toCents, rulesFromRows, applyRules } from "./core/money.js";
+import { CATEGORIES, CATEGORY_EMOJI, euros, newEntry, learnCategory, toCents, rulesFromRows, applyRules } from "./core/money.js";
 import { MODE_TITLES, modeState } from "./core/modes.js";
 import { capture, confirm, markUnclassified, pending, tasks, ideas, toggleDone } from "./core/inbox.js";
 import { initialRefuge, refugeReply } from "./core/refuge.js";
@@ -52,6 +52,8 @@ import { bankRequest, safeBankRedirect } from "./core/enablebanking.js";
 import { bankAisCard } from "./core/bank-ais-view.js";
 import { planImport, importRange, DAYS as BANK_IMPORT_DAYS } from "./core/bankimport.js";
 import { wherePlaces } from "./core/places.js";
+import { mergeLedger, ledgerOf, keyOf as lgKey, movements as lgMovements, resolve as lgResolve, summary as lgSummary, suggestions as lgSuggestions, balances as lgBalances, personalSpending, personalIncome, annotate as lgAnnotate, revert as lgRevert, restore as lgRestore, setLink as lgSetLink, unlink as lgUnlink, addDebt as lgAddDebt, dropDebt as lgDropDebt, bulkPlan as lgBulkPlan, equalParts as lgEqualParts, personKey as lgPersonKey, ME as LG_ME } from "./core/ledger.js";
+import { summaryCard as lgSummaryCard, suggestionsCard as lgSuggestionsCard, balancesCard as lgBalancesCard, moveRow as lgMoveRow, editorPage as lgEditorPage, bulkBar as lgBulkBar, bulkPreview as lgBulkPreview } from "./core/ledger-view.js";
 import { fableIcon, fableMark } from "./design/fable-icons.js";
 import { fableHoyIntro, fableHoyServices } from "./design/fable-today.js";
 import { nightReview, weekReview, nightDue, weekDue } from "./core/review.js";
@@ -72,7 +74,7 @@ import { SKINS, skinOf, cielo as hzCielo, variables as hzVars, tiempoDe, portada
 import { hzCara, hzPortada, hzBotella, hzMareas, hzConstelacion, hzAstillero, hzBarcoCarta, hzBotadura, hzBitacora, hzApariencia } from "./design/horizonte.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "110"; // = número de la última tarea WEB publicada (desde WEB-87)
+export const APP_VERSION = "111"; // = número de la última tarea WEB publicada (desde WEB-87)
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -126,6 +128,17 @@ let tab = ["hoy", "agenda", "manu", "dinero", "proyectos", "tu"].includes(restor
 let sub = null; // Tú subpage
 // WEB-94: Memoria. The brain lives in the vault; the screen state does not.
 let memUi = { filter: "vigentes", query: "", open: null, correcting: null, choosing: null };
+// ---------- Dinero 2.0 (WEB-111) ----------
+// Los movimientos del banco no se tocan: lo que Manu dice de ellos vive en vault.ledger.
+// `money()` calcula una vez por repintado las vistas que usan todas las estadísticas.
+const lgUi = { key: null, draft: null, filter: null, selecting: false, picked: new Set(), plan: null, debtForm: false };
+let moneyCache = null;
+function money() {
+  if (moneyCache) return moneyCache;
+  const { rows } = lgResolve(vault);
+  return (moneyCache = { rows, byKey: new Map(rows.map((r) => [r.key, r])), spend: personalSpending(vault), income: personalIncome(vault) });
+}
+const splitPool = () => { const n = ledgerOf(vault).notes; return vault.spending.filter((e) => !n[lgKey("g", e.id)]); };
 const brain = () => { if (!vault.brain) { const v = validateBrain(undefined); vault.brain = v.brain; } return vault.brain; };
 let morningLaunch = false; // WEB-72: opened by the morning Shortcut
 let refuge = null; // Refugio lives only in memory
@@ -187,6 +200,7 @@ const hhmm = (d) => `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinu
 
 let restoring = false; // WEB-44: while a full copy is restored, nothing in memory may overwrite it
 function persist() {
+  moneyCache = null;
   if (restoring) return;
   fileNewItems();
   // WEB-94: accepted rules propose a category for new «Otros» spending (inferred, correctable).
@@ -550,6 +564,8 @@ async function nubeResolve(which) {
     // WEB-99: what the other device forgot stays forgotten, even when keeping this device's data.
     const row = await remoteGet(nubeCfg(), await nubeSession());
     if (row?.data?.brain && vault.brain) { vault.brain = applyTombstones(vault.brain, row.data.brain); store.save(vault); }
+    // WEB-111: las correcciones de Dinero del otro dispositivo se conservan también.
+    if (row?.data?.ledger) { vault.ledger = mergeLedger(vault.ledger, row.data.ledger); store.save(vault); }
     await nubePush(row?.rev ?? null);
     toast("Hecho: la nube tiene ahora lo de este dispositivo (sin lo que olvidaste en el otro)");
   } catch (err) { toast(syncErrorText(err)); }
@@ -751,7 +767,7 @@ function findCard() {
 }
 
 // ---------- Presupuestos (WEB-47) ----------
-const budgetsNow = () => budgetStatus(vault.spending, vault.settings.budgets ?? {}, today());
+const budgetsNow = () => budgetStatus(money().spend, vault.settings.budgets ?? {}, today());
 function budgetCard() {
   const list = budgetsNow();
   const used = new Set(list.map((b) => b.cat));
@@ -770,8 +786,9 @@ function dayBriefing() {
     now: today(), weather: f, advice: f ? advice(f) : null,
     today: eventsFor(localDay()), tomorrow: eventsFor(tomorrowKey()),
     reminders: vault.reminders, tasks: tasks(vault.inbox), birthdays: upcomingBirthdays(vault.people, today(), 1),
-    spending: vault.spending, inbox: vault.inbox, importantMail: googleOn("gmail") ? vault.mail?.important?.length ?? 0 : 0,
-    budgetAlerts: budgetsNow().filter((b) => b.status !== "ok").slice(0, 2).map(budgetLine),
+    spending: money().spend, inbox: vault.inbox, importantMail: googleOn("gmail") ? vault.mail?.important?.length ?? 0 : 0,
+    // WEB-111: sin consejos de presupuesto mientras las cifras no sean fiables.
+    budgetAlerts: (() => { const [a, b] = monthRange(); return lgSummary(vault, { from: a, to: b }).fiable; })() ? budgetsNow().filter((b) => b.status !== "ok").slice(0, 2).map(budgetLine) : [],
     gentle: gentleNow().on,
   });
 }
@@ -1292,9 +1309,10 @@ const INCOME_KIND = { PAYROLL: "💼 Nómina", FAMILY: "👨‍👦 Familia", BI
 const pctText = (p) => (p === null ? "" : `${p > 0 ? "▲" : p < 0 ? "▼" : "="} ${Math.abs(p)} %`);
 function moneyStatsSection(ref, monthName) {
   const key = `${ref.getFullYear()}-${String(ref.getMonth() + 1).padStart(2, "0")}`;
-  const income = vault.income ?? [];
-  const st = monthStats(vault.spending, income, key, today());
-  const series = monthlySeries(vault.spending, income, 6, today());
+  const income = money().income;
+  const st = monthStats(money().spend, money().income, key, today());
+  const series = monthlySeries(money().spend, money().income, 6, today());
+  const fiable = lgSummary(vault, { from: new Date(ref.getFullYear(), ref.getMonth(), 1), to: new Date(ref.getFullYear(), ref.getMonth() + 1, 1) }).fiable;
   const top = Math.max(1, ...series.map((m) => Math.max(m.spent, m.earned)));
   const pick = series.find((m) => m.key === seriesPick) ?? null;
   const bal = vault.settings.balance;
@@ -1306,7 +1324,7 @@ function moneyStatsSection(ref, monthName) {
       <div class="stat-grid">
         ${tile("Ingresado", euros(st.earned), st.earnedDelta !== null ? `${pctText(st.earnedDelta)} vs mes anterior` : "", "inc")}
         ${tile("Gastado", euros(st.spent), st.spentDelta !== null ? `${pctText(st.spentDelta)} vs mes anterior` : "", "exp")}
-        ${tile(st.saved >= 0 ? "Ahorrado" : "Has gastado de más", euros(Math.abs(st.saved)), st.savingRate !== null ? `${st.savingRate} % de lo ingresado` : "")}
+        ${fiable ? tile(st.saved >= 0 ? "Ahorrado" : "Has gastado de más", euros(Math.abs(st.saved)), st.savingRate !== null ? `${st.savingRate} % de lo ingresado` : "") : tile("Ahorro", "—", "Provisional: revisa lo pendiente")}
         ${tile("Nómina", st.payroll.cents ? euros(st.payroll.cents) : "—", st.payroll.days.length ? `Día ${st.payroll.days.join(" y ")}` : noIncome ? "Importa el extracto" : "Aún no ha llegado")}
       </div>
       ${bal ? `<div class="row"><span class="muted small">Saldo en cuenta el ${new Date(bal.at).toLocaleDateString("es-ES", { day: "numeric", month: "short" })}</span><b class="num">${euros(bal.cents)}</b></div>` : ""}
@@ -1320,7 +1338,7 @@ function moneyStatsSection(ref, monthName) {
     </section>
     <section class="card"><h2>Ritmo de ${esc(month)}</h2>
       <div class="row"><span>Media diaria</span><b class="num">${euros(st.avgDaily)}</b></div>
-      ${st.projection !== null ? `<div class="row"><span>Si sigues así, a fin de mes</span><b class="num">${euros(st.projection)}</b></div>` : ""}
+      ${st.projection !== null && fiable ? `<div class="row"><span>Si sigues así, a fin de mes</span><b class="num">${euros(st.projection)}</b></div>` : ""}
       <div class="row"><span>Movimientos</span><b class="num">${st.count}</b></div>
       ${st.biggest ? `<div class="row"><span class="grow">Mayor gasto<br><span class="muted small">${esc(st.biggest.merchant ?? "Sin concepto")} · ${new Date(st.biggest.at).toLocaleDateString("es-ES", { day: "numeric", month: "short" })}</span></span><b class="num">${euros(st.biggest.cents)}</b></div>` : ""}
     </section>
@@ -1352,7 +1370,7 @@ function incomeListSection() {
 
 // WEB-106: «Dónde gastas»: shops and cities from the bank concepts (last 90 days).
 function placesCard() {
-  const p = wherePlaces(vault.spending, { now: new Date() });
+  const p = wherePlaces(money().spend, { now: new Date() });
   if (!p.shops.length) return "";
   const max = Math.max(1, ...p.shops.map((x) => x.cents));
   return `<section class="card" id="placesCard"><h2>Dónde gastas · 90 días</h2>
@@ -1362,7 +1380,7 @@ function placesCard() {
 }
 
 function repeatsCard() {
-  const common = commonSpends(vault.spending, today(), 90, CATEGORIES);
+  const common = commonSpends(money().spend, today(), 90, CATEGORIES);
   const inc = recurringIncome(vault.income, today());
   if (!common.length && !inc.length) return "";
   return `<section class="card"><h2>Lo que más se repite · 90 días</h2>
@@ -1372,10 +1390,12 @@ function repeatsCard() {
 
 // ---------- Money insights ----------
 function moneyInsights() {
-  if (!vault.spending.length) return "";
-  const rec = detectRecurring(vault.spending);
+  if (!money().spend.length) return "";
+  const rec = detectRecurring(money().spend);
   const soon = new Set(upcomingRecurring(rec).map((r) => r.key));
-  const p = spendingPattern(vault.spending);
+  const p = spendingPattern(money().spend);
+  const [ms0, ms1] = monthRange();
+  const fiable = lgSummary(vault, { from: ms0, to: ms1 }).fiable;
   const maxW = Math.max(1, ...p.byWeekday.map((x) => x.cents));
   const maxP = Math.max(1, ...p.byMonthPart.map((x) => x.cents));
   return `${rec.length ? `<section class="card"><h2>Cobros fijos</h2>${rec.map((r) => `<div class="row"><div class="grow"><div>${esc(r.merchant)}</div><div class="muted small">Día ${r.dayOfMonth} de cada mes · próximo ${new Date(r.nextExpected).toLocaleDateString("es-ES", { day: "numeric", month: "short" })}${soon.has(r.key) ? ' · <b class="review">esta semana</b>' : ""}</div></div><span class="num">${euros(r.cents)}</span></div>`).join("")}<div class="row"><strong>Al mes</strong><strong class="num">${euros(rec.reduce((a, r) => a + r.cents, 0))}</strong></div></section>` : ""}
@@ -1383,7 +1403,7 @@ function moneyInsights() {
       <div class="week-bars">${p.byWeekday.map((d) => `<div><i data-h="${Math.max(4, Math.round((d.cents / maxW) * 100))}"></i><span class="small muted">${d.label}</span></div>`).join("")}</div>
       ${p.byMonthPart.map((x) => `<div class="stack"><div class="row"><span>${x.label}</span><span class="num">${euros(x.cents)}</span></div><div class="bar"><i data-w="${Math.max(3, Math.round((x.cents / maxP) * 100))}"></i></div></div>`).join("")}
       ${p.byMoment ? `<p class="muted small">Por momento del día (solo gastos apuntados a mano): ${p.byMoment.map((x) => `${x.label.toLowerCase()} ${euros(x.cents)}`).join(" · ")}</p>` : `<p class="muted small">El banco no da la hora de cada pago; los que apuntes en MANU sí la guardan.</p>`}
-      ${p.topWeekday ? `<p class="small">Tu día de más gasto: <b>${esc(p.topWeekday)}</b>.</p>` : ""}</section>`;
+      ${p.topWeekday && fiable ? `<p class="small">Tu día de más gasto: <b>${esc(p.topWeekday)}</b>.</p>` : !fiable ? '<p class="muted small">Sin conclusiones mientras haya movimientos pendientes de atribuir.</p>' : ""}</section>`;
 }
 
 // ---------- Month calendar (Apple Calendar style) ----------
@@ -1511,7 +1531,7 @@ const screens = {
     const inbox = pending(vault.inbox);
     const open = tasks(vault.inbox);
     const [s, e] = monthRange();
-    const month = summary(vault.spending, s, e);
+    const month = lgSummary(vault, { from: s, to: e });
     const next = agendaToday() ? nextEvent(vault.agenda) : null;
     const rems = vault.reminders.filter((r) => !r.done && dayKey(new Date(r.at)) === localDay()).sort((a, b) => (a.at < b.at ? -1 : 1));
     const bdays = upcomingBirthdays(vault.people, today(), 7);
@@ -1539,7 +1559,7 @@ const screens = {
       ${!actualWeather ? weatherCard() : ""}
       <div class="ft-section-label ft-rest-label">Tu día <span>Lo importante, a tu ritmo</span></div>
       ${clockCard()}
-      ${toAsk(vault.spending, today()).length || splitDraft ? splitAskCard() : ""}
+      ${toAsk(splitPool(), today()).length || splitDraft ? splitAskCard() : ""}
       ${(() => { const due = fixedIncomeStatus(vault.settings.fixedIncome, vault.income, today()).filter((x) => x.due); return due.length ? `<section class="card"><h2>💶 ¿Ha llegado?</h2>${due.map(({ f }) => `<div class="row"><span class="grow">${esc(f.name)} · ${esc(euros(f.cents))}</span><button class="btn small-btn" data-act="fixed-got" data-id="${esc(f.id)}">Sí</button></div>`).join("")}</section>` : ""; })()}
       ${closingCard()}
       ${weekReviewCard()}
@@ -1608,7 +1628,10 @@ const screens = {
   dinero() {
     const ref = today(); ref.setDate(1); ref.setMonth(ref.getMonth() - moneyMonth);
     const [s, e] = monthRange(ref);
-    const month = summary(vault.spending, s, e);
+    const lsum = lgSummary(vault, { from: s, to: e });
+    const month = { total: lsum.consumo, byCategory: Object.fromEntries(lsum.byCategory) };
+    if (lgUi.plan) return lgBulkPreview(lgUi.plan);
+    if (lgUi.key && money().byKey.has(lgUi.key)) return lgEditor();
     const monthName = ref.toLocaleDateString("es-ES", { month: "long", year: "numeric" });
     const ri = vault.settings.lastRulesImport;
     const toReview = vault.spending.filter((x) => x.review).length;
@@ -1619,12 +1642,14 @@ const screens = {
     const imp = vault.settings.lastImport;
     return `<h1>Dinero</h1><p class="subtitle">${esc(cap(monthName))}</p>
       <div class="stack">
+      ${moneyMonth === 0 ? lgSummaryCard(lsum, { monthName: cap(monthName.replace(/ de \d{4}$/, "")) }) : lgSummaryCard(lsum, { monthName: cap(monthName) })}
+      ${lgSuggestionsCard(lgSuggestions(vault, { max: 5 }), money().byKey)}
       ${bankAisCard(bankAisUi, nubeOn())}
-      ${hz() && moneyMonth === 0 ? hzMareas(hzMareasData({ spending: vault.spending, income: vault.income }), { respuestas: vault.settings.hzNoches ?? {} }) : ""}
+      ${hz() && moneyMonth === 0 ? hzMareas(hzMareasData({ spending: money().spend, income: money().income }), { respuestas: vault.settings.hzNoches ?? {} }) : ""}
       <section class="card hero money-hero">${celebrateMoney ? moneyRain() : ""}<div class="row cal-head"><button class="link" data-act="money-prev" aria-label="Mes anterior">${I.back}</button><h2>${moneyMonth === 0 ? "Gastado este mes" : `Gastado en ${esc(monthName.replace(/ de \d{4}$/, ""))}`}</h2><button class="link" data-act="money-next" aria-label="Mes siguiente"${moneyMonth === 0 ? " disabled" : ""}>${I.chev}</button></div><div class="big-money" data-count-money="${month.total}">${euros(month.total)}</div>
-        <p class="muted small">Gastos registrados en MANU, no es el saldo de Sabadell.</p>
+        <p class="muted small">Tu consumo personal (sin dinero de otros, efectivo sin revisar ni lo pendiente). No es el saldo de Sabadell.</p>
         ${cats.map(([c, v]) => { const lim = moneyMonth === 0 ? vault.settings.budgets?.[c] : null; return `<div class="stack"><div class="row"><span>${esc(catLabel(c))}</span><span class="num">${euros(v)}${lim ? `<span class="muted small"> / ${euros(lim)}</span>` : ""}</span></div><div class="bar${lim && v > lim ? " over" : lim && v >= lim * 0.8 ? " warn" : ""}"><i data-w="${Math.max(3, Math.round((v / (lim ? Math.max(lim, v) : max)) * 100))}"></i></div></div>`; }).join("")}</section>
-      ${moneyMonth === 0 ? `${splitAskCard()}${addMoneyCard()}${fixedIncomeCard()}${debtsCard()}` : ""}
+      ${moneyMonth === 0 ? `${splitAskCard()}${addMoneyCard()}${fixedIncomeCard()}${lgBalancesCard(lgBalances(vault), { people: vault.people ?? [], form: lgUi.debtForm })}` : ""}
       ${moneyMonth === 0 ? budgetCard() : ""}
       ${moneyStatsSection(ref, monthName)}
       ${moneyMonth === 0 ? repeatsCard() : ""}
@@ -1638,10 +1663,9 @@ const screens = {
         ${imp ? `<p class="muted small">Última importación: ${imp.added} gastos nuevos, ${imp.duplicates} repetidos${imp.incomeAdded !== undefined ? `, ${imp.incomeAdded} ingresos nuevos${imp.incomeDuplicates ? ` (${imp.incomeDuplicates} ya estaban)` : ""}` : imp.income ? ` · ${imp.income} ingresos sin importar: vuelve a elegir el archivo para añadirlos` : ""}${imp.invalid ? `, ${imp.invalid} filas no reconocidas` : ""}.</p>` : ""}</section>
       ${moneyInsights()}
       ${placesCard()}
-      ${sectionTitle("Movimientos", `${toReview ? `<button class="link small" data-act="money-filter">${moneyFilter === "review" ? "Ver todos" : `Por revisar (${toReview})`}</button>` : ""}${addLink("EXPENSE")}`)}
-      <section class="card">${entries.length ? entries.map((x) => `<div class="row"><span class="cat-emoji" aria-hidden="true">${CATEGORY_EMOJI[x.category] ?? "📦"}</span><div class="grow"><div>${esc(x.merchant ? cleanConcept(x.merchant) : "Sin concepto")}</div><div class="muted small">${new Date(x.at).toLocaleDateString("es-ES", { day: "numeric", month: "short" })}${x.sub ? ` · ${esc(x.sub)}` : ""}${x.source === "BANK" ? " · banco" : x.source === "SABADELL" ? " · Sabadell" : ""}${x.review ? ' · <b class="review">revisar</b>' : x.learned && x.inferred ? ` · deducción aprendida (${Math.round(x.learned.confidence * 100)} %)` : x.inferred ? " · categoría propuesta" : x.ruled ? " · según tus reglas" : ""}</div></div>
-          <div class="stack"><span class="num">${euros(x.cents)}</span>${catEditing === x.id ? `<label class="sr" for="cat-${esc(x.id)}">Categoría</label><select id="cat-${esc(x.id)}" data-cat="${esc(x.id)}">${Object.keys(CATEGORIES).map((k) => `<option value="${k}"${k === x.category ? " selected" : ""}>${esc(catLabel(k))}</option>`).join("")}</select><button class="link small danger-link" data-act="spend-del" data-id="${esc(x.id)}">Borrar</button>` : `<button class="cat-chip" data-act="cat-edit" data-id="${esc(x.id)}" aria-label="Cambiar categoría: ${esc(CATEGORIES[x.category] ?? "Otros")}">${esc(catLabel(x.category))}</button>`}</div></div>`).join("")
-        : '<p class="muted">Sin gastos. Escribe a MANU «gasté 12,50 en café» o importa el extracto del banco.</p>'}</section>
+      ${sectionTitle("Movimientos", `${lgUi.filter === "pending" ? '<button class="link small" data-act="lg-filter" data-f="">Ver todos</button>' : ""}<button class="link small" data-act="lg-select">${lgUi.selecting ? "Terminar" : "Corregir varios"}</button>${addLink("EXPENSE")}`)}
+      ${lgUi.selecting ? lgBulkBar(lgUi.picked.size) : ""}
+      ${lgMovesSection()}
       ${incomeListSection()}
       </div>`;
   },
@@ -1896,7 +1920,7 @@ const subpages = {
       ${soon.length ? `<section class="card"><h2>Cumpleaños próximos</h2>${soon.map((b) => `<div class="row"><span class="grow">${esc(b.person.name)}</span><span class="muted">${b.days === 0 ? "¡Hoy!" : (b.days === 1 ? "Mañana" : `En ${b.days} días`)}</span></div>`).join("")}</section>` : ""}
       ${quiet.length ? `<section class="card"><h2>Hace tiempo que no hablas con</h2>${quiet.map((p) => `<div class="row"><span class="grow">${esc(p.name)}</span><button class="link small" data-act="talked" data-id="${esc(p.id)}">Hablé hoy</button></div>`).join("")}</section>` : ""}
       ${sectionTitle("Todas")}
-      <div class="list">${vault.people.length ? vault.people.map((p) => { const d = daysUntilBirthday(p.birthday); return `<details><summary class="item"><span class="ico purple">${esc(p.name.slice(0, 1).toUpperCase())}</span><span class="grow"><span>${esc(p.name)}</span><br><span class="muted small">${d !== null ? `${d === 1 ? "Cumple mañana" : `Cumple en ${d} días`}` : "Sin cumpleaños"}${p.lastContact ? ` · última vez ${new Date(p.lastContact).toLocaleDateString("es-ES", { day: "numeric", month: "short" })}` : ""}${(() => { const d = debts(vault.spending).find((x) => x.key === p.id); return d ? ` · <b>te debe ${esc(eurosTxt(d.cents))}</b>` : ""; })()}</span></span></summary>
+      <div class="list">${vault.people.length ? vault.people.map((p) => { const d = daysUntilBirthday(p.birthday); return `<details><summary class="item"><span class="ico purple">${esc(p.name.slice(0, 1).toUpperCase())}</span><span class="grow"><span>${esc(p.name)}</span><br><span class="muted small">${d !== null ? `${d === 1 ? "Cumple mañana" : `Cumple en ${d} días`}` : "Sin cumpleaños"}${p.lastContact ? ` · última vez ${new Date(p.lastContact).toLocaleDateString("es-ES", { day: "numeric", month: "short" })}` : ""}${(() => { const b = lgBalances(vault).find((x) => x.who === `p:${p.id}`); return !b ? "" : b.cents < 0 ? ` · <b>te debe ${esc(eurosTxt(-b.cents))}</b>` : ` · <b>${b.items.some((i) => /suyo|su dinero|su compra/.test(i.what)) ? "tienes" : "le debes"} ${esc(eurosTxt(b.cents))}</b>`; })()}</span></span></summary>
         <div class="inner">${p.notes ? `<p>${esc(p.notes)}</p>` : '<p class="muted small">Sin notas.</p>'}<div class="btns">${p.birthday && !p.calendarEventId && googleOn("calendar") ? `<button class="btn ghost" data-act="person-cal" data-id="${esc(p.id)}">🎂 Al calendario</button>` : ""}${p.birthday && p.googleId && vault.contacts?.some((c) => c.googleId === p.googleId && !c.birthday) ? `<button class="btn ghost" data-act="person-gcontact" data-id="${esc(p.id)}">📇 A Google Contactos</button>` : ""}${whatsappUrl(p.phone, "") ? `<a class="btn ghost" href="${esc(whatsappUrl(p.phone, `¡Hola, ${p.name.split(" ")[0]}!`))}" target="_blank" rel="noopener">WhatsApp</a>` : ""}<button class="btn ghost" data-act="talked" data-id="${esc(p.id)}">Hablé hoy</button><button class="btn danger" data-act="del" data-list="people" data-id="${esc(p.id)}">Quitar</button></div></div></details>`; }).join("") : '<p class="muted item">Aún no hay nadie.</p>'}</div>
       <form class="card" id="addPerson"><h2>Añadir persona</h2>
         <label for="pName" class="muted small">Nombre${vault.contacts?.length ? ` (busca entre tus ${vault.contacts.length} contactos)` : ""}</label><input id="pName" maxlength="60" required autocomplete="off" placeholder="${vault.contacts?.length ? "Escribe «eva» y elige" : ""}">
@@ -2305,6 +2329,7 @@ function closeSheet() {
 
 function render({ focus = false, enter = null } = {}) {
   setSensitiveOk(vault?.settings?.aiSensitive === true);
+  moneyCache = null;
   applySkin();
   celebrateMoney = Boolean(enter) && tab === "dinero" && !overlay && !reduceMotion();
   const w = currentWeather();
@@ -2384,6 +2409,8 @@ function go(newTab) {
   tab = TABS.some(([id]) => id === newTab) ? newTab : "hoy";
   sub = null;
   overlay = null;
+  // WEB-111: tocar una pestaña vuelve a su portada (no a una ficha de movimiento que quedó abierta).
+  lgUi.key = null; lgUi.draft = null; lgUi.plan = null;
   sessionStorage.setItem("manuos.tab", tab);
   render({ focus: true, enter: "tab" });
   if (tab !== "manu") scrollTo(0, 0); // the chat opens at its end (WEB-40)
@@ -2643,17 +2670,20 @@ async function activateGemini(key) {
 function localAnswer(intent) {
   if (intent.kind === "spendQuery") { // WEB-50
     const [s, e] = monthRange();
-    const m = summary(vault.spending, s, e);
-    const pace = monthPace(vault.spending, today());
-    const vs = pace.diff === null ? "" : pace.diff === 0 ? " Igual que el mes pasado a estas alturas." : ` Un ${Math.abs(pace.diff)} % ${pace.diff < 0 ? "menos" : "más"} que el mes pasado a estas alturas.`;
+    // Una sola fuente de verdad: el consumo personal de Dinero 2.0, con su fiabilidad.
+    const m = lgSummary(vault, { from: s, to: e });
+    const pace = monthPace(money().spend, today());
+    const vs = !m.fiable || pace.diff === null ? "" : pace.diff === 0 ? " Igual que el mes pasado a estas alturas." : ` Un ${Math.abs(pace.diff)} % ${pace.diff < 0 ? "menos" : "más"} que el mes pasado a estas alturas.`;
+    const caveat = m.fiable ? (m.nivel === "INTERPRETADA" && m.consumoAuto ? ` (${euros(m.consumoAuto)} son compras que supongo tuyas sin que lo hayas confirmado)` : "") : ` Ojo: es provisional, hay ${euros(m.pending.cents)} sin atribuir (retiradas, Bizum o transferencias). Revísalos en Dinero y te doy la cifra buena.`;
+    const src = " Fuente: tus movimientos y lo que has corregido en Dinero.";
     if (intent.category) {
-      const v = m.byCategory[intent.category] ?? 0;
-      const b = budgetsNow().find((x) => x.cat === intent.category);
-      return `${catLabel(intent.category)}: ${euros(v)} este mes.${b ? ` ${budgetLine(b)}` : ""}`;
+      const v = m.byCategory.find(([c]) => c === intent.category)?.[1] ?? 0;
+      const b = m.fiable ? budgetsNow().find((x) => x.cat === intent.category) : null;
+      return `${catLabel(intent.category)}: ${euros(v)} de consumo personal este mes.${b ? ` ${budgetLine(b)}` : ""}${caveat}${src}`;
     }
-    if (!m.total) return "Este mes aún no has apuntado gastos.";
-    const top = Object.entries(m.byCategory).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([c, v]) => `${CATEGORIES[c] ?? c} ${euros(v)}`).join(", ");
-    return `Llevas ${euros(m.total)} este mes.${vs} Lo que más: ${top}.`;
+    if (!m.bank.count) return "Este mes aún no tengo movimientos tuyos. Importa el extracto o apunta un gasto en Dinero.";
+    const top = m.byCategory.slice(0, 3).map(([c, v]) => `${CATEGORIES[c] ?? c} ${euros(v)}`).join(", ");
+    return `Llevas ${euros(m.consumo)} de consumo personal este mes.${vs}${top ? ` Lo que más: ${top}.` : ""}${caveat}${src}`;
   }
   if (intent.kind === "agenda" && intent.day === "week") { // WEB-51: «¿qué tengo esta semana?»
     const lines = [];
@@ -2707,16 +2737,16 @@ function lifeSnapshot() {
   for (let d = 0; d < 2; d++) { const x = new Date(now); x.setDate(x.getDate() + d); const k = dayKey(x); events[k] = eventsFor(k).filter((e) => !e.multi || e.first || d === 0); }
   const w = currentWeather()?.data;
   const [s, e] = monthRange();
-  const month = summary(vault.spending, s, e);
+  const month = lgSummary(vault, { from: s, to: e });
   const key = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-  const st = monthStats(vault.spending, vault.income ?? [], key, now);
+  const st = monthStats(money().spend, money().income, key, now);
   const hs = healthSummary(vault.health);
   const mood = vault.moods.find((m) => m.day === localDay())?.value;
   return {
     events, reminders: vault.reminders, tasks: tasks(vault.inbox).filter((t) => !t.done), ideas: ideas(vault.inbox),
     weather: w ? { city: activeCity().name, text: w.now.text, temp: w.now.temp, min: w.today.min, max: w.today.max, rain: w.today.rain ?? null } : null,
     habits: vault.habits.map((h) => ({ name: h.name, doneToday: (h.done ?? []).includes(localDay()) })),
-    money: { spent: st.spent, earned: st.earned, payroll: st.payroll.cents, balance: vault.settings.balance?.cents ?? null, byCategory: Object.entries(month.byCategory).sort((a, b) => b[1] - a[1]) },
+    money: { spent: month.consumo, earned: month.ingreso, payroll: st.payroll.cents, balance: vault.settings.balance?.cents ?? null, byCategory: month.byCategory, nivel: month.nivelLabel, fiable: month.fiable, pending: month.pending.cents, others: month.others.in + month.others.out },
     health: hs.sleep !== null || hs.steps !== null ? { sleep: hs.sleep !== null ? dec(hs.sleep) : null, steps: hs.steps !== null ? Math.round(hs.steps) : null } : null,
     mood: mood ? MOODS[mood - 1].label : null,
     birthdays: upcomingBirthdays(vault.people, now, 14).map((b) => ({ name: b.person.name, days: b.days })),
@@ -3175,11 +3205,12 @@ document.addEventListener("click", (e) => {
   (c.birthday ? $("pNotes") : $("pBDay"))?.focus();
 });
 document.addEventListener("input", (e) => {
+  if (e.target.dataset?.mvCents !== undefined || e.target.dataset?.mvPct !== undefined) { lgPartInput(e.target); return; }
   if (e.target.id === "hzDial") { hzDial(e.target.value); return; }
   if (e.target.id === "fullPass") { full.pass = e.target.value; return; }
   // WEB-80: the split card. Searching redraws only the matches (the keyboard stays).
   if (e.target.id === "splitQ") {
-    const entryId = splitDraft?.entryId ?? toAsk(vault.spending, today())[0]?.id;
+    const entryId = splitDraft?.entryId ?? toAsk(splitPool(), today())[0]?.id;
     if (!entryId) return;
     splitDraft = splitDraft?.entryId ? splitDraft : { entryId, people: [], mode: null, q: "" };
     splitDraft.q = e.target.value;
@@ -3352,7 +3383,7 @@ function hzAct(a) {
       return;
     case "hz-frase": memUi.open = d.id; memUi.correcting = null; tab = "tu"; sub = "memoria"; render({ focus: true }); setTimeout(() => document.querySelector(".mem-detail")?.scrollIntoView({ block: "start" }), 30); return;
     case "hz-noche": {
-      const n = hzMareasData({ spending: vault.spending, income: vault.income }).noches.find((x) => x.id === d.id);
+      const n = hzMareasData({ spending: money().spend, income: money().income }).noches.find((x) => x.id === d.id);
       if (!n) { render(); return; }
       const resp = { ...(vault.settings.hzNoches ?? {}) };
       if (d.v === "si") {
@@ -3381,6 +3412,139 @@ function hzAct(a) {
     }
     case "hz-botadura-fin": document.querySelector(".hz-botadura")?.remove(); $("screen")?.focus({ preventScroll: true }); return;
     case "hz-varar": hzProyecto(hzVarar, "De vuelta al astillero."); return;
+  }
+}
+// ---------- Dinero 2.0: la ficha, el reparto, las relaciones y las correcciones (WEB-111) ----------
+function lgPeople() {
+  const seen = new Map();
+  for (const p of vault.people ?? []) seen.set(`p:${p.id}`, { who: `p:${p.id}`, name: p.name });
+  for (const n of Object.values(ledgerOf(vault).notes)) for (const x of n.parts ?? []) if (x.who !== LG_ME && !seen.has(x.who)) seen.set(x.who, { who: x.who, name: x.name });
+  for (const d of Object.values(ledgerOf(vault).debts)) if (d?.who && !seen.has(d.who)) seen.set(d.who, { who: d.who, name: d.name });
+  return [...seen.values()];
+}
+// Un nombre escrito a mano se une a la persona de Personas o a la que ya usaste con ese nombre.
+function lgWhoFor(name) {
+  const n = normalise(name);
+  return lgPeople().find((p) => normalise(p.name) === n)?.who ?? lgPersonKey(name);
+}
+function lgOpen(key) {
+  const r = money().byKey.get(key); if (!r) return;
+  const note = ledgerOf(vault).notes[key];
+  const legacy = !note && r.m.raw?.split ? [{ who: LG_ME, name: "Yo", cents: r.m.raw.split.mine ?? 0 }, ...(r.m.raw.split.people ?? []).map((p) => ({ who: `p:${p.key}`, name: p.name, cents: p.cents }))] : null;
+  lgUi.key = key; lgUi.plan = null;
+  lgUi.draft = { kind: r.kind, name: note?.name ?? "", category: note?.category ?? r.category, parts: (note?.parts ?? legacy ?? []).map((p) => ({ ...p })), cashUse: note?.cashUse ?? null, note: note?.note ?? "" };
+  tab = "dinero"; render({ focus: true, enter: "page" }); scrollTo(0, 0);
+}
+function lgReadDraft() {
+  const d = lgUi.draft; if (!d) return;
+  if ($("mvName")) d.name = $("mvName").value;
+  if ($("mvCat")) d.category = $("mvCat").value;
+  if ($("mvNote")) d.note = $("mvNote").value;
+  const k = document.querySelector('input[name="mvKind"]:checked'); if (k) d.kind = k.value;
+  const c = document.querySelector('input[name="mvCash"]:checked'); if (c) d.cashUse = c.value;
+  document.querySelectorAll("[data-mv-cents]").forEach((el) => { const p = d.parts.find((x) => x.who === el.dataset.mvCents); if (p) p.cents = toCents(el.value) ?? 0; });
+}
+function lgKindChanged() {
+  const d = lgUi.draft, r = money().byKey.get(lgUi.key); if (!d || !r) return;
+  if (d.kind === "SHARED" && !d.parts.some((p) => p.who === LG_ME)) d.parts.unshift({ who: LG_ME, name: "Yo", cents: r.cents - d.parts.reduce((s, p) => s + p.cents, 0) });
+  if (d.kind === "SETTLE") d.parts = d.parts.filter((p) => p.who !== LG_ME);
+}
+const lgMove = () => lgMovements(vault).find((m) => m.key === lgUi.key);
+// Lo que quedaría al guardar, sin guardar (para la línea «importe personal atribuible»).
+function lgPreview() {
+  const d = lgUi.draft, m = lgMove(); if (!d || !m) return null;
+  try {
+    const l = lgAnnotate(ledgerOf(vault), m, d);
+    const r = lgResolve({ ...vault, ledger: l }).rows.find((x) => x.key === m.key);
+    return { personal: r.dir === "out" ? r.consumo : r.ingreso, pending: r.pending, others: r.people.reduce((s, p) => s + Math.abs(p.cents), 0) };
+  } catch { return null; }
+}
+function lgPreviewUpdate() {
+  const el = document.querySelector(".lg-effect"); const p = lgPreview(); if (!el || !p) return;
+  el.innerHTML = `<b>Importe personal atribuible:</b> ${esc(euros(p.personal))}${p.pending ? ` · <span class="lg-badge lg-pending">${esc(euros(p.pending))} pendiente</span>` : ""}${p.others ? ` · de otras personas: ${esc(euros(p.others))}` : ""}`;
+}
+// Cambiar euros o % de una persona actualiza su otra casilla y el total, sin repintar (el teclado no se va).
+function lgPartInput(el) {
+  const d = lgUi.draft, r = money().byKey.get(lgUi.key); if (!d || !r) return;
+  const who = el.dataset.mvCents ?? el.dataset.mvPct, p = d.parts.find((x) => x.who === who); if (!p) return;
+  if (el.dataset.mvPct !== undefined) {
+    const pct = Number(String(el.value).replace(",", ".")) || 0;
+    p.cents = Math.round((r.cents * pct) / 100);
+    const c = document.querySelector(`[data-mv-cents="${CSS.escape(who)}"]`); if (c) c.value = (p.cents / 100).toFixed(2).replace(".", ",");
+  } else {
+    p.cents = toCents(el.value) ?? 0;
+    const c = document.querySelector(`[data-mv-pct="${CSS.escape(who)}"]`); if (c) c.value = String(Math.round((p.cents / r.cents) * 1000) / 10).replace(".", ",");
+  }
+  const sum = d.parts.reduce((s, x) => s + x.cents, 0), t = $("mvTotal");
+  if (t) t.textContent = sum === r.cents ? `Repartido: ${euros(sum)} de ${euros(r.cents)}` : sum < r.cents ? `Repartido: ${euros(sum)} de ${euros(r.cents)} · lo que falta ${d.kind === "SETTLE" ? "debe asignarse" : "será tuyo"}` : `Te pasas: ${euros(sum)} de ${euros(r.cents)}`;
+  lgPreviewUpdate();
+}
+function lgEditor() {
+  const r = money().byKey.get(lgUi.key), l = ledgerOf(vault);
+  const links = Object.entries(l.links).filter(([, x]) => x.a === r.key || x.b === r.key).map(([id, x]) => { const other = money().byKey.get(x.a === r.key ? x.b : x.a); return other ? { id, kind: x.kind, status: x.status, otherKey: other.key, otherName: `${other.name} · ${other.dir === "in" ? "+" : "−"}${euros(other.cents)}` } : null; }).filter(Boolean);
+  return lgEditorPage(r, lgUi.draft, { people: lgPeople(), preview: lgPreview(), suggestionsHtml: lgSuggestionsCard(lgSuggestions(vault, { max: 50 }), money().byKey, { only: r.key }), links, history: l.notes[r.key]?.prev ?? [] }) + (!r.m.source ? `<p><button class="link small danger-link" data-act="spend-del" data-id="${esc(r.id)}">Borrar este apunte (lo apuntaste a mano)</button></p>` : "");
+}
+function lgMovesSection() {
+  let rows = [...money().rows].sort((a, b) => (a.at < b.at ? 1 : -1));
+  if (lgUi.filter === "pending") rows = rows.filter((r) => r.pending > 0);
+  const shown = rows.slice(0, lgUi.filter === "pending" || lgUi.selecting ? 300 : 80);
+  return `<section class="card lg-moves">${shown.length ? shown.map((r) => lgMoveRow(r, { selecting: lgUi.selecting, picked: lgUi.picked.has(r.key) })).join("") + (rows.length > shown.length ? `<p class="muted small">Y ${rows.length - shown.length} más antiguos.</p>` : "") : lgUi.filter === "pending" ? '<p class="muted">No queda nada pendiente de atribuir.</p>' : '<p class="muted">Sin movimientos. Escribe a MANU «gasté 12,50 en café» o importa el extracto del banco.</p>'}</section>`;
+}
+function lgSave() {
+  lgReadDraft();
+  const m = lgMove(); if (!m) return;
+  try { vault.ledger = lgAnnotate(ledgerOf(vault), m, lgUi.draft, { device: deviceName() }); }
+  catch (err) { toast(err.message); return; }
+  persist(); lgOpen(m.key); toast("Guardado. El movimiento del banco no cambia.");
+}
+function lgDebtSubmit() {
+  const name = $("lgDebtWho")?.value ?? "", cents = toCents($("lgDebtCents")?.value ?? "");
+  const owesMe = document.querySelector('input[name="lgDebtDir"]:checked')?.value !== "iOwe";
+  try { vault.ledger = lgAddDebt(ledgerOf(vault), { who: lgWhoFor(name), name, cents: owesMe ? -(cents ?? 0) : (cents ?? 0), note: $("lgDebtNote")?.value }, { uid: () => uid("deuda") }); }
+  catch (err) { toast(err.message); return; }
+  lgUi.debtForm = false; persist(); render(); toast("Apuntado.");
+}
+function lgAct(a) {
+  const d = a.dataset;
+  switch (d.act) {
+    case "mv-open": lgOpen(d.k); return;
+    case "mv-close": lgUi.key = null; lgUi.draft = null; render({ focus: true, enter: "tab" }); scrollTo(0, 0); return;
+    case "mv-person": case "mv-person-add": {
+      lgReadDraft();
+      const dr = lgUi.draft, r = money().byKey.get(lgUi.key); if (!dr || !r) return;
+      const name = d.act === "mv-person" ? d.name : ($("mvPerson")?.value ?? "").trim();
+      if (!name) { $("mvPerson")?.focus(); return; }
+      const who = d.who || lgWhoFor(name);
+      if (dr.parts.some((p) => p.who === who)) return;
+      dr.parts.push({ who, name, cents: 0 });
+      // Repartir rápido: en un compartido, a partes iguales; si es de otra persona o una deuda, todo para ella.
+      if (dr.kind === "SHARED") dr.parts = lgEqualParts(r.cents, dr.parts.filter((p) => p.who !== LG_ME), { includeMe: true });
+      else if (dr.kind === "SETTLE" || dr.kind === "OTHERS") { const mine = dr.parts.find((p) => p.who === LG_ME)?.cents ?? 0; const others = dr.parts.filter((p) => p.who !== LG_ME); others.forEach((p, i) => { p.cents = i === others.length - 1 ? r.cents - mine - others.slice(0, -1).reduce((s, x) => s + x.cents, 0) : p.cents; }); }
+      render(); $("mvPerson")?.focus(); return;
+    }
+    case "mv-person-del": lgReadDraft(); lgUi.draft.parts = lgUi.draft.parts.filter((p) => p.who !== d.who); render(); return;
+    case "mv-equal": { lgReadDraft(); const r = money().byKey.get(lgUi.key); lgUi.draft.parts = lgEqualParts(r.cents, lgUi.draft.parts.filter((p) => p.who !== LG_ME), { includeMe: lgUi.draft.parts.some((p) => p.who === LG_ME) }); render(); return; }
+    case "mv-revert": if (window.confirm("¿Volver a lo que dice el banco? La anotación actual queda en el historial de Tu nube como borrada.")) { vault.ledger = lgRevert(ledgerOf(vault), lgUi.key); persist(); lgOpen(lgUi.key); toast("Vuelve a ser como lo dio el banco."); } return;
+    case "mv-restore": vault.ledger = lgRestore(ledgerOf(vault), lgUi.key, Number(d.i)); persist(); lgOpen(lgUi.key); toast("Versión restaurada."); return;
+    case "lg-link": vault.ledger = lgSetLink(ledgerOf(vault), { kind: d.kind, a: d.a, b: d.b }, d.s); persist(); render(); toast(d.s === "CONFIRMED" ? "Relacionados. Lo puedes deshacer desde la ficha." : "Vale: no te lo vuelvo a proponer."); return;
+    case "lg-unlink": vault.ledger = lgUnlink(ledgerOf(vault), d.id); persist(); render(); toast("Relación deshecha."); return;
+    case "lg-filter": lgUi.filter = d.f || null; lgUi.key = null; render(); document.querySelector(".lg-moves")?.scrollIntoView({ block: "start" }); return;
+    case "lg-select": lgUi.selecting = !lgUi.selecting; lgUi.picked = new Set(); lgUi.plan = null; render(); if (lgUi.selecting) document.querySelector(".lg-bulk")?.scrollIntoView({ block: "start" }); return;
+    case "lg-pick": if (a.checked) lgUi.picked.add(d.k); else lgUi.picked.delete(d.k); { const bar = document.querySelector(".lg-bulk p b"); if (bar) bar.textContent = String(lgUi.picked.size); const btn = document.querySelector('[data-act="lg-bulk-plan"]'); if (btn) btn.disabled = !lgUi.picked.size; } return;
+    case "lg-bulk-plan": {
+      const kind = $("lgBulkKind")?.value || undefined, category = $("lgBulkCat")?.value || undefined;
+      if (!kind && !category) { toast("Elige un tipo o una categoría."); return; }
+      lgUi.plan = lgBulkPlan(vault, [...lgUi.picked], { kind, category }); render({ focus: true }); scrollTo(0, 0); return;
+    }
+    case "lg-bulk-apply": { const n = lgUi.plan.rows.length - lgUi.plan.skipped.length; vault.ledger = lgUi.plan.ledger; lgUi.plan = null; lgUi.selecting = false; lgUi.picked = new Set(); persist(); render(); toast(`${n} ${n === 1 ? "movimiento corregido" : "movimientos corregidos"}. Cada uno guarda su versión anterior.`); return; }
+    case "lg-bulk-cancel": lgUi.plan = null; render(); return;
+    case "lg-debt-form": lgUi.debtForm = !lgUi.debtForm; render(); if (lgUi.debtForm) $("lgDebtWho")?.focus(); return;
+    case "lg-debt-drop": vault.ledger = lgDropDebt(ledgerOf(vault), d.id); persist(); render(); return;
+    case "lg-settle": {
+      const cents = Number(d.cents);
+      if (!window.confirm(`¿Dejar a cero lo de ${d.name}? Se apunta un ajuste de ${euros(Math.abs(cents))} sin tocar ningún movimiento.`)) return;
+      vault.ledger = lgAddDebt(ledgerOf(vault), { who: d.who, name: d.name, cents: -cents, note: "Saldado a mano" }, { uid: () => uid("deuda") }); persist(); render(); toast("Saldado."); return;
+    }
   }
 }
 function memSave(msg) { persist(); render(); if (msg) toast(msg); }
@@ -3468,6 +3632,7 @@ document.addEventListener("click", async (e) => {
   if (!a) return;
   const id = a.dataset.id;
   if (a.dataset.act.startsWith("mem-")) { memAct(a); return; }
+  if (a.dataset.act.startsWith("lg-") || a.dataset.act.startsWith("mv-")) { lgAct(a); return; }
   if (a.dataset.act.startsWith("hz-")) { hzAct(a); return; }
   switch (a.dataset.act) {
     case "task": updateItem(id, (i) => confirm(i, "TASK")); toast("Guardada como tarea"); break;
@@ -3728,7 +3893,7 @@ document.addEventListener("click", async (e) => {
     case "bank-cancel": bankRead = null; render(); break;
     case "split-person": {
       const key = a.dataset.key;
-      const e = splitDraft?.entryId ? splitDraft : { entryId: (vault.spending.find((x) => x.id === splitDraft?.entryId) ?? toAsk(vault.spending, today())[0])?.id, people: [], mode: null, q: "" };
+      const e = splitDraft?.entryId ? splitDraft : { entryId: (vault.spending.find((x) => x.id === splitDraft?.entryId) ?? toAsk(splitPool(), today())[0])?.id, people: [], mode: null, q: "" };
       if (!e.entryId) break;
       const p = vault.people.find((x) => x.id === key);
       e.people = e.people.some((x) => x.key === key) ? e.people.filter((x) => x.key !== key) : p ? [...e.people, { key, name: p.name, ...(p.googleId ? { googleId: p.googleId } : {}) }] : e.people;
@@ -3736,15 +3901,15 @@ document.addEventListener("click", async (e) => {
     }
     case "split-contact": {
       const p = personFromContact(a.dataset.gid);
-      const e = splitDraft?.entryId ? splitDraft : { entryId: toAsk(vault.spending, today())[0]?.id, people: [], mode: null, q: "" };
+      const e = splitDraft?.entryId ? splitDraft : { entryId: toAsk(splitPool(), today())[0]?.id, people: [], mode: null, q: "" };
       if (!p || !e.entryId) break;
       if (!e.people.some((x) => x.key === p.id)) e.people.push({ key: p.id, name: p.name, googleId: p.googleId });
       e.q = ""; splitDraft = e; persist(); render(); break;
     }
     case "split-mode": if (splitDraft) { splitDraft.mode = a.dataset.mode || null; render(); } break;
     case "split-save": saveSplit(a.dataset.mode); break;
-    case "split-none": { const ids = new Set(toAsk(vault.spending, today()).map((x) => x.id)); vault.spending = vault.spending.map((x) => (ids.has(x.id) ? { ...x, splitAsked: true } : x)); splitDraft = null; persist(); render(); break; }
-    case "split-alone": vault.spending = vault.spending.map((x) => (x.id === a.dataset.id ? { ...x, splitAsked: true } : x)); splitDraft = null; persist(); render(); break;
+    case "split-none": { const ms = new Map(lgMovements(vault).map((m) => [m.key, m])); for (const x of toAsk(splitPool(), today())) vault.ledger = lgAnnotate(ledgerOf(vault), ms.get(lgKey("g", x.id)), { kind: "MINE" }, { device: deviceName() }); splitDraft = null; persist(); render(); break; }
+    case "split-alone": { const m = lgMovements(vault).find((x) => x.key === lgKey("g", a.dataset.id)); if (m) vault.ledger = lgAnnotate(ledgerOf(vault), m, { kind: "MINE" }, { device: deviceName() }); splitDraft = null; persist(); render(); break; }
     case "debt-paid": {
       const d = debts(vault.spending).find((x) => x.key === a.dataset.key);
       if (d && window.confirm(`¿${d.name.split(" ")[0]} te ha pagado los ${eurosTxt(d.cents)}?`)) { vault.spending = settleAll(vault.spending, d.key, new Date()); persist(); render(); toast("Saldado"); }
@@ -3808,6 +3973,8 @@ document.addEventListener("submit", async (e) => {
   e.preventDefault();
   const f = e.target.id;
   if (MEM_FORMS.has(f)) { memSubmit(e.target); return; }
+  if (f === "mvForm") { lgSave(); return; }
+  if (f === "lgDebtForm") { lgDebtSubmit(); return; }
   if (f === "hzPiezaForm") { hzProyecto((p) => addPieza(p, $("hzPieza").value, uid("pz")), null, true); return; }
   if (f === "nubeMail") { nubeMail($("nubeEmail").value.trim()); return; }
   if (f === "bzIdea") { // WEB-91: an idea goes straight to MANU as an idea, no questions
@@ -4048,6 +4215,8 @@ document.addEventListener("input", (e) => {
 });
 
 document.addEventListener("change", async (e) => {
+  if (e.target.name === "mvKind") { lgReadDraft(); lgKindChanged(); render(); return; }
+  if (e.target.name === "mvCash") { lgReadDraft(); lgPreviewUpdate(); return; }
   if (e.target.id === "hzDial") { render(); $("hzDial")?.focus({ preventScroll: true }); return; }
   if (e.target.id === "chatImage" && e.target.files?.[0]) {
     try { chatImage = await compressImage(e.target.files[0]); render(); $("msg")?.focus(); } catch (err) { toast(err.message); }
@@ -4597,7 +4766,8 @@ applyBankReturn();
 let reviewNote = false;  // the «Apuntar algo» box on tonight's card
 let docDraft = null;     // { busy } while Gemini reads; { fields, fileData?, fileType?, editId? } to review
 let libFilter = "todo";
-const reviewData = (now = today()) => ({ now, inbox: vault.inbox, habits: vault.habits, spending: vault.spending, clock: vault.clock, targetMin: clockTarget(), reminders: vault.reminders });
+// Las revisiones usan el consumo personal (Dinero 2.0) y solo hablan de gasto si la cifra es fiable.
+const reviewData = (now = today()) => { const from = new Date(now); from.setDate(from.getDate() - 35); return { now, inbox: vault.inbox, habits: vault.habits, spending: money().spend, moneyReliable: lgSummary(vault, { from, to: new Date(now.getTime() + 86400000) }).fiable, clock: vault.clock, targetMin: clockTarget(), reminders: vault.reminders }; };
 function tonightReview() {
   const t = today(); const next = new Date(t.getFullYear(), t.getMonth(), t.getDate() + 1);
   return nightReview({ ...reviewData(), tomorrowEvents: eventsFor(dayKey(next)) });
@@ -4730,7 +4900,7 @@ function personFromContact(gid) {
   return p;
 }
 function splitAskCard() {
-  const e = splitDraft ? vault.spending.find((x) => x.id === splitDraft.entryId) : toAsk(vault.spending, today())[0];
+  const e = splitDraft ? vault.spending.find((x) => x.id === splitDraft.entryId) : toAsk(splitPool(), today())[0];
   if (!e) return "";
   const d = splitDraft?.entryId === e.id ? splitDraft : null;
   const when = new Date(e.at).toLocaleDateString("es-ES", { weekday: "long", day: "numeric" });
@@ -4748,18 +4918,10 @@ function splitAskCard() {
     <p>${d?.people?.length ? "¿Cómo lo repartís?" : `¿Con quién estabas el ${esc(when)}?`}</p>
     ${d?.mode === "detail" ? detail : `<div class="chips" role="group" aria-label="Personas">${chips}</div>
     <label class="sr" for="splitQ">Buscar persona o contacto</label><input id="splitQ" placeholder="Busca en Personas o Google Contactos" autocomplete="off" value="${esc(q)}"><div class="contact-matches">${matches}</div>
-    <div class="btns">${d?.people?.length ? `<button class="btn" data-act="split-save" data-mode="equal">A partes iguales (${esc(eurosTxt(Math.floor(e.cents / (d.people.length + 1))))} cada uno)</button><button class="btn ghost" data-act="split-mode" data-mode="detail">Cada uno lo suyo</button>` : ""}<button class="btn ghost" data-act="split-alone" data-id="${esc(e.id)}">Pagué solo yo</button></div>${toAsk(vault.spending, today()).length > 1 && !d?.people?.length ? `<button class="link small" data-act="split-none">No preguntar por estos ${toAsk(vault.spending, today()).length}</button>` : ""}`}</section>`;
+    <div class="btns">${d?.people?.length ? `<button class="btn" data-act="split-save" data-mode="equal">A partes iguales (${esc(eurosTxt(Math.floor(e.cents / (d.people.length + 1))))} cada uno)</button><button class="btn ghost" data-act="split-mode" data-mode="detail">Cada uno lo suyo</button>` : ""}<button class="btn ghost" data-act="split-alone" data-id="${esc(e.id)}">Pagué solo yo</button></div>${toAsk(splitPool(), today()).length > 1 && !d?.people?.length ? `<button class="link small" data-act="split-none">No preguntar por estos ${toAsk(splitPool(), today()).length}</button>` : ""}`}</section>`;
 }
-function debtsCard() {
-  const list = debts(vault.spending);
-  if (!list.length) return "";
-  const total = list.reduce((s, d) => s + d.cents, 0);
-  return `<section class="card debts"><h2>🤝 Te deben ${esc(eurosTxt(total))}</h2>${list.map((d) => {
-    const p = vault.people.find((x) => x.id === d.key);
-    const wa = p?.phone ? whatsappUrl(p.phone, reminderText(d)) : null;
-    return `<div class="stack debt"><div class="row"><span class="grow">${esc(debtLine(d))}</span></div><div class="btns">${wa ? `<a class="btn ghost small-btn" href="${esc(safeHref(wa))}" target="_blank" rel="noopener">Recordárselo</a>` : ""}<button class="btn small-btn" data-act="debt-paid" data-key="${esc(d.key)}">Me ha pagado</button></div></div>`;
-  }).join("")}</section>`;
-}
+// WEB-111: «Te deben» (debtsCard) se sustituye por lgBalancesCard («Con otras personas»), que incluye
+// también los repartos antiguos sin pagar.
 function addMoneyCard() {
   const form = incomeForm ? `<form id="incomeForm" class="stack"><label for="inAmount" class="muted small">Ingreso</label><input id="inAmount" inputmode="decimal" placeholder="Importe (€)" required>
       <label for="inConcept" class="sr">Concepto</label><input id="inConcept" placeholder="Concepto (nómina, Bizum de Ana…)" maxlength="80">
@@ -4800,7 +4962,7 @@ function saveBankShots() {
   }
   bankRead = null;
   persist(); render();
-  toast(`Añadidos ${out} gasto${out === 1 ? "" : "s"} y ${inn} ingreso${inn === 1 ? "" : "s"}${toAsk(vault.spending, today()).length ? ". ¿Con quién fuiste al bar? Te lo pregunto arriba" : ""}`);
+  toast(`Añadidos ${out} gasto${out === 1 ? "" : "s"} y ${inn} ingreso${inn === 1 ? "" : "s"}${toAsk(splitPool(), today()).length ? ". ¿Con quién fuiste al bar? Te lo pregunto arriba" : ""}`);
 }
 function saveSplit(mode) {
   const e = vault.spending.find((x) => x.id === splitDraft?.entryId);
@@ -4808,7 +4970,9 @@ function saveSplit(mode) {
   try {
     const people = splitDraft.people.map((p) => ({ key: p.key, name: p.name, ...(p.googleId ? { googleId: p.googleId } : {}), ...(mode === "detail" ? { cents: p.cents ?? 0, what: p.what } : {}) }));
     const split = mode === "equal" ? equalSplit(e.cents, people) : detailSplit(e.cents, people);
-    vault.spending = vault.spending.map((x) => (x.id === e.id ? { ...x, split, splitAsked: true } : x));
+    // WEB-111: el reparto se guarda como anotación; el movimiento del banco no cambia.
+    const m = lgMovements(vault).find((x) => x.key === lgKey("g", e.id));
+    vault.ledger = lgAnnotate(ledgerOf(vault), m, { kind: "SHARED", parts: [{ who: LG_ME, cents: split.mine }, ...split.people.map((p) => ({ who: `p:${p.key}`, name: p.name, cents: p.cents }))], note: split.people.filter((p) => p.what).map((p) => `${p.name.split(" ")[0]}: ${p.what}`).join(" · ") || null }, { device: deviceName() });
     splitDraft = null;
     persist(); render();
     const owed = split.people.reduce((s, p) => s + p.cents, 0);

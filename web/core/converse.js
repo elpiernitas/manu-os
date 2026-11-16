@@ -49,7 +49,7 @@ export function buildContext(data, context, now = new Date()) {
   if (context.habits && data.habits?.length) out.push(`HÁBITOS: ${data.habits.map((h) => `${h.name}${h.doneToday ? " (hecho hoy)" : ""}`).join("; ")}.`);
   if (context.money && data.money) {
     const m = data.money;
-    out.push(`DINERO este mes: gastado ${euros(m.spent)}, ingresado ${euros(m.earned)}${m.payroll ? `, nómina ${euros(m.payroll)}` : ""}${m.balance !== null && m.balance !== undefined ? `, saldo ${euros(m.balance)}` : ""}. Por categoría: ${m.byCategory.slice(0, 6).map(([c, v]) => `${CATEGORIES[c] ?? c} ${euros(v)}`).join("; ") || "sin gastos"}.`);
+    out.push(`DINERO este mes (consumo personal: sin dinero de otras personas, traspasos ni lo pendiente): gastado ${euros(m.spent)}, ingresado ${euros(m.earned)}${m.payroll ? `, nómina ${euros(m.payroll)}` : ""}${m.balance !== null && m.balance !== undefined ? `, saldo ${euros(m.balance)}` : ""}. Por categoría: ${(m.byCategory ?? []).slice(0, 6).map(([c, v]) => `${CATEGORIES[c] ?? c} ${euros(v)}`).join("; ") || "sin gastos"}.${m.nivel ? ` Fiabilidad: ${m.nivel}.` : ""}${m.pending ? ` Pendiente de atribuir: ${euros(m.pending)}.` : ""}${m.fiable === false ? " Las cifras son provisionales: no des consejos de ahorro ni previsiones; dilo así." : ""}`);
   }
   if (context.health && data.health) out.push(`SALUD (media semanal): sueño ${data.health.sleep ?? "?"} h, pasos ${data.health.steps ?? "?"}.`);
   if (context.mood && data.mood) out.push(`ÁNIMO de hoy: ${data.mood}.`);
