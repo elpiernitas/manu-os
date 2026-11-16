@@ -1,5 +1,45 @@
 # HANDOFF
 
+## WEB-115 · Hoy a la medida de Manu: franjas, «Ahora», trabajo, finde, ideas y tono (Claude, 2026-11-16)
+
+Manu, tras leer su ficha de cliente (página privada, fuera del repositorio porque lleva datos personales), pidió «hazlo todo»:
+- fines de semana distintos (aún decide si descansa o los usa);
+- humor «el justo»;
+- su tono.
+
+Detalle en `docs/ASISTENTE.md` (WEB-115).
+
+**Hecho:**
+- `core/daymode.js`: las franjas del día y del fin de semana.
+- «Ahora» dentro del centro de control, con «Ahora no».
+- Tareas de trabajo (chip 💼, con supuesto en horario laboral) que se ocultan desde el cierre de jornada hasta el día laborable siguiente, también en los repasos.
+- Pregunta del fin de semana.
+- Ideas aparcadas con la carga a la vista.
+- Para qué de cada proyecto y paso de 10 minutos.
+- Dinero en una línea con el nivel de humor de Memoria.
+- Campo «Cómo hablas tú» para Gemini.
+- Menos texto.
+- Versión 115.
+
+**Reutilizado, no duplicado:** el cierre de jornada (WEB-63), `whatNow` (WEB-58), proyectos parados y el nivel de humor de `voice.js`.
+
+**Pruebas:**
+- `npm test`: 463 de 463 (`daymode` y tono nuevos).
+- `e2e/dia.e2e.mjs`: 47 de 47, a las 10:00, 13:20, sábado y tarde, a 320, 375, 390 y 430 px.
+- Sin regresión en asistente (93), dinero2 (53), horizonte (103), vivo (68) y el resto.
+
+**Fallos encontrados por las pruebas y corregidos:**
+- `controlCard` tapaba la función `money()` con una variable local.
+- El repaso semanal enseñaba tareas de trabajo después del cierre.
+- El chip 💼 medía 36 px por `button.chip`.
+
+**NO_VERIFICADO:**
+- Safari e iPhone reales.
+- Las franjas con los datos reales de Manu.
+- Si el supuesto «tarea apuntada de 09:00 a 13:00 = de trabajo» le encaja. Se corrige con un toque.
+
+**Observación (fuera de alcance):** muchos botones antiguos (`button.chip`, `.small-btn`) miden 36 px, por debajo de 44.
+
 ## WEB-114 · revisión de seguridad con las skills de ECC (Claude, 2026-11-16)
 
 Manu pidió «usa las skills que veas». Se aplicaron, leyéndolas desde `.claude/skills/`, `security-review`, `agent-security-hardening` y `verification-loop` sobre lo publicado hoy (v111 a v113).

@@ -26,14 +26,14 @@ export const LEVELS = { URGENT: "Urgente", IMPORTANT: "Importante", INFO: "Para 
 export function quietProjects(projects, now = new Date(), days = 14) {
   return (projects ?? []).map((p) => {
     const last = Math.max(Date.parse(p.createdAt ?? "") || 0, ...(p.sources ?? []).map((x) => Date.parse(x.at ?? "") || 0), ...(p.chat ?? []).map((x) => Date.parse(x.at ?? "") || 0));
-    return { id: p.id, name: p.name, emoji: p.emoji ?? "📁", days: last ? Math.floor((now.getTime() - last) / DAY) : null };
+    return { id: p.id, name: p.name, emoji: p.emoji ?? "📁", why: p.why ?? null, days: last ? Math.floor((now.getTime() - last) / DAY) : null };
   }).filter((x) => x.days !== null && x.days > days).sort((a, b) => b.days - a.days);
 }
 
-export function controlItems({ now = new Date(), events = [], tomorrow = [], reminders = [], tasks = [], mail = [], docs = [], money = null, birthdays = [], projects = [], euros = (c) => `${(c / 100).toFixed(2)} €`, mailLabel = (k) => k } = {}) {
+export function controlItems({ now = new Date(), events = [], tomorrow = [], reminders = [], tasks = [], mail = [], docs = [], money = null, moneyText = null, birthdays = [], projects = [], euros = (c) => `${(c / 100).toFixed(2)} €`, mailLabel = (k) => k } = {}) {
   const out = [];
   const t = now.getTime();
-  for (const q of quietProjects(projects, now).slice(0, 2)) out.push({ level: "INFO", icon: q.emoji, title: `«${q.name}» sin novedades`, detail: `Nada nuevo desde hace ${q.days} días`, source: "Proyectos", why: "Más de 14 días sin fuentes ni mensajes nuevos", go: { project: q.id }, sort: t + 20 * DAY });
+  for (const q of quietProjects(projects, now).slice(0, 2)) out.push({ level: "INFO", icon: q.emoji, title: `«${q.name}» sin novedades`, detail: `Nada nuevo desde hace ${q.days} días${q.why ? ` · Lo empezaste para: ${q.why}` : ""}`, source: "Proyectos", why: "Más de 14 días sin fuentes ni mensajes nuevos. Ábrelo y apunta un paso de 10 minutos, o archívalo", go: { project: q.id }, sort: t + 20 * DAY });
   for (const e of events ?? []) {
     if (!e.time) continue; // los de todo el día van como información de la agenda
     const start = at(now, e.time).getTime(), end = e.end ? at(now, e.end).getTime() : start;
@@ -61,7 +61,7 @@ export function controlItems({ now = new Date(), events = [], tomorrow = [], rem
     else if (b.days <= 7) out.push({ level: "INFO", icon: "🎂", title: `Cumpleaños de ${b.name}`, detail: b.days === 1 ? "Mañana" : `En ${b.days} días`, source: "Personas", why: "Esta semana", go: { sub: "personas" }, sort: t + b.days * DAY });
   }
   if (money && money.pending?.count && !money.fiable) out.push({ level: "IMPORTANT", icon: "💶", title: `${money.pending.count} movimientos sin atribuir`, detail: `${euros(money.pending.cents)}: retiradas, Bizum o transferencias`, source: "Dinero", why: "Hasta revisarlos, tus cifras del mes son provisionales", go: { tab: "dinero" }, sort: t + 5 * H });
-  if (money && money.bank?.count) out.push({ level: "INFO", icon: "💶", title: `Consumo del mes: ${euros(money.consumo)}`, detail: money.nivelLabel ?? "", source: "Dinero", why: money.fiable ? "Tu consumo personal, sin dinero de otros ni traspasos" : "Provisional: falta revisar movimientos", go: { tab: "dinero" }, sort: t + 30 * DAY });
+  if (money && money.bank?.count) out.push({ level: "INFO", icon: "💶", title: moneyText ?? `Consumo del mes: ${euros(money.consumo)}`, detail: money.nivelLabel ?? "", source: "Dinero", why: money.fiable ? "Tu consumo personal, sin dinero de otros ni traspasos" : "Provisional: falta revisar movimientos", go: { tab: "dinero" }, sort: t + 30 * DAY });
   const tmw = (tomorrow ?? []).filter((e) => e.time).sort((a, b) => (a.time < b.time ? -1 : 1));
   if (tmw.length) out.push({ level: "INFO", icon: "🌅", title: `Mañana empiezas a las ${tmw[0].time}`, detail: `${tmw[0].title}${tmw.length > 1 ? ` y ${tmw.length - 1} más` : ""}`, source: "Agenda", why: "Para que lo tengas en cuenta esta noche", go: { tab: "agenda" }, sort: t + DAY });
   const order = { URGENT: 0, IMPORTANT: 1, INFO: 2 };

@@ -28,7 +28,7 @@ import { findExcerpts, askPayload, profileDigest, profilePayload, memoryContext 
 import { diaryDocs, dayLines, dayFromText, isDiaryQuestion, dayTitle } from "./core/diary.js";
 import { applyBuzon, buzonSummary } from "./core/buzon.js";
 import { briefing, briefingText, isBriefingQuestion, monthPace } from "./core/briefing.js";
-import { whatNow, whatNowText, isWhatNowQuestion, morningSpeech } from "./core/now.js";
+import { whatNow, whatNowText, isWhatNowQuestion, morningSpeech, lastTouched } from "./core/now.js";
 import { gentleMode, gentlePlan, isGentleQuestion } from "./core/lowmode.js";
 import { punch, punchAt, editPunch, today as shiftToday, monthReport, reportRows, toCsv, monthNote, monthIcs, dur, PAUSE_REASONS, clockState, clockNudge } from "./core/clock.js";
 import { closingDue, workClosing, closingText, isClosingQuestion, nextWorkDay } from "./core/closing.js";
@@ -38,6 +38,7 @@ import { newCapture, toReview, pendingCaptures, groupCaptures, buildCapturesPayl
 import { budgetStatus, budgetLine, budgetCommand } from "./core/budget.js";
 import { findInVault, findCommand } from "./core/find.js";
 import { controlItems, freshness, LEVELS as CONTROL_LEVELS } from "./core/control.js";
+import { franja, visibleTasks, hiddenWork, weekendKey, moneyLine } from "./core/daymode.js";
 import { propose as saveProposal, searchSaved, SAVE_LIMITS, safeViewType } from "./core/saveitem.js";
 import { weatherEmoji, sceneFor, PARTICLES, SHAPES, MONEY_EMOJI, dayPhase, cityMinutes } from "./core/scene.js";
 import { buildImagePayload, buildLinkPayload, isGeminiKey, mayGo, setSensitiveOk, sensitiveAllowed, pickModel, backupModel, listModels, buildActionPayload, askWithActions, issueUrl, aiErrorText } from "./core/ai.js";
@@ -77,7 +78,7 @@ import { SKINS, skinOf, cielo as hzCielo, variables as hzVars, tiempoDe, portada
 import { hzCara, hzPortada, hzBotella, hzMareas, hzConstelacion, hzAstillero, hzBarcoCarta, hzBotadura, hzBitacora, hzApariencia } from "./design/horizonte.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "114"; // = número de la última tarea WEB publicada (desde WEB-87)
+export const APP_VERSION = "115"; // = número de la última tarea WEB publicada (desde WEB-87)
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -878,7 +879,14 @@ function gentleCard() {
     <div class="btns"><button class="btn" data-act="refuge">Hablarlo con MANU</button>${g.level === "heavy" && trustedPeople()[0] ? `<button class="btn ghost" data-sub-go="personas">Escribir a ${esc(trustedPeople()[0].name)}</button>` : ""}<button class="link small" data-act="gentle-pause">Hoy estoy bien, quítalo</button></div></section>`;
 }
 // ---------- Cierre de jornada (WEB-63) ----------
-const dayClosing = () => workClosing({ now: today(), inbox: vault.inbox, tomorrow: eventsFor(nextWorkDay(today()).key), reminders: vault.reminders });
+// WEB-115: la franja del día (Hoy cambia de contenido, no de colores) y qué tareas se ven.
+const fr = () => franja(today(), { override: overrideOn() ? vault.settings.override : null, closedDay: vault.settings.closedDay ?? null, weekendPlans: vault.settings.weekendPlans ?? {} });
+const openNow = () => visibleTasks(tasks(vault.inbox), fr());
+// Al cerrar la jornada, si hay tareas marcadas de trabajo, solo cuentan esas.
+const closingInbox = () => (vault.inbox.some((i) => i.status === "TASK" && i.work) ? vault.inbox.filter((i) => i.status !== "TASK" || i.work) : vault.inbox);
+// Una tarea nueva en horario de trabajo se marca de trabajo (supuesto: se cambia con un toque).
+const workTag = () => (modeState(today(), undefined, vault.settings.override).mode === "WORK" ? { work: true, workGuess: true } : {});
+const dayClosing = () => workClosing({ now: today(), inbox: closingInbox(), tomorrow: eventsFor(nextWorkDay(today()).key), reminders: vault.reminders });
 const overrideOn = () => Boolean(vault.settings.override && today() < new Date(vault.settings.override.until));
 const closingNow = () => (!overrideOn() && closingDue(today(), { closedDay: vault.settings.closedDay ?? null }) ? dayClosing() : null);
 function closingCard() {
@@ -900,7 +908,7 @@ function nowPlan() {
   return whatNow({ closing: closingNow(), gentle: gentleNow().on, trip: oviedoToday(), shift: shiftNow(),
     now: today(), mode: modeState(today(), undefined, vault.settings.override).mode,
     events: eventsFor(localDay()), tomorrow: eventsFor(tomorrowKey()),
-    reminders: vault.reminders, tasks: tasks(vault.inbox), projects: vault.projects,
+    reminders: vault.reminders, tasks: openNow(), projects: fr().weekendPlan === "descanso" ? [] : vault.projects,
     birthdays: upcomingBirthdays(vault.people, today(), 0), quiet: longTimeNoTalk(vault.people), moods: vault.moods, captures: toReview(vault.captures).length,
   });
 }
@@ -1185,8 +1193,9 @@ async function seedFromArchive(p) {
   return added;
 }
 
-async function createProject({ name, emoji, keywords = [] }) {
-  const p = { ...newProject({ id: uid("p"), name, emoji }), keywords };
+async function createProject({ name, emoji, keywords = [], why = "" }) {
+  const w = String(why ?? "").replace(/\s+/g, " ").trim().slice(0, 200);
+  const p = { ...newProject({ id: uid("p"), name, emoji }), keywords, ...(w ? { why: w } : {}) };
   vault.projects = [...(vault.projects ?? []), p];
   const filed = fileNewItems(p.id);
   const seeded = await seedFromArchive(p);
@@ -1219,6 +1228,21 @@ function updateProject(id, fn) {
   persist(); render();
 }
 const SOURCE_ICON = { note: "📝", link: "🔗", image: "🖼️" };
+// WEB-115: empiezas muchas ideas y los proyectos crecen. Una idea nueva se queda aparcada (no se
+// vuelve proyecto sola) y, al convertirla, MANU te enseña cuántos proyectos tienes en marcha.
+const activeProjects = () => (vault.projects ?? []).filter((p) => { const t = lastTouched(p); return t && Date.now() - t < 14 * 86400000; });
+function parkedCard() {
+  const list = ideas(vault.inbox).filter((i) => !i.done).slice(-8).reverse();
+  if (!list.length) return "";
+  const act = activeProjects().length;
+  return `<section class="card parked"><div class="row"><h2>Ideas aparcadas · ${list.length}</h2></div><p class="muted small">No son proyectos hasta que tú quieras. Ahora tienes ${act} proyecto${act === 1 ? "" : "s"} con movimiento en las últimas dos semanas.</p>
+    ${list.map((i) => `<div class="row parked-row"><span class="grow">💡 ${esc(i.text)}</span><button class="btn ghost small-btn" data-act="idea-to-project" data-id="${esc(i.id)}">Hacerla proyecto</button></div>`).join("")}</section>`;
+}
+function projectWhyCard(p) {
+  return `<section class="card proj-why"><form id="projWhyForm" data-id="${esc(p.id)}" class="stack"><label for="pWhy" class="small muted">Para qué lo empezaste</label><input id="pWhy" maxlength="200" value="${esc(p.why ?? "")}" placeholder="Para qué lo empezaste"></form>
+    <form id="projStepForm" data-id="${esc(p.id)}" class="composer-inline"><label for="pStep" class="sr">Siguiente paso de 10 minutos</label><input id="pStep" maxlength="140" placeholder="Siguiente paso, de 10 minutos" required><button class="btn small-btn" type="submit">Apuntar</button></form>
+    ${(() => { const st = vault.inbox.filter((i) => i.status === "TASK" && !i.done && i.project === p.id); return st.length ? `<div class="stack">${st.map(taskRow).join("")}</div>` : ""; })()}</section>`;
+}
 function projectPage(p) {
   const kinds = [["note", "📝 Nota"], ["link", "🔗 Enlace"], ["image", "🖼️ Captura"]];
   const form = {
@@ -1230,6 +1254,7 @@ function projectPage(p) {
   return `<button class="link" data-act="proj-back">${I.back} Proyectos</button>
     <div class="proj-head"><span class="proj-e big" aria-hidden="true">${esc(p.emoji)}</span><div><h1>${esc(p.name)}</h1><p class="subtitle">${p.sources.length} fuente${p.sources.length === 1 ? "" : "s"}</p></div></div>
     <div class="stack">
+    ${projectWhyCard(p)}
     ${hz() ? hzAstillero(hzBarco(p), hzUi) : ""}
     <section class="card"><h2>Pregunta al proyecto</h2>
       ${ai ? `<div class="suggest">${[["resumen", "📄 Resumen"], ["claves", "🔑 Puntos clave"], ["preguntas", "❓ Preguntas de repaso"]].map(([k, l]) => `<button type="button" data-act="proj-preset" data-p="${k}" data-label="${esc(l)}"${p.sources.length ? "" : " disabled"}>${l}</button>`).join("")}</div>
@@ -1516,7 +1541,7 @@ function nightCard() {
 // ---------- Shared bits ----------
 // Attachments of an item: its screenshot (tap to see it big) and its link.
 const attach = (x) => `${x.imageId ? `<button class="thumb" data-act="img-view" data-img-id="${esc(x.imageId)}" aria-label="Ver captura"><img data-img="${esc(x.imageId)}" alt=""></button>` : ""}${x.url ? `<a class="link small" href="${esc(safeHref(x.url))}" target="_blank" rel="noopener">Abrir</a>` : ""}`;
-const taskRow = (t) => `<div class="row"><button class="check" data-act="toggle" data-id="${esc(t.id)}" aria-pressed="${Boolean(t.done)}" aria-label="${t.done ? "Reabrir" : "Completar"}: ${esc(t.text)}">${I.check}</button><span class="grow ${t.done ? "done-text" : ""}">${esc(t.text)}</span>${attach(t)}</div>`;
+const taskRow = (t) => `<div class="row"><button class="check" data-act="toggle" data-id="${esc(t.id)}" aria-pressed="${Boolean(t.done)}" aria-label="${t.done ? "Reabrir" : "Completar"}: ${esc(t.text)}">${I.check}</button><span class="grow ${t.done ? "done-text" : ""}">${esc(t.text)}</span>${attach(t)}${t.done ? "" : `<button class="chip work-chip${t.work ? " on" : ""}" data-act="task-work" data-id="${esc(t.id)}" aria-pressed="${Boolean(t.work)}" aria-label="${t.work ? "Es de trabajo" : "No es de trabajo"}: ${esc(t.text)}">💼${t.work && t.workGuess ? "?" : ""}</button>`}</div>`;
 const reminderAt = (r) => { const d = new Date(r.at); return `${d.toDateString() === today().toDateString() ? "Hoy" : d.toLocaleDateString("es-ES", { weekday: "short", day: "numeric" })} ${hhmm(d)}`; };
 const reminderIphoneUrl = (r) => { const d = new Date(r.at); return shortcutUrl(SHORTCUT_REMINDER, `${r.text} | ${dayKey(d)} ${hhmm(d)}`); };
 const reminderRow = (r) => `<div class="row"><button class="check" data-act="rem-done" data-id="${esc(r.id)}" aria-pressed="${Boolean(r.done)}" aria-label="Hecho: ${esc(r.text)}">${I.check}</button><div class="grow"><div class="${r.done ? "done-text" : ""}">${esc(r.text)}</div><div class="muted small">${esc(reminderAt(r))}</div></div>${attach(r)}<a class="link small" href="${esc(reminderIphoneUrl(r))}">Al iPhone</a></div>`;
@@ -1532,7 +1557,7 @@ const screens = {
   hoy() {
     const m = modeState(today(), undefined, vault.settings.override);
     const inbox = pending(vault.inbox);
-    const open = tasks(vault.inbox);
+    const open = openNow();
     const [s, e] = monthRange();
     const month = lgSummary(vault, { from: s, to: e });
     const next = agendaToday() ? nextEvent(vault.agenda) : null;
@@ -1554,7 +1579,6 @@ const screens = {
       ${gentleCard()}
       ${vault.brain || vault.spending.length ? (hz() ? hzBotella : hoyMemCard)(topProposal(brain(), { spending: vault.spending, projects: vault.projects, now: new Date() })) : ""}
       <button class="cmdk-pill glass" data-act="cmdk" aria-label="Comando rápido">⚡ <span>Haz algo rápido…</span></button>
-      ${nowCard()}
       ${fableHoyServices({
         cloud: { signedIn: nubeOn(), conflict: Boolean(cloudState.conflict), dirty: Boolean(cloudState.dirty), error: Boolean(cloudState.error), lastAt: cloudState.lastAt },
         push: { enabled: pushPrefs().on, here: Boolean(pushDev.v.endpoint), error: Boolean(pushUi.msg) },
@@ -1675,8 +1699,9 @@ const screens = {
     return `<h1>Proyectos</h1><p class="subtitle">Cuadernos con tus fuentes: MANU responde solo con lo que metas en cada uno.</p>
       <div class="stack">
       ${list.length ? `<div class="proj-grid">${list.map((x) => hz() ? hzBarcoCarta(hzBarco(x)) : `<button class="proj-card" data-act="proj-open" data-id="${esc(x.id)}"><span class="proj-e" aria-hidden="true">${esc(x.emoji)}</span><b>${esc(x.name)}</b><span class="muted small">${x.sources.length} fuente${x.sources.length === 1 ? "" : "s"}</span></button>`).join("")}</div>` : '<section class="card"><p class="muted">Aún no tienes proyectos. Crea uno para un viaje, un estudio, una reforma, recetas… y mete notas, capturas y vídeos.</p></section>'}
+      ${parkedCard()}
       ${suggestCard()}
-      <section class="card"><h2>Nuevo proyecto</h2><form id="projForm" class="proj-new"><label for="projEmoji" class="sr">Emoji</label><input id="projEmoji" maxlength="4" value="📁" aria-label="Emoji"><label for="projName" class="sr">Nombre</label><input id="projName" maxlength="60" placeholder="Viaje a Lisboa" required><button class="btn" type="submit">Crear</button></form></section>
+      <section class="card"><h2>Nuevo proyecto</h2><form id="projForm" class="proj-new"><label for="projEmoji" class="sr">Emoji</label><input id="projEmoji" maxlength="4" value="📁" aria-label="Emoji"><label for="projName" class="sr">Nombre</label><input id="projName" maxlength="60" placeholder="Viaje a Lisboa" required><label for="projWhy" class="sr">Para qué lo empiezas</label><input id="projWhy" maxlength="200" placeholder="Para qué lo empiezas (opcional)"><button class="btn" type="submit">Crear</button></form></section>
       </div>`;
   },
   tu() {
@@ -1834,7 +1859,7 @@ const subpages = {
         ${res ? (res.length ? `<p class="muted small">${res.length} resultado${res.length === 1 ? "" : "s"} para «${esc(libQ)}» en tu biblioteca, documentos, proyectos e ideas</p>${res.map((x) => `<button class="row find-row" ${goAttr(x.go)}><span aria-hidden="true">${esc(x.icon)}</span><div class="grow"><div>${esc(x.title)}</div><div class="muted small">${esc(x.kind)}${x.snippet ? ` · ${esc(x.snippet)}` : ""}</div></div><span class="chev">${I.chev}</span></button>`).join("")}<button class="link small" data-act="lib-q-clear">Quitar la búsqueda</button>` : `<p class="muted small">No encuentro «${esc(libQ)}» en lo que has guardado.</p><button class="link small" data-act="lib-q-clear">Quitar la búsqueda</button>`) : ""}</section>
       <div class="chips" role="group" aria-label="Filtro">${["todo", ...STATUSES, ...(review ? ["revisar"] : [])].map((st) => `<button class="chip${libFilter === st ? " on" : ""}" data-act="lib-filter" data-v="${st}" aria-pressed="${libFilter === st}">${st === "revisar" ? `por revisar (${review})` : st}</button>`).join("")}</div>
       <div class="stack">${items.length ? items.map(libRow).join("") : '<p class="muted">Nada por aquí.</p>'}</div>
-      <p class="muted small">Lo que guardas vive en este dispositivo y viaja en Tu nube como texto (título, enlace, notas). Los archivos se quedan solo en este dispositivo: no suben a Tu nube ni a ninguna IA.</p>`;
+      <p class="muted small">Los archivos se quedan en este dispositivo: no suben a la nube ni a ninguna IA.</p>`;
   },
   // WEB-59: drop all the screenshots, MANU reads, groups and proposes; Manu keeps the text.
   capturas() {
@@ -2594,7 +2619,7 @@ También puedes buscar en Tú → 🔎.` });
   if (intent.kind === "health") { const t = localDay(); vault.health = [...vault.health.filter((x) => !(x.day === t && x.kind === intent.metric)), { day: t, kind: intent.metric, value: intent.value }]; }
   if (intent.kind === "mood") vault.moods = setMood(vault.moods, localDay(), intent.value);
   if (intent.kind === "idea") vault.inbox.push(capture({ id: uid("c"), text: intent.text, at }));
-  if (intent.kind === "task") vault.inbox.push({ ...capture({ id: uid("c"), text: intent.text.slice(0, 140), at }), status: "TASK" });
+  if (intent.kind === "task") vault.inbox.push({ ...capture({ id: uid("c"), text: intent.text.slice(0, 140), at }), status: "TASK", ...workTag() });
   if (intent.kind === "alarm") action = { label: `Poner en el iPhone · ${intent.time}`, href: shortcutUrl(SHORTCUT_ALARM, intent.time) };
   if (intent.kind === "reminder") {
     let when = new Date(now);
@@ -2754,6 +2779,7 @@ function lifeSnapshot() {
     birthdays: upcomingBirthdays(vault.people, now, 14).map((b) => ({ name: b.person.name, days: b.days })),
     mail: googleOn("gmail") ? vault.mail ?? null : null,
     profile: vault.profile?.text ?? null,
+    voice: { description: brain().voice?.description ?? null, humor: brain().voice?.humor ?? 1 },
   };
 }
 
@@ -2965,7 +2991,7 @@ function runCall(c, { quiet = false } = {}) {
   const at = new Date().toISOString();
   const say = (t) => { if (!quiet) toast(t); };
   switch (c.name) {
-    case "anadir_tarea": { const id = uid("c"); vault.inbox.push({ ...capture({ id, text: c.texto, at }), status: "TASK", ...shared(c) }); c.undo = { list: "inbox", id }; say("Tarea añadida"); break; }
+    case "anadir_tarea": { const id = uid("c"); vault.inbox.push({ ...capture({ id, text: c.texto, at }), status: "TASK", ...workTag(), ...shared(c) }); c.undo = { list: "inbox", id }; say("Tarea añadida"); break; }
     case "anadir_idea": { const id = uid("c"); vault.inbox.push({ ...capture({ id, text: c.texto, at }), status: "IDEA", ...shared(c) }); c.undo = { list: "inbox", id }; say("Idea guardada"); break; }
     case "completar_tarea": {
       const q = normalise(c.texto);
@@ -3287,24 +3313,37 @@ function mailSubmit(form) {
 // ---------- Hoy: centro de control (misión «asistente real») ----------
 function controlCard() {
   const [s, e] = monthRange();
+  const f = fr();
+  const msum = (vault.spending.length || (vault.income ?? []).length) ? lgSummary(vault, { from: s, to: e }) : null;
+  const rest = f.weekendPlan === "descanso";
   const items = controlItems({
     now: new Date(), events: agendaToday()?.events ?? [], tomorrow: vault.agendaTomorrow?.day === tomorrowKey() ? vault.agendaTomorrow.events : [],
-    reminders: vault.reminders, mail: googleOn("gmail") ? pendingMail(mailItems()) : [], docs: expiringSoon(vault.docs, today(), 30),
-    money: (vault.spending.length || (vault.income ?? []).length) ? lgSummary(vault, { from: s, to: e }) : null, euros, projects: vault.projects ?? [], mailLabel: (k) => TRIAGE[k]?.short ?? k,
-  });
+    reminders: vault.reminders, mail: googleOn("gmail") && !rest ? pendingMail(mailItems()) : [], docs: expiringSoon(vault.docs, today(), 30),
+    money: msum, moneyText: msum ? moneyLine(msum, msum.fiable ? monthPace(money().spend, today()).diff : null, { humor: brain().voice?.humor ?? 1, seed: today().getDate() }) : null,
+    euros, projects: rest || f.key === "WORK" ? [] : vault.projects ?? [], mailLabel: (k) => TRIAGE[k]?.short ?? k,
+  }).filter((x) => !(rest && x.level === "IMPORTANT" && x.source !== "Agenda" && !/^Google Calendar/.test(x.source) && x.source !== "Recordatorios"));
   const fresh = freshness([
     { name: "Agenda", on: googleOn("calendar"), at: vault.calendar?.syncedAt ?? null },
     { name: "Correo", on: googleOn("gmail"), at: vault.mail?.syncedAt ?? null },
     { name: "Tiempo", on: true, at: vault.weather?.at ?? null, maxAgeH: 3 },
   ]);
-  const goAttr = (g) => (g.project ? `data-act="find-go" data-project="${esc(g.project)}"` : g.sub ? `data-sub-go="${esc(g.sub)}"` : `data-tab="${esc(g.tab)}"`);
+  const goAttr = (g) => (!g ? "" : g.project ? `data-act="find-go" data-project="${esc(g.project)}"` : g.sub ? `data-sub-go="${esc(g.sub)}"` : `data-tab="${esc(g.tab)}"`);
   const row = (x) => `<button class="row ctl-row ctl-${x.level.toLowerCase()}" ${goAttr(x.go)}><span class="ctl-icon" aria-hidden="true">${x.icon}</span><div class="grow"><div class="ctl-title">${esc(x.title)}</div><div class="muted small">${esc(x.detail)}${x.detail ? " · " : ""}${esc(x.source)}</div><div class="muted small ctl-why">${esc(x.why)}</div></div><span class="chev">${I.chev}</span></button>`;
   const group = (lv) => { const xs = items.filter((x) => x.level === lv); return xs.length ? `<div class="ctl-group"><h3 class="ctl-h ctl-h-${lv.toLowerCase()}">${CONTROL_LEVELS[lv]} <span class="muted small">· ${xs.length}</span></h3>${xs.map(row).join("")}</div>` : ""; };
   const info = items.filter((x) => x.level === "INFO");
-  return `<section class="card ctl" aria-labelledby="ctlT"><div class="row"><h2 id="ctlT">Lo de hoy</h2><span class="btns ctl-tools">${"speechSynthesis" in globalThis ? '<button class="link small" data-act="speak-day" aria-label="Leer el día en voz alta">🔊</button>' : ""}<button class="link small" data-sub-go="biblioteca">＋ Guardar en MANU</button></span></div>
-    ${items.some((x) => x.level !== "INFO") ? `${group("URGENT")}${group("IMPORTANT")}` : '<p class="muted">Nada urgente ni pendiente para hoy con lo que sé. 🌿</p>'}
-    ${info.length ? `<details class="ctl-group"><summary class="ctl-h">${CONTROL_LEVELS.INFO} <span class="muted small">· ${info.length}</span></summary>${info.map(row).join("")}</details>` : ""}
-    <p class="muted small ctl-fresh">${fresh.map((f) => `${esc(f.name)} ${esc(f.text)}${f.stale ? " (antiguo)" : ""}`).join(" · ")}${fresh.length ? ". " : ""}Se actualiza al abrir MANU; con la app cerrada no se actualiza nada.</p></section>`;
+  // «Ahora»: una sola cosa, con su porqué. Se puede apartar por hoy.
+  const skipped = vault.settings.nowSkipped?.day === localDay() ? vault.settings.nowSkipped.items : [];
+  const plan = nowPlan();
+  const now = [plan.main, ...plan.more].find((x) => x && !skipped.includes(x.t));
+  const nowHtml = now ? `<div class="ctl-now"><p class="ctl-now-t"><span aria-hidden="true">${now.e}</span> <b>${esc(now.t)}</b></p><p class="muted small">${esc(now.why)}</p><div class="btns">${now.go ? goButton(now.go) : ""}<button class="link small" data-act="now-skip" data-t="${esc(now.t)}">Ahora no</button></div></div>` : "";
+  const hidden = hiddenWork(tasks(vault.inbox), f);
+  const weekendAsk = f.weekend && !f.weekendPlan && f.key === "WEEKEND" ? `<div class="ctl-weekend"><p class="small"><b>¿Este finde descansas o lo usas para tus cosas?</b></p><div class="btns"><button class="btn small-btn" data-act="weekend-plan" data-v="descanso">Descanso</button><button class="btn ghost small-btn" data-act="weekend-plan" data-v="proyectos">Mis cosas</button></div></div>` : "";
+  return `<section class="card ctl" aria-labelledby="ctlT"><div class="row"><h2 id="ctlT">${esc(f.title)}</h2><span class="btns ctl-tools">${"speechSynthesis" in globalThis ? '<button class="link small" data-act="speak-day" aria-label="Leer el día en voz alta">🔊</button>' : ""}<button class="link small" data-sub-go="biblioteca">＋ Guardar</button></span></div>
+    <p class="muted small ctl-hint">${esc(f.hint)}${hidden ? ` · ${hidden} de trabajo ${hidden === 1 ? "espera" : "esperan"} al próximo día laborable` : ""}</p>
+    ${weekendAsk}${nowHtml}
+    ${items.some((x) => x.level !== "INFO") ? `${group("URGENT")}${group("IMPORTANT")}` : '<p class="muted">Nada urgente ni pendiente con lo que sé. 🌿</p>'}
+    ${info.length ? `<details class="ctl-group"${f.key === "NIGHT" || f.key === "MORNING" ? " open" : ""}><summary class="ctl-h">${CONTROL_LEVELS.INFO} <span class="muted small">· ${info.length}</span></summary>${info.map(row).join("")}</details>` : ""}
+    <p class="muted small ctl-fresh">${fresh.map((x) => `${esc(x.name)} ${esc(x.text)}${x.stale ? " (antiguo)" : ""}`).join(" · ")}${fresh.length ? ". " : ""}Se actualiza al abrir MANU, no con la app cerrada.</p></section>`;
 }
 // ---------- Triaje del correo (local, sin IA, sin acciones automáticas) ----------
 let mailUi = { open: null, mode: null, showAll: false };
@@ -3333,7 +3372,7 @@ function mailTriageSection() {
     ${done.length ? `<details class="card"><summary>${done.length} revisado${done.length === 1 ? "" : "s"}</summary><div class="mail-list">${done.map(mailRow).join("")}</div></details>` : ""}
     ${info.length ? `<details class="card"><summary>${info.length} informativo${info.length === 1 ? "" : "s"}</summary><div class="mail-list">${info.map(mailRow).join("")}</div></details>` : ""}
     ${bulk.length ? `<details class="card"><summary>${bulk.length} de publicidad o repetitivos</summary><div class="mail-list">${bulk.map(mailRow).join("")}</div></details>` : ""}
-    <p class="muted small">Clasifico solo por el remitente, el asunto y si ya contestaste en el hilo; no leo el texto de los correos ni lo mando a ninguna IA. Que algo esté sin leer no lo hace importante. Nunca archivo, borro, respondo ni doy de baja nada sin que tú lo pidas.</p>`;
+    <p class="muted small">Por remitente y asunto, sin leer los correos ni mandarlos a una IA. Nunca archivo, borro ni respondo solo.</p>`;
 }
 const senderName = (email) => vault.mail?.senders?.find((s) => s.email === email)?.name ?? email;
 
@@ -3424,7 +3463,7 @@ function updateItem(id, fn) {
 
 // ---------- WEB-94: Memoria ----------
 // Every handler here is Manu's tap: the decision is his; the core only proposes.
-const MEM_FORMS = new Set(["memAnswerForm", "memCatForm", "memChangeForm", "memAddForm", "memSearchForm", "memCorrectForm", "memExampleForm"]);
+const MEM_FORMS = new Set(["memAnswerForm", "memCatForm", "memChangeForm", "memAddForm", "memSearchForm", "memCorrectForm", "memExampleForm", "memVoiceForm"]);
 const memProposalByKey = (key) => memProposals(brain(), { spending: vault.spending, projects: vault.projects, now: new Date() }).find((p) => p.key === key);
 // ---------- Horizonte: acciones (WEB-108) ----------
 const hzModos = () => `<div class="hz-modos" role="group" aria-label="Vista de MANU"><button data-act="hz-manu" data-v="hablar" aria-pressed="${hzUi.manu !== "cielo"}">Hablar</button><button data-act="hz-manu" data-v="cielo" aria-pressed="${hzUi.manu === "cielo"}">Constelación</button></div>`;
@@ -3685,6 +3724,7 @@ function memSubmit(form) {
   if (f === "memCatForm") { memRunProposal(form.dataset.key, "choose", { category: val("memCat") }); return; }
   if (f === "memChangeForm") { memRunProposal(form.dataset.key, "change", { text: val("memChange") }); return; }
   if (f === "memCorrectForm") { const r = memTry(() => memCorrect(brain(), form.dataset.id, { text: val("memCorrectText") }, { now })); if (r) { vault.brain = r.brain; memUi.open = r.claim.id; memUi.correcting = null; memSave("Corregido. La versión anterior queda en el historial."); } return; }
+  if (f === "memVoiceForm") { const d = ($("memVoiceDesc")?.value ?? "").replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, " ").trim().slice(0, 1500); const voice = { ...(brain().voice ?? {}) }; if (d) voice.description = d; else delete voice.description; vault.brain = { ...brain(), voice }; memSave(d ? "Guardado: hablaré más como tú" : "Borrado"); return; }
   if (f === "memExampleForm") { const v = memTry(() => addExample(brain().voice, val("memExText"), val("memExWhen"), { now })); if (v) { vault.brain = { ...brain(), voice: v }; memSave("Apuntada. La usaré de vez en cuando."); } return; }
   if (f === "memAddForm") {
     const text = val("memText"); if (!text) return;
@@ -3717,6 +3757,16 @@ document.addEventListener("click", async (e) => {
     case "idea-to-task": updateItem(id, (i) => ({ ...i, status: "TASK" })); toast("Ahora es una tarea"); break;
     case "forget": updateItem(id, markUnclassified); break;
     case "toggle": updateItem(id, toggleDone); break;
+    case "idea-to-project": {
+      const i = vault.inbox.find((x) => x.id === a.dataset.id); if (!i) break;
+      const act = activeProjects().length;
+      if (act >= 3 && !window.confirm(`Ya tienes ${act} proyectos en marcha. ¿Seguro que empiezas otro con «${i.text.slice(0, 60)}»?`)) break;
+      createProject({ name: i.text.slice(0, 60), emoji: "💡", why: i.text }).then(({ p }) => { vault.inbox = vault.inbox.map((x) => (x.id === i.id ? { ...x, done: true, doneAt: new Date().toISOString(), project: p.id } : x)); openProject = p.id; go("proyectos"); persist(); render({ focus: true, enter: "page" }); toast("Proyecto creado desde la idea"); });
+      break;
+    }
+    case "task-work": { const t = vault.inbox.find((x) => x.id === a.dataset.id); if (t) { t.work = !t.work || Boolean(t.workGuess); delete t.workGuess; persist(); render(); toast(t.work ? "Marcada de trabajo: desde el cierre de jornada no te la enseño hasta el día siguiente" : "Ya no es de trabajo"); } break; }
+    case "weekend-plan": { vault.settings.weekendPlans = { ...Object.fromEntries(Object.entries(vault.settings.weekendPlans ?? {}).slice(-8)), [weekendKey(today())]: a.dataset.v }; persist(); render(); toast(a.dataset.v === "descanso" ? "Finde de descanso: nada de proyectos ni de pendientes que no sean urgentes" : "Finde para tus cosas: te propongo tus proyectos"); break; }
+    case "now-skip": { const k = localDay(); const sk = vault.settings.nowSkipped?.day === k ? vault.settings.nowSkipped.items : []; vault.settings.nowSkipped = { day: k, items: [...sk, a.dataset.t].slice(-20) }; persist(); render(); break; }
     case "rem-done": vault.reminders = vault.reminders.map((r) => (r.id === id ? { ...r, done: !r.done } : r)); persist(); render(); break;
     case "sheet": openSheet(a.dataset.kind, true); break;
     case "close-day": closeDay(); break;
@@ -4076,9 +4126,11 @@ document.addEventListener("submit", async (e) => {
     toast(n ? `Guardadas. He metido ${n} ${n === 1 ? "cosa" : "cosas"} que encajan.` : "Guardadas");
     return;
   }
+  if (f === "projWhyForm") { const p = (vault.projects ?? []).find((x) => x.id === e.target.dataset.id); if (p) { const w = $("pWhy").value.replace(/\s+/g, " ").trim().slice(0, 200); if (w) p.why = w; else delete p.why; persist(); toast("Guardado"); } return; }
+  if (f === "projStepForm") { const p = (vault.projects ?? []).find((x) => x.id === e.target.dataset.id); const text = $("pStep").value.trim().slice(0, 140); if (p && text) { vault.inbox.push({ ...capture({ id: uid("c"), text: `${p.emoji ?? "📁"} ${text}`, at: new Date().toISOString() }), status: "TASK", project: p.id }); p.updatedAt = new Date().toISOString(); persist(); render(); toast("Apuntado: te lo propondré cuando toque"); } return; }
   if (f === "projForm") {
     try {
-      const { p, n } = await createProject({ name: $("projName").value, emoji: $("projEmoji").value || "📁" });
+      const { p, n } = await createProject({ name: $("projName").value, emoji: $("projEmoji").value || "📁", why: $("projWhy")?.value ?? "" });
       openProject = p.id; render({ focus: true, enter: "page" }); scrollTo(0, 0);
       if (n) toast(`He metido ${n} ${n === 1 ? "cosa" : "cosas"} que ya tenías sobre esto`);
     } catch (err) { toast(err.message); }
@@ -4270,7 +4322,7 @@ document.addEventListener("submit", async (e) => {
     const d = quickDetect(raw, today());
     // Use the cleaned text MANU understood («sacar la basura», not the whole sentence).
     const text = (d.kind === k && d.text) || (k === "EXPENSE" && d.kind === "EXPENSE" ? d.merchant ?? "" : raw);
-    if (k === "TASK" && text) vault.inbox.push({ ...capture({ id: uid("c"), text: text.slice(0, 140), at }), status: "TASK", ...extra });
+    if (k === "TASK" && text) vault.inbox.push({ ...capture({ id: uid("c"), text: text.slice(0, 140), at }), status: "TASK", ...workTag(), ...extra });
     else if (k === "IDEA" && text) vault.inbox.push({ ...capture({ id: uid("c"), text: text.slice(0, 400), at }), status: "IDEA", ...extra });
     else if (k === "EXPENSE") {
       // WEB-52: «12.50» is 12,50 € (before, every dot was removed: 1.250 €); «1.200» is 1.200 €.
@@ -4366,6 +4418,7 @@ document.addEventListener("change", async (e) => {
     return;
   }
   if (e.target.id === "docFile" && e.target.files?.[0]) { const file = e.target.files[0]; e.target.value = ""; readDocFile(file).catch(() => { docDraft = null; render(); toast("No he podido abrir ese archivo"); }); return; }
+  if (e.target.id === "pWhy") { const p = (vault.projects ?? []).find((x) => x.id === openProject); if (p) { const w = e.target.value.replace(/\s+/g, " ").trim().slice(0, 200); if (w) p.why = w; else delete p.why; persist(); toast("Guardado"); } return; }
   if (e.target.dataset?.libTitle) { const id = e.target.dataset.libTitle, t = e.target.value.trim().slice(0, 120); if (!t) return; vault.library = vault.library.map((x) => { if (x.id !== id) return x; const { needsReview, ...rest } = x; return { ...rest, title: t }; }); persist(); toast("Título guardado"); return; }
   if (e.target.dataset?.libNotes) { const id = e.target.dataset.libNotes; vault.library = vault.library.map((x) => (x.id === id ? { ...x, notes: e.target.value.slice(0, 4000) } : x)); persist(); toast("Notas guardadas"); return; }
   if (e.target.id === "bankShots" && e.target.files?.length) { const files = [...e.target.files]; e.target.value = ""; readBankShots(files); return; }
@@ -4879,7 +4932,7 @@ function saveCard() {
   const p = saveUi.prop;
   if (!p) return `<form class="card stack save-card" id="saveForm"><h2>Guardar en MANU</h2><label for="saveText" class="sr">Enlace, nota o idea</label><textarea id="saveText" rows="2" placeholder="Pega un enlace o escribe una nota o idea">${esc(saveUi.text)}</textarea>
     <div class="btns"><button class="btn" type="submit">Siguiente</button><label class="btn ghost" for="saveFile" role="button" tabindex="0">📎 Elegir archivo</label><input id="saveFile" type="file" class="sr"></div>
-    <p class="muted small">Enlaces, artículos, vídeos, PDF, documentos, imágenes, notas e ideas. MANU propone título, tema y proyecto y tú decides.</p></form>`;
+    <p class="muted small">Enlaces, PDF, fotos, notas o ideas. Tú decides dónde va.</p></form>`;
   return `<form class="card stack save-card" id="saveConfirm"><h2>¿Lo guardo así?</h2>
     ${p.needsReview ? '<p class="small lg-warn"><b>Revísalo:</b> no puedo saber bien de qué trata sin abrirlo, y no lo abro.</p>' : ""}
     <label for="svTitle" class="muted small">Título</label><input id="svTitle" maxlength="120" value="${esc(p.title)}" required>
@@ -4911,7 +4964,7 @@ async function saveConfirm() {
   persist(); render(); toast(project ? "Guardado en tu biblioteca y en el proyecto" : "Guardado en tu biblioteca");
 }
 // Las revisiones usan el consumo personal (Dinero 2.0) y solo hablan de gasto si la cifra es fiable.
-const reviewData = (now = today()) => { const from = new Date(now); from.setDate(from.getDate() - 35); return { now, inbox: vault.inbox, habits: vault.habits, projects: vault.projects ?? [], docsSoon: expiringSoon(vault.docs, now, 30).map((x) => ({ title: x.doc.title, left: x.left })), spending: money().spend, moneyReliable: lgSummary(vault, { from, to: new Date(now.getTime() + 86400000) }).fiable, clock: vault.clock, targetMin: clockTarget(), reminders: vault.reminders }; };
+const reviewData = (now = today()) => { const from = new Date(now); from.setDate(from.getDate() - 35); return { now, inbox: fr().showsWork ? vault.inbox : vault.inbox.filter((i) => !(i.status === "TASK" && i.work && !i.done)), habits: vault.habits, projects: vault.projects ?? [], docsSoon: expiringSoon(vault.docs, now, 30).map((x) => ({ title: x.doc.title, left: x.left })), spending: money().spend, moneyReliable: lgSummary(vault, { from, to: new Date(now.getTime() + 86400000) }).fiable, clock: vault.clock, targetMin: clockTarget(), reminders: vault.reminders }; };
 function tonightReview() {
   const t = today(); const next = new Date(t.getFullYear(), t.getMonth(), t.getDate() + 1);
   return nightReview({ ...reviewData(), todayEvents: eventsFor(dayKey(t)), tomorrowEvents: eventsFor(dayKey(next)) });

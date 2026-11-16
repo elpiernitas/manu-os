@@ -58,7 +58,7 @@ const sub = async (p, name) => { await p.evaluate((n) => { const b = document.cr
   ok("correo que pide algo, con su fuente", /presupuesto[\s\S]*Gmail/.test(txt));
   ok("el correo ya contestado no sale", !/Quedamos el jueves/.test(txt));
   ok("frescura: agenda y correo con su hora", /Agenda a las 09:50/.test(txt) && /Correo a las 09:55/.test(txt));
-  ok("no promete actualizar con la app cerrada", /con la app cerrada no se actualiza nada/.test(txt));
+  ok("no promete actualizar con la app cerrada", /no con la app cerrada/.test(txt));
   ok("dinero provisional pide revisar (600 € sin atribuir)", /movimientos sin atribuir/.test(txt));
   const hoy = await page.locator("#screen").innerText();
   ok("Hoy sin NaN ni undefined", !/NaN|undefined/.test(hoy));

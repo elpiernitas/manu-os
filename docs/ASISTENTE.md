@@ -143,3 +143,39 @@ Búsqueda:
 
 - **Safari y iPhone reales:** no probados; solo Chromium con emulación de iPhone.
 - **Teclado de iOS:** la prueba comprueba que la barra inferior no tapa el botón de guardar, pero el teclado real de Safari no se puede simular en Chromium.
+
+## Hoy a la medida de Manu (WEB-115)
+
+`web/core/daymode.js`. Hoy cambia de contenido según la franja del día. Los colores no cambian nunca.
+
+| Franja | Cuándo | Qué enseña |
+|---|---|---|
+| Mañana | Antes de las 09:00 | Lo de hoy, para arrancar |
+| Trabajo | Laborables, de 09:00 a 13:00 | «Ahora»: lo siguiente de trabajo. Sin proyectos personales |
+| Desconexión | Desde las 13:00 hasta cerrar la jornada (o 2 horas) | Cierre de jornada |
+| Tarde | Después de cerrar la jornada | Lo tuyo. El trabajo no se ve |
+| Noche | Desde las 22:00 | Mañana; «Para saber» desplegado |
+| Fin de semana | Sábado y domingo | Sin trabajo, y pregunta si descansas o lo usas |
+
+- **«Ahora».** Una sola propuesta arriba, con su porqué. «Ahora no» la aparta solo por hoy.
+- **Tareas de trabajo.** Las marca el chip 💼.
+  - Una tarea apuntada en horario de trabajo se marca como supuesto (💼?) y se cambia con un toque.
+  - Desde el cierre de jornada hasta el día laborable siguiente no se ven: ni en Hoy, ni en «Ahora», ni en los repasos. Hoy dice cuántas esperan.
+  - Si hay tareas marcadas, el cierre de jornada solo cuenta esas.
+- **Fin de semana.** Manu aún no ha decidido si descansa o lo usa, así que se le pregunta cada fin de semana y no se supone nada.
+  - «Descanso»: fuera los proyectos parados y lo importante que no sea agenda ni recordatorios. Lo urgente sigue saliendo.
+  - «Mis cosas»: se le proponen sus proyectos.
+- **Ideas aparcadas.** Una idea no es un proyecto hasta que Manu quiere.
+  - Proyectos enseña las ideas con la carga actual (proyectos con movimiento en 14 días).
+  - Al convertir una idea en proyecto con 3 o más en marcha, pide confirmación.
+  - El proyecto nuevo se queda con la idea como «para qué».
+- **Para qué y paso de 10 minutos.**
+  - Cada proyecto guarda para qué lo empezaste, y se recuerda cuando se para.
+  - Desde el proyecto se apunta el siguiente paso de 10 minutos como tarea.
+- **Dinero en una línea.**
+  - Sale en «Para saber», con el humor elegido en Memoria (sobrio, natural o con chispa) y sin juicios. Por ejemplo: «Llevas X € este mes. Como el mes pasado: ni sustos ni milagros».
+  - Si la cifra es provisional, lo dice.
+- **Cómo hablas tú.**
+  - En Memoria → Tu estilo, Manu puede pegar cómo describe ChatGPT su forma de hablar.
+  - Solo se manda a Gemini como guía de tono, dentro del bloque de datos y nunca como órdenes, junto con el humor elegido.
+- **Menos texto.** Explicaciones más cortas en Correo, Biblioteca y Hoy.
