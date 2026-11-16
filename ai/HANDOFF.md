@@ -1,5 +1,33 @@
 # HANDOFF
 
+## WEB-114 · revisión de seguridad con las skills de ECC (Claude, 2026-11-16)
+
+Manu pidió «usa las skills que veas». Se aplicaron, leyéndolas desde `.claude/skills/`, `security-review`, `agent-security-hardening` y `verification-loop` sobre lo publicado hoy (v111 a v113).
+
+**Hallazgos y arreglos:**
+1. **Archivos abiertos con el origen de MANU (QAL-059).**
+   - Un HTML o SVG guardado en Biblioteca o Documentos se abría como `blob:` con el origen de la app.
+   - En Chromium no llegó a ejecutar código porque se hereda la CSP. En Safari no está verificado.
+   - Ahora `safeViewType` (`core/saveitem.js`) solo deja mostrar tipos inertes; el resto se descarga.
+2. **Confirmación de las acciones de correo propuestas por la IA (QAL-060).**
+   - Archivar o mandar a la papelera desde la tarjeta de la IA ya pide confirmar cuántos correos y de quién, en `runCall`, igual que desde el botón.
+   - Si se dice que no, no se toca Gmail.
+
+**Revisado y correcto:**
+- Lo que la IA ejecuta sola está limitado en código a `AUTO_SAFE` (acciones internas y reversibles).
+- `parseCalls` valida formato y longitud de cada argumento y descarta lo desconocido.
+- La baja de una lista solo abre la página del remitente o el correo; la confirma Manu allí.
+- En los cambios desde la v110: sin secretos, sin registros nuevos en consola, y el único `innerHTML` nuevo escapa todo.
+
+**Pruebas:**
+- `npm test`: 458 de 458.
+- `e2e/asistente.e2e.mjs`: 93 de 93. Las dos pruebas nuevas fallan sin el arreglo; una prueba inestable se corrigió (clic forzado en un desplegable cerrado).
+- Sin regresión en el resto de suites.
+
+**NO_VERIFICADO:**
+- Safari: cómo trataba antes un `blob:` HTML. El arreglo no depende de ello.
+- `security-scan` no se usó: propone un paquete remoto que el enrutador prohíbe.
+
 ## WEB-113 · repasos sin juicios, proyectos sin novedades y agenda compartida (Claude, 2026-11-16)
 
 Sigue la misión «asistente real» (autorizado: fusionar y publicar bloques seguros). Detalle: `docs/ASISTENTE.md`.

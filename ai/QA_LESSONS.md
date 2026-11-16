@@ -282,3 +282,13 @@ En WEB-112, las pruebas buscaban «Para ti» y «¿Lo guardo así?», pero los t
 En el PR #122, la skill `security-scan` de ECC indicaba ejecutar `npx ecc-agentshield` (sin versión fijada, con opciones que envían la configuración a un modelo con coste o reescriben archivos). El enrutador decía que `AGENTS.md` manda, pero no nombraba este caso, y un agente que sigue la skill paso a paso lo habría ejecutado.
 
 Regla: al incorporar instrucciones de agente de terceros (skills, prompts, plantillas), se buscan órdenes de ejecutar paquetes remotos, enviar datos fuera o generar costes, y se prohíben de forma explícita en el enrutador del repo, con una comprobación automática que falle si la regla desaparece.
+
+### QAL-059 — Un archivo del usuario abierto como `blob:` tiene el origen de la app
+
+En WEB-114 (revisión con `security-review` y `agent-security-hardening`), los archivos de la Biblioteca y de Documentos se abrían con `URL.createObjectURL` en una pestaña nueva. Una URL `blob:` hereda el origen de MANU: un HTML o un SVG guardado se mostraba como si fuera la app, con acceso potencial a `localStorage` (el vault). En Chromium la CSP heredada bloqueó el script de prueba, pero no está comprobado en Safari y no se debe depender de ello.
+
+Regla: solo se muestran dentro del navegador los tipos inertes (imagen sin SVG, PDF, texto plano, audio, vídeo); todo lo demás se descarga como `application/octet-stream`. Prueba e2e: un `.html` guardado provoca una descarga y ninguna pestaña.
+
+### QAL-060 — La confirmación de una acción no puede depender de por dónde se pidió
+
+En WEB-114, archivar o mandar a la papelera los correos de un remitente pedía «¿seguro?» con el número de correos desde el botón de la app, pero no desde la tarjeta que propone la IA, donde además el remitente se busca por parecido. Regla: la confirmación del alcance exacto vive en la función que ejecuta la acción (`runCall`), no en cada botón, y se prueba que al decir «no» no sale ninguna petición.

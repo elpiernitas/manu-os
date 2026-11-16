@@ -105,3 +105,9 @@ export function searchSaved(vault, query, { limit = 30 } = {}) {
   }
   return out.sort((a, b) => String(b.at).localeCompare(String(a.at))).slice(0, limit);
 }
+
+// Abrir un archivo guardado: solo se muestran dentro del navegador los tipos inertes. HTML, SVG,
+// XML, JavaScript y lo desconocido se descargan, para que nunca corran con el origen de MANU
+// (y así no puedan leer el vault de localStorage).
+const SAFE_VIEW = /^(image\/(png|jpeg|gif|webp|heic|heif|avif)|application\/pdf|text\/plain|video\/[a-z0-9.+-]+|audio\/[a-z0-9.+-]+)$/i;
+export const safeViewType = (mime) => SAFE_VIEW.test(String(mime ?? "").trim()) && !/svg|xml|html|script/i.test(String(mime));

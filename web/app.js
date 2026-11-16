@@ -38,7 +38,7 @@ import { newCapture, toReview, pendingCaptures, groupCaptures, buildCapturesPayl
 import { budgetStatus, budgetLine, budgetCommand } from "./core/budget.js";
 import { findInVault, findCommand } from "./core/find.js";
 import { controlItems, freshness, LEVELS as CONTROL_LEVELS } from "./core/control.js";
-import { propose as saveProposal, searchSaved, SAVE_LIMITS } from "./core/saveitem.js";
+import { propose as saveProposal, searchSaved, SAVE_LIMITS, safeViewType } from "./core/saveitem.js";
 import { weatherEmoji, sceneFor, PARTICLES, SHAPES, MONEY_EMOJI, dayPhase, cityMinutes } from "./core/scene.js";
 import { buildImagePayload, buildLinkPayload, isGeminiKey, mayGo, setSensitiveOk, sensitiveAllowed, pickModel, backupModel, listModels, buildActionPayload, askWithActions, issueUrl, aiErrorText } from "./core/ai.js";
 import { encryptBackup, decryptBackup, passphraseProblem, isEnvelope } from "./core/crypto.js";
@@ -77,7 +77,7 @@ import { SKINS, skinOf, cielo as hzCielo, variables as hzVars, tiempoDe, portada
 import { hzCara, hzPortada, hzBotella, hzMareas, hzConstelacion, hzAstillero, hzBarcoCarta, hzBotadura, hzBitacora, hzApariencia } from "./design/horizonte.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "113"; // = número de la última tarea WEB publicada (desde WEB-87)
+export const APP_VERSION = "114"; // = número de la última tarea WEB publicada (desde WEB-87)
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -2988,6 +2988,9 @@ function runCall(c, { quiet = false } = {}) {
       const s = findSender(vault.mail, c.remitente);
       if (!s) { c.state = "missing"; break; }
       const kind = { correo_baja: "unsub", correo_archivar: "archive", correo_papelera: "trash", correo_etiquetar: "label" }[c.name];
+      // Lo propone la IA (y el remitente se busca por parecido): igual que desde el botón, archivar
+      // o mandar a la papelera necesita confirmar el alcance exacto, en código, antes de tocar Gmail.
+      if ((kind === "trash" || kind === "archive") && !window.confirm(`¿${kind === "trash" ? "Mandar a la papelera" : "Archivar"} ${s.count ? `los ${s.count} correos` : "los correos"} de ${s.name || s.email} <${s.email}>? Lo propone MANU; se puede deshacer desde el chat.`)) { c.state = null; break; }
       markMailSeen(`sender:${s.email}`);
       c.state = "working";
       mailDo(kind, s.email, c.etiqueta ?? "").then((r) => { c.state = "done"; c.result = r?.text ?? null; if (r?.undo) c.mailUndo = r.undo; persist(); render(); });
@@ -3945,8 +3948,7 @@ document.addEventListener("click", async (e) => {
       const d = vault.docs.find((x) => x.id === a.dataset.id);
       const data = d?.fileId ? await getImage(d.fileId).catch(() => null) : null;
       if (!data) { toast("No encuentro el archivo en este dispositivo"); break; }
-      const url = URL.createObjectURL(dataUrlToBlob(data));
-      window.open(url, "_blank", "noopener"); setTimeout(() => URL.revokeObjectURL(url), 60000);
+      if (openStoredFile(data, d.title) === "download") toast("Este tipo de archivo se descarga en vez de abrirse dentro de MANU (por seguridad)");
       break;
     }
     case "lib-filter": libFilter = a.dataset.v; render(); break;
@@ -3955,7 +3957,7 @@ document.addEventListener("click", async (e) => {
     case "lib-q-clear": libQ = ""; render(); break;
     case "lib-show": libQ = ""; libFilter = "todo"; libOpen = a.dataset.id; render(); document.getElementById(`lib-${a.dataset.id}`)?.scrollIntoView({ block: "center" }); break;
     case "lib-reviewed": { const it = vault.library.find((x) => x.id === a.dataset.id); if (it) { delete it.needsReview; persist(); render(); } break; }
-    case "lib-file": { const it = vault.library.find((x) => x.id === a.dataset.id); const data = it?.fileId ? await getImage(it.fileId).catch(() => null) : null; if (!data) { toast("Ese archivo no está en este dispositivo (los archivos no viajan en Tu nube)"); break; } const url = URL.createObjectURL(dataUrlToBlob(data)); window.open(url, "_blank", "noopener"); setTimeout(() => URL.revokeObjectURL(url), 60000); break; }
+    case "lib-file": { const it = vault.library.find((x) => x.id === a.dataset.id); const data = it?.fileId ? await getImage(it.fileId).catch(() => null) : null; if (!data) { toast("Ese archivo no está en este dispositivo (los archivos no viajan en Tu nube)"); break; } if (openStoredFile(data, it.fileName) === "download") toast("Este tipo de archivo se descarga en vez de abrirse dentro de MANU (por seguridad)"); break; }
     case "lib-del": { const it = vault.library.find((x) => x.id === a.dataset.id); if (it && window.confirm(`¿Borrar «${it.title}»?`)) { if (it.fileId) deleteImage(it.fileId).catch(() => {}); vault.library = vault.library.filter((x) => x.id !== it.id); persist(); render(); } break; }
     case "lib-ideas": {
       const it = vault.library.find((x) => x.id === a.dataset.id);
@@ -4970,6 +4972,15 @@ function docRow(d) {
     <div class="stack">${d.expires ? `<p class="small">Vence el ${esc(new Date(`${d.expires}T12:00`).toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" }))}${d.autoRenew ? " · se renueva sola" : ""}</p>` : ""}
       ${d.cents ? `<p class="small">${esc(euros(d.cents))}${d.period ? ` ${esc(d.period)}` : ""}</p>` : ""}${d.ref ? `<p class="small muted">Ref. ${esc(d.ref)}</p>` : ""}${d.summary ? `<p class="small">${esc(d.summary)}</p>` : ""}
       <div class="btns">${d.phone ? `<a class="btn ghost small-btn" href="${esc(safeHref(`tel:${d.phone.replace(/\s/g, "")}`))}">Llamar</a>` : ""}${d.fileId ? `<button class="btn ghost small-btn" data-act="doc-file" data-id="${esc(d.id)}">Ver archivo</button>` : ""}<button class="btn ghost small-btn" data-act="doc-edit" data-id="${esc(d.id)}">Editar</button><button class="btn danger small-btn" data-act="doc-del" data-id="${esc(d.id)}">Borrar</button></div></div></details>`;
+}
+// Abrir un archivo guardado sin darle el origen de la app a contenido activo: solo se muestran
+// los tipos inertes; HTML, SVG, XML, JS y cualquier otro se descargan (no se ejecutan como MANU).
+function openStoredFile(dataUrl, name = "archivo") {
+  const blob = dataUrlToBlob(dataUrl);
+  if (safeViewType(blob.type)) { const url = URL.createObjectURL(blob); window.open(url, "_blank", "noopener"); setTimeout(() => URL.revokeObjectURL(url), 60000); return "view"; }
+  const url = URL.createObjectURL(new Blob([blob], { type: "application/octet-stream" }));
+  const a = document.createElement("a"); a.href = url; a.download = String(name).replace(/[\\/:*?"<>|]+/g, "_").slice(0, 120) || "archivo"; document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60000); return "download";
 }
 function dataUrlToBlob(dataUrl) {
   const [head, b64] = String(dataUrl).split(",");
