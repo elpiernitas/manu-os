@@ -23,7 +23,7 @@ test("WEB-46: morning summary — weather, next event, reminder, tasks, birthday
   assert.match(t, /A las 18:00: Llamar al taller/);
   assert.match(t, /2 tareas pendientes: Comprar regalo…/);
   assert.match(t, /Persona Demo cumple mañana/);
-  assert.match(t, /2 correos importantes sin leer/);
+  assert.match(t, /2 correos parecen pedirte algo/);
   assert.match(t, /Llevas 50,00 € este mes, un 50 % menos que el mes pasado a estas alturas/); // 30 Aug is after the 29th: not counted
 });
 

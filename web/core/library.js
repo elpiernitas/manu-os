@@ -7,7 +7,7 @@
 //                    notes?, ideas?: string[], at, doneAt? }]
 import { normalise } from "./text.js";
 
-export const LIB_KINDS = { libro: "📚 Libro", articulo: "📰 Artículo", video: "🎬 Vídeo", podcast: "🎧 Podcast", curso: "🎓 Curso" };
+export const LIB_KINDS = { libro: "📚 Libro", articulo: "📰 Artículo", video: "🎬 Vídeo", podcast: "🎧 Podcast", curso: "🎓 Curso", nota: "📝 Nota", idea: "💡 Idea", documento: "📄 Documento", imagen: "🖼️ Imagen" };
 export const STATUSES = ["quiero", "en curso", "hecho"];
 const clip = (s, n) => String(s ?? "").replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, n);
 

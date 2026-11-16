@@ -15,6 +15,7 @@ import { importStatement, importStatementRows, classifiedFromRows, dropCrossSour
 import { CITIES, oviedoTrip, proposeAlarm, shouldAskTomorrow, shortcutUrl, guessCity } from "./core/night.js";
 import { birthdayEventBody, isClientId, listEvents, createEvent, newEventBody, monthGrid, listCalendars, mergeDays } from "./core/gcal.js";
 import { detectRecurring, upcomingRecurring, spendingPattern, monthStats, monthlySeries } from "./core/insights.js";
+import { TRIAGE, TRIAGE_KINDS, ACTIONABLE as MAIL_ACTIONABLE, triageList, pendingMail, keepForTriage, triageStateOf, markReviewed as mailMarkReviewed, fixKind as mailFixKind, pruneTriage } from "./core/mailtriage.js";
 import { fetchSnapshot, summarize as mailSummary, mailSuggestions, findSender, mailOrder, idsFrom, archive as mailArchive, unarchive as mailUnarchive, trash as mailTrash, untrash as mailUntrash, ensureLabel, addLabel, removeLabel, messageUrl } from "./core/gmail.js";
 import { SCOPE, runServices, planTaskSync, listOpenTasks, insertTask, completeTask, contactBirthdays, setContactBirthday, mergePeople, saveBackup, loadBackup } from "./core/google.js";
 import { detectLink, linkInfo, PROVIDER_NAME, safeHref } from "./core/links.js";
@@ -36,6 +37,8 @@ import { autoFile, projectKeys, parseKeywords, buildSuggestPayload, parseSuggest
 import { newCapture, toReview, pendingCaptures, groupCaptures, buildCapturesPayload, parseCapturesReply, applyReading, keepCapture, dropCapture, trimCaptures, BATCH } from "./core/captures.js";
 import { budgetStatus, budgetLine, budgetCommand } from "./core/budget.js";
 import { findInVault, findCommand } from "./core/find.js";
+import { controlItems, freshness, LEVELS as CONTROL_LEVELS } from "./core/control.js";
+import { propose as saveProposal, searchSaved, SAVE_LIMITS } from "./core/saveitem.js";
 import { weatherEmoji, sceneFor, PARTICLES, SHAPES, MONEY_EMOJI, dayPhase, cityMinutes } from "./core/scene.js";
 import { buildImagePayload, buildLinkPayload, isGeminiKey, mayGo, setSensitiveOk, sensitiveAllowed, pickModel, backupModel, listModels, buildActionPayload, askWithActions, issueUrl, aiErrorText } from "./core/ai.js";
 import { encryptBackup, decryptBackup, passphraseProblem, isEnvelope } from "./core/crypto.js";
@@ -74,7 +77,7 @@ import { SKINS, skinOf, cielo as hzCielo, variables as hzVars, tiempoDe, portada
 import { hzCara, hzPortada, hzBotella, hzMareas, hzConstelacion, hzAstillero, hzBarcoCarta, hzBotadura, hzBitacora, hzApariencia } from "./design/horizonte.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "111"; // = número de la última tarea WEB publicada (desde WEB-87)
+export const APP_VERSION = "112"; // = número de la última tarea WEB publicada (desde WEB-87)
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -786,7 +789,7 @@ function dayBriefing() {
     now: today(), weather: f, advice: f ? advice(f) : null,
     today: eventsFor(localDay()), tomorrow: eventsFor(tomorrowKey()),
     reminders: vault.reminders, tasks: tasks(vault.inbox), birthdays: upcomingBirthdays(vault.people, today(), 1),
-    spending: money().spend, inbox: vault.inbox, importantMail: googleOn("gmail") ? vault.mail?.important?.length ?? 0 : 0,
+    spending: money().spend, inbox: vault.inbox, importantMail: googleOn("gmail") ? pendingMail(mailItems()).length : 0,
     // WEB-111: sin consejos de presupuesto mientras las cifras no sean fiables.
     budgetAlerts: (() => { const [a, b] = monthRange(); return lgSummary(vault, { from: a, to: b }).fiable; })() ? budgetsNow().filter((b) => b.status !== "ok").slice(0, 2).map(budgetLine) : [],
     gentle: gentleNow().on,
@@ -1481,7 +1484,7 @@ function calendarCard(canCreate) {
       ${d0(selected) ? "" : `<button class="link small" data-act="cal-today">Hoy</button>`}
     </section>
     ${sectionTitle(esc(cap(selDate.toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" }))), canCreate ? addLink("EVENT", "Nuevo evento") : "")}
-    <section class="card">${events.length || tasksDue.length ? events.map((ev) => `<div class="row event"><span class="ev-bar" data-c="${esc(ev.color ?? "")}"></span><div class="grow"><div>${esc(ev.title)}</div><div class="muted small">${esc(ev.time ? ev.time + (ev.end ? " – " + ev.end : "") : "Todo el día")}${ev.location ? ` · ${esc(ev.location)}` : ""}${ev.calendar ? ` · ${esc(ev.calendar)}` : ""}</div></div></div>`).join("") + tasksDue.map(reminderRow).join("")
+    <section class="card">${events.length || tasksDue.length ? events.map((ev) => `<div class="row event"><span class="ev-bar" data-c="${esc(ev.color ?? "")}"></span><div class="grow"><div>${esc(ev.title)}</div><div class="muted small">${esc(ev.time ? ev.time + (ev.end ? " – " + ev.end : "") : "Todo el día")}${ev.location ? ` · ${esc(ev.location)}` : ""}${(ev.calendars ?? [ev.calendar]).filter(Boolean).length ? ` · ${esc((ev.calendars ?? [ev.calendar]).filter(Boolean).join(" y "))}` : ""}</div></div></div>`).join("") + tasksDue.map(reminderRow).join("")
       : `<p class="muted">${vault.calendar ? "Nada este día." : "Conecta Google para ver tu calendario completo."}</p>`}</section>`;
 }
 const d0 = (day) => day === localDay() && (!calView || (calView.y === today().getFullYear() && calView.m === today().getMonth()));
@@ -1547,6 +1550,7 @@ const screens = {
       })}
       <div class="ft-work stack">
       ${morningLaunch ? `<section class="card morning-hello"><h2>☀️ ${esc(greeting())}, Manu</h2><p class="muted small">Toca y te leo el día en voz alta.</p><div class="btns"><button class="btn" data-act="speak-day">🔊 Léemelo</button><button class="link small" data-act="morning-dismiss">Ahora no</button></div></section>` : ""}
+      ${controlCard()}
       ${gentleCard()}
       ${vault.brain || vault.spending.length ? (hz() ? hzBotella : hoyMemCard)(topProposal(brain(), { spending: vault.spending, projects: vault.projects, now: new Date() })) : ""}
       <button class="cmdk-pill glass" data-act="cmdk" aria-label="Comando rápido">⚡ <span>Haz algo rápido…</span></button>
@@ -1564,19 +1568,14 @@ const screens = {
       ${closingCard()}
       ${weekReviewCard()}
       ${nightReviewCard()}
-      ${docsSoonCard()}
-      ${briefingCard()}
       ${nightCard()}
       ${backupNudge()}
       ${mailCards()}
-      ${googleOn("gmail") && vault.mail?.important?.length ? `<section class="card"><h2>${I.mail} ${vault.mail.important.length} correo${vault.mail.important.length === 1 ? "" : "s"} importante${vault.mail.important.length === 1 ? "" : "s"}</h2>${vault.mail.important.slice(0, 3).map((x) => `<a class="row" href="${esc(messageUrl(x.id))}" target="_blank" rel="noopener"><div class="grow"><div>${esc(x.name)}</div><div class="muted small">${esc(x.subject || "(sin asunto)")}</div></div></a>`).join("")}<button class="link small" data-sub-go="correo">Ver todo el correo</button></section>` : ""}
-      ${rems.length ? `<section class="card"><h2>${I.bell} Recordatorios de hoy</h2>${rems.map(reminderRow).join("")}</section>` : ""}
       ${inbox.length ? `<section class="card"><h2>Bandeja · ${inbox.length}</h2>${inbox.map((c) => `<div class="stack"><div>${esc(c.text)}</div><div class="btns">
           <button class="btn" data-act="task" data-id="${esc(c.id)}">Tarea</button><button class="btn ghost" data-act="idea" data-id="${esc(c.id)}">Idea</button><button class="btn ghost" data-act="forget" data-id="${esc(c.id)}">No recuerdo</button></div></div>`).join("")}</section>` : ""}
       ${hubCard(m.mode)}
       <section class="card"><div class="row"><h2>Tareas</h2>${addLink("TASK")}</div>${open.length ? open.slice(0, 5).map(taskRow).join("") + (open.length > 5 ? `<p class="muted small">Y ${open.length - 5} más en Agenda.</p>` : "") : '<p class="muted">Nada pendiente. Toca «Añadir» o díselo a MANU.</p>'}</section>
       ${bdays.length ? `<section class="card"><h2>${I.people} Cumpleaños</h2>${bdays.map((b) => { const wa = b.days === 0 ? whatsappUrl(b.person.phone, `¡Feliz cumpleaños, ${b.person.name.split(" ")[0]}! 🎉`) : null; return `<div class="row"><span class="grow">${esc(b.person.name)}</span>${wa ? `<a class="btn" href="${esc(safeHref(wa))}" target="_blank" rel="noopener">Felicitar por WhatsApp</a>` : `<span class="muted">${b.days === 0 ? "¡Hoy!" : b.days === 1 ? "Mañana" : (b.days === 1 ? "Mañana" : `En ${b.days} días`)}</span>`}</div>`; }).join("")}</section>` : ""}
-      <section class="card"><div class="row"><h2>Este mes</h2><button class="link small" data-tab="dinero">Ver dinero</button></div><div class="big-money">${euros(month.total)}</div></section>
       </div></div>`;
   },
   agenda() {
@@ -1707,7 +1706,7 @@ const screens = {
         ${item("comidas", "fork", "orange", "Comidas", `${vault.meals.filter((m) => m.day === t).length} apuntadas hoy`)}
         ${item("archivo", "box", "teal", "Tu archivo", archive.stats?.count ? `${archive.stats.count} conversaciones guardadas` : "Tus conversaciones y tu exportación de ChatGPT")}
         ${item("documentos", "box", "orange", "Documentos", (() => { const s = expiringSoon(vault.docs, today(), 30); return s.length ? `${s[0].doc.title}: ${leftText(s[0].left)}` : vault.docs?.length ? `${vault.docs.length} guardados` : "Seguros, contratos y garantías"; })())}
-        ${item("biblioteca", "leaf", "teal", "Biblioteca", vault.library?.length ? `${vault.library.length} cosas · ${vault.library.filter((x) => x.status === "en curso").length} en curso` : "Libros, vídeos y podcasts con lo que aprendes")}
+        ${item("biblioteca", "leaf", "teal", "Biblioteca · Guardar en MANU", vault.library?.length ? `${vault.library.length} cosas guardadas${vault.library.some((x) => x.needsReview) ? ` · ${vault.library.filter((x) => x.needsReview).length} por revisar` : ""}` : "Enlaces, vídeos, PDF, notas e ideas, con búsqueda")}
         ${item("personas", "people", "purple", "Personas", vault.people.length ? `${vault.people.length} personas` : "Cumpleaños y detalles")}
         <button class="item" data-act="refuge"><span class="ico teal">${I.leaf}</span><span class="grow"><span>Refugio</span><br><span class="muted small">Para cuando no estás bien</span></span><span class="chev">${I.chev}</span></button>
       </div>
@@ -1825,14 +1824,17 @@ const subpages = {
     return `${backBar("Memoria")}${memoriaPage(brain(), { spending: vault.spending, projects: vault.projects, ui: memUi, now: new Date() })}`;
   },
   biblioteca() {
-    const items = [...(vault.library ?? [])].filter((i) => libFilter === "todo" || i.status === libFilter).sort((a, b) => String(b.at).localeCompare(String(a.at)));
+    const items = [...(vault.library ?? [])].filter((i) => libFilter === "todo" || i.status === libFilter || (libFilter === "revisar" && i.needsReview)).sort((a, b) => String(b.at).localeCompare(String(a.at)));
+    const res = libQ ? searchSaved(vault, libQ) : null;
+    const goAttr = (g) => (g.project ? `data-act="find-go" data-project="${esc(g.project)}"` : g.sub === "biblioteca" ? `data-act="lib-show" data-id="${esc(g.id)}"` : g.sub ? `data-sub-go="${esc(g.sub)}"` : `data-act="find-go" data-tab="${esc(g.tab)}"`);
+    const review = (vault.library ?? []).filter((x) => x.needsReview).length;
     return `${backBar("Biblioteca")}
-      <form class="card stack" id="libForm"><h2>Añadir</h2><label for="lTitle" class="sr">Título</label><input id="lTitle" placeholder="Título" maxlength="120" required>
-        <div class="row"><label for="lKind" class="sr">Tipo</label><select id="lKind">${Object.entries(LIB_KINDS).map(([k, v]) => `<option value="${k}">${v}</option>`).join("")}</select><label for="lStatus" class="sr">Estado</label><select id="lStatus">${STATUSES.map((st) => `<option value="${st}">${st}</option>`).join("")}</select></div>
-        <label for="lAuthor" class="sr">Autor</label><input id="lAuthor" placeholder="Autor (opcional)" maxlength="80"><label for="lUrl" class="sr">Enlace</label><input id="lUrl" type="url" placeholder="Enlace (opcional)">
-        <label for="lNotes" class="sr">Lo que te llevas</label><textarea id="lNotes" rows="3" placeholder="Lo que te llevas (opcional)"></textarea><button class="btn" type="submit">Añadir</button></form>
-      <div class="chips" role="group" aria-label="Filtro">${["todo", ...STATUSES].map((st) => `<button class="chip${libFilter === st ? " on" : ""}" data-act="lib-filter" data-v="${st}" aria-pressed="${libFilter === st}">${st}</button>`).join("")}</div>
-      <div class="stack">${items.length ? items.map(libRow).join("") : '<p class="muted">Nada por aquí.</p>'}</div>`;
+      ${saveCard()}
+      <section class="card find"><form id="libSearch" role="search" class="composer-inline"><label for="libQ" class="sr">Buscar en lo guardado</label><input id="libQ" type="search" placeholder="🔎 Buscar en lo guardado" value="${esc(libQ)}"><button class="btn small-btn" type="submit">Buscar</button></form>
+        ${res ? (res.length ? `<p class="muted small">${res.length} resultado${res.length === 1 ? "" : "s"} para «${esc(libQ)}» en tu biblioteca, documentos, proyectos e ideas</p>${res.map((x) => `<button class="row find-row" ${goAttr(x.go)}><span aria-hidden="true">${esc(x.icon)}</span><div class="grow"><div>${esc(x.title)}</div><div class="muted small">${esc(x.kind)}${x.snippet ? ` · ${esc(x.snippet)}` : ""}</div></div><span class="chev">${I.chev}</span></button>`).join("")}<button class="link small" data-act="lib-q-clear">Quitar la búsqueda</button>` : `<p class="muted small">No encuentro «${esc(libQ)}» en lo que has guardado.</p><button class="link small" data-act="lib-q-clear">Quitar la búsqueda</button>`) : ""}</section>
+      <div class="chips" role="group" aria-label="Filtro">${["todo", ...STATUSES, ...(review ? ["revisar"] : [])].map((st) => `<button class="chip${libFilter === st ? " on" : ""}" data-act="lib-filter" data-v="${st}" aria-pressed="${libFilter === st}">${st === "revisar" ? `por revisar (${review})` : st}</button>`).join("")}</div>
+      <div class="stack">${items.length ? items.map(libRow).join("") : '<p class="muted">Nada por aquí.</p>'}</div>
+      <p class="muted small">Lo que guardas vive en este dispositivo y viaja en Tu nube como texto (título, enlace, notas). Los archivos se quedan solo en este dispositivo: no suben a Tu nube ni a ninguna IA.</p>`;
   },
   // WEB-59: drop all the screenshots, MANU reads, groups and proposes; Manu keeps the text.
   capturas() {
@@ -1876,9 +1878,9 @@ const subpages = {
       <div class="btns"><button class="btn ghost" data-act="gcal-sync">${gcal.busy ? "Actualizando…" : "Actualizar"}</button></div><p class="muted small">${when ? `Leído a las ${when} · últimos 30 días` : "Aún sin leer: toca «Actualizar»."}</p>
       ${gmailErrorCard()}
       ${mailCards()}
-      ${m ? `${sectionTitle("Importantes sin leer")}<section class="card">${m.important.length ? m.important.map((x) => `<a class="row" href="${esc(messageUrl(x.id))}" target="_blank" rel="noopener"><div class="grow"><div>${esc(x.name)}</div><div class="muted small">${esc(x.subject || "(sin asunto)")}</div></div><span class="chev">${I.chev}</span></a>`).join("") : '<p class="muted">Nada importante sin leer en los últimos 3 días. 🌿</p>'}</section>
-      ${sectionTitle("Quién te escribe más")}<section class="card">${m.senders.length ? m.senders.slice(0, 15).map((x) => `<div class="stack mail-sender"><div class="row"><div class="grow"><div>${esc(x.name)}</div><div class="muted small">${esc(x.email)} · ${x.count} en 30 días${x.unread ? ` · ${x.unread} sin leer` : ""}</div></div></div><div class="btns">${x.unsub ? `<button class="btn small-btn" data-act="mail-do" data-kind="unsub" data-email="${esc(x.email)}">Baja</button>` : ""}<button class="btn ghost small-btn" data-act="mail-do" data-kind="archive" data-email="${esc(x.email)}">Archivar</button><button class="btn ghost small-btn" data-act="mail-do" data-kind="label" data-email="${esc(x.email)}">Etiquetar</button><button class="btn ghost small-btn" data-act="mail-do" data-kind="trash" data-email="${esc(x.email)}">Papelera</button></div></div>`).join("") : '<p class="muted">Sin newsletters ni avisos masivos.</p>'}</section>
-      <p class="muted small">En el móvil solo se guarda este resumen (remitentes, asuntos y recuentos), nunca el texto de los correos. Archivar, etiquetar y papelera se pueden deshacer desde el chat.</p>` : ""}`;
+      ${m ? `${mailTriageSection()}
+      <details class="card"><summary>Quién te escribe más (para darte de baja o archivar, siempre a mano)</summary>${m.senders.length ? m.senders.slice(0, 15).map((x) => `<div class="stack mail-sender"><div class="row"><div class="grow"><div>${esc(x.name)}</div><div class="muted small">${esc(x.email)} · ${x.count} en 30 días${x.unread ? ` · ${x.unread} sin leer` : ""}</div></div></div><div class="btns">${x.unsub ? `<button class="btn small-btn" data-act="mail-do" data-kind="unsub" data-email="${esc(x.email)}">Baja</button>` : ""}<button class="btn ghost small-btn" data-act="mail-do" data-kind="archive" data-email="${esc(x.email)}">Archivar</button><button class="btn ghost small-btn" data-act="mail-do" data-kind="label" data-email="${esc(x.email)}">Etiquetar</button><button class="btn ghost small-btn" data-act="mail-do" data-kind="trash" data-email="${esc(x.email)}">Papelera</button></div></div>`).join("") : '<p class="muted">Sin newsletters ni avisos masivos.</p>'}</details>
+      <p class="muted small">En este dispositivo solo se guarda este resumen (remitentes, asuntos y recuentos), nunca el texto de los correos, y no sube a Tu nube. Sí viajan tus correcciones y lo que marcas como revisado. Archivar, etiquetar y papelera se pueden deshacer desde el chat.</p>` : ""}`;
   },
   habitos() {
     const t = localDay();
@@ -3258,6 +3260,78 @@ function gmailErrorCard() {
 }
 const mailSeen = () => vault.settings.mailSeen ?? [];
 function markMailSeen(key) { if (key) vault.settings.mailSeen = [...new Set([...mailSeen(), key])].slice(-300); }
+function mailSubmit(form) {
+  const x = mailItems().find((i) => i.id === form.dataset.id); if (!x) return;
+  const at = new Date().toISOString(), url = messageUrl(x.id);
+  let st = triageStateOf(vault), msg = "";
+  if (form.id === "mailTaskForm") {
+    const text = $("mailTaskText").value.trim().slice(0, 140); if (!text) return;
+    vault.inbox.push({ ...capture({ id: uid("c"), text, at }), status: "TASK", link: url, from: "mail" });
+    st = mailMarkReviewed(st, x.id); msg = "Tarea creada";
+  } else if (form.id === "mailProjForm") {
+    const p = (vault.projects ?? []).find((q) => q.id === $("mailProj").value); if (!p) return;
+    try { Object.assign(p, addSource(p, { id: uid("src"), kind: "link", title: `✉️ ${x.subject || "Correo"} · ${x.name}`.slice(0, 140), url, at })); } catch (err) { toast(err.message); return; }
+    msg = `Guardado en «${p.name}»`;
+  } else if (form.id === "mailDateForm") {
+    const when = new Date($("mailDate").value); if (Number.isNaN(when.getTime())) return;
+    vault.reminders.push({ id: uid("r"), text: `Correo de ${x.name}: ${x.subject}`.slice(0, 140), at: when.toISOString(), done: false, notified: false, link: url });
+    msg = "Recordatorio creado";
+  } else if (form.id === "mailFixForm") {
+    st = mailFixKind(st, x, $("mailFixKind").value, { sender: Boolean($("mailFixSender")?.checked) }); msg = "Corregido: lo recordaré";
+  }
+  vault.mailTriage = st; mailUi = { ...mailUi, open: null, mode: null }; persist(); render(); toast(msg);
+}
+// ---------- Hoy: centro de control (misión «asistente real») ----------
+function controlCard() {
+  const [s, e] = monthRange();
+  const items = controlItems({
+    now: new Date(), events: agendaToday()?.events ?? [], tomorrow: vault.agendaTomorrow?.day === tomorrowKey() ? vault.agendaTomorrow.events : [],
+    reminders: vault.reminders, mail: googleOn("gmail") ? pendingMail(mailItems()) : [], docs: expiringSoon(vault.docs, today(), 30),
+    money: (vault.spending.length || (vault.income ?? []).length) ? lgSummary(vault, { from: s, to: e }) : null, euros, mailLabel: (k) => TRIAGE[k]?.short ?? k,
+  });
+  const fresh = freshness([
+    { name: "Agenda", on: googleOn("calendar"), at: vault.calendar?.syncedAt ?? null },
+    { name: "Correo", on: googleOn("gmail"), at: vault.mail?.syncedAt ?? null },
+    { name: "Tiempo", on: true, at: vault.weather?.at ?? null, maxAgeH: 3 },
+  ]);
+  const goAttr = (g) => (g.sub ? `data-sub-go="${esc(g.sub)}"` : `data-tab="${esc(g.tab)}"`);
+  const row = (x) => `<button class="row ctl-row ctl-${x.level.toLowerCase()}" ${goAttr(x.go)}><span class="ctl-icon" aria-hidden="true">${x.icon}</span><div class="grow"><div class="ctl-title">${esc(x.title)}</div><div class="muted small">${esc(x.detail)}${x.detail ? " · " : ""}${esc(x.source)}</div><div class="muted small ctl-why">${esc(x.why)}</div></div><span class="chev">${I.chev}</span></button>`;
+  const group = (lv) => { const xs = items.filter((x) => x.level === lv); return xs.length ? `<div class="ctl-group"><h3 class="ctl-h ctl-h-${lv.toLowerCase()}">${CONTROL_LEVELS[lv]} <span class="muted small">· ${xs.length}</span></h3>${xs.map(row).join("")}</div>` : ""; };
+  const info = items.filter((x) => x.level === "INFO");
+  return `<section class="card ctl" aria-labelledby="ctlT"><div class="row"><h2 id="ctlT">Lo de hoy</h2><span class="btns ctl-tools">${"speechSynthesis" in globalThis ? '<button class="link small" data-act="speak-day" aria-label="Leer el día en voz alta">🔊</button>' : ""}<button class="link small" data-sub-go="biblioteca">＋ Guardar en MANU</button></span></div>
+    ${items.some((x) => x.level !== "INFO") ? `${group("URGENT")}${group("IMPORTANT")}` : '<p class="muted">Nada urgente ni pendiente para hoy con lo que sé. 🌿</p>'}
+    ${info.length ? `<details class="ctl-group"><summary class="ctl-h">${CONTROL_LEVELS.INFO} <span class="muted small">· ${info.length}</span></summary>${info.map(row).join("")}</details>` : ""}
+    <p class="muted small ctl-fresh">${fresh.map((f) => `${esc(f.name)} ${esc(f.text)}${f.stale ? " (antiguo)" : ""}`).join(" · ")}${fresh.length ? ". " : ""}Se actualiza al abrir MANU; con la app cerrada no se actualiza nada.</p></section>`;
+}
+// ---------- Triaje del correo (local, sin IA, sin acciones automáticas) ----------
+let mailUi = { open: null, mode: null, showAll: false };
+let libFilter = "todo", libQ = "", libOpen = null;
+let saveUi = { prop: null, file: null, text: "" };
+function mailItems() {
+  if (!vault.mail?.triage) return [];
+  return triageList(vault.mail.triage, { now: Date.now(), projects: vault.projects ?? [], state: triageStateOf(vault) });
+}
+const mailWhen = (at) => { const d = new Date(at); return dayKey(d) === localDay() ? hhmm(d) : d.toLocaleDateString("es-ES", { weekday: "short", day: "numeric" }); };
+function mailRow(x) {
+  const t = TRIAGE[x.kind], open = mailUi.open === x.id;
+  const tools = !open ? "" : mailUi.mode === "task" ? `<form class="mail-tool" id="mailTaskForm" data-id="${esc(x.id)}"><label for="mailTaskText" class="small muted">Tarea (se crea al confirmar)</label><input id="mailTaskText" maxlength="140" value="${esc(`${x.kind === "REPLY" ? "Responder a" : "Revisar correo de"} ${x.name}: ${x.subject}`.slice(0, 140))}"><div class="btns"><button class="btn" type="submit">Crear tarea</button><button class="btn ghost" type="button" data-act="mail-mode" data-m="">Cancelar</button></div></form>`
+    : mailUi.mode === "project" ? ((vault.projects ?? []).length ? `<form class="mail-tool" id="mailProjForm" data-id="${esc(x.id)}"><label for="mailProj" class="small muted">Guardar el enlace al correo en</label><select id="mailProj">${vault.projects.map((p) => `<option value="${esc(p.id)}"${x.project === p.id ? " selected" : ""}>${esc(p.emoji ?? "📁")} ${esc(p.name)}</option>`).join("")}</select><p class="muted small">Se guarda el asunto y el enlace a Gmail, no el texto del correo.</p><div class="btns"><button class="btn" type="submit">Guardar</button><button class="btn ghost" type="button" data-act="mail-mode" data-m="">Cancelar</button></div></form>` : `<p class="muted small">Aún no tienes proyectos. Créalo en Proyectos.</p>`)
+    : mailUi.mode === "date" ? `<form class="mail-tool" id="mailDateForm" data-id="${esc(x.id)}"><label for="mailDate" class="small muted">Recordármelo el</label><input id="mailDate" type="datetime-local" required><div class="btns"><button class="btn" type="submit">Crear recordatorio</button><button class="btn ghost" type="button" data-act="mail-mode" data-m="">Cancelar</button></div></form>`
+    : mailUi.mode === "fix" ? `<form class="mail-tool" id="mailFixForm" data-id="${esc(x.id)}"><label for="mailFixKind" class="small muted">En realidad es</label><select id="mailFixKind">${TRIAGE_KINDS.map((k) => `<option value="${k}"${k === x.kind ? " selected" : ""}>${TRIAGE[k].icon} ${esc(TRIAGE[k].label)}</option>`).join("")}</select>${x.email ? `<label class="row small"><input type="checkbox" id="mailFixSender"> Todo lo que llegue de ${esc(x.name)}</label>` : ""}<div class="btns"><button class="btn" type="submit">Guardar</button><button class="btn ghost" type="button" data-act="mail-mode" data-m="">Cancelar</button></div></form>`
+    : `<p class="small mail-why"><b>${x.sure ? "Por qué" : "Por qué lo creo"}:</b> ${esc(x.why.join(" · "))}${x.sure ? "" : ". Es una suposición de MANU por el remitente y el asunto: no he leído el correo."}${x.replied ? " Ya escribiste en este hilo." : ""}</p>
+      <div class="btns mail-acts"><a class="btn small-btn" href="${esc(messageUrl(x.id))}" target="_blank" rel="noopener">Abrir en Gmail</a><button class="btn ghost small-btn" data-act="mail-reviewed" data-id="${esc(x.id)}">${x.reviewed ? "No revisado" : "Revisado"}</button><button class="btn ghost small-btn" data-act="mail-mode" data-m="task">Tarea</button><button class="btn ghost small-btn" data-act="mail-mode" data-m="project">A un proyecto</button><button class="btn ghost small-btn" data-act="mail-mode" data-m="date">Con fecha</button><button class="btn ghost small-btn" data-act="mail-mode" data-m="fix">Corregir</button></div>`;
+  return `<div class="mail-item${x.reviewed ? " is-reviewed" : ""}${open ? " is-open" : ""}"><button class="row mail-head" data-act="mail-open" data-id="${esc(x.id)}" aria-expanded="${open}"><span class="mail-kind" aria-hidden="true">${t.icon}</span><div class="grow"><div class="mail-top"><b>${esc(x.name)}</b><span class="muted small">${esc(mailWhen(x.at))}</span></div><div class="small mail-subj">${esc(x.subject || "(sin asunto)")}</div><div class="muted small">${esc(t.short)}${x.reviewed ? " · revisado" : ""}${x.unread ? " · sin leer" : ""}</div></div></button>${tools}</div>`;
+}
+function mailTriageSection() {
+  const items = mailItems();
+  if (!vault.mail?.triage) return `<section class="card"><p class="muted">Toca «Actualizar» para que MANU clasifique tu correo de los últimos 7 días.</p></section>`;
+  const pend = pendingMail(items), done = items.filter((x) => MAIL_ACTIONABLE.has(x.kind) && x.reviewed), info = items.filter((x) => x.kind === "INFO"), bulk = items.filter((x) => x.kind === "BULK");
+  return `${sectionTitle("Para ti")}<section class="card mail-list">${pend.length ? pend.map(mailRow).join("") : '<p class="muted">Nada que parezca pedirte algo en los últimos 7 días. 🌿</p>'}</section>
+    ${done.length ? `<details class="card"><summary>${done.length} revisado${done.length === 1 ? "" : "s"}</summary><div class="mail-list">${done.map(mailRow).join("")}</div></details>` : ""}
+    ${info.length ? `<details class="card"><summary>${info.length} informativo${info.length === 1 ? "" : "s"}</summary><div class="mail-list">${info.map(mailRow).join("")}</div></details>` : ""}
+    ${bulk.length ? `<details class="card"><summary>${bulk.length} de publicidad o repetitivos</summary><div class="mail-list">${bulk.map(mailRow).join("")}</div></details>` : ""}
+    <p class="muted small">Clasifico solo por el remitente, el asunto y si ya contestaste en el hilo; no leo el texto de los correos ni lo mando a ninguna IA. Que algo esté sin leer no lo hace importante. Nunca archivo, borro, respondo ni doy de baja nada sin que tú lo pidas.</p>`;
+}
 const senderName = (email) => vault.mail?.senders?.find((s) => s.email === email)?.name ?? email;
 
 // What MANU raises by itself: ChatGPT's export arrived, a sender that writes too much.
@@ -3320,10 +3394,10 @@ function mailCommand(text) {
   if (!googleOn("gmail") || !vault.mail) return null;
   if (aboutMail && /(que|cuales|nuevos|ultimos|recientes|hoy|llegado|llegaron|tengo|hay|importantes|sin leer)/.test(t) && !/(quien|quienes|remitentes|mas|muchos|baja|archiv|papelera|borra|etiquet)/.test(t)) {
     const m = vault.mail;
-    const imp = m.important.slice(0, 6);
+    const pend = pendingMail(mailItems()).slice(0, 6);
     const top = m.senders.slice(0, 3);
-    const when = m.syncedAt ? new Date(m.syncedAt).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }) : "?";
-    return { text: `${imp.length ? `Importantes sin leer: ${imp.map((x) => `${x.name} — «${x.subject || "sin asunto"}»`).join("; ")}.` : "No tienes correos importantes sin leer de los últimos 3 días."}${top.length ? ` Lo que más te llega: ${top.map((s) => `${s.name} (${s.count})`).join(", ")}.` : ""} (Leído a las ${when}; en Tú → Correo puedes actualizar.)` };
+    const when = new Date(m.syncedAt).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+    return { text: `${!m.triage ? "Aún no he clasificado tu correo: toca «Actualizar» en Tú → Correo." : pend.length ? `Lo que parece pedirte algo: ${pend.map((x) => `${TRIAGE[x.kind].short.toLowerCase()} · ${x.name} — «${x.subject || "sin asunto"}»`).join("; ")}. Lo supongo por el remitente y el asunto, sin leer los correos.` : "No veo nada que parezca pedirte algo en los últimos 7 días."}${top.length ? ` Lo que más te llega: ${top.map((s) => `${s.name} (${s.count})`).join(", ")}.` : ""} (Fuente: tu Gmail, leído a las ${when}.)` };
   }
   if (/(correo|mail|email)/.test(t) && /(quien|quienes|cuales|remitentes|mas|muchos)/.test(t) && !/(baja|archiv|papelera|borra|etiquet)/.test(t)) {
     const top = vault.mail.senders.slice(0, 6);
@@ -3749,6 +3823,9 @@ document.addEventListener("click", async (e) => {
     case "mail-reconnect": delete gcal.tokens[SCOPE.gmail]; gcal.consentError = null; vault.settings.google = { ...(vault.settings.google ?? {}), gmail: true }; persist(); syncGoogle(); break;
     case "mail-connect": vault.settings.google = { ...(vault.settings.google ?? {}), gmail: true }; persist(); syncGoogle(); break;
     case "mail-seen": markMailSeen(a.dataset.k); persist(); render(); break;
+    case "mail-open": mailUi = { ...mailUi, open: mailUi.open === a.dataset.id ? null : a.dataset.id, mode: null }; render(); break;
+    case "mail-mode": mailUi.mode = a.dataset.m || null; render(); break;
+    case "mail-reviewed": { const st = triageStateOf(vault), on = !st.reviewed[a.dataset.id]; vault.mailTriage = mailMarkReviewed(st, a.dataset.id, new Date(), on); mailUi.open = null; persist(); render(); toast(on ? "Marcado como revisado (solo en MANU; Gmail no cambia)" : "Vuelve a estar pendiente"); break; }
     case "mail-do": {
       const email = a.dataset.email, kind = a.dataset.kind;
       // WEB-69: a card can move under the finger (another one disappears
@@ -3874,7 +3951,12 @@ document.addEventListener("click", async (e) => {
     }
     case "lib-filter": libFilter = a.dataset.v; render(); break;
     case "lib-status": vault.library = vault.library.map((x) => (x.id === a.dataset.id ? setStatus(x, a.dataset.v, new Date()) : x)); persist(); render(); break;
-    case "lib-del": { const it = vault.library.find((x) => x.id === a.dataset.id); if (it && window.confirm(`¿Borrar «${it.title}»?`)) { vault.library = vault.library.filter((x) => x.id !== it.id); persist(); render(); } break; }
+    case "save-cancel": saveUi = { prop: null, file: null, text: "" }; render(); break;
+    case "lib-q-clear": libQ = ""; render(); break;
+    case "lib-show": libQ = ""; libFilter = "todo"; libOpen = a.dataset.id; render(); document.getElementById(`lib-${a.dataset.id}`)?.scrollIntoView({ block: "center" }); break;
+    case "lib-reviewed": { const it = vault.library.find((x) => x.id === a.dataset.id); if (it) { delete it.needsReview; persist(); render(); } break; }
+    case "lib-file": { const it = vault.library.find((x) => x.id === a.dataset.id); const data = it?.fileId ? await getImage(it.fileId).catch(() => null) : null; if (!data) { toast("Ese archivo no está en este dispositivo (los archivos no viajan en Tu nube)"); break; } const url = URL.createObjectURL(dataUrlToBlob(data)); window.open(url, "_blank", "noopener"); setTimeout(() => URL.revokeObjectURL(url), 60000); break; }
+    case "lib-del": { const it = vault.library.find((x) => x.id === a.dataset.id); if (it && window.confirm(`¿Borrar «${it.title}»?`)) { if (it.fileId) deleteImage(it.fileId).catch(() => {}); vault.library = vault.library.filter((x) => x.id !== it.id); persist(); render(); } break; }
     case "lib-ideas": {
       const it = vault.library.find((x) => x.id === a.dataset.id);
       if (!it?.notes || !aiReady()) break;
@@ -3974,6 +4056,7 @@ document.addEventListener("submit", async (e) => {
   const f = e.target.id;
   if (MEM_FORMS.has(f)) { memSubmit(e.target); return; }
   if (f === "mvForm") { lgSave(); return; }
+  if (["mailTaskForm", "mailProjForm", "mailDateForm", "mailFixForm"].includes(f)) { mailSubmit(e.target); return; }
   if (f === "lgDebtForm") { lgDebtSubmit(); return; }
   if (f === "hzPiezaForm") { hzProyecto((p) => addPieza(p, $("hzPieza").value, uid("pz")), null, true); return; }
   if (f === "nubeMail") { nubeMail($("nubeEmail").value.trim()); return; }
@@ -4028,6 +4111,9 @@ document.addEventListener("submit", async (e) => {
     return;
   }
   if (f === "docForm") { await saveDoc(); return; }
+  if (f === "saveForm") { const text = $("saveText").value.trim(); if (!text) { toast("Pega un enlace o escribe algo"); return; } saveUi = { text, file: null, prop: saveProposal({ text }, { projects: vault.projects ?? [] }) }; render(); return; }
+  if (f === "saveConfirm") { await saveConfirm(); return; }
+  if (f === "libSearch") { libQ = $("libQ").value.trim().slice(0, 80); render(); return; }
   if (f === "libForm") {
     try {
       const it = newItem({ id: uid("lib"), title: $("lTitle").value, kind: $("lKind").value, status: $("lStatus").value, author: $("lAuthor").value, url: $("lUrl").value.trim() || null, notes: $("lNotes").value }, new Date());
@@ -4278,12 +4364,20 @@ document.addEventListener("change", async (e) => {
     return;
   }
   if (e.target.id === "docFile" && e.target.files?.[0]) { const file = e.target.files[0]; e.target.value = ""; readDocFile(file).catch(() => { docDraft = null; render(); toast("No he podido abrir ese archivo"); }); return; }
+  if (e.target.dataset?.libTitle) { const id = e.target.dataset.libTitle, t = e.target.value.trim().slice(0, 120); if (!t) return; vault.library = vault.library.map((x) => { if (x.id !== id) return x; const { needsReview, ...rest } = x; return { ...rest, title: t }; }); persist(); toast("Título guardado"); return; }
   if (e.target.dataset?.libNotes) { const id = e.target.dataset.libNotes; vault.library = vault.library.map((x) => (x.id === id ? { ...x, notes: e.target.value.slice(0, 4000) } : x)); persist(); toast("Notas guardadas"); return; }
   if (e.target.id === "bankShots" && e.target.files?.length) { const files = [...e.target.files]; e.target.value = ""; readBankShots(files); return; }
   if (e.target.id === "buzonFile" && e.target.files?.[0]) {
     const file = e.target.files[0]; e.target.value = "";
     if (file.size > 5_000_000) { toast("Ese archivo es demasiado grande para ser el buzón."); return; }
     try { importBuzon(await file.text()); } catch { toast("No he podido leer el buzón."); }
+    return;
+  }
+  if (e.target.id === "saveFile" && e.target.files?.[0]) {
+    const file = e.target.files[0]; e.target.value = "";
+    if (file.size > SAVE_LIMITS.fileBytes) { toast(`Ese archivo pasa de ${Math.round(SAVE_LIMITS.fileBytes / 1048576)} MB; guarda mejor el enlace`); return; }
+    try { const data = await readAsDataUrl(file); const text = $("saveText")?.value.trim() ?? ""; saveUi = { text, file: { name: file.name, type: file.type, size: file.size, data }, prop: saveProposal({ text, file: { name: file.name, type: file.type, size: file.size } }, { projects: vault.projects ?? [] }) }; render(); }
+    catch { toast("No he podido leer ese archivo"); }
     return;
   }
   if (e.target.id === "capFiles" && e.target.files?.length) {
@@ -4447,7 +4541,7 @@ async function syncGoogle({ silent = false, quiet = false } = {}) {
       const calToken = await cachedToken(SCOPE.calendar);
       const listToken = await cachedToken(SCOPE.calendarList).catch(() => null);
       const calendars = listToken ? await listCalendars(listToken).catch(() => []) : [];
-      const sources = calendars.length ? calendars : [{ id: "primary", color: null, name: null }];
+      const sources = calendars.length ? [...calendars].sort((a, b) => Number(b.primary) - Number(a.primary)) : [{ id: "primary", color: null, name: null }];
       const days = mergeDays(await Promise.all(sources.map((c) => listEvents(calToken, start, end, fetch, { calendarId: c.id, color: c.color, calendar: c.name }).catch(() => new Map()))));
       vault.calendar = { from: localDay(start), to: localDay(end), days: Object.fromEntries(days), syncedAt: new Date().toISOString() };
       const t = localDay(); const tk = tomorrowKey();
@@ -4473,9 +4567,12 @@ async function syncGoogle({ silent = false, quiet = false } = {}) {
       return `${fromGoogle.total} leídos · ${fromGoogle.people.length} con cumpleaños · ${merged.added} nuevos${fromGoogle.complete ? "" : " (lista incompleta)"}`;
     } },
     { key: "gmail", scope: SCOPE.gmail, run: async (token) => {
-      const s = mailSummary(await fetchSnapshot(token), Date.now());
-      vault.mail = { ...s, syncedAt: new Date().toISOString() };
-      return `${s.total} correos (30 días) · ${s.senders.length} remitentes masivos · ${s.important.length} importantes`;
+      const msgs = await fetchSnapshot(token);
+      const s = mailSummary(msgs, Date.now());
+      vault.mail = { ...s, triage: keepForTriage(msgs, Date.now()), syncedAt: new Date().toISOString() };
+      vault.mailTriage = pruneTriage(triageStateOf(vault), vault.mail.triage);
+      const pend = pendingMail(mailItems()).length;
+      return `${s.total} correos (30 días) · ${pend} para ti · ${s.senders.length} remitentes masivos`;
     } },
   ];
   const enabled = Object.fromEntries(["calendar", "tasks", "contacts", "gmail"].map((k) => [k, googleOn(k)]));
@@ -4725,6 +4822,16 @@ if ("serviceWorker" in navigator) {
 
 // Spotify redirect back (Authorization Code with PKCE).
 const returned = new URLSearchParams(location.search);
+// «Guardar en MANU» desde un Atajo de iOS o desde «Compartir» (donde el sistema lo permita):
+// ?guardar=<enlace o texto>, o ?guardar=1&title=&text=&url= (share_target). Solo prepara la
+// propuesta: no guarda nada hasta que Manu confirma.
+if (returned.has("guardar")) {
+  const g = returned.get("guardar");
+  const text = [g && g !== "1" ? g : "", returned.get("title") ?? "", returned.get("text") ?? "", returned.get("url") ?? ""].map((x) => x.trim()).filter(Boolean).filter((x, i, a) => a.indexOf(x) === i).join(" ").slice(0, 4000);
+  history.replaceState(null, "", location.pathname);
+  tab = "tu"; sub = "biblioteca";
+  if (text) saveUi = { text, file: null, prop: saveProposal({ text }, { projects: vault.projects ?? [] }) };
+}
 if (returned.has("code") && returned.has("state")) {
   history.replaceState(null, "", location.pathname);
   tab = "tu"; sub = "spotify";
@@ -4765,7 +4872,42 @@ applyBankReturn();
 // ---------- Repaso, documentos y biblioteca (WEB-83..85) ----------
 let reviewNote = false;  // the «Apuntar algo» box on tonight's card
 let docDraft = null;     // { busy } while Gemini reads; { fields, fileData?, fileType?, editId? } to review
-let libFilter = "todo";
+// «Guardar en MANU»: paso 1, pegar o elegir; paso 2, revisar lo que propone MANU.
+function saveCard() {
+  const p = saveUi.prop;
+  if (!p) return `<form class="card stack save-card" id="saveForm"><h2>Guardar en MANU</h2><label for="saveText" class="sr">Enlace, nota o idea</label><textarea id="saveText" rows="2" placeholder="Pega un enlace o escribe una nota o idea">${esc(saveUi.text)}</textarea>
+    <div class="btns"><button class="btn" type="submit">Siguiente</button><label class="btn ghost" for="saveFile" role="button" tabindex="0">📎 Elegir archivo</label><input id="saveFile" type="file" class="sr"></div>
+    <p class="muted small">Enlaces, artículos, vídeos, PDF, documentos, imágenes, notas e ideas. MANU propone título, tema y proyecto y tú decides.</p></form>`;
+  return `<form class="card stack save-card" id="saveConfirm"><h2>¿Lo guardo así?</h2>
+    ${p.needsReview ? '<p class="small lg-warn"><b>Revísalo:</b> no puedo saber bien de qué trata sin abrirlo, y no lo abro.</p>' : ""}
+    <label for="svTitle" class="muted small">Título</label><input id="svTitle" maxlength="120" value="${esc(p.title)}" required>
+    <div class="row"><label for="svKind" class="sr">Tipo</label><select id="svKind">${Object.entries(LIB_KINDS).map(([k, v]) => `<option value="${k}"${k === p.kind ? " selected" : ""}>${v}</option>`).join("")}</select>
+    <label for="svProject" class="sr">Proyecto</label><select id="svProject"><option value="">Sin proyecto</option>${(vault.projects ?? []).map((x) => `<option value="${esc(x.id)}"${x.id === p.project ? " selected" : ""}>${esc(x.emoji ?? "📁")} ${esc(x.name)}</option>`).join("")}</select></div>
+    <label for="svTopic" class="muted small">Tema (opcional)</label><input id="svTopic" maxlength="40" value="${esc(p.topic)}">
+    ${p.url ? `<p class="small muted">🔗 ${esc(p.url)}</p>` : ""}${saveUi.file ? `<p class="small muted">📎 ${esc(saveUi.file.name)} · ${Math.max(1, Math.round(saveUi.file.size / 1024))} KB · se guarda solo en este dispositivo</p>` : ""}
+    <label for="svNote" class="muted small">Tu nota (opcional)</label><textarea id="svNote" rows="2" maxlength="4000">${esc(p.note)}</textarea>
+    <details><summary class="muted small">Por qué lo propongo así</summary><ul class="small">${p.why.map((w) => `<li>${esc(w)}</li>`).join("")}</ul></details>
+    <div class="btns"><button class="btn" type="submit">Guardar</button><button class="btn ghost" type="button" data-act="save-cancel">Cancelar</button></div></form>`;
+}
+async function saveConfirm() {
+  const p = saveUi.prop; if (!p) return;
+  let it;
+  try { it = newItem({ id: uid("lib"), title: $("svTitle").value, kind: $("svKind").value, url: p.url, notes: $("svNote").value }, new Date()); } catch (err) { toast(err.message); return; }
+  const topic = $("svTopic").value.trim().slice(0, 40), project = $("svProject").value || null;
+  const titleChanged = $("svTitle").value.trim() !== p.title;
+  Object.assign(it, { ...(topic ? { topic, tags: [topic] } : {}), ...(project ? { project } : {}), ...(p.needsReview && !titleChanged ? { needsReview: true } : {}), source: saveUi.file ? "archivo" : p.url ? "enlace" : "texto" });
+  if (saveUi.file) {
+    const fileId = uid("f");
+    try { await putImage(fileId, saveUi.file.data); Object.assign(it, { fileId, fileType: saveUi.file.type, fileName: saveUi.file.name.slice(0, 120) }); }
+    catch { toast("No he podido guardar el archivo en este dispositivo"); return; }
+  }
+  vault.library = [...(vault.library ?? []), it];
+  // También como fuente del proyecto, para que se vea (y se pueda preguntar) desde allí.
+  const pj = project ? (vault.projects ?? []).find((x) => x.id === project) : null;
+  if (pj) { try { Object.assign(pj, addSource(pj, { id: uid("src"), kind: it.url ? "link" : "note", title: `📚 ${it.title}`, text: it.notes || (it.fileName ? `Archivo guardado en tu biblioteca: ${it.fileName}` : it.title), url: it.url ?? null })); } catch (err) { toast(err.message); } }
+  saveUi = { prop: null, file: null, text: "" }; libFilter = "todo"; libOpen = it.id;
+  persist(); render(); toast(project ? "Guardado en tu biblioteca y en el proyecto" : "Guardado en tu biblioteca");
+}
 // Las revisiones usan el consumo personal (Dinero 2.0) y solo hablan de gasto si la cifra es fiable.
 const reviewData = (now = today()) => { const from = new Date(now); from.setDate(from.getDate() - 35); return { now, inbox: vault.inbox, habits: vault.habits, spending: money().spend, moneyReliable: lgSummary(vault, { from, to: new Date(now.getTime() + 86400000) }).fiable, clock: vault.clock, targetMin: clockTarget(), reminders: vault.reminders }; };
 function tonightReview() {
@@ -4877,8 +5019,11 @@ async function saveDoc() {
   toast(clean.expires ? `Guardado: ${leftText(daysLeft(clean, today()))}` : "Guardado");
 }
 function libRow(i) {
-  return `<details class="card lib"><summary class="row"><span class="grow"><b>${esc(LIB_KINDS[i.kind] ?? "")} ${esc(i.title)}</b>${i.author ? `<br><span class="muted small">${esc(i.author)}</span>` : ""}</span><span class="chip">${esc(i.status)}</span></summary>
-    <div class="stack">${i.url ? `<a class="link small" href="${esc(safeHref(i.url))}" target="_blank" rel="noopener">Abrir enlace</a>` : ""}
+  const proj = i.project ? (vault.projects ?? []).find((p) => p.id === i.project) : null;
+  return `<details class="card lib" id="lib-${esc(i.id)}"${libOpen === i.id ? " open" : ""}><summary class="row"><span class="grow"><b>${esc(LIB_KINDS[i.kind] ?? "")} ${esc(i.title)}</b>${i.author || i.topic || proj ? `<br><span class="muted small">${esc([i.author, i.topic, proj ? `📁 ${proj.name}` : ""].filter(Boolean).join(" · "))}</span>` : ""}</span>${i.needsReview ? '<span class="chip lib-review">revisar</span>' : `<span class="chip">${esc(i.status)}</span>`}</summary>
+    <div class="stack">${i.needsReview ? `<p class="small lg-warn">MANU no pudo saber bien de qué trata (no abre páginas ni lee archivos). Revisa el título. <button class="link small" data-act="lib-reviewed" data-id="${esc(i.id)}">Ya está bien</button></p>` : ""}
+      <label for="lt-${esc(i.id)}" class="sr">Título</label><input id="lt-${esc(i.id)}" data-lib-title="${esc(i.id)}" maxlength="120" value="${esc(i.title)}">
+      ${i.url ? `<a class="link small" href="${esc(safeHref(i.url))}" target="_blank" rel="noopener">Abrir enlace</a>` : ""}${i.fileId ? `<button class="link small" data-act="lib-file" data-id="${esc(i.id)}">Abrir archivo (${esc(i.fileName ?? "")})</button>` : ""}
       <label for="ln-${esc(i.id)}" class="sr">Notas</label><textarea id="ln-${esc(i.id)}" data-lib-notes="${esc(i.id)}" rows="3" placeholder="Lo que te llevas">${esc(i.notes ?? "")}</textarea>
       ${i.ideas?.length ? `<ul class="brief-list">${i.ideas.map((x) => `<li><span aria-hidden="true">💡</span><span>${esc(x)}</span></li>`).join("")}</ul>` : ""}
       <div class="chips" role="group" aria-label="Estado">${STATUSES.map((st) => `<button class="chip${i.status === st ? " on" : ""}" data-act="lib-status" data-id="${esc(i.id)}" data-v="${st}" aria-pressed="${i.status === st}">${st}</button>`).join("")}</div>

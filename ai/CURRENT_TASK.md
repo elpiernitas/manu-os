@@ -4,7 +4,7 @@ Status: **IN_PROGRESS**
 
 ## Tarea activa
 
-WEB-111 — Dinero 2.0 (`ai/HANDOFF.md`, «WEB-111»; `docs/DINERO2.md`). PR abierto **sin fusionar**: Manu revisa el editor y las reglas de cálculo antes de publicar.
+WEB-112: MANU como asistente real (`docs/ASISTENTE.md`, `ai/HANDOFF.md` «WEB-112»). Manu autorizó el 2026-11-16 implementar, fusionar y publicar los bloques seguros sin pedir permiso entre fases. Antes, WEB-111 (Dinero 2.0) ya está fusionado y publicado (v111).
 
 ## Autorización
 

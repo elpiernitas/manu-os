@@ -23,6 +23,8 @@ function* items(v) {
     yield { kind: "Proyecto", icon: p.emoji ?? "📁", title: p.name, detail: `Proyecto · ${(p.sources ?? []).length} fuentes`, at: p.createdAt ?? "", go: { project: p.id }, text: p.name };
     for (const src of p.sources ?? []) yield { kind: "Fuente", icon: "📄", title: src.title, detail: `En «${p.name}»`, at: src.at ?? "", go: { project: p.id }, text: `${src.title} ${src.text ?? ""} ${src.url ?? ""}` };
   }
+  for (const l of v.library ?? []) yield { kind: "Biblioteca", icon: "📚", title: l.title, detail: `Biblioteca${l.topic ? ` · ${l.topic}` : ""} · ${day(l.at)}`, at: l.at ?? "", go: { sub: "biblioteca" }, text: `${l.title} ${l.author ?? ""} ${l.topic ?? ""} ${l.notes ?? ""} ${l.url ?? ""}` };
+  for (const d of v.docs ?? []) yield { kind: "Documento", icon: "📄", title: d.title, detail: `Documento${d.company ? ` · ${d.company}` : ""}`, at: d.at ?? "", go: { sub: "documentos" }, text: `${d.title} ${d.company ?? ""} ${d.ref ?? ""} ${d.summary ?? ""}` };
   for (const m of v.meals ?? []) yield { kind: "Comida", icon: "🍽️", title: m.text, detail: `Comida · ${m.day ?? ""}`, at: m.day ?? "", go: { sub: "comidas" }, text: m.text };
   // WEB-59: what MANU read from screenshots Manu kept.
   for (const c of v.captures ?? []) if (c.text && c.status !== "pending") yield { kind: "Captura", icon: "🖼️", title: c.text.slice(0, 90), detail: `Captura · ${c.topic ?? ""} · ${day(c.at)}`, at: c.at ?? "", go: { sub: "capturas" }, text: `${c.topic ?? ""} ${c.text}` };

@@ -66,6 +66,7 @@ export function slim(msg) {
   const from = parseFrom(header(msg, "From"));
   return {
     id: String(msg.id ?? ""),
+    threadId: msg.threadId ? String(msg.threadId) : null,
     labels: msg.labelIds ?? [],
     from,
     subject: clip(header(msg, "Subject"), 140),

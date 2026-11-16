@@ -1,7 +1,7 @@
 // «Modo conversación» (WEB-27): MANU talks through Gemini, remembers the
 // conversation and knows the parts of Manu's life he chose to share. Each
 // category is Manu's explicit decision; secrets and the Refugio never go.
-import { sensitiveKinds, TOOLS, BASE_SYSTEM, NEVER } from "./ai.js";
+import { sensitiveKinds, TOOLS, BASE_SYSTEM, NEVER, MANU_RULES, asData } from "./ai.js";
 import { euros, CATEGORIES } from "./money.js";
 
 export const CONTEXT_CATEGORIES = [
@@ -65,10 +65,11 @@ export function buildContext(data, context, now = new Date()) {
 export function conversationSystem(contextText, now = new Date(), autoActions = false) {
   return `${BASE_SYSTEM.replace("(máximo 4 frases)", "(normalmente 1 a 4 frases)")}
 Eres la IA integrada en la app MANU OS de Manu: conversas con él y gestionas sus cosas con las funciones disponibles.${autoActions ? " Las acciones sencillas (tareas, ideas, recordatorios, completar tareas, ir a una pantalla) se hacen al momento y Manu puede deshacerlas; los gastos y lo demás los confirma él." : " Manu confirma cada acción con un toque; no digas que ya está hecha."}
-Usa lo que sabes de Manu (abajo) solo cuando sea útil. Si algo no está ahí, no lo inventes: dilo.
+Usa lo que sabes de Manu (abajo) solo cuando sea útil. Si algo no está ahí, no lo inventes: dilo y di qué fuente falta.
+${MANU_RULES}
 Fecha y hora: ${now.toLocaleString("es-ES", { weekday: "long", day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })}.
 LO QUE SABES DE MANU:
-${contextText || "(Manu no ha compartido datos.)"}`;
+${asData(contextText || "(Manu no ha compartido datos.)")}`;
 }
 
 // History: the last turns that are themselves allowed to go.
