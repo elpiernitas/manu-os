@@ -68,7 +68,7 @@ export function briefing({ now = new Date(), weather = null, advice = null, toda
     if (tw) lines.push({ e: tw.rain >= 50 ? "☔" : "🌤️", t: `Mañana ${tw.min}°–${tw.max}°${tw.rain >= 30 ? `, lluvia ${tw.rain} %` : ""}.` });
   }
   for (const b of birthdays ?? []) if (b.days <= 1) lines.push({ e: "🎂", t: `${b.person.name} cumple ${b.days === 0 ? "hoy" : "mañana"}.` });
-  if (importantMail > 0 && !evening) lines.push({ e: "📬", t: `${plural(importantMail, "correo importante", "correos importantes")} sin leer.` });
+  if (importantMail > 0 && !evening) lines.push({ e: "📬", t: `${plural(importantMail, "correo parece", "correos parecen")} pedirte algo (respuesta, cita, factura o vencimiento).` });
   // WEB-47: budgets that are over or going too fast (already worded).
   // WEB-70: on a low day, no money pressure.
   if (!gentle) for (const t of budgetAlerts ?? []) lines.push({ e: "🎯", t });

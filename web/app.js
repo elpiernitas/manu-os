@@ -787,7 +787,7 @@ function dayBriefing() {
     now: today(), weather: f, advice: f ? advice(f) : null,
     today: eventsFor(localDay()), tomorrow: eventsFor(tomorrowKey()),
     reminders: vault.reminders, tasks: tasks(vault.inbox), birthdays: upcomingBirthdays(vault.people, today(), 1),
-    spending: money().spend, inbox: vault.inbox, importantMail: googleOn("gmail") ? vault.mail?.important?.length ?? 0 : 0,
+    spending: money().spend, inbox: vault.inbox, importantMail: googleOn("gmail") ? pendingMail(mailItems()).length : 0,
     // WEB-111: sin consejos de presupuesto mientras las cifras no sean fiables.
     budgetAlerts: (() => { const [a, b] = monthRange(); return lgSummary(vault, { from: a, to: b }).fiable; })() ? budgetsNow().filter((b) => b.status !== "ok").slice(0, 2).map(budgetLine) : [],
     gentle: gentleNow().on,
@@ -1570,7 +1570,7 @@ const screens = {
       ${nightCard()}
       ${backupNudge()}
       ${mailCards()}
-      ${googleOn("gmail") && vault.mail?.important?.length ? `<section class="card"><h2>${I.mail} ${vault.mail.important.length} correo${vault.mail.important.length === 1 ? "" : "s"} importante${vault.mail.important.length === 1 ? "" : "s"}</h2>${vault.mail.important.slice(0, 3).map((x) => `<a class="row" href="${esc(messageUrl(x.id))}" target="_blank" rel="noopener"><div class="grow"><div>${esc(x.name)}</div><div class="muted small">${esc(x.subject || "(sin asunto)")}</div></div></a>`).join("")}<button class="link small" data-sub-go="correo">Ver todo el correo</button></section>` : ""}
+      ${(() => { if (!googleOn("gmail") || !vault.mail?.triage) return ""; const pend = pendingMail(mailItems()); return pend.length ? `<section class="card"><h2>${I.mail} Correo que parece pedirte algo</h2>${pend.slice(0, 3).map((x) => `<button class="row" data-sub-go="correo"><span aria-hidden="true">${TRIAGE[x.kind].icon}</span><div class="grow"><div>${esc(x.name)}</div><div class="muted small">${esc(TRIAGE[x.kind].short)} · ${esc(x.subject || "(sin asunto)")}</div></div><span class="chev">${I.chev}</span></button>`).join("")}<button class="link small" data-sub-go="correo">${pend.length > 3 ? `Ver los ${pend.length}` : "Ir al correo"}</button></section>` : ""; })()}
       ${rems.length ? `<section class="card"><h2>${I.bell} Recordatorios de hoy</h2>${rems.map(reminderRow).join("")}</section>` : ""}
       ${inbox.length ? `<section class="card"><h2>Bandeja · ${inbox.length}</h2>${inbox.map((c) => `<div class="stack"><div>${esc(c.text)}</div><div class="btns">
           <button class="btn" data-act="task" data-id="${esc(c.id)}">Tarea</button><button class="btn ghost" data-act="idea" data-id="${esc(c.id)}">Idea</button><button class="btn ghost" data-act="forget" data-id="${esc(c.id)}">No recuerdo</button></div></div>`).join("")}</section>` : ""}
@@ -3369,10 +3369,10 @@ function mailCommand(text) {
   if (!googleOn("gmail") || !vault.mail) return null;
   if (aboutMail && /(que|cuales|nuevos|ultimos|recientes|hoy|llegado|llegaron|tengo|hay|importantes|sin leer)/.test(t) && !/(quien|quienes|remitentes|mas|muchos|baja|archiv|papelera|borra|etiquet)/.test(t)) {
     const m = vault.mail;
-    const imp = m.important.slice(0, 6);
+    const pend = pendingMail(mailItems()).slice(0, 6);
     const top = m.senders.slice(0, 3);
-    const when = m.syncedAt ? new Date(m.syncedAt).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }) : "?";
-    return { text: `${imp.length ? `Importantes sin leer: ${imp.map((x) => `${x.name} — «${x.subject || "sin asunto"}»`).join("; ")}.` : "No tienes correos importantes sin leer de los últimos 3 días."}${top.length ? ` Lo que más te llega: ${top.map((s) => `${s.name} (${s.count})`).join(", ")}.` : ""} (Leído a las ${when}; en Tú → Correo puedes actualizar.)` };
+    const when = new Date(m.syncedAt).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+    return { text: `${!m.triage ? "Aún no he clasificado tu correo: toca «Actualizar» en Tú → Correo." : pend.length ? `Lo que parece pedirte algo: ${pend.map((x) => `${TRIAGE[x.kind].short.toLowerCase()} · ${x.name} — «${x.subject || "sin asunto"}»`).join("; ")}. Lo supongo por el remitente y el asunto, sin leer los correos.` : "No veo nada que parezca pedirte algo en los últimos 7 días."}${top.length ? ` Lo que más te llega: ${top.map((s) => `${s.name} (${s.count})`).join(", ")}.` : ""} (Fuente: tu Gmail, leído a las ${when}.)` };
   }
   if (/(correo|mail|email)/.test(t) && /(quien|quienes|cuales|remitentes|mas|muchos)/.test(t) && !/(baja|archiv|papelera|borra|etiquet)/.test(t)) {
     const top = vault.mail.senders.slice(0, 6);

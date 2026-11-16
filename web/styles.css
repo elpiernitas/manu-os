@@ -904,3 +904,16 @@ pre.code { white-space: pre-wrap; word-break: break-word; max-height: 220px; ove
 .lg-bulk { gap: 8px; }
 .lg-plan { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .lg-plan li { border-top: 1px solid var(--line); padding-top: 8px; overflow-wrap: anywhere; }
+/* Triaje del correo */
+.mail-item { border-bottom: 1px solid var(--line); padding: 4px 0; }
+.mail-item:last-child { border-bottom: 0; }
+.mail-head { width: 100%; text-align: left; background: none; border: 0; color: inherit; font: inherit; align-items: flex-start; gap: 10px; padding: 8px 0; min-height: 44px; }
+.mail-kind { font-size: 18px; line-height: 1.4; flex: none; }
+.mail-top { display: flex; justify-content: space-between; gap: 8px; }
+.mail-top b { overflow-wrap: anywhere; }
+.mail-subj { overflow-wrap: anywhere; }
+.mail-item.is-reviewed .mail-head { opacity: .7; }
+.mail-why { margin: 4px 0 6px; }
+.mail-acts { flex-wrap: wrap; }
+.mail-tool { display: grid; gap: 6px; padding: 6px 0 10px; }
+.mail-tool select, .mail-tool input:not([type="checkbox"]) { width: 100%; max-width: 100%; }
