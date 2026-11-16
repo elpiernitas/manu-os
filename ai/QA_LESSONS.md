@@ -276,3 +276,9 @@ Regla: cada formulario o fila nueva con controles lleva su prueba e2e de contenc
 ### QAL-057 — `innerText` devuelve el texto como se ve, con `text-transform`
 
 En WEB-112, las pruebas buscaban «Para ti» y «¿Lo guardo así?», pero los títulos de sección se pintan en mayúsculas por CSS y `innerText` devolvía «PARA TI». La app funcionaba; la prueba fallaba. Regla: en las pruebas e2e, los textos de títulos se comparan sin distinguir mayúsculas (`/…/i`) o con `textContent`.
+
+### QAL-058 — Las skills de terceros pueden ordenar ejecutar código remoto
+
+En el PR #122, la skill `security-scan` de ECC indicaba ejecutar `npx ecc-agentshield` (sin versión fijada, con opciones que envían la configuración a un modelo con coste o reescriben archivos). El enrutador decía que `AGENTS.md` manda, pero no nombraba este caso, y un agente que sigue la skill paso a paso lo habría ejecutado.
+
+Regla: al incorporar instrucciones de agente de terceros (skills, prompts, plantillas), se buscan órdenes de ejecutar paquetes remotos, enviar datos fuera o generar costes, y se prohíben de forma explícita en el enrutador del repo, con una comprobación automática que falle si la regla desaparece.

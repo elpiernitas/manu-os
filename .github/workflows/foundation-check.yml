@@ -49,6 +49,10 @@ jobs:
             exit 1
           fi
 
+      - name: Check agent skills contract
+        shell: bash
+        run: node tools/check-ecc-skills.mjs
+
       - name: Require explicit task status
         shell: bash
         run: |

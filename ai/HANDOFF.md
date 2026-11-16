@@ -3206,6 +3206,11 @@ Petición de Manu: poder escribir «usa ecc» en las sesiones de Claude Code en 
 - Añadidas 38 skills de ECC (affaan-m/ECC v2.2.3, MIT; licencia en `.claude/skills/ECC_LICENSE`) seleccionadas para el stack de MANU OS, más el enrutador `.claude/skills/usa-ecc`.
 - El enrutador deja explícito que `AGENTS.md`/`CLAUDE.md` prevalecen sobre cualquier skill.
 
+**Revisión (Claude, rutina sobre `4b3095e`):**
+- Defecto: `security-scan` manda ejecutar `npx ecc-agentshield` (paquete remoto sin versión fijada; `--opus` envía la configuración a un modelo con coste, `--fix` reescribe archivos), y el enrutador no lo impedía. Corregido: `usa-ecc` prohíbe paquetes remotos no instalados y escáneres que envíen el repo a terceros.
+- Regresión: `tools/check-ecc-skills.mjs` (en `foundation-check.yml`) comprueba frontmatter y `name` = carpeta, que el mapa de `usa-ecc` liste exactamente las skills incluidas, la regla de paquetes remotos y la licencia. Falla sin el arreglo y al quitar una skill del mapa.
+- VERIFICADO: una sesión de Claude Code en la nube abierta sobre la rama del PR lista las 38 skills y `usa-ecc` como disponibles.
+
 ### NO VERIFICADO
 
-- Que Claude Code en la nube cargue estas skills: se comprobará al abrir una sesión nueva sobre `main` tras fusionar.
+- El resultado de usar cada skill en una tarea real: solo se ha comprobado que cargan.

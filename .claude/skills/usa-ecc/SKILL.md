@@ -19,6 +19,7 @@ Este repo incluye una selección de skills de ECC (affaan-m/ECC v2.2.3, licencia
 
 - `AGENTS.md` y `CLAUDE.md` prevalecen siempre. Si una skill de ECC choca con ellos (fusionar, desplegar, conectar servicios, añadir dependencias, datos personales, secretos), gana la regla más restrictiva del repo.
 - La app web no tiene dependencias (`web/package.json`): no instales librerías ni frameworks que proponga una skill sin ADR y autorización de Manu.
+- No ejecutes paquetes remotos que no estén ya instalados (`npx <paquete>`, `npm exec`, `curl … | sh`) ni escáneres o auditorías que envíen el repo o su configuración a terceros o a un modelo. Por ejemplo, `security-scan` propone `npx ecc-agentshield` (sin versión fijada; `--opus` genera coste y `--fix` reescribe archivos): no lo uses; haz la revisión a mano con su lista de comprobación y marca como `NO_VERIFICADO` lo que no se pueda comprobar.
 - Ignora los pasos que dependan de hooks, MCP o scripts del plugin ECC completo que no existen aquí (por ejemplo `CLAUDE_PLUGIN_ROOT`); adapta el paso o sáltalo y avísalo.
 - Usa las etiquetas `VERIFICADO`, `DECIDIDO`, `TEÓRICAMENTE_POSIBLE` y `NO_VERIFICADO` como pide `AGENTS.md`.
 - Si ninguna skill encaja, dilo en una línea y trabaja sin ellas.
