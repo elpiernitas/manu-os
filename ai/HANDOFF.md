@@ -1,5 +1,33 @@
 # HANDOFF
 
+## WEB-118 · El cerebro compartido de Manu (Claude, 2026-11-16)
+
+Manu quiere un «cerebro masivo» que alimenten Claude, Claude Code, Codex y ChatGPT con cada conversación, cada IA eligiendo la rama, y que MANU lo lea. Detalle en `docs/CEREBRO.md`.
+
+**Hecho:**
+- Migración `20261116120000_cerebro.sql`: tablas `cerebro` y `cerebro_llaves`, con RLS de solo lectura para el dueño y escrituras solo por la función.
+- Función `manu-cerebro`, **desplegada**: llaves por IA (solo se guarda la huella), guardar, buscar, recientes y el esquema OpenAPI para el GPT. MANU entra con su sesión.
+- Contrato en `web/core/cerebro.js`, con copia en el servidor:
+  - ramas fijas;
+  - limpieza;
+  - rechazo de claves, tokens e IBAN.
+- MANU:
+  - Tú → Tu cerebro: ramas, revisar, mover, archivar, y crear o revocar llaves (se enseñan una sola vez);
+  - «Lo que sabe tu cerebro» en cada proyecto;
+  - el cerebro en la búsqueda;
+  - las entradas relevantes van al contexto de Gemini dentro del bloque de datos.
+- Regla en `AGENTS.md` para que los agentes guarden al terminar.
+- Versión 118.
+
+**Pendiente:**
+- Aplicar la migración (Manu, en el editor SQL de Supabase: la llave del entorno no tiene permiso de base de datos).
+- Crear las llaves y el GPT.
+- Conector MCP para claude.ai.
+
+**Pruebas:**
+- `npm test`: 476 de 476.
+- `dia.e2e`: 70 de 70.
+
 ## WEB-117 · rutinas de trabajo y Tablero conectado (Claude, 2026-11-16)
 
 **Tablero conectado de verdad:**

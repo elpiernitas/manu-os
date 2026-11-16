@@ -942,3 +942,9 @@ button.chip.work-chip.on { opacity: 1; border-color: var(--accent); }
 .parked-row { gap: 8px; flex-wrap: wrap; }
 .parked-row .grow { min-width: 0; overflow-wrap: anywhere; }
 .proj-why .composer-inline { margin-top: 6px; }
+/* WEB-118 · cerebro */
+.cer-entry { border-top: 1px solid var(--line); padding: 8px 0; gap: 4px; }
+.cer-entry b, .cer-entry p { overflow-wrap: anywhere; }
+.cer-sub { margin: 10px 0 2px; }
+.cer-newkey { background: var(--surface-2); border-radius: 12px; padding: 10px; display: grid; gap: 6px; margin-bottom: 8px; }
+.cer-newkey input { font-family: ui-monospace, Menlo, monospace; font-size: 13px; width: 100%; }

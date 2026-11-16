@@ -225,6 +225,31 @@ for (const w of [320, 375, 390, 430]) {
   await shot(page, "09-rutinas");
   await ctx.close();
 }
+// 10. El cerebro: ramas con recuentos, lo de cada proyecto, búsqueda; nada en el vault.
+{
+  const ents = [
+    { id: "00000000-0000-0000-0000-000000000001", rama: "manu-os", subrama: "salud", titulo: "Rutina de sueño", resumen: "Acostarse antes de las 0:00 entre semana.", etiquetas: ["sueno"], origen: "chatgpt", estado: "sin_revisar", creado: t(15, 22) },
+    { id: "00000000-0000-0000-0000-000000000002", rama: "proyectos", subrama: "reforma-bano", titulo: "Presupuesto del fontanero", resumen: "Cobra por horas; pedir cierre de precio.", etiquetas: [], origen: "claude", estado: "revisado", proyecto: "reforma-bano", creado: t(14, 12) },
+  ];
+  const ctx = await browser.newContext({ timezoneId: "Europe/Madrid", ...devices["iPhone 14"] });
+  const page = await ctx.newPage(); const errors = [];
+  page.on("pageerror", (e) => errors.push(String(e)));
+  await page.clock.install({ time: new Date(t(16, 18)) });
+  await page.route(/^https:\/\/([^/]*\.)?(open-meteo\.com|supabase\.co|googleapis\.com|google\.com|spotify\.com|enablebanking\.com|gstatic\.com)\//, (r) => r.fulfill({ status: 503, body: "" }));
+  await page.addInitScript(([vv, en, at]) => { if (sessionStorage.getItem("seeded")) return; sessionStorage.setItem("seeded", "1"); sessionStorage.setItem("manuos.tab", "tu"); localStorage.setItem("manuos.vault", JSON.stringify(vv)); localStorage.setItem("manuos.cerebro", JSON.stringify({ entradas: en, readAt: at })); }, [seed(), ents, t(16, 17)]);
+  await page.goto(B); await page.waitForTimeout(600);
+  ok("Tú: el cerebro con su recuento", /Tu cerebro[\s\S]*2 entradas de tus IAs · 1 sin revisar/.test(await page.locator("#screen").innerText()));
+  await page.evaluate(() => { const b = document.createElement("button"); b.dataset.subGo = "cerebro"; document.body.append(b); b.click(); b.remove(); }); await page.waitForTimeout(250);
+  const c = await page.locator("#screen").innerText();
+  ok("cerebro: ramas MANU OS y Proyectos con recuentos", /MANU OS\s*1 · 1 sin revisar/.test(c) && /Proyectos\s*1/.test(c));
+  ok("cerebro: llaves para las cuatro IAs", (await page.locator('[data-act="cer-key-new"]').count()) === 4);
+  await shot(page, "10-cerebro");
+  await page.click('[data-tab="proyectos"]'); await page.click('[data-act="proj-open"][data-id="a"]'); await page.waitForTimeout(250);
+  ok("proyecto: «Lo que sabe tu cerebro»", /Lo que sabe tu cerebro[\s\S]*Presupuesto del fontanero/i.test(await page.locator("#screen").innerText()));
+  ok("cerebro: no está en el vault", !JSON.stringify(await vaultOf(page)).includes("Presupuesto del fontanero"));
+  ok("cerebro: sin errores", !errors.length);
+  await ctx.close();
+}
 await browser.close();
 console.log(`dia.e2e: ${passes} correctas, ${fails} fallos`);
 process.exit(fails ? 1 : 0);
