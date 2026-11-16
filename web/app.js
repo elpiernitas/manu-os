@@ -39,6 +39,7 @@ import { budgetStatus, budgetLine, budgetCommand } from "./core/budget.js";
 import { findInVault, findCommand } from "./core/find.js";
 import { controlItems, freshness, LEVELS as CONTROL_LEVELS } from "./core/control.js";
 import { franja, visibleTasks, hiddenWork, weekendKey, moneyLine } from "./core/daymode.js";
+import { routineTasks, newRoutine, routineWhen, MARKETING_PRESETS, EVERY as ROUTINE_EVERY, WEEKDAYS } from "./core/routines.js";
 import { COLUMNS as BOARD_COLUMNS, ACTIVE as BOARD_ACTIVE, boardItems, boardSummary, readLabel as boardReadLabel, tableroRequest } from "./core/tablero.js";
 import { propose as saveProposal, searchSaved, SAVE_LIMITS, safeViewType } from "./core/saveitem.js";
 import { weatherEmoji, sceneFor, PARTICLES, SHAPES, MONEY_EMOJI, dayPhase, cityMinutes } from "./core/scene.js";
@@ -79,7 +80,7 @@ import { SKINS, skinOf, cielo as hzCielo, variables as hzVars, tiempoDe, portada
 import { hzCara, hzPortada, hzBotella, hzMareas, hzConstelacion, hzAstillero, hzBarcoCarta, hzBotadura, hzBitacora, hzApariencia } from "./design/horizonte.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "116"; // = número de la última tarea WEB publicada (desde WEB-87)
+export const APP_VERSION = "117"; // = número de la última tarea WEB publicada (desde WEB-87)
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -883,6 +884,14 @@ function gentleCard() {
 // WEB-115: la franja del día (Hoy cambia de contenido, no de colores) y qué tareas se ven.
 const fr = () => franja(today(), { override: overrideOn() ? vault.settings.override : null, closedDay: vault.settings.closedDay ?? null, weekendPlans: vault.settings.weekendPlans ?? {} });
 const openNow = () => visibleTasks(tasks(vault.inbox), fr());
+// WEB-117: rutinas de trabajo. El día que toca, se apuntan solas como tareas 💼 (una vez por periodo).
+function applyRoutines() {
+  if (!(vault.routines ?? []).length) return false;
+  const r = routineTasks(vault.routines, today(), { done: vault.settings.routineDone ?? {}, uid: () => uid("c") });
+  if (!r.tasks.length) return false;
+  vault.inbox.push(...r.tasks); vault.settings.routineDone = r.done; persist();
+  return true;
+}
 // Al cerrar la jornada, si hay tareas marcadas de trabajo, solo cuentan esas.
 const closingInbox = () => (vault.inbox.some((i) => i.status === "TASK" && i.work) ? vault.inbox.filter((i) => i.status !== "TASK" || i.work) : vault.inbox);
 // Una tarea nueva en horario de trabajo se marca de trabajo (supuesto: se cambia con un toque).
@@ -1556,6 +1565,7 @@ const addLink = (kind, label = "Añadir") => `<button class="link small" data-ac
 // ---------- Screens ----------
 const screens = {
   hoy() {
+    applyRoutines();
     const m = modeState(today(), undefined, vault.settings.override);
     const inbox = pending(vault.inbox);
     const open = openNow();
@@ -1732,6 +1742,7 @@ const screens = {
         ${item("comidas", "fork", "orange", "Comidas", `${vault.meals.filter((m) => m.day === t).length} apuntadas hoy`)}
         ${item("archivo", "box", "teal", "Tu archivo", archive.stats?.count ? `${archive.stats.count} conversaciones guardadas` : "Tus conversaciones y tu exportación de ChatGPT")}
         ${item("documentos", "box", "orange", "Documentos", (() => { const s = expiringSoon(vault.docs, today(), 30); return s.length ? `${s[0].doc.title}: ${leftText(s[0].left)}` : vault.docs?.length ? `${vault.docs.length} guardados` : "Seguros, contratos y garantías"; })())}
+        ${item("rutinas", "repeat", "blue", "Rutinas de trabajo", (vault.routines ?? []).filter((r) => r.on).length ? `${(vault.routines ?? []).filter((r) => r.on).length} activas · se apuntan solas el día que tocan` : "Tareas que se repiten cada semana o cada mes")}
         ${item("tablero", "box", "orange", "Tablero RK", boardOn() ? (boardCache()?.feed ? `${boardSummary(boardCache().feed, today()).count} tarjetas activas · leído ${boardReadLabel(boardCache().readAt, today())}` : "Conectado, sin leer aún") : "Ver tu Tablero de marketing (solo lectura)")}
         ${item("biblioteca", "leaf", "teal", "Biblioteca · Guardar en MANU", vault.library?.length ? `${vault.library.length} cosas guardadas${vault.library.some((x) => x.needsReview) ? ` · ${vault.library.filter((x) => x.needsReview).length} por revisar` : ""}` : "Enlaces, vídeos, PDF, notas e ideas, con búsqueda")}
         ${item("personas", "people", "purple", "Personas", vault.people.length ? `${vault.people.length} personas` : "Cumpleaños y detalles")}
@@ -1849,6 +1860,17 @@ const subpages = {
   },
   memoria() {
     return `${backBar("Memoria")}${memoriaPage(brain(), { spending: vault.spending, projects: vault.projects, ui: memUi, now: new Date() })}`;
+  },
+  rutinas() {
+    const list = vault.routines ?? [];
+    const have = new Set(list.map((r) => r.preset).filter(Boolean));
+    const presets = MARKETING_PRESETS.filter((p) => !have.has(p.key));
+    return `${backBar("Rutinas de trabajo")}<p class="subtitle">El día que tocan, MANU las apunta solas como tareas de trabajo 💼. Si la completas o la borras, no vuelve hasta la próxima vez.</p>
+      <section class="card">${list.length ? list.map((r) => `<div class="row routine-row"><label class="sw-row grow"><input type="checkbox" data-act="routine-on" data-id="${esc(r.id)}" ${r.on ? "checked" : ""}> <span><b>${esc(r.text)}</b><br><span class="muted small">${esc(routineWhen(r))}</span></span></label><button class="link small danger-link" data-act="routine-del" data-id="${esc(r.id)}" aria-label="Quitar rutina: ${esc(r.text)}">Quitar</button></div>`).join("") : '<p class="muted">Aún no tienes rutinas.</p>'}</section>
+      ${presets.length ? `<section class="card"><h2>Propuestas para tu marketing</h2><p class="muted small">Sacadas de cómo trabajas. Se añaden activas y las puedes cambiar o quitar.</p>${presets.map((p) => `<div class="row"><span class="grow">${esc(p.text)} <span class="muted small">· ${esc(routineWhen(p))}</span></span><button class="btn ghost small-btn" data-act="routine-preset" data-k="${esc(p.key)}">Añadir</button></div>`).join("")}</section>` : ""}
+      <form class="card stack" id="routineForm"><h2>Nueva rutina</h2><label for="rtText" class="sr">Qué hay que hacer</label><input id="rtText" maxlength="140" placeholder="Qué hay que hacer" required>
+        <div class="row"><label for="rtEvery" class="sr">Cada cuánto</label><select id="rtEvery">${Object.entries(ROUTINE_EVERY).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join("")}</select><label for="rtDay" class="sr">Qué día</label><select id="rtDay">${WEEKDAYS.slice(1, 6).map((w, i) => `<option value="${i + 1}">${esc(w)}</option>`).join("")}</select></div>
+        <button class="btn" type="submit">Añadir rutina</button></form>`;
   },
   tablero() {
     const bc = boardCache();
@@ -3377,7 +3399,7 @@ function controlCard() {
   const nowHtml = now ? `<div class="ctl-now"><p class="ctl-now-t"><span aria-hidden="true">${now.e}</span> <b>${esc(now.t)}</b></p><p class="muted small">${esc(now.why)}</p><div class="btns">${now.go ? goButton(now.go) : ""}<button class="link small" data-act="now-skip" data-t="${esc(now.t)}">Ahora no</button></div></div>` : "";
   const hidden = hiddenWork(tasks(vault.inbox), f);
   const weekendAsk = f.weekend && !f.weekendPlan && f.key === "WEEKEND" ? `<div class="ctl-weekend"><p class="small"><b>¿Este finde descansas o lo usas para tus cosas?</b></p><div class="btns"><button class="btn small-btn" data-act="weekend-plan" data-v="descanso">Descanso</button><button class="btn ghost small-btn" data-act="weekend-plan" data-v="proyectos">Mis cosas</button></div></div>` : "";
-  return `<section class="card ctl" aria-labelledby="ctlT"><div class="row"><h2 id="ctlT">${esc(f.title)}</h2><span class="btns ctl-tools">${"speechSynthesis" in globalThis ? '<button class="link small" data-act="speak-day" aria-label="Leer el día en voz alta">🔊</button>' : ""}<button class="link small" data-sub-go="biblioteca">＋ Guardar</button></span></div>
+  return `<section class="card ctl" aria-labelledby="ctlT"><div class="row"><h2 id="ctlT">${esc(f.title)}</h2><span class="btns ctl-tools">${"speechSynthesis" in globalThis ? '<button class="link small" data-act="speak-day" aria-label="Leer el día en voz alta">🔊</button>' : ""}${f.showsWork && boardOn() && boardCache()?.feed?.openUrl ? `<a class="link small" href="${esc(safeHref(boardCache().feed.openUrl))}" target="_blank" rel="noopener">Tablero ↗</a>` : ""}<button class="link small" data-sub-go="biblioteca">＋ Guardar</button></span></div>
     <p class="muted small ctl-hint">${esc(f.hint)}${hidden ? ` · ${hidden} de trabajo ${hidden === 1 ? "espera" : "esperan"} al próximo día laborable` : ""}</p>
     ${weekendAsk}${nowHtml}
     ${items.some((x) => x.level !== "INFO") ? `${group("URGENT")}${group("IMPORTANT")}` : '<p class="muted">Nada urgente ni pendiente con lo que sé. 🌿</p>'}
@@ -3803,6 +3825,9 @@ document.addEventListener("click", async (e) => {
       createProject({ name: i.text.slice(0, 60), emoji: "💡", why: i.text }).then(({ p }) => { vault.inbox = vault.inbox.map((x) => (x.id === i.id ? { ...x, done: true, doneAt: new Date().toISOString(), project: p.id } : x)); openProject = p.id; go("proyectos"); persist(); render({ focus: true, enter: "page" }); toast("Proyecto creado desde la idea"); });
       break;
     }
+    case "routine-on": { const r = (vault.routines ?? []).find((x) => x.id === a.dataset.id); if (r) { r.on = Boolean(a.checked); persist(); render(); } break; }
+    case "routine-del": { const r = (vault.routines ?? []).find((x) => x.id === a.dataset.id); if (r && window.confirm(`¿Quitar la rutina «${r.text}»? Las tareas ya apuntadas se quedan.`)) { vault.routines = vault.routines.filter((x) => x.id !== r.id); persist(); render(); } break; }
+    case "routine-preset": { const p = MARKETING_PRESETS.find((x) => x.key === a.dataset.k); if (p) { vault.routines = [...(vault.routines ?? []), { ...newRoutine({ id: uid("rt"), ...p }), preset: p.key }]; persist(); render(); toast(`Añadida: ${routineWhen(p).toLowerCase()}`); } break; }
     case "board-on": { const on = a.checked ?? !boardOn(); vault.settings.tablero = { on: Boolean(on) }; if (!on) { boardSave(null); board.error = null; board.code = null; } persist(); render(); if (on) refreshBoard({ force: true }); break; }
     case "board-refresh": refreshBoard({ force: true }); break;
     case "board-clear": boardSave(null); render(); toast("Copia del Tablero borrada de este dispositivo"); break;
@@ -4168,6 +4193,7 @@ document.addEventListener("submit", async (e) => {
     toast(n ? `Guardadas. He metido ${n} ${n === 1 ? "cosa" : "cosas"} que encajan.` : "Guardadas");
     return;
   }
+  if (f === "routineForm") { try { const r = newRoutine({ id: uid("rt"), text: $("rtText").value, every: $("rtEvery").value, weekday: $("rtDay").value }); vault.routines = [...(vault.routines ?? []), r]; persist(); render(); toast(`Rutina añadida: ${routineWhen(r).toLowerCase()}`); } catch (err) { toast(err.message); } return; }
   if (f === "projWhyForm") { const p = (vault.projects ?? []).find((x) => x.id === e.target.dataset.id); if (p) { const w = $("pWhy").value.replace(/\s+/g, " ").trim().slice(0, 200); if (w) p.why = w; else delete p.why; persist(); toast("Guardado"); } return; }
   if (f === "projStepForm") { const p = (vault.projects ?? []).find((x) => x.id === e.target.dataset.id); const text = $("pStep").value.trim().slice(0, 140); if (p && text) { vault.inbox.push({ ...capture({ id: uid("c"), text: `${p.emoji ?? "📁"} ${text}`, at: new Date().toISOString() }), status: "TASK", project: p.id }); p.updatedAt = new Date().toISOString(); persist(); render(); toast("Apuntado: te lo propondré cuando toque"); } return; }
   if (f === "projForm") {
