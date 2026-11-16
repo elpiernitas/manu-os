@@ -37,6 +37,7 @@ import { autoFile, projectKeys, parseKeywords, buildSuggestPayload, parseSuggest
 import { newCapture, toReview, pendingCaptures, groupCaptures, buildCapturesPayload, parseCapturesReply, applyReading, keepCapture, dropCapture, trimCaptures, BATCH } from "./core/captures.js";
 import { budgetStatus, budgetLine, budgetCommand } from "./core/budget.js";
 import { findInVault, findCommand } from "./core/find.js";
+import { propose as saveProposal, searchSaved, SAVE_LIMITS } from "./core/saveitem.js";
 import { weatherEmoji, sceneFor, PARTICLES, SHAPES, MONEY_EMOJI, dayPhase, cityMinutes } from "./core/scene.js";
 import { buildImagePayload, buildLinkPayload, isGeminiKey, mayGo, setSensitiveOk, sensitiveAllowed, pickModel, backupModel, listModels, buildActionPayload, askWithActions, issueUrl, aiErrorText } from "./core/ai.js";
 import { encryptBackup, decryptBackup, passphraseProblem, isEnvelope } from "./core/crypto.js";
@@ -1708,7 +1709,7 @@ const screens = {
         ${item("comidas", "fork", "orange", "Comidas", `${vault.meals.filter((m) => m.day === t).length} apuntadas hoy`)}
         ${item("archivo", "box", "teal", "Tu archivo", archive.stats?.count ? `${archive.stats.count} conversaciones guardadas` : "Tus conversaciones y tu exportación de ChatGPT")}
         ${item("documentos", "box", "orange", "Documentos", (() => { const s = expiringSoon(vault.docs, today(), 30); return s.length ? `${s[0].doc.title}: ${leftText(s[0].left)}` : vault.docs?.length ? `${vault.docs.length} guardados` : "Seguros, contratos y garantías"; })())}
-        ${item("biblioteca", "leaf", "teal", "Biblioteca", vault.library?.length ? `${vault.library.length} cosas · ${vault.library.filter((x) => x.status === "en curso").length} en curso` : "Libros, vídeos y podcasts con lo que aprendes")}
+        ${item("biblioteca", "leaf", "teal", "Biblioteca · Guardar en MANU", vault.library?.length ? `${vault.library.length} cosas guardadas${vault.library.some((x) => x.needsReview) ? ` · ${vault.library.filter((x) => x.needsReview).length} por revisar` : ""}` : "Enlaces, vídeos, PDF, notas e ideas, con búsqueda")}
         ${item("personas", "people", "purple", "Personas", vault.people.length ? `${vault.people.length} personas` : "Cumpleaños y detalles")}
         <button class="item" data-act="refuge"><span class="ico teal">${I.leaf}</span><span class="grow"><span>Refugio</span><br><span class="muted small">Para cuando no estás bien</span></span><span class="chev">${I.chev}</span></button>
       </div>
@@ -1826,14 +1827,17 @@ const subpages = {
     return `${backBar("Memoria")}${memoriaPage(brain(), { spending: vault.spending, projects: vault.projects, ui: memUi, now: new Date() })}`;
   },
   biblioteca() {
-    const items = [...(vault.library ?? [])].filter((i) => libFilter === "todo" || i.status === libFilter).sort((a, b) => String(b.at).localeCompare(String(a.at)));
+    const items = [...(vault.library ?? [])].filter((i) => libFilter === "todo" || i.status === libFilter || (libFilter === "revisar" && i.needsReview)).sort((a, b) => String(b.at).localeCompare(String(a.at)));
+    const res = libQ ? searchSaved(vault, libQ) : null;
+    const goAttr = (g) => (g.project ? `data-act="find-go" data-project="${esc(g.project)}"` : g.sub === "biblioteca" ? `data-act="lib-show" data-id="${esc(g.id)}"` : g.sub ? `data-sub-go="${esc(g.sub)}"` : `data-act="find-go" data-tab="${esc(g.tab)}"`);
+    const review = (vault.library ?? []).filter((x) => x.needsReview).length;
     return `${backBar("Biblioteca")}
-      <form class="card stack" id="libForm"><h2>Añadir</h2><label for="lTitle" class="sr">Título</label><input id="lTitle" placeholder="Título" maxlength="120" required>
-        <div class="row"><label for="lKind" class="sr">Tipo</label><select id="lKind">${Object.entries(LIB_KINDS).map(([k, v]) => `<option value="${k}">${v}</option>`).join("")}</select><label for="lStatus" class="sr">Estado</label><select id="lStatus">${STATUSES.map((st) => `<option value="${st}">${st}</option>`).join("")}</select></div>
-        <label for="lAuthor" class="sr">Autor</label><input id="lAuthor" placeholder="Autor (opcional)" maxlength="80"><label for="lUrl" class="sr">Enlace</label><input id="lUrl" type="url" placeholder="Enlace (opcional)">
-        <label for="lNotes" class="sr">Lo que te llevas</label><textarea id="lNotes" rows="3" placeholder="Lo que te llevas (opcional)"></textarea><button class="btn" type="submit">Añadir</button></form>
-      <div class="chips" role="group" aria-label="Filtro">${["todo", ...STATUSES].map((st) => `<button class="chip${libFilter === st ? " on" : ""}" data-act="lib-filter" data-v="${st}" aria-pressed="${libFilter === st}">${st}</button>`).join("")}</div>
-      <div class="stack">${items.length ? items.map(libRow).join("") : '<p class="muted">Nada por aquí.</p>'}</div>`;
+      ${saveCard()}
+      <section class="card find"><form id="libSearch" role="search" class="composer-inline"><label for="libQ" class="sr">Buscar en lo guardado</label><input id="libQ" type="search" placeholder="🔎 Buscar en lo guardado" value="${esc(libQ)}"><button class="btn small-btn" type="submit">Buscar</button></form>
+        ${res ? (res.length ? `<p class="muted small">${res.length} resultado${res.length === 1 ? "" : "s"} para «${esc(libQ)}» en tu biblioteca, documentos, proyectos e ideas</p>${res.map((x) => `<button class="row find-row" ${goAttr(x.go)}><span aria-hidden="true">${esc(x.icon)}</span><div class="grow"><div>${esc(x.title)}</div><div class="muted small">${esc(x.kind)}${x.snippet ? ` · ${esc(x.snippet)}` : ""}</div></div><span class="chev">${I.chev}</span></button>`).join("")}<button class="link small" data-act="lib-q-clear">Quitar la búsqueda</button>` : `<p class="muted small">No encuentro «${esc(libQ)}» en lo que has guardado.</p><button class="link small" data-act="lib-q-clear">Quitar la búsqueda</button>`) : ""}</section>
+      <div class="chips" role="group" aria-label="Filtro">${["todo", ...STATUSES, ...(review ? ["revisar"] : [])].map((st) => `<button class="chip${libFilter === st ? " on" : ""}" data-act="lib-filter" data-v="${st}" aria-pressed="${libFilter === st}">${st === "revisar" ? `por revisar (${review})` : st}</button>`).join("")}</div>
+      <div class="stack">${items.length ? items.map(libRow).join("") : '<p class="muted">Nada por aquí.</p>'}</div>
+      <p class="muted small">Lo que guardas vive en este dispositivo y viaja en Tu nube como texto (título, enlace, notas). Los archivos se quedan solo en este dispositivo: no suben a Tu nube ni a ninguna IA.</p>`;
   },
   // WEB-59: drop all the screenshots, MANU reads, groups and proposes; Manu keeps the text.
   capturas() {
@@ -3282,6 +3286,8 @@ function mailSubmit(form) {
 }
 // ---------- Triaje del correo (local, sin IA, sin acciones automáticas) ----------
 let mailUi = { open: null, mode: null, showAll: false };
+let libFilter = "todo", libQ = "", libOpen = null;
+let saveUi = { prop: null, file: null, text: "" };
 function mailItems() {
   if (!vault.mail?.triage) return [];
   return triageList(vault.mail.triage, { now: Date.now(), projects: vault.projects ?? [], state: triageStateOf(vault) });
@@ -3926,7 +3932,12 @@ document.addEventListener("click", async (e) => {
     }
     case "lib-filter": libFilter = a.dataset.v; render(); break;
     case "lib-status": vault.library = vault.library.map((x) => (x.id === a.dataset.id ? setStatus(x, a.dataset.v, new Date()) : x)); persist(); render(); break;
-    case "lib-del": { const it = vault.library.find((x) => x.id === a.dataset.id); if (it && window.confirm(`¿Borrar «${it.title}»?`)) { vault.library = vault.library.filter((x) => x.id !== it.id); persist(); render(); } break; }
+    case "save-cancel": saveUi = { prop: null, file: null, text: "" }; render(); break;
+    case "lib-q-clear": libQ = ""; render(); break;
+    case "lib-show": libQ = ""; libFilter = "todo"; libOpen = a.dataset.id; render(); document.getElementById(`lib-${a.dataset.id}`)?.scrollIntoView({ block: "center" }); break;
+    case "lib-reviewed": { const it = vault.library.find((x) => x.id === a.dataset.id); if (it) { delete it.needsReview; persist(); render(); } break; }
+    case "lib-file": { const it = vault.library.find((x) => x.id === a.dataset.id); const data = it?.fileId ? await getImage(it.fileId).catch(() => null) : null; if (!data) { toast("Ese archivo no está en este dispositivo (los archivos no viajan en Tu nube)"); break; } const url = URL.createObjectURL(dataUrlToBlob(data)); window.open(url, "_blank", "noopener"); setTimeout(() => URL.revokeObjectURL(url), 60000); break; }
+    case "lib-del": { const it = vault.library.find((x) => x.id === a.dataset.id); if (it && window.confirm(`¿Borrar «${it.title}»?`)) { if (it.fileId) deleteImage(it.fileId).catch(() => {}); vault.library = vault.library.filter((x) => x.id !== it.id); persist(); render(); } break; }
     case "lib-ideas": {
       const it = vault.library.find((x) => x.id === a.dataset.id);
       if (!it?.notes || !aiReady()) break;
@@ -4081,6 +4092,9 @@ document.addEventListener("submit", async (e) => {
     return;
   }
   if (f === "docForm") { await saveDoc(); return; }
+  if (f === "saveForm") { const text = $("saveText").value.trim(); if (!text) { toast("Pega un enlace o escribe algo"); return; } saveUi = { text, file: null, prop: saveProposal({ text }, { projects: vault.projects ?? [] }) }; render(); return; }
+  if (f === "saveConfirm") { await saveConfirm(); return; }
+  if (f === "libSearch") { libQ = $("libQ").value.trim().slice(0, 80); render(); return; }
   if (f === "libForm") {
     try {
       const it = newItem({ id: uid("lib"), title: $("lTitle").value, kind: $("lKind").value, status: $("lStatus").value, author: $("lAuthor").value, url: $("lUrl").value.trim() || null, notes: $("lNotes").value }, new Date());
@@ -4331,12 +4345,20 @@ document.addEventListener("change", async (e) => {
     return;
   }
   if (e.target.id === "docFile" && e.target.files?.[0]) { const file = e.target.files[0]; e.target.value = ""; readDocFile(file).catch(() => { docDraft = null; render(); toast("No he podido abrir ese archivo"); }); return; }
+  if (e.target.dataset?.libTitle) { const id = e.target.dataset.libTitle, t = e.target.value.trim().slice(0, 120); if (!t) return; vault.library = vault.library.map((x) => { if (x.id !== id) return x; const { needsReview, ...rest } = x; return { ...rest, title: t }; }); persist(); toast("Título guardado"); return; }
   if (e.target.dataset?.libNotes) { const id = e.target.dataset.libNotes; vault.library = vault.library.map((x) => (x.id === id ? { ...x, notes: e.target.value.slice(0, 4000) } : x)); persist(); toast("Notas guardadas"); return; }
   if (e.target.id === "bankShots" && e.target.files?.length) { const files = [...e.target.files]; e.target.value = ""; readBankShots(files); return; }
   if (e.target.id === "buzonFile" && e.target.files?.[0]) {
     const file = e.target.files[0]; e.target.value = "";
     if (file.size > 5_000_000) { toast("Ese archivo es demasiado grande para ser el buzón."); return; }
     try { importBuzon(await file.text()); } catch { toast("No he podido leer el buzón."); }
+    return;
+  }
+  if (e.target.id === "saveFile" && e.target.files?.[0]) {
+    const file = e.target.files[0]; e.target.value = "";
+    if (file.size > SAVE_LIMITS.fileBytes) { toast(`Ese archivo pasa de ${Math.round(SAVE_LIMITS.fileBytes / 1048576)} MB; guarda mejor el enlace`); return; }
+    try { const data = await readAsDataUrl(file); const text = $("saveText")?.value.trim() ?? ""; saveUi = { text, file: { name: file.name, type: file.type, size: file.size, data }, prop: saveProposal({ text, file: { name: file.name, type: file.type, size: file.size } }, { projects: vault.projects ?? [] }) }; render(); }
+    catch { toast("No he podido leer ese archivo"); }
     return;
   }
   if (e.target.id === "capFiles" && e.target.files?.length) {
@@ -4781,6 +4803,16 @@ if ("serviceWorker" in navigator) {
 
 // Spotify redirect back (Authorization Code with PKCE).
 const returned = new URLSearchParams(location.search);
+// «Guardar en MANU» desde un Atajo de iOS o desde «Compartir» (donde el sistema lo permita):
+// ?guardar=<enlace o texto>, o ?guardar=1&title=&text=&url= (share_target). Solo prepara la
+// propuesta: no guarda nada hasta que Manu confirma.
+if (returned.has("guardar")) {
+  const g = returned.get("guardar");
+  const text = [g && g !== "1" ? g : "", returned.get("title") ?? "", returned.get("text") ?? "", returned.get("url") ?? ""].map((x) => x.trim()).filter(Boolean).filter((x, i, a) => a.indexOf(x) === i).join(" ").slice(0, 4000);
+  history.replaceState(null, "", location.pathname);
+  tab = "tu"; sub = "biblioteca";
+  if (text) saveUi = { text, file: null, prop: saveProposal({ text }, { projects: vault.projects ?? [] }) };
+}
 if (returned.has("code") && returned.has("state")) {
   history.replaceState(null, "", location.pathname);
   tab = "tu"; sub = "spotify";
@@ -4821,7 +4853,42 @@ applyBankReturn();
 // ---------- Repaso, documentos y biblioteca (WEB-83..85) ----------
 let reviewNote = false;  // the «Apuntar algo» box on tonight's card
 let docDraft = null;     // { busy } while Gemini reads; { fields, fileData?, fileType?, editId? } to review
-let libFilter = "todo";
+// «Guardar en MANU»: paso 1, pegar o elegir; paso 2, revisar lo que propone MANU.
+function saveCard() {
+  const p = saveUi.prop;
+  if (!p) return `<form class="card stack save-card" id="saveForm"><h2>Guardar en MANU</h2><label for="saveText" class="sr">Enlace, nota o idea</label><textarea id="saveText" rows="2" placeholder="Pega un enlace o escribe una nota o idea">${esc(saveUi.text)}</textarea>
+    <div class="btns"><button class="btn" type="submit">Siguiente</button><label class="btn ghost" for="saveFile" role="button" tabindex="0">📎 Elegir archivo</label><input id="saveFile" type="file" class="sr"></div>
+    <p class="muted small">Enlaces, artículos, vídeos, PDF, documentos, imágenes, notas e ideas. MANU propone título, tema y proyecto y tú decides.</p></form>`;
+  return `<form class="card stack save-card" id="saveConfirm"><h2>¿Lo guardo así?</h2>
+    ${p.needsReview ? '<p class="small lg-warn"><b>Revísalo:</b> no puedo saber bien de qué trata sin abrirlo, y no lo abro.</p>' : ""}
+    <label for="svTitle" class="muted small">Título</label><input id="svTitle" maxlength="120" value="${esc(p.title)}" required>
+    <div class="row"><label for="svKind" class="sr">Tipo</label><select id="svKind">${Object.entries(LIB_KINDS).map(([k, v]) => `<option value="${k}"${k === p.kind ? " selected" : ""}>${v}</option>`).join("")}</select>
+    <label for="svProject" class="sr">Proyecto</label><select id="svProject"><option value="">Sin proyecto</option>${(vault.projects ?? []).map((x) => `<option value="${esc(x.id)}"${x.id === p.project ? " selected" : ""}>${esc(x.emoji ?? "📁")} ${esc(x.name)}</option>`).join("")}</select></div>
+    <label for="svTopic" class="muted small">Tema (opcional)</label><input id="svTopic" maxlength="40" value="${esc(p.topic)}">
+    ${p.url ? `<p class="small muted">🔗 ${esc(p.url)}</p>` : ""}${saveUi.file ? `<p class="small muted">📎 ${esc(saveUi.file.name)} · ${Math.max(1, Math.round(saveUi.file.size / 1024))} KB · se guarda solo en este dispositivo</p>` : ""}
+    <label for="svNote" class="muted small">Tu nota (opcional)</label><textarea id="svNote" rows="2" maxlength="4000">${esc(p.note)}</textarea>
+    <details><summary class="muted small">Por qué lo propongo así</summary><ul class="small">${p.why.map((w) => `<li>${esc(w)}</li>`).join("")}</ul></details>
+    <div class="btns"><button class="btn" type="submit">Guardar</button><button class="btn ghost" type="button" data-act="save-cancel">Cancelar</button></div></form>`;
+}
+async function saveConfirm() {
+  const p = saveUi.prop; if (!p) return;
+  let it;
+  try { it = newItem({ id: uid("lib"), title: $("svTitle").value, kind: $("svKind").value, url: p.url, notes: $("svNote").value }, new Date()); } catch (err) { toast(err.message); return; }
+  const topic = $("svTopic").value.trim().slice(0, 40), project = $("svProject").value || null;
+  const titleChanged = $("svTitle").value.trim() !== p.title;
+  Object.assign(it, { ...(topic ? { topic, tags: [topic] } : {}), ...(project ? { project } : {}), ...(p.needsReview && !titleChanged ? { needsReview: true } : {}), source: saveUi.file ? "archivo" : p.url ? "enlace" : "texto" });
+  if (saveUi.file) {
+    const fileId = uid("f");
+    try { await putImage(fileId, saveUi.file.data); Object.assign(it, { fileId, fileType: saveUi.file.type, fileName: saveUi.file.name.slice(0, 120) }); }
+    catch { toast("No he podido guardar el archivo en este dispositivo"); return; }
+  }
+  vault.library = [...(vault.library ?? []), it];
+  // También como fuente del proyecto, para que se vea (y se pueda preguntar) desde allí.
+  const pj = project ? (vault.projects ?? []).find((x) => x.id === project) : null;
+  if (pj) { try { Object.assign(pj, addSource(pj, { id: uid("src"), kind: it.url ? "link" : "note", title: `📚 ${it.title}`, text: it.notes || (it.fileName ? `Archivo guardado en tu biblioteca: ${it.fileName}` : it.title), url: it.url ?? null })); } catch (err) { toast(err.message); } }
+  saveUi = { prop: null, file: null, text: "" }; libFilter = "todo"; libOpen = it.id;
+  persist(); render(); toast(project ? "Guardado en tu biblioteca y en el proyecto" : "Guardado en tu biblioteca");
+}
 // Las revisiones usan el consumo personal (Dinero 2.0) y solo hablan de gasto si la cifra es fiable.
 const reviewData = (now = today()) => { const from = new Date(now); from.setDate(from.getDate() - 35); return { now, inbox: vault.inbox, habits: vault.habits, spending: money().spend, moneyReliable: lgSummary(vault, { from, to: new Date(now.getTime() + 86400000) }).fiable, clock: vault.clock, targetMin: clockTarget(), reminders: vault.reminders }; };
 function tonightReview() {
@@ -4933,8 +5000,11 @@ async function saveDoc() {
   toast(clean.expires ? `Guardado: ${leftText(daysLeft(clean, today()))}` : "Guardado");
 }
 function libRow(i) {
-  return `<details class="card lib"><summary class="row"><span class="grow"><b>${esc(LIB_KINDS[i.kind] ?? "")} ${esc(i.title)}</b>${i.author ? `<br><span class="muted small">${esc(i.author)}</span>` : ""}</span><span class="chip">${esc(i.status)}</span></summary>
-    <div class="stack">${i.url ? `<a class="link small" href="${esc(safeHref(i.url))}" target="_blank" rel="noopener">Abrir enlace</a>` : ""}
+  const proj = i.project ? (vault.projects ?? []).find((p) => p.id === i.project) : null;
+  return `<details class="card lib" id="lib-${esc(i.id)}"${libOpen === i.id ? " open" : ""}><summary class="row"><span class="grow"><b>${esc(LIB_KINDS[i.kind] ?? "")} ${esc(i.title)}</b>${i.author || i.topic || proj ? `<br><span class="muted small">${esc([i.author, i.topic, proj ? `📁 ${proj.name}` : ""].filter(Boolean).join(" · "))}</span>` : ""}</span>${i.needsReview ? '<span class="chip lib-review">revisar</span>' : `<span class="chip">${esc(i.status)}</span>`}</summary>
+    <div class="stack">${i.needsReview ? `<p class="small lg-warn">MANU no pudo saber bien de qué trata (no abre páginas ni lee archivos). Revisa el título. <button class="link small" data-act="lib-reviewed" data-id="${esc(i.id)}">Ya está bien</button></p>` : ""}
+      <label for="lt-${esc(i.id)}" class="sr">Título</label><input id="lt-${esc(i.id)}" data-lib-title="${esc(i.id)}" maxlength="120" value="${esc(i.title)}">
+      ${i.url ? `<a class="link small" href="${esc(safeHref(i.url))}" target="_blank" rel="noopener">Abrir enlace</a>` : ""}${i.fileId ? `<button class="link small" data-act="lib-file" data-id="${esc(i.id)}">Abrir archivo (${esc(i.fileName ?? "")})</button>` : ""}
       <label for="ln-${esc(i.id)}" class="sr">Notas</label><textarea id="ln-${esc(i.id)}" data-lib-notes="${esc(i.id)}" rows="3" placeholder="Lo que te llevas">${esc(i.notes ?? "")}</textarea>
       ${i.ideas?.length ? `<ul class="brief-list">${i.ideas.map((x) => `<li><span aria-hidden="true">💡</span><span>${esc(x)}</span></li>`).join("")}</ul>` : ""}
       <div class="chips" role="group" aria-label="Estado">${STATUSES.map((st) => `<button class="chip${i.status === st ? " on" : ""}" data-act="lib-status" data-id="${esc(i.id)}" data-v="${st}" aria-pressed="${i.status === st}">${st}</button>`).join("")}</div>
