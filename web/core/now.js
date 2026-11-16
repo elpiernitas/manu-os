@@ -119,7 +119,7 @@ export function whatNow({ now = new Date(), mode = "AFTERNOON", events = [], tom
 
   // 7. A project gone quiet (not during work).
   const stale = mode === "WORK" || gentle ? [] : staleProjects(projects, now);
-  if (stale.length) out.push({ e: stale[0].project.emoji ?? "📁", t: `Diez minutos para «${stale[0].project.name}».`, why: `Llevas ${stale[0].days} días sin tocarlo. Ábrelo y apunta el siguiente paso, solo eso. Si ya no te interesa, archívalo y quítatelo de la cabeza.`, go: { project: stale[0].project.id } });
+  if (stale.length) out.push({ e: stale[0].project.emoji ?? "📁", t: `Diez minutos para «${stale[0].project.name}».`, why: `Llevas ${stale[0].days} días sin tocarlo.${stale[0].project.why ? ` Lo empezaste para: ${stale[0].project.why}.` : ""} Ábrelo y apunta un paso de 10 minutos, solo eso. Si ya no te interesa, archívalo y quítatelo de la cabeza.`, go: { project: stale[0].project.id } });
 
   // 8. Someone he hasn't talked to in a while.
   if ((quiet ?? []).length && mode !== "WORK") {

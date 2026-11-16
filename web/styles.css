@@ -931,3 +931,14 @@ pre.code { white-space: pre-wrap; word-break: break-word; max-height: 220px; ove
 .save-card .row { flex-wrap: wrap; gap: 8px; }
 .save-card .row select { flex: 1 1 120px; min-width: 0; max-width: 100%; }
 .save-card input, .save-card textarea, .save-card select { max-width: 100%; box-sizing: border-box; }
+/* WEB-115 · franjas, «Ahora», fin de semana, trabajo e ideas aparcadas */
+.ctl-hint { margin: -2px 0 6px; }
+.ctl-now { border: 1px solid var(--accent); border-radius: 12px; padding: 10px 12px; margin: 6px 0 8px; display: grid; gap: 4px; }
+.ctl-now-t { margin: 0; overflow-wrap: anywhere; }
+.ctl-now .btns { margin-top: 2px; }
+.ctl-weekend { background: var(--surface-2); border-radius: 12px; padding: 10px 12px; margin: 6px 0; }
+button.chip.work-chip { flex: none; min-width: 44px; min-height: 44px; padding: 0 10px; display: inline-flex; align-items: center; justify-content: center; opacity: .55; }
+button.chip.work-chip.on { opacity: 1; border-color: var(--accent); }
+.parked-row { gap: 8px; flex-wrap: wrap; }
+.parked-row .grow { min-width: 0; overflow-wrap: anywhere; }
+.proj-why .composer-inline { margin-top: 6px; }
