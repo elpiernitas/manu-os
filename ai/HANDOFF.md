@@ -1,5 +1,29 @@
 # HANDOFF
 
+## WEB-117 · rutinas de trabajo y Tablero conectado (Claude, 2026-11-16)
+
+**Tablero conectado de verdad:**
+- La empresa publicó `mkt-tablero-feed`, que autentica por huella SHA-256.
+- Claude, con el permiso de Manu y su token de Supabase guardado en el entorno:
+  - generó la clave sin mostrarla;
+  - guardó `RK_TABLERO_TOKEN` y `RK_TABLERO_URL` en el Supabase de Manu;
+  - desplegó `manu-tablero`.
+- Prueba real: el feed responde 200 con la clave buena (11 tarjetas, sin teléfonos ni correos) y 401 con una mala. MANU acepta las 11.
+- `manu-tablero` responde 401 sin sesión, 403 desde otra web y 405 a GET.
+- Se borró la copia temporal de la clave.
+- **NO_VERIFICADO:** la lectura desde el iPhone de Manu con su sesión (paso suyo).
+
+**Rutinas de trabajo** (`core/routines.js`, Tú → Rutinas de trabajo):
+- Tareas semanales, mensuales o trimestrales que se apuntan solas como 💼 el día que tocan, una vez por periodo. Las mensuales y trimestrales, el último día laborable.
+- Tres propuestas de marketing que Manu añade con un toque.
+- Acceso «Tablero ↗» en Hoy en horario de trabajo.
+- Versión 117.
+
+**Pruebas:**
+- `npm test`: 471 de 471.
+- `dia.e2e`: 64 de 64.
+- Sin regresión en el resto.
+
 ## WEB-116 · Tablero de marketing de la empresa en MANU, solo lectura (Claude, 2026-11-16)
 
 Manu solo usa el Tablero de la app de su empresa y quiere verlo en MANU. Puede leer el código de la app de la empresa y añadir cosas en su Supabase, pero no tocar ciertas partes. Su jornada termina a las 13:00 y a veces se alarga hasta las 13:30; la desconexión ya lo cubre, porque el trabajo sigue visible hasta «Jornada cerrada». Detalle en `docs/TABLERO.md`.

@@ -198,6 +198,33 @@ for (const w of [320, 375, 390, 430]) {
   ok("Tablero: sin errores", !errors.length);
   await ctx.close();
 }
+// 9. Rutinas de trabajo: se añade la propuesta y el viernes se apunta sola, una sola vez.
+{
+  const fd = { version: 1, generatedAt: t(20, 8), openUrl: "https://app.ejemplo.test/tablero", cards: [] };
+  const v = { ...seed(), settings: { tablero: { on: true } } };
+  const ctx = await browser.newContext({ timezoneId: "Europe/Madrid", ...devices["iPhone 14"] });
+  const page = await ctx.newPage(); const errors = [];
+  page.on("pageerror", (e) => errors.push(String(e))); page.on("dialog", (d) => d.accept());
+  await page.clock.install({ time: new Date(t(20, 9, 30)) }); // viernes
+  await page.route(/^https:\/\/([^/]*\.)?(open-meteo\.com|supabase\.co|googleapis\.com|google\.com|spotify\.com|enablebanking\.com|gstatic\.com)\//, (r) => r.fulfill({ status: 503, body: "" }));
+  await page.addInitScript(([vv, f, at]) => { if (sessionStorage.getItem("seeded")) return; sessionStorage.setItem("seeded", "1"); sessionStorage.setItem("manuos.tab", "tu"); localStorage.setItem("manuos.nudged", JSON.stringify({ day: "x", ids: [] })); localStorage.setItem("manuos.vault", JSON.stringify(vv)); localStorage.setItem("manuos.tablero", JSON.stringify({ feed: f, readAt: at })); }, [v, fd, t(20, 9)]);
+  await page.goto(B); await page.waitForTimeout(600);
+  await page.evaluate(() => { const b = document.createElement("button"); b.dataset.subGo = "rutinas"; document.body.append(b); b.click(); b.remove(); }); await page.waitForTimeout(250);
+  ok("rutinas: propuestas de marketing visibles", /Propuestas para tu marketing/i.test(await page.locator("#screen").innerText()));
+  await page.click('[data-act="routine-preset"][data-k="vendidos"]'); await page.waitForTimeout(200);
+  await page.click('[data-tab="hoy"]'); await page.waitForTimeout(300);
+  let vv = await vaultOf(page);
+  const made = vv.inbox.filter((i) => i.routine);
+  ok("el viernes se apunta sola como tarea de trabajo", made.length === 1 && made[0].work === true && /Piezas de vendidos/.test(made[0].text));
+  await page.reload(); await page.waitForTimeout(500);
+  vv = await vaultOf(page);
+  ok("al volver a abrir no se repite", vv.inbox.filter((i) => i.routine).length === 1);
+  ok("en horario de trabajo, acceso directo al Tablero", (await page.locator('.ctl a[href="https://app.ejemplo.test/tablero"]').count()) === 1);
+  ok("las rutinas se conservan en el vault", (vv.routines ?? []).length === 1 && vv.routines[0].on === true);
+  ok("rutinas: sin errores", !errors.length);
+  await shot(page, "09-rutinas");
+  await ctx.close();
+}
 await browser.close();
 console.log(`dia.e2e: ${passes} correctas, ${fails} fallos`);
 process.exit(fails ? 1 : 0);
