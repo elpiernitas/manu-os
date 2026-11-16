@@ -283,9 +283,32 @@ export function resolve(vault) {
     r.pendingFlag = r.pending > 0;
     rows.push(r);
   }
+  applyLooseRefunds(rows);
   // Deudas apuntadas a mano (sin movimiento en el banco).
   const manual = Object.entries(l.debts).filter(([, d]) => d && d.who && Number.isInteger(d.cents) && d.cents !== 0).map(([id, d]) => ({ id, ...d }));
   return { rows, manual };
+}
+/**
+ * Una devolución sin relacionar rebaja tus compras anteriores de su misma categoría (la más
+ * reciente primero, como mucho 90 días antes), para que el resumen, las categorías, la serie y
+ * los patrones digan lo mismo. Lo que no encuentra compra queda en `refundLeft`: no rebaja nada
+ * y se avisa para relacionarlo.
+ */
+const REFUND_WINDOW = 90 * 86400000;
+function applyLooseRefunds(rows) {
+  const refunds = rows.filter((r) => r.refund > 0).sort((a, b) => (a.at < b.at ? -1 : 1));
+  for (const rf of refunds) {
+    const t = Date.parse(rf.at);
+    let left = rf.refund;
+    const cands = rows.filter((r) => r.dir === "out" && r.consumo > 0 && (r.category ?? "OTHER") === (rf.category ?? "OTHER") && Date.parse(r.at) <= t && t - Date.parse(r.at) <= REFUND_WINDOW).sort((a, b) => (a.at < b.at ? 1 : -1));
+    for (const c of cands) {
+      if (!left) break;
+      const off = Math.min(left, c.consumo);
+      c.consumo -= off; c.refundApplied = (c.refundApplied ?? 0) + off; left -= off;
+      (c.refundFrom ??= []).push(rf.key);
+    }
+    rf.refundUsed = rf.refund - left; rf.refundLeft = left;
+  }
 }
 function legacyParts(m) {
   const s = m.raw.split;
@@ -323,14 +346,16 @@ const inRange = (at, from, to) => { const t = Date.parse(at); return t >= from &
  * Las cifras de un periodo, separando banco, consumo personal, ingresos propios, dinero de otras
  * personas, movimientos neutros y lo pendiente. `fiable` decide si se dan consejos y previsiones.
  */
+export const NIVEL_LABEL = { CONFIRMADA: "Confirmada por ti", INTERPRETADA: "Interpretada por MANU", PROVISIONAL: "Provisional: falta revisar", SIN_DATOS: "Sin datos" };
 export function summary(vault, { from, to }) {
   const f = new Date(from).getTime(), t = new Date(to).getTime();
   const { rows } = resolve(vault);
   const rs = rows.filter((r) => inRange(r.at, f, t));
   const sum = (fn) => rs.reduce((s, r) => s + fn(r), 0);
   const bankOut = sum((r) => (r.dir === "out" ? r.cents : 0)), bankIn = sum((r) => (r.dir === "in" ? r.cents : 0));
-  const refunds = sum((r) => r.refund);
-  const consumo = Math.max(0, sum((r) => r.consumo) - refunds);
+  // Las devoluciones ya están descontadas de cada compra (relacionadas o por categoría).
+  const refunds = sum((r) => r.refundApplied ?? 0), refundsLeft = sum((r) => r.refundLeft ?? 0);
+  const consumo = sum((r) => r.consumo);
   const ingreso = sum((r) => r.ingreso);
   const pending = rs.filter((r) => r.pending > 0);
   const pendingCents = pending.reduce((s, r) => s + r.pending, 0);
@@ -338,13 +363,16 @@ export function summary(vault, { from, to }) {
   const othersOut = sum((r) => (r.dir === "out" ? r.people.reduce((s, p) => s + -p.cents, 0) : 0));
   const byCategory = {};
   for (const r of rs) if (r.consumo > 0) byCategory[r.category ?? "OTHER"] = (byCategory[r.category ?? "OTHER"] ?? 0) + r.consumo;
-  for (const r of rs) if (r.refund > 0) byCategory[r.category ?? "OTHER"] = Math.max(0, (byCategory[r.category ?? "OTHER"] ?? 0) - r.refund);
   const base = bankOut + bankIn;
   const pendingShare = base ? pendingCents / base : 0;
   const fiable = pendingShare <= RELIABLE_PENDING_SHARE;
+  const consumoAuto = sum((r) => (r.auto ? r.consumo : 0));
+  // Nivel de confianza de la cifra: confirmada por Manu, interpretada por MANU, provisional
+  // (demasiado pendiente) o sin datos. Una cifra con supuestos nunca sale como confirmada.
+  const nivel = !rs.length ? "SIN_DATOS" : !fiable ? "PROVISIONAL" : consumoAuto > 0 || pendingCents > 0 ? "INTERPRETADA" : "CONFIRMADA";
   return {
     bank: { out: bankOut, in: bankIn, count: rs.length },
-    consumo, consumoAuto: sum((r) => (r.auto ? r.consumo : 0)), ingreso, refunds,
+    consumo, consumoAuto, consumoConfirmado: consumo - consumoAuto, ingreso, refunds, refundsLeft, nivel, nivelLabel: NIVEL_LABEL[nivel],
     neutral: sum((r) => r.neutral),
     others: { in: othersIn, out: othersOut },
     pending: { cents: pendingCents, count: pending.length, rows: pending.sort((a, b) => b.pending - a.pending) },

@@ -224,3 +224,53 @@ test("las piezas visuales escapan y no usan estilos en línea", () => {
   assert.ok(!html.includes("<img"));
   assert.ok(!/style="/.test(html));
 });
+
+// ---------- Una sola fuente de verdad (misión «asistente real») ----------
+const inMes = (e) => e.at >= MES.from && e.at < MES.to;
+const total = (xs) => xs.filter(inMes).reduce((t, e) => t + e.cents, 0);
+const coherent = (v, label) => {
+  const s = sum(v);
+  assert.equal(total(L.personalSpending(v)), s.consumo, `${label}: la serie y los patrones suman lo mismo que el resumen`);
+  assert.equal(s.byCategory.reduce((t, [, c]) => t + c, 0), s.consumo, `${label}: las categorías suman el consumo`);
+  assert.ok(L.personalSpending(v).every((e) => e.cents > 0), `${label}: nada en negativo`);
+};
+
+test("coherencia: resumen, categorías y personalSpending dan la misma cifra en todos los casos", () => {
+  let v = base();
+  coherent(v, "sin revisar");
+  v = { ...v, ledger: L.setLink(L.ledgerOf(v), { kind: "CASH_BACK", a: "g:cajero", b: "i:ingreso" }, "CONFIRMED", { now: T0 }) };
+  coherent(v, "600 € devueltos");
+  assert.ok(!L.personalSpending(v).some((e) => e.id === "cajero"), "la retirada de 600 € devuelta nunca es consumo");
+  v = note(v, "g:cena", { kind: "SHARED", parts: L.equalParts(9000, [{ name: "Ana" }]) });
+  coherent(v, "compartido");
+  v = note(v, "i:devol", { kind: "REFUND", category: "SHOPPING" });
+  coherent(v, "devolución suelta");
+  v = note(v, "g:farmacia", { kind: "OTHERS", parts: [{ name: "Mamá", cents: 4000 }] });
+  coherent(v, "dinero de mamá");
+});
+
+test("devolución sin relacionar: rebaja la compra anterior de su categoría también en la serie", () => {
+  const v = note(base(), "i:devol", { kind: "REFUND", category: "SHOPPING" });
+  const r = new Map(L.resolve(v).rows.map((x) => [x.key, x]));
+  assert.equal(r.get("g:zapas").consumo, 0); assert.equal(r.get("g:zapas").refundApplied, 8000);
+  assert.deepEqual(r.get("g:zapas").refundFrom, ["i:devol"]);
+  assert.ok(!L.personalSpending(v).some((e) => e.id === "zapas"), "la serie de 6 meses ya no la cuenta");
+  assert.equal(sum(v).refunds, 8000); assert.equal(sum(v).refundsLeft, 0);
+  assert.equal(base().spending.find((x) => x.id === "zapas").cents, 8000, "el movimiento del banco no cambia");
+  // Una devolución sin compra de su categoría no rebaja nada y se avisa.
+  const sin = note(base(), "i:devol", { kind: "REFUND", category: "TRAVEL" });
+  assert.equal(sum(sin).consumo, sum(base()).consumo);
+  assert.equal(sum(sin).refundsLeft, 8000);
+  assert.match(summaryCard(sum(sin)), /Devoluciones sin compra/);
+});
+
+test("niveles de confianza: confirmada, interpretada, provisional y sin datos", () => {
+  assert.equal(sum(base()).nivel, "PROVISIONAL");
+  assert.equal(L.summary({ ...base(), spending: [], income: [] }, MES).nivel, "SIN_DATOS");
+  let v = { ...base(), spending: base().spending.filter((x) => ["cafe", "cena"].includes(x.id)), income: [] };
+  assert.equal(L.summary(v, MES).nivel, "INTERPRETADA", "las compras supuestas nunca salen como confirmadas");
+  v = note(v, "g:cafe", { kind: "MINE" }); v = note(v, "g:cena", { kind: "MINE" });
+  const s = L.summary(v, MES);
+  assert.equal(s.nivel, "CONFIRMADA"); assert.equal(s.consumoConfirmado, 10250);
+  assert.match(summaryCard(s), /Confirmada por ti/);
+});

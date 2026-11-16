@@ -1,7 +1,8 @@
 # Dinero 2.0 · Entender tu dinero de verdad (WEB-111)
 
-Estado: **implementado y probado en una rama, sin fusionar ni publicar.** Manu revisa primero el editor
-y estas reglas.
+Estado: **publicado en la versión 111** (autorizado por Manu en la misión «de prototipo a asistente
+personal real»). Antes de fusionar se corrigieron las cuatro cosas que pidió: una sola fuente de verdad,
+coherencia de las devoluciones, niveles de confianza e interacción en iPhone.
 
 ## Principio
 
@@ -27,7 +28,7 @@ entre importaciones: una anotación sobrevive a reimportar el extracto o a «Imp
 | Gasto compartido | Pagaste tú: tu parte es consumo; la de los demás, te la deben | — |
 | Entre mis cuentas | Neutro | Neutro |
 | Efectivo | Retirada: tú dices si lo gastaste, lo tienes en mano o lo volviste a ingresar | Ingreso de efectivo: neutro |
-| Devolución | — | Rebaja la compra relacionada o, sin relacionar, el consumo de su categoría |
+| Devolución | — | Rebaja la compra relacionada o, sin relacionar, tus compras anteriores de su categoría (90 días) |
 | Pago de una deuda | Le pagas a alguien lo que le debías | Alguien te paga lo que te debía |
 | Pendiente de revisar | No cuenta ni como tuyo ni como de nadie | Igual |
 
@@ -61,7 +62,10 @@ proponer, y se puede deshacer desde la ficha.
 Para un periodo:
 
 - **Movimientos del banco**: todo lo que salió y entró, tal cual.
-- **Consumo personal**: tu parte de cada gasto, menos las devoluciones.
+- **Consumo personal**: tu parte de cada gasto, con las devoluciones ya descontadas de su compra.
+  - Una devolución relacionada rebaja esa compra.
+  - Sin relacionar, rebaja tus compras anteriores de la misma categoría, la más reciente primero y como
+    mucho 90 días antes. Lo que no encuentra compra sale como «Devoluciones sin compra» y no rebaja nada.
 - **Ingresos propios**: los ingresos tuyos, y tu parte si una parte es de otra persona.
 - **Dinero de otras personas**: lo suyo que entró y salió por tu cuenta.
 - **Neutros**: traspasos, efectivo devuelto y devoluciones ya aplicadas a su compra.
@@ -69,11 +73,20 @@ Para un periodo:
 - **Ahorro personal** = ingresos propios − consumo personal. Nunca incluye dinero de otros ni lo pendiente.
 - **Fiable** si lo pendiente es como mucho el **5 %** de lo que se ha movido.
   - Si no es fiable: el ahorro sale como «—», y se suspenden la previsión de fin de mes, «tu día de más
-    gasto» y los avisos de presupuesto de Hoy.
+    gasto», los avisos de presupuesto de Hoy, los comentarios de gasto de las revisiones de la noche y de
+    la semana, y la comparación con el mes pasado en las respuestas de MANU.
+- **Nivel de confianza** de la cifra, siempre visible en el resumen:
+  - **Confirmada por ti**: todo lo que cuenta lo has revisado y no queda nada pendiente.
+  - **Interpretada por MANU**: fiable, pero incluye compras supuestas o algo pendiente (por debajo del 5 %).
+  - **Provisional**: más del 5 % pendiente.
+  - **Sin datos**: no hay movimientos en el periodo.
+  Una cifra con movimientos supuestos nunca sale como confirmada.
 
 Las estadísticas de siempre (media diaria, serie de 6 meses, «Dónde gastas», «Lo que más se repite»,
 patrones, presupuestos y el resumen de Hoy) se calculan ahora sobre **tu consumo y tus ingresos**, no
-sobre el banco en bruto. Las devoluciones sin relacionar solo rebajan el resumen y las categorías.
+sobre el banco en bruto. También las revisiones de la noche y de la semana, la respuesta de MANU a
+«¿cuánto he gastado?» y el contexto que se manda a Gemini si lo autorizas. Las pruebas comprueban que el
+resumen, las categorías y la serie suman lo mismo en todos los casos.
 
 ## Saldos con personas
 
@@ -120,6 +133,4 @@ dispositivo.
   anota o se corrige en grupo.
 - **Cambiar la categoría desde la ficha no enseña la regla de categorías** (`learnCategory`), como hacía la
   fila antigua. Se puede añadir si lo quieres.
-- Las devoluciones sin relacionar no se descuentan en la serie de 6 meses ni en los patrones; sí en el
-  resumen y las categorías.
 - **Safari e iPhone reales: no probados.**

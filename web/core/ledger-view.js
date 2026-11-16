@@ -19,12 +19,15 @@ export function badge(r) {
 export function summaryCard(s, { monthName = "este mes" } = {}) {
   const row = (label, value, help, cls = "") => `<div class="lg-sum-row ${cls}"><div><b>${label}</b><span class="muted small">${help}</span></div><span class="num">${value}</span></div>`;
   return `<section class="card lg-sum" aria-labelledby="lgSumT"><h2 id="lgSumT">Tu dinero de verdad · ${esc(monthName)}</h2>
+    ${s.nivel ? `<p class="lg-level lg-level-${esc(s.nivel.toLowerCase())}"><b>Fiabilidad:</b> ${esc(s.nivelLabel)}${s.nivel === "INTERPRETADA" ? ` · ${esc(euros(s.consumoConfirmado))} confirmados, ${esc(euros(s.consumoAuto))} supuestos` : ""}</p>` : ""}
     ${s.fiable ? "" : `<p class="lg-warn" role="status"><b>Cifras provisionales.</b> Hay ${esc(euros(s.pending.cents))} en ${s.pending.count} ${s.pending.count === 1 ? "movimiento" : "movimientos"} sin atribuir (${Math.round(s.pendingShare * 100)} % de lo que se ha movido). Hasta revisarlos no te doy consejos, previsiones ni ahorro.</p>`}
     ${row("Consumo personal", euros(s.consumo), s.consumoAuto ? `Incluye ${esc(euros(s.consumoAuto))} supuestos (compras normales sin revisar)` : "Todo revisado", "lg-main")}
     ${row("Ingresos propios", euros(s.ingreso), "Nómina e ingresos que has dicho que son tuyos")}
     ${row(s.fiable ? (s.ahorro >= 0 ? "Ahorro personal" : "Gastas más de lo que ingresas") : "Ahorro personal", s.fiable ? euros(Math.abs(s.ahorro)) : "—", s.fiable ? "Ingresos propios menos consumo. Sin dinero de otras personas" : "Se calcula cuando no quede casi nada pendiente")}
     ${row("Pendiente de atribuir", euros(s.pending.cents), `${s.pending.count} ${s.pending.count === 1 ? "movimiento" : "movimientos"}: ni tuyo ni de nadie hasta que lo digas`, s.pending.count ? "lg-pend" : "")}
     ${s.others.in || s.others.out ? row("Dinero de otras personas", `+${euros(s.others.in)} / −${euros(s.others.out)}`, "Entró y salió por tu cuenta, pero no es tuyo", "lg-two") : ""}
+    ${s.refunds ? row("Devoluciones descontadas", euros(s.refunds), "Ya restadas de la compra a la que corresponden") : ""}
+    ${s.refundsLeft ? row("Devoluciones sin compra", euros(s.refundsLeft), "No encuentro una compra de su categoría que rebajar: relaciónalas en su ficha", "lg-pend") : ""}
     ${s.neutral ? row("Movimientos neutros", euros(s.neutral), "Entre tus cuentas, efectivo que volviste a ingresar, devoluciones ya aplicadas") : ""}
     ${row("Movimientos del banco", `−${euros(s.bank.out)} / +${euros(s.bank.in)}`, `${s.bank.count} movimientos tal como los da el banco`, "lg-bank")}
     <div class="btns">${s.pending.count ? `<button class="btn" data-act="lg-filter" data-f="pending">Revisar ${s.pending.count} pendientes</button>` : ""}<button class="btn ghost" data-act="lg-select">Corregir varios</button></div>
@@ -32,7 +35,7 @@ export function summaryCard(s, { monthName = "este mes" } = {}) {
       <li>Las compras normales cuentan como consumo tuyo hasta que digas otra cosa («supuesto»).</li>
       <li>Retiradas de efectivo, Bizum y transferencias quedan <b>pendientes</b>: no son consumo ni ingreso hasta que lo digas.</li>
       <li>El dinero de otra persona y su parte de un gasto compartido no cuentan como tuyos.</li>
-      <li>Una devolución relacionada con su compra rebaja esa compra.</li>
+      <li>Una devolución relacionada rebaja su compra; sin relacionar, rebaja tus compras anteriores de su categoría (90 días como mucho). Así el resumen, las categorías, la serie y los patrones dicen lo mismo.</li>
       <li>Con más del ${Math.round(RELIABLE_PENDING_SHARE * 100)} % pendiente, no hay consejos, previsiones ni ahorro.</li>
       <li>Los movimientos del banco no se cambian nunca: lo que corriges se guarda aparte y se puede deshacer.</li></ul></details></section>`;
 }

@@ -1,6 +1,6 @@
 import { normalise } from "./core/text.js";
 import { parse, reply, quickDetect, amountCents } from "./core/assistant.js";
-import { CATEGORIES, CATEGORY_EMOJI, euros, newEntry, learnCategory, summary, toCents, rulesFromRows, applyRules } from "./core/money.js";
+import { CATEGORIES, CATEGORY_EMOJI, euros, newEntry, learnCategory, toCents, rulesFromRows, applyRules } from "./core/money.js";
 import { MODE_TITLES, modeState } from "./core/modes.js";
 import { capture, confirm, markUnclassified, pending, tasks, ideas, toggleDone } from "./core/inbox.js";
 import { initialRefuge, refugeReply } from "./core/refuge.js";
@@ -1531,7 +1531,7 @@ const screens = {
     const inbox = pending(vault.inbox);
     const open = tasks(vault.inbox);
     const [s, e] = monthRange();
-    const month = { total: lgSummary(vault, { from: s, to: e }).consumo };
+    const month = lgSummary(vault, { from: s, to: e });
     const next = agendaToday() ? nextEvent(vault.agenda) : null;
     const rems = vault.reminders.filter((r) => !r.done && dayKey(new Date(r.at)) === localDay()).sort((a, b) => (a.at < b.at ? -1 : 1));
     const bdays = upcomingBirthdays(vault.people, today(), 7);
@@ -2670,17 +2670,20 @@ async function activateGemini(key) {
 function localAnswer(intent) {
   if (intent.kind === "spendQuery") { // WEB-50
     const [s, e] = monthRange();
-    const m = summary(vault.spending, s, e);
-    const pace = monthPace(vault.spending, today());
-    const vs = pace.diff === null ? "" : pace.diff === 0 ? " Igual que el mes pasado a estas alturas." : ` Un ${Math.abs(pace.diff)} % ${pace.diff < 0 ? "menos" : "más"} que el mes pasado a estas alturas.`;
+    // Una sola fuente de verdad: el consumo personal de Dinero 2.0, con su fiabilidad.
+    const m = lgSummary(vault, { from: s, to: e });
+    const pace = monthPace(money().spend, today());
+    const vs = !m.fiable || pace.diff === null ? "" : pace.diff === 0 ? " Igual que el mes pasado a estas alturas." : ` Un ${Math.abs(pace.diff)} % ${pace.diff < 0 ? "menos" : "más"} que el mes pasado a estas alturas.`;
+    const caveat = m.fiable ? (m.nivel === "INTERPRETADA" && m.consumoAuto ? ` (${euros(m.consumoAuto)} son compras que supongo tuyas sin que lo hayas confirmado)` : "") : ` Ojo: es provisional, hay ${euros(m.pending.cents)} sin atribuir (retiradas, Bizum o transferencias). Revísalos en Dinero y te doy la cifra buena.`;
+    const src = " Fuente: tus movimientos y lo que has corregido en Dinero.";
     if (intent.category) {
-      const v = m.byCategory[intent.category] ?? 0;
-      const b = budgetsNow().find((x) => x.cat === intent.category);
-      return `${catLabel(intent.category)}: ${euros(v)} este mes.${b ? ` ${budgetLine(b)}` : ""}`;
+      const v = m.byCategory.find(([c]) => c === intent.category)?.[1] ?? 0;
+      const b = m.fiable ? budgetsNow().find((x) => x.cat === intent.category) : null;
+      return `${catLabel(intent.category)}: ${euros(v)} de consumo personal este mes.${b ? ` ${budgetLine(b)}` : ""}${caveat}${src}`;
     }
-    if (!m.total) return "Este mes aún no has apuntado gastos.";
-    const top = Object.entries(m.byCategory).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([c, v]) => `${CATEGORIES[c] ?? c} ${euros(v)}`).join(", ");
-    return `Llevas ${euros(m.total)} este mes.${vs} Lo que más: ${top}.`;
+    if (!m.bank.count) return "Este mes aún no tengo movimientos tuyos. Importa el extracto o apunta un gasto en Dinero.";
+    const top = m.byCategory.slice(0, 3).map(([c, v]) => `${CATEGORIES[c] ?? c} ${euros(v)}`).join(", ");
+    return `Llevas ${euros(m.consumo)} de consumo personal este mes.${vs}${top ? ` Lo que más: ${top}.` : ""}${caveat}${src}`;
   }
   if (intent.kind === "agenda" && intent.day === "week") { // WEB-51: «¿qué tengo esta semana?»
     const lines = [];
@@ -2734,7 +2737,7 @@ function lifeSnapshot() {
   for (let d = 0; d < 2; d++) { const x = new Date(now); x.setDate(x.getDate() + d); const k = dayKey(x); events[k] = eventsFor(k).filter((e) => !e.multi || e.first || d === 0); }
   const w = currentWeather()?.data;
   const [s, e] = monthRange();
-  const month = { total: lgSummary(vault, { from: s, to: e }).consumo };
+  const month = lgSummary(vault, { from: s, to: e });
   const key = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   const st = monthStats(money().spend, money().income, key, now);
   const hs = healthSummary(vault.health);
@@ -2743,7 +2746,7 @@ function lifeSnapshot() {
     events, reminders: vault.reminders, tasks: tasks(vault.inbox).filter((t) => !t.done), ideas: ideas(vault.inbox),
     weather: w ? { city: activeCity().name, text: w.now.text, temp: w.now.temp, min: w.today.min, max: w.today.max, rain: w.today.rain ?? null } : null,
     habits: vault.habits.map((h) => ({ name: h.name, doneToday: (h.done ?? []).includes(localDay()) })),
-    money: { spent: st.spent, earned: st.earned, payroll: st.payroll.cents, balance: vault.settings.balance?.cents ?? null, byCategory: Object.entries(month.byCategory).sort((a, b) => b[1] - a[1]) },
+    money: { spent: month.consumo, earned: month.ingreso, payroll: st.payroll.cents, balance: vault.settings.balance?.cents ?? null, byCategory: month.byCategory, nivel: month.nivelLabel, fiable: month.fiable, pending: month.pending.cents, others: month.others.in + month.others.out },
     health: hs.sleep !== null || hs.steps !== null ? { sleep: hs.sleep !== null ? dec(hs.sleep) : null, steps: hs.steps !== null ? Math.round(hs.steps) : null } : null,
     mood: mood ? MOODS[mood - 1].label : null,
     birthdays: upcomingBirthdays(vault.people, now, 14).map((b) => ({ name: b.person.name, days: b.days })),
@@ -3380,7 +3383,7 @@ function hzAct(a) {
       return;
     case "hz-frase": memUi.open = d.id; memUi.correcting = null; tab = "tu"; sub = "memoria"; render({ focus: true }); setTimeout(() => document.querySelector(".mem-detail")?.scrollIntoView({ block: "start" }), 30); return;
     case "hz-noche": {
-      const n = hzMareasData({ spending: vault.spending, income: vault.income }).noches.find((x) => x.id === d.id);
+      const n = hzMareasData({ spending: money().spend, income: money().income }).noches.find((x) => x.id === d.id);
       if (!n) { render(); return; }
       const resp = { ...(vault.settings.hzNoches ?? {}) };
       if (d.v === "si") {
@@ -4763,7 +4766,8 @@ applyBankReturn();
 let reviewNote = false;  // the «Apuntar algo» box on tonight's card
 let docDraft = null;     // { busy } while Gemini reads; { fields, fileData?, fileType?, editId? } to review
 let libFilter = "todo";
-const reviewData = (now = today()) => ({ now, inbox: vault.inbox, habits: vault.habits, spending: vault.spending, clock: vault.clock, targetMin: clockTarget(), reminders: vault.reminders });
+// Las revisiones usan el consumo personal (Dinero 2.0) y solo hablan de gasto si la cifra es fiable.
+const reviewData = (now = today()) => { const from = new Date(now); from.setDate(from.getDate() - 35); return { now, inbox: vault.inbox, habits: vault.habits, spending: money().spend, moneyReliable: lgSummary(vault, { from, to: new Date(now.getTime() + 86400000) }).fiable, clock: vault.clock, targetMin: clockTarget(), reminders: vault.reminders }; };
 function tonightReview() {
   const t = today(); const next = new Date(t.getFullYear(), t.getMonth(), t.getDate() + 1);
   return nightReview({ ...reviewData(), tomorrowEvents: eventsFor(dayKey(next)) });

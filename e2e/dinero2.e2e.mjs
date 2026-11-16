@@ -159,6 +159,18 @@ for (const w of [320, 375, 390, 430, 1280]) {
   if (w === 320) await shot(p, "07-ficha-320");
   await c.close();
 }
+// 9. Una sola cifra: MANU responde con el consumo personal y avisa de que es provisional.
+{
+  const { ctx: c, page: p, errors: errs } = await open();
+  await p.evaluate(() => { sessionStorage.setItem("manuos.tab", "manu"); }); await p.reload(); await p.waitForTimeout(600);
+  await p.fill("#msg", "¿cuánto he gastado este mes?"); await p.press("#msg", "Enter"); await p.waitForTimeout(600);
+  const said = await p.locator("#chat .bubble").last().innerText();
+  ok("MANU: consumo personal, no el banco en bruto (142,50, sin los 600 €)", /142,50/.test(said) && !/742|756/.test(said));
+  ok("MANU: avisa de que es provisional y por qué", /provisional/.test(said) && /sin atribuir/.test(said));
+  ok("MANU: dice de dónde sale la cifra", /Fuente:/.test(said));
+  ok("MANU: sin errores", !errs.length);
+  await c.close();
+}
 await browser.close();
 console.log(`dinero2.e2e: ${passes} correctas, ${fails} fallos`);
 process.exit(fails ? 1 : 0);

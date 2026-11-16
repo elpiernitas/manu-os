@@ -30,7 +30,7 @@ function workday(clock, day, targetMin, now) {
  * Tonight's review. Shown on Hoy from 20:00 until he marks it done.
  * @param {object} d { now, inbox, habits, spending, clock, targetMin, tomorrowEvents, reminders }
  */
-export function nightReview({ now = new Date(), inbox = [], habits = [], spending = [], clock = [], targetMin = 240, tomorrowEvents = [], reminders = [] } = {}) {
+export function nightReview({ now = new Date(), inbox = [], habits = [], spending = [], moneyReliable = true, clock = [], targetMin = 240, tomorrowEvents = [], reminders = [] } = {}) {
   const today = dayKey(now);
   const wins = [], improve = [], tomorrow = [];
 
@@ -48,6 +48,8 @@ export function nightReview({ now = new Date(), inbox = [], habits = [], spendin
   if (w?.done) wins.push(`Jornada fichada: ${dur(w.worked)}${w.diff ? ` (${w.diff > 0 ? "+" : "−"}${dur(w.diff)})` : ", justa"}.`);
   else if (w) improve.push("No fichaste la salida: corrígelo en Tú → Fichaje.");
 
+  // `spending` es el consumo personal; con cifras provisionales no se comenta el gasto.
+  if (!moneyReliable) spending = [];
   const spentToday = spentOn(spending, new Set([today]));
   const lastDays = new Set(Array.from({ length: 28 }, (_, i) => dayKey(addDays(now, -1 - i))));
   const avg = Math.round(spentOn(spending, lastDays) / 28);
@@ -71,7 +73,7 @@ export function nightReview({ now = new Date(), inbox = [], habits = [], spendin
  * The week (the 7 days ending today) and a plan for the next one.
  * @param {object} d { now, inbox, habits, spending, clock, targetMin, nextWeekEvents, budgets }
  */
-export function weekReview({ now = new Date(), inbox = [], habits = [], spending = [], clock = [], targetMin = 240, nextWeekEvents = [] } = {}) {
+export function weekReview({ now = new Date(), inbox = [], habits = [], spending = [], moneyReliable = true, clock = [], targetMin = 240, nextWeekEvents = [] } = {}) {
   const days = Array.from({ length: 7 }, (_, i) => dayKey(addDays(now, -6 + i)));
   const set = new Set(days);
   const prev = new Set(Array.from({ length: 7 }, (_, i) => dayKey(addDays(now, -13 + i))));
@@ -95,6 +97,7 @@ export function weekReview({ now = new Date(), inbox = [], habits = [], spending
   if (workdays) (balance >= 0 ? wins : improve).push(`Trabajo: ${plural(workdays, "día", "días")}, ${dur(worked)}${balance ? `, ${balance > 0 ? "+" : "−"}${dur(balance)} sobre tu jornada` : ", justo"}.`);
   if (open) improve.push(`${plural(open, "día", "días")} sin fichar la salida: corrígelos en Fichaje.`);
 
+  if (!moneyReliable) { spending = []; improve.push("Gasto: no lo comento porque hay movimientos sin atribuir. Revísalos en Dinero."); }
   const spent = spentOn(spending, set), before = spentOn(spending, prev);
   if (spent || before) {
     const pct = before ? Math.round(((spent - before) / before) * 100) : null;

@@ -843,6 +843,10 @@ pre.code { white-space: pre-wrap; word-break: break-word; max-height: 220px; ove
 .lg-sum-row.lg-bank b, .lg-sum-row.lg-bank .num { color: var(--muted); font-weight: 600; }
 .lg-warn { border-left: 4px solid var(--warm, #e0a64a); padding: 8px 12px; background: var(--surface-2); border-radius: 8px; font-size: 14px; }
 .lg-warn-t { color: var(--warm, #e0a64a); }
+.lg-level { font-size: 13px; margin: 0 0 8px; padding: 4px 10px; border-radius: 999px; display: inline-block; background: var(--surface-2); }
+.lg-level-confirmada { border: 1px solid var(--ok, #3a9a5b); }
+.lg-level-interpretada { border: 1px dashed var(--muted); }
+.lg-level-provisional { border: 1px solid var(--warm, #e0a64a); }
 .lg-rules { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 4px; }
 .lg-badge { display: inline-block; max-width: 100%; font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); white-space: normal; overflow-wrap: anywhere; vertical-align: middle; }
 .lg-badge.lg-pending { border-style: dashed; border-color: var(--warm, #e0a64a); color: var(--warm, #e0a64a); }

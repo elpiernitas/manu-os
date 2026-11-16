@@ -61,3 +61,15 @@ test("WEB-83: when the cards show", () => {
   assert.equal(weekDue(now, "2026-W40"), null);
   assert.equal(weekDue(new Date(2026, 9, 3, 20), null), null); // Saturday
 });
+
+test("revisiones: con cifras de dinero provisionales no se comenta el gasto", async () => {
+  const { nightReview, weekReview } = await import("../core/review.js");
+  const now = new Date(2026, 10, 18, 21, 0);
+  const spending = [{ at: new Date(2026, 10, 18, 12).toISOString(), cents: 90000, category: "SHOPPING" }, ...Array.from({ length: 10 }, (_, k) => ({ at: new Date(2026, 10, 5 + k, 12).toISOString(), cents: 1000 }))];
+  assert.ok(nightReview({ now, spending }).improve.some((x) => /gastado/.test(x)), "fiable: se comenta");
+  const n = nightReview({ now, spending, moneyReliable: false });
+  assert.ok(![...n.wins, ...n.improve].some((x) => /gastado|gastar/.test(x)), "provisional: nada de gasto");
+  const w = weekReview({ now, spending, moneyReliable: false });
+  assert.ok(!w.plan.some((x) => /Gasto: intenta/.test(x)), "sin propuesta de tope");
+  assert.ok(w.improve.some((x) => /sin atribuir/.test(x)), "dice por qué");
+});
