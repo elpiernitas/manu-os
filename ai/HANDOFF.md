@@ -1,5 +1,15 @@
 # HANDOFF
 
+## WEB-111 · Dinero 2.0: entender el dinero de verdad (Claude, 2026-11-16)
+
+Rama `claude/magical-goodall-rf5qoo`. **PR abierto sin fusionar ni publicar**: Manu revisa primero el editor y las reglas de cálculo (`docs/DINERO2.md`). Copia recuperable: la rama `respaldo/pre-dinero2-v108` (= main antes del cambio).
+
+**Hecho:** los movimientos del banco ya no se modifican. Las correcciones van en `vault.ledger` (anotaciones con historial, relaciones confirmadas, deudas a mano y marcas de borrado), que se fusiona en Tu nube. Hay 8 tipos de movimiento, la ficha del movimiento, relaciones sugeridas (nunca automáticas), dinero de otras personas (con € o %), gastos compartidos y deudas, corrección múltiple con revisión previa, y un resumen que separa banco, consumo, ingresos propios, dinero de otros, neutro y pendiente. Los consejos se suspenden si lo pendiente supera el 5 %. Las estadísticas de siempre usan ahora el consumo personal. El reparto antiguo anota en vez de escribir en el movimiento, y se corrige el nombre en vertical. Versión 111.
+
+**Pruebas:** `npm test` 433/433 (16 nuevas en `tests/ledger.test.js`); `e2e/dinero2.e2e.mjs` 49/49. Sin regresión en bankimport, banco, nube, push, permisos, memoria, estilo y horizonte (103/103). Se ajustaron dos pruebas que fijaban un texto o el número de versión.
+
+**NO_VERIFICADO:** Safari e iPhone reales; con los movimientos reales de Manu (no los he visto); reglas automáticas por comercio (no implementadas).
+
 ## WEB-110 · simplificar MANU OS: Bahía retirada y Agenda en la navegación (2026-11-16)
 
 Manu dice que Bahía fue un calentón y quiere eliminar de la app las funciones que no le resultan útiles. En una rama aislada, se retiró la UI de Bahía, sus interacciones y las importaciones del juego; **los datos de `vault.settings.game` no se borraron**. Hoy abre de forma predeterminada y las sesiones anteriores guardadas en Bahía se redirigen a Hoy. Agenda ocupa su pestaña. La PWA y tests se actualizan a v110. Se mantienen memoria, proyectos, Sabadell, Tu nube, IA, Google, Spotify y push intactos.

@@ -47,6 +47,7 @@ test("iOS scroll header is readable over content and money total is labeled corr
   const sw = read("sw.js");
   assert.match(css, /\.topbar\.show \{[^}]*background: rgba\(8, 11, 17, \.97\)/);
   assert.match(css, /\.topbar\.show \{[^}]*-webkit-backdrop-filter: none/);
-  assert.match(app, /Gastos registrados en MANU, no es el saldo de Sabadell/);
+  // WEB-111: el total es el consumo personal; sigue diciendo que no es el saldo del banco.
+  assert.match(app, /No es el saldo de Sabadell/);
   assert.match(sw, /const VERSION = "manuos-v\d+"/); // the exact number is checked against APP_VERSION in sw-shell.test.js
 });

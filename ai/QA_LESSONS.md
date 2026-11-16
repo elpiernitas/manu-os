@@ -260,3 +260,9 @@ Regla: cuando la posición de elementos tocables sale de un cálculo (mapas, gr�
 En WEB-108, la prueba bloqueaba las llamadas externas con `/…|enablebanking/`. Esa expresión también atrapaba el archivo local `core/enablebanking.js`: el módulo no cargaba y la app salía en blanco, sin ningún error en consola (solo un 503 que la prueba filtraba como ruido). Parecía un fallo de la app.
 
 Regla: los filtros de red de las pruebas se anclan al esquema y al dominio (`^https://([^/]*\.)?dominio\.com/`) y nunca se silencian los errores de carga de archivos propios del origen.
+
+### QAL-055 — Un dato que no puede partirse rompe la fila entera
+
+En WEB-111, el sello «Gasto compartido · Luis, Ana» llevaba `white-space: nowrap`. En el modo de selección (con una casilla más), la fila superó el ancho de la tarjeta y la tarjeta recortó los importes. La comprobación «la página no desborda» no lo vio, porque el recorte ocurre dentro de la tarjeta. Es el mismo patrón que el nombre «Luisssss» en vertical del reparto antiguo, pero al revés: allí el texto no tenía sitio.
+
+Regla: los textos que vienen de datos (nombres, conceptos, sellos con nombres) pueden partirse (`overflow-wrap: anywhere`) y viven en columnas con `min-width: 0`. Las pruebas e2e comprueban que los importes no quedan fuera de su tarjeta, además de que la página no desborde.

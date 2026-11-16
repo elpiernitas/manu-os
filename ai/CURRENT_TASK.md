@@ -4,7 +4,7 @@ Status: **IN_PROGRESS**
 
 ## Tarea activa
 
-WEB-110 — Simplificar MANU OS a petición de Manu (2026-11-16). Retirar Bahía como función activa, recuperar Agenda como pestaña, dejar Hoy como portada y conservar todos los datos. Implementar en rama/PR; pruebas y publicación según `AGENTS.md`. Documentación: `docs/product/LEAN_MANU_OS.md`.
+WEB-111 — Dinero 2.0 (`ai/HANDOFF.md`, «WEB-111»; `docs/DINERO2.md`). PR abierto **sin fusionar**: Manu revisa el editor y las reglas de cálculo antes de publicar.
 
 ## Autorización
 
