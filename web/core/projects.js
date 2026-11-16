@@ -1,7 +1,7 @@
 // «Proyectos», like NotebookLM: notebooks with sources (notes, pasted text,
 // screenshots, video captions). Gemini answers only from those sources and
 // cites them as [n]. Sources that look sensitive are never sent (AGENTS.md).
-import { mayGo } from "./ai.js";
+import { mayGo, MANU_RULES, asData } from "./ai.js";
 
 export const PROJECT_LIMITS = { sources: 40, textChars: 20000, imagesPerAsk: 4, promptChars: 60000 };
 const clip = (v, n) => String(v ?? "").replace(/\u0000/g, "").trim().slice(0, n);
@@ -53,8 +53,8 @@ export function buildProjectPayload({ project, question, images = {} }) {
     if (!mime || !data) continue;
     parts.push({ text: `[${s.n}] Captura: ${s.title}` }, { inlineData: { mimeType: mime, data } });
   }
-  parts.push({ text: `FUENTES DEL PROYECTO «${project.name}»:\n\n${blocks.join("\n\n") || "(sin fuentes de texto)"}\n\nPREGUNTA: ${q}` });
-  const system = "Eres MANU, el asistente de Manu, en modo cuaderno. Responde en español de España usando SOLO las fuentes del proyecto. Cita cada dato con el número de su fuente entre corchetes, por ejemplo [2]. Si la respuesta no está en las fuentes, dilo claramente y no inventes. Sé claro y breve.";
+  parts.push({ text: `FUENTES DEL PROYECTO «${project.name}»:\n${asData(blocks.join("\n\n") || "(sin fuentes de texto)")}\n\nPREGUNTA DE MANU: ${q}` });
+  const system = `Eres MANU, el asistente de Manu, en modo cuaderno. Responde en español de España usando SOLO las fuentes del proyecto. Cita cada dato con el número de su fuente entre corchetes, por ejemplo [2]. Si la respuesta no está en las fuentes, dilo claramente y no inventes. Sé claro y breve.\n${MANU_RULES}`;
   return {
     payload: { systemInstruction: { parts: [{ text: system }] }, contents: [{ role: "user", parts }], generationConfig: { maxOutputTokens: 900, temperature: 0.2 } },
     sent: [...textSources.slice(0, blocks.length), ...imageSources].map((s) => s.n).sort((a, b) => a - b),

@@ -266,3 +266,13 @@ Regla: los filtros de red de las pruebas se anclan al esquema y al dominio (`^ht
 En WEB-111, el sello «Gasto compartido · Luis, Ana» llevaba `white-space: nowrap`. En el modo de selección (con una casilla más), la fila superó el ancho de la tarjeta y la tarjeta recortó los importes. La comprobación «la página no desborda» no lo vio, porque el recorte ocurre dentro de la tarjeta. Es el mismo patrón que el nombre «Luisssss» en vertical del reparto antiguo, pero al revés: allí el texto no tenía sitio.
 
 Regla: los textos que vienen de datos (nombres, conceptos, sellos con nombres) pueden partirse (`overflow-wrap: anywhere`) y viven en columnas con `min-width: 0`. Las pruebas e2e comprueban que los importes no quedan fuera de su tarjeta, además de que la página no desborde.
+
+### QAL-056 — La comprobación «nada se sale de su tarjeta» va en cada formulario nuevo
+
+En WEB-112 se repitió el patrón de QAL-055 en otro sitio: en la ficha «¿Lo guardo así?», dos `select` en una fila sin `min-width: 0` hacían que «Sin proyecto» quedara cortado a 320 px. La prueba «la página no desborda» pasaba, porque la tarjeta recorta. Se detectó al mirar la captura de 320 px, no por una prueba.
+
+Regla: cada formulario o fila nueva con controles lleva su prueba e2e de contención (cada `input`, `select`, `textarea` y botón dentro de su tarjeta) a 320, 375, 390 y 430 px. Una prueba de regresión nueva se comprueba quitando el arreglo: tiene que fallar sin él.
+
+### QAL-057 — `innerText` devuelve el texto como se ve, con `text-transform`
+
+En WEB-112, las pruebas buscaban «Para ti» y «¿Lo guardo así?», pero los títulos de sección se pintan en mayúsculas por CSS y `innerText` devolvía «PARA TI». La app funcionaba; la prueba fallaba. Regla: en las pruebas e2e, los textos de títulos se comparan sin distinguir mayúsculas (`/…/i`) o con `textContent`.

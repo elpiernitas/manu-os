@@ -928,3 +928,6 @@ pre.code { white-space: pre-wrap; word-break: break-word; max-height: 220px; ove
 .ctl-title, .ctl-row .muted { overflow-wrap: anywhere; }
 .ctl-why { opacity: .85; }
 .ctl-fresh { margin-top: 8px; }
+.save-card .row { flex-wrap: wrap; gap: 8px; }
+.save-card .row select { flex: 1 1 120px; min-width: 0; max-width: 100%; }
+.save-card input, .save-card textarea, .save-card select { max-width: 100%; box-sizing: border-box; }

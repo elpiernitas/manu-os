@@ -1,5 +1,43 @@
 # HANDOFF
 
+## WEB-112 · MANU como asistente real: Hoy, correo, Guardar en MANU, agenda e IA segura (Claude, 2026-11-16)
+
+Rama `claude/magical-goodall-rf5qoo`. Autorizado por Manu en la misión «de prototipo a asistente personal real»: implementar, fusionar y publicar los bloques seguros. Detalle: `docs/ASISTENTE.md`. Copia recuperable: `respaldo/pre-dinero2-v108` (antes de Dinero 2.0); la v111 queda en el historial de `main`.
+
+**Hecho:**
+- **Hoy:**
+  - un centro de control (`core/control.js`) con urgente / importante / para saber, según reglas fijas;
+  - cada fila con su fuente, el motivo y adónde lleva, y la hora de cada fuente;
+  - fuera las tarjetas duplicadas, entre ellas «Este mes», que mostraba una cifra rota en la v111 porque leía `month.total`.
+- **Correo (`core/mailtriage.js`):**
+  - triaje local por remitente, asunto, etiquetas y si Manu ya contestó en el hilo;
+  - acciones: revisado, tarea con confirmación, a un proyecto, con fecha y corregir (también por remitente);
+  - sin acciones automáticas;
+  - el correo leído ya no sube a Tu nube; sí suben las correcciones.
+- **Guardar en MANU (`core/saveitem.js`):**
+  - enlace, nota, idea o archivo, con propuesta revisable y sin resúmenes inventados;
+  - los archivos solo en IndexedDB del dispositivo;
+  - `?guardar=` para el Atajo de iOS y `share_target` en el manifiesto;
+  - búsqueda de texto en biblioteca, documentos, fuentes de proyectos e ideas.
+- **Agenda:** el mismo evento en dos calendarios sale una vez, pero solo con el mismo `iCalUID` o id y la misma hora. Se indican los calendarios en los que está.
+- **IA:**
+  - las 10 normas de MANU en el sistema;
+  - los datos externos van en un bloque `<datos>` que no se puede cerrar desde dentro, también en los proyectos;
+  - la respuesta local sobre el correo cita su fuente y su hora.
+- Versión 112.
+
+**Pruebas:**
+- `npm test`: 455 de 455. Nuevas: `mailtriage`, `saveitem`, `control`, el duplicado de agenda y la inyección.
+- `e2e/asistente.e2e.mjs`: 74 de 74, a 320, 375, 390 y 430 px, con la barra inferior, el tema, el estado vacío y sin red.
+- Sin regresión en dinero2 (53), bankimport, banco, nube, push, permisos, memoria, estilo, horizonte (103) y vivo (68).
+
+**NO_VERIFICADO:**
+- Safari e iPhone reales.
+- Si iOS ofrece «Compartir» a la PWA.
+- El triaje con el correo real de Manu: no lo he visto, y la clasificación es por asunto, así que habrá errores; se corrigen con «Corregir».
+- La deduplicación con los calendarios reales.
+- Proyectos que necesitan acción: no implementado (sin un criterio fiable).
+
 ## WEB-111 · Dinero 2.0: entender el dinero de verdad (Claude, 2026-11-16)
 
 Rama `claude/magical-goodall-rf5qoo`, PR #119. **Fusionado y publicado** con autorización expresa de Manu (misión «de prototipo a asistente personal real», 2026-11-16). Copia recuperable: la rama `respaldo/pre-dinero2-v108` (= main antes del cambio).
