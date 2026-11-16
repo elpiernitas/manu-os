@@ -3198,3 +3198,14 @@ Sigue sin haber ninguna decisión pendiente de Manu ahora. D-04B y D-03 son gate
 > **SUPERSEDED.** El PR #5 está fusionado (`ff2f86a`) y la línea nativa (BRAIN-02) está pausada. El próximo paso vigente está en la sección «Próximo paso vigente» al principio de este archivo.
 
 BRAIN-02-PREP quedó ejecutada por Claude Code conforme a `docs/roadmap/BRAIN_02_TASK.md`, con tres rondas de corrección tras revisión externa. El orquestador revisó el PR #5 y lo fusionó.
+
+## TOOLING — Skills de ECC en `.claude/skills` (2026-11-16)
+
+Petición de Manu: poder escribir «usa ecc» en las sesiones de Claude Code en la nube, donde los plugins no están disponibles. Cambio solo de herramientas de agente; no toca código de producto ni la web publicada (Pages publica solo `web/`).
+
+- Añadidas 38 skills de ECC (affaan-m/ECC v2.2.3, MIT; licencia en `.claude/skills/ECC_LICENSE`) seleccionadas para el stack de MANU OS, más el enrutador `.claude/skills/usa-ecc`.
+- El enrutador deja explícito que `AGENTS.md`/`CLAUDE.md` prevalecen sobre cualquier skill.
+
+### NO VERIFICADO
+
+- Que Claude Code en la nube cargue estas skills: se comprobará al abrir una sesión nueva sobre `main` tras fusionar.
