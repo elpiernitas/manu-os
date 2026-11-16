@@ -19,9 +19,21 @@ export const LEVELS = { URGENT: "Urgente", IMPORTANT: "Importante", INFO: "Para 
  *  mail (pendientes del triaje), docs (de expiringSoon), money (summary del mes), birthdays
  *  ([{name, days}]), euros (formateador)
  */
-export function controlItems({ now = new Date(), events = [], tomorrow = [], reminders = [], tasks = [], mail = [], docs = [], money = null, birthdays = [], euros = (c) => `${(c / 100).toFixed(2)} €`, mailLabel = (k) => k } = {}) {
+/**
+ * Proyectos sin novedades: el último movimiento (fuente o mensaje) hace más de `days` días.
+ * Es un hecho, no un juicio: no dice que «necesite acción».
+ */
+export function quietProjects(projects, now = new Date(), days = 14) {
+  return (projects ?? []).map((p) => {
+    const last = Math.max(Date.parse(p.createdAt ?? "") || 0, ...(p.sources ?? []).map((x) => Date.parse(x.at ?? "") || 0), ...(p.chat ?? []).map((x) => Date.parse(x.at ?? "") || 0));
+    return { id: p.id, name: p.name, emoji: p.emoji ?? "📁", days: last ? Math.floor((now.getTime() - last) / DAY) : null };
+  }).filter((x) => x.days !== null && x.days > days).sort((a, b) => b.days - a.days);
+}
+
+export function controlItems({ now = new Date(), events = [], tomorrow = [], reminders = [], tasks = [], mail = [], docs = [], money = null, birthdays = [], projects = [], euros = (c) => `${(c / 100).toFixed(2)} €`, mailLabel = (k) => k } = {}) {
   const out = [];
   const t = now.getTime();
+  for (const q of quietProjects(projects, now).slice(0, 2)) out.push({ level: "INFO", icon: q.emoji, title: `«${q.name}» sin novedades`, detail: `Nada nuevo desde hace ${q.days} días`, source: "Proyectos", why: "Más de 14 días sin fuentes ni mensajes nuevos", go: { project: q.id }, sort: t + 20 * DAY });
   for (const e of events ?? []) {
     if (!e.time) continue; // los de todo el día van como información de la agenda
     const start = at(now, e.time).getTime(), end = e.end ? at(now, e.end).getTime() : start;

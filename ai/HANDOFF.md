@@ -1,5 +1,31 @@
 # HANDOFF
 
+## WEB-113 · repasos sin juicios, proyectos sin novedades y agenda compartida (Claude, 2026-11-16)
+
+Sigue la misión «asistente real» (autorizado: fusionar y publicar bloques seguros). Detalle: `docs/ASISTENTE.md`.
+
+**Hecho:**
+- **Repasos** (`core/review.js`):
+  - «Hecho / Pendiente / Mañana» y «La semana que viene / Propuestas»;
+  - sin juicios ni topes de gasto;
+  - incluyen proyectos con novedades, citas del día y documentos que vencen;
+  - como mucho dos propuestas, cada una sacada de un dato.
+- **Proyectos sin novedades:** más de 14 días sin nada nuevo; sale en Hoy como «Para saber» (`quietProjects`).
+- **Agenda:** los eventos de calendarios que no son tuyos se marcan «compartido» (`accessRole`). Si el mismo evento está también en el tuyo, cuenta como tuyo.
+- Versión 113.
+
+**Pruebas:**
+- `npm test`: 457 de 457.
+- `e2e/asistente.e2e.mjs`: 89 de 89. Incluye:
+  - nombres accesibles y zonas táctiles de 44 px;
+  - un vault antiguo que abre sin perder datos, con el reparto viejo intacto;
+  - el repaso de la noche sin juicios.
+- Sin regresión en el resto de suites.
+
+**NO_VERIFICADO:**
+- Safari e iPhone reales, y el teclado de iOS.
+- Los calendarios reales de Manu (si los compartidos dicen `reader`).
+
 ## WEB-112 · MANU como asistente real: Hoy, correo, Guardar en MANU, agenda e IA segura (Claude, 2026-11-16)
 
 Rama `claude/magical-goodall-rf5qoo`. Autorizado por Manu en la misión «de prototipo a asistente personal real»: implementar, fusionar y publicar los bloques seguros. Detalle: `docs/ASISTENTE.md`. Copia recuperable: `respaldo/pre-dinero2-v108` (antes de Dinero 2.0); la v111 queda en el historial de `main`.

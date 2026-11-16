@@ -40,6 +40,8 @@ export function groupByDay(json, meta = {}) {
       location: ev.location ? String(ev.location).slice(0, 120) : null,
       color: safeColor(meta.color),
       calendar: meta.calendar ? String(meta.calendar).slice(0, 60) : null,
+      // De un calendario que no es tuyo (te lo comparten o solo puedes verlo): de otra persona.
+      shared: meta.own === false,
     };
     let firstDay, lastDay, time = null, end = null, allDay = false;
     if (ev.start?.dateTime) {
@@ -79,7 +81,7 @@ export function mergeDays(maps) {
     const cur = out.get(day) ?? [];
     for (const ev of list) {
       const same = cur.find((x) => ((ev.uid && x.uid === ev.uid) || x.id === ev.id) && x.time === ev.time && x.allDay === ev.allDay && x.first === ev.first);
-      if (same) { const cals = new Set([...(same.calendars ?? [same.calendar].filter(Boolean)), ev.calendar].filter(Boolean)); same.calendars = [...cals]; continue; }
+      if (same) { if (!ev.shared) same.shared = false; const cals = new Set([...(same.calendars ?? [same.calendar].filter(Boolean)), ev.calendar].filter(Boolean)); same.calendars = [...cals]; continue; }
       cur.push({ ...ev });
     }
     out.set(day, cur);
@@ -94,7 +96,7 @@ export async function listCalendars(token, fetchImpl = fetch) {
   if (res.status === 401) throw Object.assign(new Error("Sesión de Google caducada"), { code: "auth" });
   if (!res.ok) throw new Error(`Google Calendar respondió ${res.status}`);
   const json = await res.json();
-  return (json.items ?? []).filter((c) => c.selected !== false && !c.hidden).slice(0, 25).map((c) => ({ id: String(c.id), name: String(c.summaryOverride ?? c.summary ?? "Calendario"), color: safeColor(c.backgroundColor), primary: Boolean(c.primary) }));
+  return (json.items ?? []).filter((c) => c.selected !== false && !c.hidden).slice(0, 25).map((c) => ({ id: String(c.id), name: String(c.summaryOverride ?? c.summary ?? "Calendario"), color: safeColor(c.backgroundColor), primary: Boolean(c.primary), own: c.accessRole === "owner" }));
 }
 
 export function newEventBody({ title, start, minutes = 60 }) {
@@ -123,7 +125,7 @@ export function birthdayEventBody({ name, birthday }, now = new Date()) {
 }
 
 // Paginated: follows nextPageToken (max 10 pages) so a busy month is complete.
-export async function listEvents(token, from, to, fetchImpl = fetch, { calendarId = "primary", color = null, calendar = null } = {}) {
+export async function listEvents(token, from, to, fetchImpl = fetch, { calendarId = "primary", color = null, calendar = null, own = true } = {}) {
   const items = [];
   let pageToken = null;
   for (let page = 0; page < 10; page++) {
@@ -136,7 +138,7 @@ export async function listEvents(token, from, to, fetchImpl = fetch, { calendarI
     pageToken = json.nextPageToken;
     if (!pageToken) break;
   }
-  return groupByDay({ items }, { color, calendar });
+  return groupByDay({ items }, { color, calendar, own });
 }
 
 // Month grid (weeks starting on Monday) for the calendar view.
