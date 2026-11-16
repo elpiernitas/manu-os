@@ -37,6 +37,7 @@ test("new design assets are referenced in the PWA and service worker cache", () 
   assert.match(html, /href="design\/fable-mark\.svg"/);
   assert.match(js, /import \{ fableIcon, fableMark \}/);
   assert.match(js, /data-fable="true"/);
-  // Crucial: all six real destinations are preserved, including Bahía and Proyectos.
-  assert.match(js, /const TABS = \[\["bahia", "Bahía"\], \["hoy", "Hoy"\], \["manu", "MANU"\], \["dinero", "Dinero"\], \["proyectos", "Proyectos"\], \["tu", "Tú"\]\]/);
+  // Six useful destinations remain; Agenda replaces the retired Bahía tab.
+  assert.match(js, /const TABS = \[\["hoy", "Hoy"\], \["agenda", "Agenda"\], \["manu", "MANU"\], \["dinero", "Dinero"\], \["proyectos", "Proyectos"\], \["tu", "Tú"\]\]/);
+  assert.doesNotMatch(js.match(/const TABS = .*;/)?.[0] ?? "", /"bahia"/);
 });

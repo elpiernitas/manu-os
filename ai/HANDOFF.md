@@ -1,5 +1,14 @@
 # HANDOFF
 
+## WEB-110 · simplificar MANU OS: Bahía retirada y Agenda en la navegación (2026-11-16)
+
+Manu dice que Bahía fue un calentón y quiere eliminar de la app las funciones que no le resultan útiles. En una rama aislada, se retiró la UI de Bahía, sus interacciones y las importaciones del juego; **los datos de `vault.settings.game` no se borraron**. Hoy abre de forma predeterminada y las sesiones anteriores guardadas en Bahía se redirigen a Hoy. Agenda ocupa su pestaña. La PWA y tests se actualizan a v110. Se mantienen memoria, proyectos, Sabadell, Tu nube, IA, Google, Spotify y push intactos.
+
+La simplificación posterior de otros módulos NO está autorizada de forma específica: propuesta de criterios en `docs/product/LEAN_MANU_OS.md`.
+
+**NO_VERIFICADO:** resultados de CI del último commit, test visual en Safari iPhone, impacto en dispositivos con sesiones anteriores, utilidad real de la nueva agenda.
+
+
 ## WEB-109 · recuperar la propuesta original de Claude Design (ChatGPT, 2026-11-10)
 
 **Decisión actual de Manu:** Horizonte no le gusta y quiere el diseño original creado con Claude Design. Fuente recuperada: archivo facilitado por Manu `MANU OS en revisión.zip` del 9/11/2026, con sistema negro / blanco / azul eléctrico, 31 iconos y composición editorial.
