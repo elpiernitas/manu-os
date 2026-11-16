@@ -39,6 +39,7 @@ import { budgetStatus, budgetLine, budgetCommand } from "./core/budget.js";
 import { findInVault, findCommand } from "./core/find.js";
 import { controlItems, freshness, LEVELS as CONTROL_LEVELS } from "./core/control.js";
 import { franja, visibleTasks, hiddenWork, weekendKey, moneyLine } from "./core/daymode.js";
+import { RAMAS as CEREBRO_RAMAS, ORIGENES as CEREBRO_ORIGENES, arbol as cerebroArbol, deProyecto as cerebroDeProyecto, buscar as cerebroBuscar, cerebroRequest } from "./core/cerebro.js";
 import { routineTasks, newRoutine, routineWhen, MARKETING_PRESETS, EVERY as ROUTINE_EVERY, WEEKDAYS } from "./core/routines.js";
 import { COLUMNS as BOARD_COLUMNS, ACTIVE as BOARD_ACTIVE, boardItems, boardSummary, readLabel as boardReadLabel, tableroRequest } from "./core/tablero.js";
 import { propose as saveProposal, searchSaved, SAVE_LIMITS, safeViewType } from "./core/saveitem.js";
@@ -80,7 +81,7 @@ import { SKINS, skinOf, cielo as hzCielo, variables as hzVars, tiempoDe, portada
 import { hzCara, hzPortada, hzBotella, hzMareas, hzConstelacion, hzAstillero, hzBarcoCarta, hzBotadura, hzBitacora, hzApariencia } from "./design/horizonte.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "117"; // = número de la última tarea WEB publicada (desde WEB-87)
+export const APP_VERSION = "118"; // = número de la última tarea WEB publicada (desde WEB-87)
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -763,7 +764,8 @@ function findEverywhere(q, limit = 30) {
   const local = findInVault(vault, q, { limit });
   const docs = archive.docs ?? [];
   const arch = docs.length ? archiveSearch(docs, q, { limit: 8 }).map((r) => ({ kind: r.doc.source === "diario" ? "Diario" : "Archivo", icon: r.doc.source === "diario" ? "📔" : r.doc.source === "manu" ? "💬" : "🗂️", title: r.doc.title, detail: r.snippet, at: new Date(r.doc.at).toISOString(), go: { sub: "archivo" } })) : [];
-  return [...local, ...arch].slice(0, limit);
+  const cerb = cerebroBuscar(cerEntries(), q).slice(0, 8).map((e) => ({ kind: "Cerebro", icon: "🧠", title: e.titulo, detail: `Cerebro · ${CEREBRO_RAMAS[e.rama]?.label ?? e.rama} · ${CEREBRO_ORIGENES[e.origen] ?? e.origen}`, at: e.creado, go: { sub: "cerebro" } }));
+  return [...local, ...cerb, ...arch].slice(0, limit);
 }
 function findCard() {
   const res = findQ ? findEverywhere(findQ) : [];
@@ -1265,6 +1267,7 @@ function projectPage(p) {
     <div class="proj-head"><span class="proj-e big" aria-hidden="true">${esc(p.emoji)}</span><div><h1>${esc(p.name)}</h1><p class="subtitle">${p.sources.length} fuente${p.sources.length === 1 ? "" : "s"}</p></div></div>
     <div class="stack">
     ${projectWhyCard(p)}
+    ${cerebroProjectCard(p)}
     ${hz() ? hzAstillero(hzBarco(p), hzUi) : ""}
     <section class="card"><h2>Pregunta al proyecto</h2>
       ${ai ? `<div class="suggest">${[["resumen", "📄 Resumen"], ["claves", "🔑 Puntos clave"], ["preguntas", "❓ Preguntas de repaso"]].map(([k, l]) => `<button type="button" data-act="proj-preset" data-p="${k}" data-label="${esc(l)}"${p.sources.length ? "" : " disabled"}>${l}</button>`).join("")}</div>
@@ -1742,6 +1745,7 @@ const screens = {
         ${item("comidas", "fork", "orange", "Comidas", `${vault.meals.filter((m) => m.day === t).length} apuntadas hoy`)}
         ${item("archivo", "box", "teal", "Tu archivo", archive.stats?.count ? `${archive.stats.count} conversaciones guardadas` : "Tus conversaciones y tu exportación de ChatGPT")}
         ${item("documentos", "box", "orange", "Documentos", (() => { const s = expiringSoon(vault.docs, today(), 30); return s.length ? `${s[0].doc.title}: ${leftText(s[0].left)}` : vault.docs?.length ? `${vault.docs.length} guardados` : "Seguros, contratos y garantías"; })())}
+        ${item("cerebro", "box", "purple", "Tu cerebro", cerEntries().length ? `${cerEntries().length} entradas de tus IAs${cerEntries().filter((e) => e.estado === "sin_revisar").length ? ` · ${cerEntries().filter((e) => e.estado === "sin_revisar").length} sin revisar` : ""}` : "Lo que guardan Claude y ChatGPT de cada conversación")}
         ${item("rutinas", "repeat", "blue", "Rutinas de trabajo", (vault.routines ?? []).filter((r) => r.on).length ? `${(vault.routines ?? []).filter((r) => r.on).length} activas · se apuntan solas el día que tocan` : "Tareas que se repiten cada semana o cada mes")}
         ${item("tablero", "box", "orange", "Tablero RK", boardOn() ? (boardCache()?.feed ? `${boardSummary(boardCache().feed, today()).count} tarjetas activas · leído ${boardReadLabel(boardCache().readAt, today())}` : "Conectado, sin leer aún") : "Ver tu Tablero de marketing (solo lectura)")}
         ${item("biblioteca", "leaf", "teal", "Biblioteca · Guardar en MANU", vault.library?.length ? `${vault.library.length} cosas guardadas${vault.library.some((x) => x.needsReview) ? ` · ${vault.library.filter((x) => x.needsReview).length} por revisar` : ""}` : "Enlaces, vídeos, PDF, notas e ideas, con búsqueda")}
@@ -1860,6 +1864,24 @@ const subpages = {
   },
   memoria() {
     return `${backBar("Memoria")}${memoriaPage(brain(), { spending: vault.spending, projects: vault.projects, ui: memUi, now: new Date() })}`;
+  },
+  cerebro() {
+    if (!cerCache() && !cer.busy && !cer.error) setTimeout(() => refreshCerebro({ force: true }), 0);
+    const tree = cerebroArbol(cerEntries());
+    const rc = cerCache();
+    const entry = (e) => `<div class="cer-entry stack"><div class="row"><b class="grow">${esc(e.titulo)}</b><span class="chip">${esc(CEREBRO_ORIGENES[e.origen] ?? e.origen)}</span></div><p class="small">${esc(e.resumen)}</p>
+      <div class="muted small">${esc(new Date(e.creado).toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" }))}${e.estado === "sin_revisar" ? " · sin revisar" : " · revisado"}${(e.etiquetas ?? []).length ? ` · ${esc(e.etiquetas.join(", "))}` : ""}</div>
+      ${cer.moving === e.id ? `<form id="cerMoveForm" data-id="${esc(e.id)}" class="row"><label for="cerRama" class="sr">Rama</label><select id="cerRama">${Object.entries(CEREBRO_RAMAS).flatMap(([k, r]) => r.subramas ? Object.entries(r.subramas).map(([sk, sl]) => `<option value="${k}|${sk}"${e.rama === k && e.subrama === sk ? " selected" : ""}>${esc(r.label)} › ${esc(sl)}</option>`) : (vault.projects ?? []).map((pp) => `<option value="${k}|${esc(pp.name)}">${esc(r.label)} › ${esc(pp.name)}</option>`)).join("")}</select><button class="btn small-btn" type="submit">Mover</button></form>` : `<div class="btns">${e.estado === "sin_revisar" ? `<button class="btn ghost small-btn" data-act="cer-ok" data-id="${esc(e.id)}">Está bien</button>` : ""}<button class="btn ghost small-btn" data-act="cer-move" data-id="${esc(e.id)}">Mover</button><button class="link small danger-link" data-act="cer-archive" data-id="${esc(e.id)}">Archivar</button></div>`}</div>`;
+    const keys = cer.keys ?? [];
+    return `${backBar("Tu cerebro")}<p class="subtitle">Lo que guardan tus IAs (Claude, Claude Code, Codex y ChatGPT) de cada conversación, ordenado por ramas. MANU lo lee para tus proyectos y cuando hablas con la IA.</p>
+      <section class="card"><div class="btns"><button class="btn ghost small-btn" data-act="cer-refresh"${cer.busy ? " disabled" : ""}>${cer.busy ? "Leyendo…" : "Actualizar"}</button></div>
+        ${cer.error ? `<p class="small ${cer.code === "pending" ? "lg-warn" : "danger-text"}" role="status">${esc(cer.error)}</p>` : ""}${rc?.readAt ? `<p class="muted small">${cerEntries().length} entradas · leído ${esc(boardReadLabel(rc.readAt, today()))}</p>` : ""}</section>
+      ${Object.entries(tree).map(([k, r]) => `<details class="card cer-rama"${cer.open === k ? " open" : ""}><summary class="row"><b class="grow">${esc(r.label)}</b><span class="muted small">${r.total}${r.sinRevisar ? ` · ${r.sinRevisar} sin revisar` : ""}</span></summary>${Object.entries(r.subramas).map(([, sr]) => `<h3 class="small muted cer-sub">${esc(sr.label)} · ${sr.entradas.length}</h3>${sr.entradas.map(entry).join("")}`).join("") || '<p class="muted small">Nada todavía.</p>'}</details>`).join("")}
+      <section class="card"><h2>Llaves de tus IAs</h2><p class="muted small">Cada IA escribe con su llave. La llave se enseña una sola vez, aquí: cópiala en esa IA y no la pegues en ningún chat. La puedes revocar cuando quieras.</p>
+        ${cer.newKey ? `<div class="cer-newkey"><p class="small"><b>Llave para ${esc(CEREBRO_ORIGENES[cer.newKey.origen])}</b> (solo se ve ahora):</p><input id="cerKeyOut" readonly value="${esc(cer.newKey.llave)}" aria-label="Llave nueva"><div class="btns"><button class="btn small-btn" data-act="cer-copy">Copiar</button><button class="link small" data-act="cer-key-hide">Ya la he guardado</button></div></div>` : ""}
+        <div class="btns">${["chatgpt", "claude", "claude-code", "codex"].map((o) => `<button class="btn ghost small-btn" data-act="cer-key-new" data-o="${o}">Llave para ${esc(CEREBRO_ORIGENES[o])}</button>`).join("")}</div>
+        <button class="link small" data-act="cer-keys">Ver mis llaves</button>
+        ${keys.length ? `<div class="stack">${keys.map((k) => `<div class="row"><span class="grow small">${esc(CEREBRO_ORIGENES[k.origen] ?? k.origen)} · creada ${esc(new Date(k.creada).toLocaleDateString("es-ES"))}${k.usada ? ` · usada ${esc(new Date(k.usada).toLocaleDateString("es-ES"))}` : " · sin usar"}${k.revocada ? " · revocada" : ""}</span>${k.revocada ? "" : `<button class="link small danger-link" data-act="cer-key-revoke" data-id="${esc(k.id)}">Revocar</button>`}</div>`).join("")}</div>` : ""}</section>`;
   },
   rutinas() {
     const list = vault.routines ?? [];
@@ -2825,6 +2847,8 @@ async function converse(message) {
   const mode = aiMode();
   const history = vault.chat.slice(0, -1).filter((b) => !b.proposal);
   let contextText = buildContext(lifeSnapshot(), mode.context, today());
+  // WEB-118: lo que guardaron tus IAs sobre esto (dato, nunca orden; dentro del bloque de datos).
+  { const rel = cerebroBuscar(cerEntries(), message).slice(0, 6); if (rel.length && mayGo(rel.map((e) => e.resumen).join(" "))) contextText += `\nCEREBRO (guardado por tus IAs; puede estar sin revisar): ${rel.map((e) => `[${e.rama}/${e.subrama ?? "-"} · ${e.origen}] ${e.titulo}: ${e.resumen.slice(0, 400)}`).join(" | ")}`; }
   // WEB-35: what MANU remembers from Manu's archive, only if he shares it.
   if (mode.context.archive) {
     const mem = memoryContext(await archiveDocs(), message, { permit: mayGo }); if (mem) contextText += `\n${mem}`;
@@ -3367,6 +3391,30 @@ async function refreshBoard({ force = false } = {}) {
   } catch (err) { board.error = err.message; board.code = err.code ?? "error"; }
   board.busy = false; render();
 }
+// ---------- El cerebro compartido (WEB-118) ----------
+// Lo guardan Claude, Claude Code, Codex, ChatGPT y Manu en su Supabase; MANU lo lee. Copia en este
+// dispositivo (fuera del vault). Es dato, nunca orden: a la IA le llega dentro del bloque de datos.
+const BRAIN_KEY = "manuos.cerebro";
+const cer = { busy: false, error: null, code: null, lastTry: 0, open: null, keys: null, newKey: null, moving: null };
+function cerCache() { try { return JSON.parse(localStorage.getItem(BRAIN_KEY) ?? "null"); } catch { return null; } }
+const cerEntries = () => cerCache()?.entradas ?? [];
+async function refreshCerebro({ force = false } = {}) {
+  if (cer.busy || (!force && Date.now() - cer.lastTry < 5 * 60000)) return;
+  if (!nubeOn()) return;
+  cer.busy = true; cer.lastTry = Date.now(); if (force) render();
+  try { const r = await cerebroRequest(nubeCfg(), await nubeSession(), "leer", { limite: 1000 }); try { localStorage.setItem(BRAIN_KEY, JSON.stringify({ entradas: r.entradas ?? [], readAt: new Date().toISOString() })); } catch {} cer.error = null; cer.code = null; }
+  catch (err) { cer.error = err.message; cer.code = err.code ?? "error"; }
+  cer.busy = false; render();
+}
+async function cerAct(action, params, okMsg) {
+  try { const r = await cerebroRequest(nubeCfg(), await nubeSession(), action, params); if (okMsg) toast(okMsg); return r; }
+  catch (err) { toast(err.message); return null; }
+}
+function cerebroProjectCard(p) {
+  const list = cerebroDeProyecto(cerEntries(), p.name);
+  if (!list.length) return "";
+  return `<section class="card"><h2>🧠 Lo que sabe tu cerebro</h2>${list.slice(0, 6).map((e) => `<div class="stack cer-entry"><b>${esc(e.titulo)}</b><p class="small">${esc(e.resumen.slice(0, 280))}${e.resumen.length > 280 ? "…" : ""}</p><span class="muted small">${esc(CEREBRO_ORIGENES[e.origen] ?? e.origen)} · ${esc(new Date(e.creado).toLocaleDateString("es-ES", { day: "numeric", month: "short" }))}${e.estado === "sin_revisar" ? " · sin revisar" : ""}</span></div>`).join("")}<button class="link small" data-sub-go="cerebro">Ver todo el cerebro</button></section>`;
+}
 function controlCard() {
   const [s, e] = monthRange();
   const f = fr();
@@ -3825,6 +3873,15 @@ document.addEventListener("click", async (e) => {
       createProject({ name: i.text.slice(0, 60), emoji: "💡", why: i.text }).then(({ p }) => { vault.inbox = vault.inbox.map((x) => (x.id === i.id ? { ...x, done: true, doneAt: new Date().toISOString(), project: p.id } : x)); openProject = p.id; go("proyectos"); persist(); render({ focus: true, enter: "page" }); toast("Proyecto creado desde la idea"); });
       break;
     }
+    case "cer-refresh": refreshCerebro({ force: true }); break;
+    case "cer-ok": cerAct("revisar", { id: a.dataset.id }).then((r) => { if (r) refreshCerebro({ force: true }); }); break;
+    case "cer-archive": if (window.confirm("¿Archivar esta entrada? Deja de usarse, pero no se borra.")) cerAct("archivar", { id: a.dataset.id }, "Archivada").then((r) => { if (r) refreshCerebro({ force: true }); }); break;
+    case "cer-move": cer.moving = a.dataset.id; render(); break;
+    case "cer-keys": cerAct("llaves", {}).then((r) => { if (r) { cer.keys = r.llaves ?? []; render(); } }); break;
+    case "cer-key-new": cerAct("llave-crear", { origen: a.dataset.o }).then((r) => { if (r?.llave) { cer.newKey = { origen: r.origen, llave: r.llave }; cer.keys = null; render(); } }); break;
+    case "cer-key-hide": cer.newKey = null; render(); break;
+    case "cer-copy": { const v = cer.newKey?.llave; if (v) navigator.clipboard?.writeText(v).then(() => toast("Copiada")).catch(() => { $("cerKeyOut")?.select(); toast("Selecciónala y cópiala"); }); break; }
+    case "cer-key-revoke": if (window.confirm("¿Revocar esta llave? Esa IA dejará de poder escribir.")) cerAct("llave-revocar", { id: a.dataset.id }, "Revocada").then(() => cerAct("llaves", {}).then((r) => { if (r) { cer.keys = r.llaves ?? []; render(); } })); break;
     case "routine-on": { const r = (vault.routines ?? []).find((x) => x.id === a.dataset.id); if (r) { r.on = Boolean(a.checked); persist(); render(); } break; }
     case "routine-del": { const r = (vault.routines ?? []).find((x) => x.id === a.dataset.id); if (r && window.confirm(`¿Quitar la rutina «${r.text}»? Las tareas ya apuntadas se quedan.`)) { vault.routines = vault.routines.filter((x) => x.id !== r.id); persist(); render(); } break; }
     case "routine-preset": { const p = MARKETING_PRESETS.find((x) => x.key === a.dataset.k); if (p) { vault.routines = [...(vault.routines ?? []), { ...newRoutine({ id: uid("rt"), ...p }), preset: p.key }]; persist(); render(); toast(`Añadida: ${routineWhen(p).toLowerCase()}`); } break; }
@@ -4193,6 +4250,7 @@ document.addEventListener("submit", async (e) => {
     toast(n ? `Guardadas. He metido ${n} ${n === 1 ? "cosa" : "cosas"} que encajan.` : "Guardadas");
     return;
   }
+  if (f === "cerMoveForm") { const [rama, subrama] = $("cerRama").value.split("|"); const r = await cerAct("mover", { id: e.target.dataset.id, rama, subrama }, "Movida"); cer.moving = null; if (r) refreshCerebro({ force: true }); else render(); return; }
   if (f === "routineForm") { try { const r = newRoutine({ id: uid("rt"), text: $("rtText").value, every: $("rtEvery").value, weekday: $("rtDay").value }); vault.routines = [...(vault.routines ?? []), r]; persist(); render(); toast(`Rutina añadida: ${routineWhen(r).toLowerCase()}`); } catch (err) { toast(err.message); } return; }
   if (f === "projWhyForm") { const p = (vault.projects ?? []).find((x) => x.id === e.target.dataset.id); if (p) { const w = $("pWhy").value.replace(/\s+/g, " ").trim().slice(0, 200); if (w) p.why = w; else delete p.why; persist(); toast("Guardado"); } return; }
   if (f === "projStepForm") { const p = (vault.projects ?? []).find((x) => x.id === e.target.dataset.id); const text = $("pStep").value.trim().slice(0, 140); if (p && text) { vault.inbox.push({ ...capture({ id: uid("c"), text: `${p.emoji ?? "📁"} ${text}`, at: new Date().toISOString() }), status: "TASK", project: p.id }); p.updatedAt = new Date().toISOString(); persist(); render(); toast("Apuntado: te lo propondré cuando toque"); } return; }
