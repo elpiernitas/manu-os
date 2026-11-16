@@ -39,6 +39,7 @@ import { budgetStatus, budgetLine, budgetCommand } from "./core/budget.js";
 import { findInVault, findCommand } from "./core/find.js";
 import { controlItems, freshness, LEVELS as CONTROL_LEVELS } from "./core/control.js";
 import { franja, visibleTasks, hiddenWork, weekendKey, moneyLine } from "./core/daymode.js";
+import { COLUMNS as BOARD_COLUMNS, ACTIVE as BOARD_ACTIVE, boardItems, boardSummary, readLabel as boardReadLabel, tableroRequest } from "./core/tablero.js";
 import { propose as saveProposal, searchSaved, SAVE_LIMITS, safeViewType } from "./core/saveitem.js";
 import { weatherEmoji, sceneFor, PARTICLES, SHAPES, MONEY_EMOJI, dayPhase, cityMinutes } from "./core/scene.js";
 import { buildImagePayload, buildLinkPayload, isGeminiKey, mayGo, setSensitiveOk, sensitiveAllowed, pickModel, backupModel, listModels, buildActionPayload, askWithActions, issueUrl, aiErrorText } from "./core/ai.js";
@@ -78,7 +79,7 @@ import { SKINS, skinOf, cielo as hzCielo, variables as hzVars, tiempoDe, portada
 import { hzCara, hzPortada, hzBotella, hzMareas, hzConstelacion, hzAstillero, hzBarcoCarta, hzBotadura, hzBitacora, hzApariencia } from "./design/horizonte.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "115"; // = número de la última tarea WEB publicada (desde WEB-87)
+export const APP_VERSION = "116"; // = número de la última tarea WEB publicada (desde WEB-87)
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -1731,6 +1732,7 @@ const screens = {
         ${item("comidas", "fork", "orange", "Comidas", `${vault.meals.filter((m) => m.day === t).length} apuntadas hoy`)}
         ${item("archivo", "box", "teal", "Tu archivo", archive.stats?.count ? `${archive.stats.count} conversaciones guardadas` : "Tus conversaciones y tu exportación de ChatGPT")}
         ${item("documentos", "box", "orange", "Documentos", (() => { const s = expiringSoon(vault.docs, today(), 30); return s.length ? `${s[0].doc.title}: ${leftText(s[0].left)}` : vault.docs?.length ? `${vault.docs.length} guardados` : "Seguros, contratos y garantías"; })())}
+        ${item("tablero", "box", "orange", "Tablero RK", boardOn() ? (boardCache()?.feed ? `${boardSummary(boardCache().feed, today()).count} tarjetas activas · leído ${boardReadLabel(boardCache().readAt, today())}` : "Conectado, sin leer aún") : "Ver tu Tablero de marketing (solo lectura)")}
         ${item("biblioteca", "leaf", "teal", "Biblioteca · Guardar en MANU", vault.library?.length ? `${vault.library.length} cosas guardadas${vault.library.some((x) => x.needsReview) ? ` · ${vault.library.filter((x) => x.needsReview).length} por revisar` : ""}` : "Enlaces, vídeos, PDF, notas e ideas, con búsqueda")}
         ${item("personas", "people", "purple", "Personas", vault.people.length ? `${vault.people.length} personas` : "Cumpleaños y detalles")}
         <button class="item" data-act="refuge"><span class="ico teal">${I.leaf}</span><span class="grow"><span>Refugio</span><br><span class="muted small">Para cuando no estás bien</span></span><span class="chev">${I.chev}</span></button>
@@ -1847,6 +1849,20 @@ const subpages = {
   },
   memoria() {
     return `${backBar("Memoria")}${memoriaPage(brain(), { spending: vault.spending, projects: vault.projects, ui: memUi, now: new Date() })}`;
+  },
+  tablero() {
+    const bc = boardCache();
+    const feed = bc?.feed;
+    const pend = board.code === "pending";
+    const col = (k) => { const cs = (feed?.cards ?? []).filter((c) => c.column === k); return cs.length ? `${sectionTitle(`${BOARD_COLUMNS[k]} · ${cs.length}`)}<section class="card">${cs.map((c) => `<div class="row board-row"><span class="grow">${esc(c.title)}</span>${c.due ? `<span class="muted small num">${esc(c.due.slice(8))}/${esc(c.due.slice(5, 7))}</span>` : ""}${c.requestedBy === "comercial" ? '<span class="chip">comercial</span>' : ""}</div>`).join("")}</section>` : ""; };
+    return `${backBar("Tablero RK")}
+      <section class="card stack"><p class="small">${boardOn() ? "MANU lee tu Tablero de marketing para enseñártelo en Hoy, en horario de trabajo. Solo lee: no puede mover ni crear tarjetas." : "Conecta tu Tablero de marketing para verlo en Hoy en horario de trabajo. Solo lectura."}</p>
+        <label class="sw-row"><input type="checkbox" data-act="board-on" ${boardOn() ? "checked" : ""}> Leer mi Tablero</label>
+        ${boardOn() ? `<div class="btns"><button class="btn ghost small-btn" data-act="board-refresh"${board.busy ? " disabled" : ""}>${board.busy ? "Leyendo…" : "Leer ahora"}</button>${feed?.openUrl ? `<a class="btn ghost small-btn" href="${esc(safeHref(feed.openUrl))}" target="_blank" rel="noopener">Abrir el Tablero</a>` : ""}${bc ? '<button class="link small danger-link" data-act="board-clear">Borrar la copia de este dispositivo</button>' : ""}</div>` : ""}
+        ${board.error ? `<p class="small ${pend ? "lg-warn" : "danger-text"}" role="status">${esc(board.error)}${pend ? " Hay que crear el permiso de lectura en la app de la empresa y publicar «manu-tablero» en tu Supabase." : ""}</p>` : ""}
+        ${bc?.readAt ? `<p class="muted small">Leído ${esc(boardReadLabel(bc.readAt, today()))}${board.error ? " (copia anterior)" : ""}.</p>` : ""}</section>
+      ${feed ? BOARD_ACTIVE.map(col).join("") || '<section class="card"><p class="muted">Nada activo en tu Tablero.</p></section>' : ""}
+      <p class="muted small">Solo título, columna y fecha límite. Se guarda solo en este dispositivo: no va a Tu nube, ni a las copias, ni a ninguna IA.</p>`;
   },
   biblioteca() {
     const items = [...(vault.library ?? [])].filter((i) => libFilter === "todo" || i.status === libFilter || (libFilter === "revisar" && i.needsReview)).sort((a, b) => String(b.at).localeCompare(String(a.at)));
@@ -3311,6 +3327,24 @@ function mailSubmit(form) {
   vault.mailTriage = st; mailUi = { ...mailUi, open: null, mode: null }; persist(); render(); toast(msg);
 }
 // ---------- Hoy: centro de control (misión «asistente real») ----------
+// ---------- Tablero de marketing de la empresa, solo lectura (WEB-116) ----------
+// Copia solo en este dispositivo (localStorage aparte, fuera del vault: no va a Tu nube, ni a las
+// copias, ni a la IA). Se lee al abrir MANU en horario de trabajo, como mucho cada 10 minutos.
+const BOARD_KEY = "manuos.tablero";
+const board = { busy: false, error: null, code: null, lastTry: 0 };
+const boardOn = () => vault.settings.tablero?.on === true;
+function boardCache() { try { return JSON.parse(localStorage.getItem(BOARD_KEY) ?? "null"); } catch { return null; } }
+function boardSave(v) { try { if (v) localStorage.setItem(BOARD_KEY, JSON.stringify(v)); else localStorage.removeItem(BOARD_KEY); } catch {} }
+async function refreshBoard({ force = false } = {}) {
+  if (!boardOn() || board.busy) return;
+  if (!force && Date.now() - board.lastTry < 10 * 60000) return;
+  board.busy = true; board.lastTry = Date.now(); if (force) render();
+  try {
+    const feed = await tableroRequest(nubeCfg(), await nubeSession());
+    boardSave({ feed, readAt: new Date().toISOString() }); board.error = null; board.code = null;
+  } catch (err) { board.error = err.message; board.code = err.code ?? "error"; }
+  board.busy = false; render();
+}
 function controlCard() {
   const [s, e] = monthRange();
   const f = fr();
@@ -3322,10 +3356,15 @@ function controlCard() {
     money: msum, moneyText: msum ? moneyLine(msum, msum.fiable ? monthPace(money().spend, today()).diff : null, { humor: brain().voice?.humor ?? 1, seed: today().getDate() }) : null,
     euros, projects: rest || f.key === "WORK" ? [] : vault.projects ?? [], mailLabel: (k) => TRIAGE[k]?.short ?? k,
   }).filter((x) => !(rest && x.level === "IMPORTANT" && x.source !== "Agenda" && !/^Google Calendar/.test(x.source) && x.source !== "Recordatorios"));
+  // El Tablero solo se ve cuando se ve el trabajo (de la mañana al cierre de jornada).
+  const bc = boardOn() && f.showsWork ? boardCache() : null;
+  if (bc?.feed) { const order = { URGENT: 0, IMPORTANT: 1, INFO: 2 }; items.push(...boardItems(bc.feed, today(), { readAt: boardReadLabel(bc.readAt, today()) })); items.sort((a, b) => order[a.level] - order[b.level] || a.sort - b.sort); }
+  if (boardOn() && f.showsWork) setTimeout(() => refreshBoard(), 0);
   const fresh = freshness([
     { name: "Agenda", on: googleOn("calendar"), at: vault.calendar?.syncedAt ?? null },
     { name: "Correo", on: googleOn("gmail"), at: vault.mail?.syncedAt ?? null },
     { name: "Tiempo", on: true, at: vault.weather?.at ?? null, maxAgeH: 3 },
+    { name: "Tablero", on: boardOn() && f.showsWork, at: boardCache()?.readAt ?? null, maxAgeH: 1 },
   ]);
   const goAttr = (g) => (!g ? "" : g.project ? `data-act="find-go" data-project="${esc(g.project)}"` : g.sub ? `data-sub-go="${esc(g.sub)}"` : `data-tab="${esc(g.tab)}"`);
   const row = (x) => `<button class="row ctl-row ctl-${x.level.toLowerCase()}" ${goAttr(x.go)}><span class="ctl-icon" aria-hidden="true">${x.icon}</span><div class="grow"><div class="ctl-title">${esc(x.title)}</div><div class="muted small">${esc(x.detail)}${x.detail ? " · " : ""}${esc(x.source)}</div><div class="muted small ctl-why">${esc(x.why)}</div></div><span class="chev">${I.chev}</span></button>`;
@@ -3764,6 +3803,9 @@ document.addEventListener("click", async (e) => {
       createProject({ name: i.text.slice(0, 60), emoji: "💡", why: i.text }).then(({ p }) => { vault.inbox = vault.inbox.map((x) => (x.id === i.id ? { ...x, done: true, doneAt: new Date().toISOString(), project: p.id } : x)); openProject = p.id; go("proyectos"); persist(); render({ focus: true, enter: "page" }); toast("Proyecto creado desde la idea"); });
       break;
     }
+    case "board-on": { const on = a.checked ?? !boardOn(); vault.settings.tablero = { on: Boolean(on) }; if (!on) { boardSave(null); board.error = null; board.code = null; } persist(); render(); if (on) refreshBoard({ force: true }); break; }
+    case "board-refresh": refreshBoard({ force: true }); break;
+    case "board-clear": boardSave(null); render(); toast("Copia del Tablero borrada de este dispositivo"); break;
     case "task-work": { const t = vault.inbox.find((x) => x.id === a.dataset.id); if (t) { t.work = !t.work || Boolean(t.workGuess); delete t.workGuess; persist(); render(); toast(t.work ? "Marcada de trabajo: desde el cierre de jornada no te la enseño hasta el día siguiente" : "Ya no es de trabajo"); } break; }
     case "weekend-plan": { vault.settings.weekendPlans = { ...Object.fromEntries(Object.entries(vault.settings.weekendPlans ?? {}).slice(-8)), [weekendKey(today())]: a.dataset.v }; persist(); render(); toast(a.dataset.v === "descanso" ? "Finde de descanso: nada de proyectos ni de pendientes que no sean urgentes" : "Finde para tus cosas: te propongo tus proyectos"); break; }
     case "now-skip": { const k = localDay(); const sk = vault.settings.nowSkipped?.day === k ? vault.settings.nowSkipped.items : []; vault.settings.nowSkipped = { day: k, items: [...sk, a.dataset.t].slice(-20) }; persist(); render(); break; }

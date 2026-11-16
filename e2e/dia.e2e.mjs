@@ -156,6 +156,48 @@ for (const w of [320, 375, 390, 430]) {
   if (w === 320) await shot(page, "07-proyectos-320");
   await ctx.close();
 }
+// 8. Tablero RK (solo lectura): se ve en horario de trabajo, desaparece al cerrar; nunca en el vault.
+{
+  const feed = { version: 1, generatedAt: t(16, 9, 50), openUrl: "https://app.ejemplo.test/tablero", cards: [
+    { id: "k1", title: "Reel piso centro", column: "HACIENDO", due: "2026-11-16", estimateMin: 60 },
+    { id: "k2", title: "Historias de reseñas", column: "POR_HACER", due: "2026-11-13" },
+    { id: "k3", title: "Copy pendiente de OK", column: "ESPERANDO_OK" },
+  ] };
+  const v = { ...seed(), settings: { tablero: { on: true } } };
+  const ctx = await browser.newContext({ timezoneId: "Europe/Madrid", ...devices["iPhone 14"] });
+  const page = await ctx.newPage(); const errors = [], calls = [];
+  page.on("pageerror", (e) => errors.push(String(e)));
+  page.on("dialog", (d) => d.accept());
+  await page.clock.install({ time: new Date(t(16, 10)) });
+  await page.route(/^https:\/\/([^/]*\.)?(open-meteo\.com|supabase\.co|googleapis\.com|google\.com|spotify\.com|enablebanking\.com|gstatic\.com)\//, (r) => { calls.push(r.request().url()); r.fulfill({ status: 503, body: "" }); });
+  await page.addInitScript(([vv, fd, at]) => { if (sessionStorage.getItem("seeded")) return; sessionStorage.setItem("seeded", "1"); localStorage.setItem("manuos.nudged", JSON.stringify({ day: "x", ids: [] })); localStorage.setItem("manuos.vault", JSON.stringify(vv)); localStorage.setItem("manuos.tablero", JSON.stringify({ feed: fd, readAt: at })); }, [v, feed, t(16, 9, 50)]);
+  await page.goto(B); await page.waitForTimeout(700);
+  let c = await ctl(page);
+  ok("Tablero en Trabajo: lo vencido es urgente", /Urgente[\s\S]*Historias de reseñas/i.test(c));
+  ok("Tablero en Trabajo: lo empezado que vence hoy, importante", /Reel piso centro[\s\S]*Vence hoy/.test(c));
+  ok("Tablero: dice su fuente y la hora de lectura", /Tablero RK · leído a las 09:50/.test(c));
+  ok("Tablero: frescura en el pie", /Tablero a las 09:50/.test(c));
+  await shot(page, "08-tablero-hoy");
+  await page.locator(".ctl-row", { hasText: "Historias de reseñas" }).click(); await page.waitForTimeout(250);
+  const sub = await page.locator("#screen").innerText();
+  ok("pantalla del Tablero: columnas y abrir el Tablero", /Haciendo · 1/i.test(sub) && /Esperando OK · 1/i.test(sub) && (await page.locator('a[href="https://app.ejemplo.test/tablero"]').count()) === 1);
+  ok("solo lectura: no hay botones para mover o crear tarjetas", !(await page.locator('[data-act^="board-"]').evaluateAll((els) => els.map((e) => e.dataset.act))).some((a) => !["board-on", "board-refresh", "board-clear"].includes(a)));
+  await page.click('[data-act="board-refresh"]'); await page.waitForTimeout(400);
+  ok("leer sin Tu nube: lo dice y conserva la copia", /Tu nube/.test(await page.locator("#screen").innerText()) && /copia anterior/.test(await page.locator("#screen").innerText()));
+  const vv = await vaultOf(page);
+  ok("el Tablero no está en el vault (no sube a Tu nube ni a las copias)", !JSON.stringify(vv).includes("Reel piso centro"));
+  ok("no se ha llamado a ningún servidor de la empresa", !calls.some((u) => /ejemplo\.test/.test(u)));
+  await page.click('[data-tab="hoy"]'); await page.waitForTimeout(200);
+  await page.clock.setFixedTime(new Date(t(16, 13, 10)));
+  await page.click('[data-tab="agenda"]'); await page.click('[data-tab="hoy"]'); await page.waitForTimeout(300);
+  const hasClose = await page.locator('[data-act="close-day"]').count();
+  if (hasClose) await page.click('[data-act="close-day"]'); await page.waitForTimeout(300);
+  c = await ctl(page);
+  if (!hasClose || /Tablero/.test(c)) console.log("DEBUG", hasClose, c.slice(0, 300));
+  ok("cerrada la jornada: el Tablero desaparece de Hoy", !/Historias de reseñas|Reel piso centro|Tablero/.test(c));
+  ok("Tablero: sin errores", !errors.length);
+  await ctx.close();
+}
 await browser.close();
 console.log(`dia.e2e: ${passes} correctas, ${fails} fallos`);
 process.exit(fails ? 1 : 0);

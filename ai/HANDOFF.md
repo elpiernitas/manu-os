@@ -1,5 +1,29 @@
 # HANDOFF
 
+## WEB-116 · Tablero de marketing de la empresa en MANU, solo lectura (Claude, 2026-11-16)
+
+Manu solo usa el Tablero de la app de su empresa y quiere verlo en MANU. Puede leer el código de la app de la empresa y añadir cosas en su Supabase, pero no tocar ciertas partes. Su jornada termina a las 13:00 y a veces se alarga hasta las 13:30; la desconexión ya lo cubre, porque el trabajo sigue visible hasta «Jornada cerrada». Detalle en `docs/TABLERO.md`.
+
+**Hecho:**
+- Contrato v1 y limpieza (`web/core/tablero.js` y la copia en `supabase/functions/manu-tablero/tablero-core.js`).
+- Función puente `manu-tablero` (no desplegada).
+- El Tablero en Hoy, solo cuando se ve el trabajo.
+- Pantalla Tú → Tablero RK.
+- Copia solo en el dispositivo, fuera del vault, de Tu nube y de la IA.
+- Versión 116.
+
+**Pruebas:**
+- `npm test`: 468 de 468. En `tablero`: limpieza de teléfonos y correos, igualdad de servidor y navegador, resumen, cliente y privacidad.
+- `e2e/dia.e2e.mjs`: 58 de 58. El Tablero sale en Trabajo, desaparece al cerrar, no está en el vault y no llama a la empresa.
+- Sin regresión en el resto de suites.
+
+**Pendiente (no simulado):**
+1. El feed de lectura en la app de la empresa (prompt dado a Manu).
+2. Los secretos en el Supabase de Manu.
+3. Desplegar `manu-tablero`, con su autorización expresa.
+
+**NO_VERIFICADO:** el nombre real de las tablas del Tablero en la empresa y si su política permite sacar los títulos a una app personal (lo decide Manu o su dirección).
+
 ## WEB-115 · Hoy a la medida de Manu: franjas, «Ahora», trabajo, finde, ideas y tono (Claude, 2026-11-16)
 
 Manu, tras leer su ficha de cliente (página privada, fuera del repositorio porque lleva datos personales), pidió «hazlo todo»:
