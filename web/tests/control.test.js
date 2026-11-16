@@ -55,3 +55,19 @@ test("frescura: cuándo se leyó cada fuente, y lo viejo se marca", () => {
   assert.equal(f[1].stale, true);
   assert.equal(f[2].text, "sin leer aún");
 });
+
+test("proyectos sin novedades: hecho comprobable, solo informativo", async () => {
+  const { quietProjects } = await import("../core/control.js");
+  const projects = [
+    { id: "a", name: "Reforma", createdAt: new Date(2026, 8, 20).toISOString(), sources: [{ at: new Date(2026, 9, 1).toISOString() }] },
+    { id: "b", name: "Viaje", createdAt: iso(9, 0, 1), sources: [{ at: iso(9, 0, 10) }] },
+    { id: "c", name: "Nuevo", createdAt: iso(9, 0, 15), sources: [] },
+    { id: "d", name: "Charla", createdAt: new Date(2026, 8, 1).toISOString(), sources: [], chat: [{ at: iso(9, 0, 14) }] },
+  ];
+  const q = quietProjects(projects, NOW);
+  assert.deepEqual(q.map((x) => x.id), ["a"]);
+  assert.equal(q[0].days, 46);
+  const it = controlItems({ now: NOW, projects }).find((x) => x.source === "Proyectos");
+  assert.equal(it.level, "INFO"); assert.deepEqual(it.go, { project: "a" });
+  assert.ok(!/necesita|deberías/i.test(`${it.title} ${it.why}`));
+});

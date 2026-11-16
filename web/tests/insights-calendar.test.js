@@ -108,3 +108,14 @@ test("agenda: el mismo evento en dos calendarios sale una vez; dos parecidos sig
   const t = (id, uid, time) => groupByDay({ items: [{ id, iCalUID: uid, summary: "Reunión", start: { dateTime: `2026-12-01T${time}:00+01:00` }, end: { dateTime: `2026-12-01T${time === "10:00" ? "11" : "13"}:00:00+01:00` } }] }, { calendar: "Trabajo" });
   assert.equal(mergeDays([t("r1", "u-rec", "10:00"), t("r1", "u-rec", "12:00")]).get("2026-12-01").length, 2, "misma serie a otra hora: dos");
 });
+
+test("agenda: lo de un calendario que no es tuyo se marca como compartido", async () => {
+  const fake = async () => ({ ok: true, status: 200, json: async () => ({ items: [{ id: "c1", summary: "Familia", accessRole: "reader", backgroundColor: "#e67c73" }, { id: "p", summary: "Yo", accessRole: "owner", primary: true }] }) });
+  const cals = await listCalendars("t", fake);
+  assert.deepEqual(cals.map((c) => c.own), [false, true]);
+  const ev = { id: "x", summary: "Cumple de la prima", start: { date: "2026-12-05" }, end: { date: "2026-12-06" } };
+  assert.equal(groupByDay({ items: [ev] }, { calendar: "Familia", own: false }).get("2026-12-05")[0].shared, true);
+  assert.equal(groupByDay({ items: [ev] }, { calendar: "Yo" }).get("2026-12-05")[0].shared, false);
+  const m = mergeDays([groupByDay({ items: [{ ...ev, iCalUID: "u" }] }, { calendar: "Yo", own: true }), groupByDay({ items: [{ ...ev, iCalUID: "u" }] }, { calendar: "Familia", own: false })]);
+  assert.equal(m.get("2026-12-05")[0].shared, false, "si también está en el tuyo, es tuyo");
+});

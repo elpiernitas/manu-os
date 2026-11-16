@@ -1,4 +1,4 @@
-# MANU como asistente real (WEB-112)
+# MANU como asistente real (WEB-112 y WEB-113)
 
 Misión de Manu del 2026-11-16: «de prototipo a asistente personal real». Este documento explica qué
 hace cada pieza nueva, de dónde saca los datos y qué no hace nunca.
@@ -112,10 +112,34 @@ Búsqueda:
   - «¿cuánto he gastado?» → consumo personal con su fiabilidad;
   - «busca …» → también en la biblioteca.
 
+## Repasos de la noche y de la semana (WEB-113)
+
+`web/core/review.js` deja de juzgar: no hay «a mejorar», «aún estás a tiempo», «muy bien» ni topes de gasto.
+
+- **Noche** (desde las 20:00, en Hoy):
+  - **Hecho:** tareas cerradas, citas de hoy, proyectos con cosas nuevas, hábitos marcados, jornada y gasto. El gasto es dato, con tu media al lado, y solo si la cifra es fiable.
+  - **Pendiente:** tareas abiertas, las abiertas desde hace más de una semana, hábitos sin marcar y la salida sin fichar.
+  - **Mañana y próximos días:** primera cita, recordatorios, documentos que vencen en 7 días y por dónde empezar.
+- **Semana** (domingo tarde y lunes por la mañana):
+  - **Hecho:** tareas cerradas, proyectos que avanzaron, hábitos («Leer 6 de 7»), trabajo y consumo personal (solo si es fiable).
+  - **Pendiente:** tareas de más de una semana.
+  - **La semana que viene:** agenda y documentos que vencen.
+  - **Propuestas:** como mucho dos, cada una sacada de un dato comprobable (cerrar la tarea más antigua, revisar un documento que vence).
+- Los hábitos son opcionales: se informa, no se penaliza.
+
+## Proyectos sin novedades (WEB-113)
+
+- Un proyecto sin fuentes ni mensajes nuevos desde hace más de 14 días sale en Hoy como «Para saber»: «Nada nuevo desde hace N días».
+- Es un hecho, no un «necesita acción». Lleva al proyecto.
+
+## Agenda: lo tuyo y lo de otros (WEB-113)
+
+- Google dice qué calendarios son tuyos (`accessRole: owner`).
+- Los eventos de calendarios que te comparten o que solo puedes ver se marcan «compartido».
+- Si el mismo evento está también en el tuyo, cuenta como tuyo.
+- Se ve el nombre del calendario («Trabajo», «Familia»…) y se respeta su color.
+
 ## Qué no está (honestamente)
 
-- **Proyectos que necesitan acción:** no hay un criterio fiable con los datos actuales; no lo invento.
-- **Hábitos y rachas:** existen, sin penalización. No he cambiado nada.
-- **Revisiones de noche y semana:** usan el consumo personal y se callan sobre el gasto si es provisional
-  (WEB-111). No he añadido más.
-- **Safari y iPhone reales:** no probados (Chromium con emulación).
+- **Safari y iPhone reales:** no probados; solo Chromium con emulación de iPhone.
+- **Teclado de iOS:** la prueba comprueba que la barra inferior no tapa el botón de guardar, pero el teclado real de Safari no se puede simular en Chromium.

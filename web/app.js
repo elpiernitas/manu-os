@@ -77,7 +77,7 @@ import { SKINS, skinOf, cielo as hzCielo, variables as hzVars, tiempoDe, portada
 import { hzCara, hzPortada, hzBotella, hzMareas, hzConstelacion, hzAstillero, hzBarcoCarta, hzBotadura, hzBitacora, hzApariencia } from "./design/horizonte.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "112"; // = número de la última tarea WEB publicada (desde WEB-87)
+export const APP_VERSION = "113"; // = número de la última tarea WEB publicada (desde WEB-87)
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -1484,7 +1484,7 @@ function calendarCard(canCreate) {
       ${d0(selected) ? "" : `<button class="link small" data-act="cal-today">Hoy</button>`}
     </section>
     ${sectionTitle(esc(cap(selDate.toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" }))), canCreate ? addLink("EVENT", "Nuevo evento") : "")}
-    <section class="card">${events.length || tasksDue.length ? events.map((ev) => `<div class="row event"><span class="ev-bar" data-c="${esc(ev.color ?? "")}"></span><div class="grow"><div>${esc(ev.title)}</div><div class="muted small">${esc(ev.time ? ev.time + (ev.end ? " – " + ev.end : "") : "Todo el día")}${ev.location ? ` · ${esc(ev.location)}` : ""}${(ev.calendars ?? [ev.calendar]).filter(Boolean).length ? ` · ${esc((ev.calendars ?? [ev.calendar]).filter(Boolean).join(" y "))}` : ""}</div></div></div>`).join("") + tasksDue.map(reminderRow).join("")
+    <section class="card">${events.length || tasksDue.length ? events.map((ev) => `<div class="row event"><span class="ev-bar" data-c="${esc(ev.color ?? "")}"></span><div class="grow"><div>${esc(ev.title)}</div><div class="muted small">${esc(ev.time ? ev.time + (ev.end ? " – " + ev.end : "") : "Todo el día")}${ev.location ? ` · ${esc(ev.location)}` : ""}${(ev.calendars ?? [ev.calendar]).filter(Boolean).length ? ` · ${esc((ev.calendars ?? [ev.calendar]).filter(Boolean).join(" y "))}` : ""}${ev.shared ? ' · <span class="chip ev-shared">compartido</span>' : ""}</div></div></div>`).join("") + tasksDue.map(reminderRow).join("")
       : `<p class="muted">${vault.calendar ? "Nada este día." : "Conecta Google para ver tu calendario completo."}</p>`}</section>`;
 }
 const d0 = (day) => day === localDay() && (!calView || (calView.y === today().getFullYear() && calView.m === today().getMonth()));
@@ -1807,9 +1807,9 @@ const subpages = {
     const n = tonightReview(), w = lastWeekReview();
     const notes = [...(vault.reviews ?? [])].sort((a, b) => b.day.localeCompare(a.day)).slice(0, 14);
     return `${backBar("Repaso")}
-      <section class="card brief rev-card"><h2>🌙 Hoy</h2>${n.empty ? '<p class="muted">Aún no hay nada que repasar hoy.</p>' : `${reviewLines("Bien", n.wins, "✅")}${reviewLines("A mejorar", n.improve, "🔧")}${reviewLines("Mañana", n.tomorrow, "➡️")}`}
+      <section class="card brief rev-card"><h2>🌙 Hoy</h2>${n.empty ? '<p class="muted">Aún no hay nada que repasar hoy.</p>' : `${reviewLines("Hecho", n.wins, "✅")}${reviewLines("Pendiente", n.improve, "•")}${reviewLines("Mañana y próximos días", n.tomorrow, "➡️")}`}
         <form id="reviewForm" class="stack"><label for="revNote" class="sr">Qué te llevas de hoy</label><textarea id="revNote" rows="2" maxlength="500" placeholder="Qué te llevas de hoy">${esc((vault.reviews ?? []).find((r) => r.day === localDay())?.note ?? "")}</textarea><button class="btn ghost" type="submit">Guardar nota</button></form></section>
-      <section class="card brief rev-card"><h2>🗓️ Últimos 7 días</h2>${w.empty ? '<p class="muted">Aún no hay datos esta semana.</p>' : `${reviewLines("Bien", w.wins, "✅")}${reviewLines("A mejorar", w.improve, "🔧")}${reviewLines("Plan", w.plan, "🎯")}`}</section>
+      <section class="card brief rev-card"><h2>🗓️ Últimos 7 días</h2>${w.empty ? '<p class="muted">Aún no hay datos esta semana.</p>' : `${reviewLines("Hecho", w.wins, "✅")}${reviewLines("Pendiente", w.improve, "•")}${reviewLines("La semana que viene", w.next ?? [], "📅")}${reviewLines("Propuestas", w.plan, "🎯")}`}</section>
       ${notes.length ? `${sectionTitle("Tus notas")}<section class="card">${notes.map((r) => `<div class="stack"><b class="small">${esc(new Date(`${r.day}T12:00`).toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "short" }))}</b><p>${esc(r.note)}</p></div>`).join("")}</section>` : ""}`;
   },
   documentos() {
@@ -2518,7 +2518,7 @@ function say(text) {
   // WEB-83: «mi semana», «repaso de la semana».
   if (/\b(mi semana|repaso( semanal| de la semana)?|como (me )?(fue|ha ido) la semana|resumen de la semana)\b/.test(normalise(clean))) {
     const w = lastWeekReview();
-    const text = w.empty ? "Aún no tengo datos de esta semana." : [w.wins.length ? `Bien:\n${w.wins.map((x) => `✅ ${x}`).join("\n")}` : "", w.improve.length ? `A mejorar:\n${w.improve.map((x) => `🔧 ${x}`).join("\n")}` : "", w.plan.length ? `Plan:\n${w.plan.map((x) => `🎯 ${x}`).join("\n")}` : ""].filter(Boolean).join("\n\n");
+    const text = w.empty ? "Aún no tengo datos de esta semana." : [w.wins.length ? `Hecho:\n${w.wins.map((x) => `✅ ${x}`).join("\n")}` : "", w.improve.length ? `Pendiente:\n${w.improve.map((x) => `• ${x}`).join("\n")}` : "", w.next?.length ? `La semana que viene:\n${w.next.map((x) => `📅 ${x}`).join("\n")}` : "", w.plan.length ? `Propuestas:\n${w.plan.map((x) => `🎯 ${x}`).join("\n")}` : ""].filter(Boolean).join("\n\n");
     vault.chat.push({ from: "me", text: clean, at }, { from: "manu", text, at });
     persist(); render(); return;
   }
@@ -3287,14 +3287,14 @@ function controlCard() {
   const items = controlItems({
     now: new Date(), events: agendaToday()?.events ?? [], tomorrow: vault.agendaTomorrow?.day === tomorrowKey() ? vault.agendaTomorrow.events : [],
     reminders: vault.reminders, mail: googleOn("gmail") ? pendingMail(mailItems()) : [], docs: expiringSoon(vault.docs, today(), 30),
-    money: (vault.spending.length || (vault.income ?? []).length) ? lgSummary(vault, { from: s, to: e }) : null, euros, mailLabel: (k) => TRIAGE[k]?.short ?? k,
+    money: (vault.spending.length || (vault.income ?? []).length) ? lgSummary(vault, { from: s, to: e }) : null, euros, projects: vault.projects ?? [], mailLabel: (k) => TRIAGE[k]?.short ?? k,
   });
   const fresh = freshness([
     { name: "Agenda", on: googleOn("calendar"), at: vault.calendar?.syncedAt ?? null },
     { name: "Correo", on: googleOn("gmail"), at: vault.mail?.syncedAt ?? null },
     { name: "Tiempo", on: true, at: vault.weather?.at ?? null, maxAgeH: 3 },
   ]);
-  const goAttr = (g) => (g.sub ? `data-sub-go="${esc(g.sub)}"` : `data-tab="${esc(g.tab)}"`);
+  const goAttr = (g) => (g.project ? `data-act="find-go" data-project="${esc(g.project)}"` : g.sub ? `data-sub-go="${esc(g.sub)}"` : `data-tab="${esc(g.tab)}"`);
   const row = (x) => `<button class="row ctl-row ctl-${x.level.toLowerCase()}" ${goAttr(x.go)}><span class="ctl-icon" aria-hidden="true">${x.icon}</span><div class="grow"><div class="ctl-title">${esc(x.title)}</div><div class="muted small">${esc(x.detail)}${x.detail ? " · " : ""}${esc(x.source)}</div><div class="muted small ctl-why">${esc(x.why)}</div></div><span class="chev">${I.chev}</span></button>`;
   const group = (lv) => { const xs = items.filter((x) => x.level === lv); return xs.length ? `<div class="ctl-group"><h3 class="ctl-h ctl-h-${lv.toLowerCase()}">${CONTROL_LEVELS[lv]} <span class="muted small">· ${xs.length}</span></h3>${xs.map(row).join("")}</div>` : ""; };
   const info = items.filter((x) => x.level === "INFO");
@@ -4542,7 +4542,7 @@ async function syncGoogle({ silent = false, quiet = false } = {}) {
       const listToken = await cachedToken(SCOPE.calendarList).catch(() => null);
       const calendars = listToken ? await listCalendars(listToken).catch(() => []) : [];
       const sources = calendars.length ? [...calendars].sort((a, b) => Number(b.primary) - Number(a.primary)) : [{ id: "primary", color: null, name: null }];
-      const days = mergeDays(await Promise.all(sources.map((c) => listEvents(calToken, start, end, fetch, { calendarId: c.id, color: c.color, calendar: c.name }).catch(() => new Map()))));
+      const days = mergeDays(await Promise.all(sources.map((c) => listEvents(calToken, start, end, fetch, { calendarId: c.id, color: c.color, calendar: c.name, own: c.own !== false }).catch(() => new Map()))));
       vault.calendar = { from: localDay(start), to: localDay(end), days: Object.fromEntries(days), syncedAt: new Date().toISOString() };
       const t = localDay(); const tk = tomorrowKey();
       vault.agenda = { day: t, events: days.get(t) ?? [], importedAt: new Date().toISOString(), source: "GOOGLE" };
@@ -4909,10 +4909,10 @@ async function saveConfirm() {
   persist(); render(); toast(project ? "Guardado en tu biblioteca y en el proyecto" : "Guardado en tu biblioteca");
 }
 // Las revisiones usan el consumo personal (Dinero 2.0) y solo hablan de gasto si la cifra es fiable.
-const reviewData = (now = today()) => { const from = new Date(now); from.setDate(from.getDate() - 35); return { now, inbox: vault.inbox, habits: vault.habits, spending: money().spend, moneyReliable: lgSummary(vault, { from, to: new Date(now.getTime() + 86400000) }).fiable, clock: vault.clock, targetMin: clockTarget(), reminders: vault.reminders }; };
+const reviewData = (now = today()) => { const from = new Date(now); from.setDate(from.getDate() - 35); return { now, inbox: vault.inbox, habits: vault.habits, projects: vault.projects ?? [], docsSoon: expiringSoon(vault.docs, now, 30).map((x) => ({ title: x.doc.title, left: x.left })), spending: money().spend, moneyReliable: lgSummary(vault, { from, to: new Date(now.getTime() + 86400000) }).fiable, clock: vault.clock, targetMin: clockTarget(), reminders: vault.reminders }; };
 function tonightReview() {
   const t = today(); const next = new Date(t.getFullYear(), t.getMonth(), t.getDate() + 1);
-  return nightReview({ ...reviewData(), tomorrowEvents: eventsFor(dayKey(next)) });
+  return nightReview({ ...reviewData(), todayEvents: eventsFor(dayKey(t)), tomorrowEvents: eventsFor(dayKey(next)) });
 }
 // On Monday morning the «week» is the one that ended yesterday.
 function lastWeekReview() {
@@ -4933,7 +4933,7 @@ function nightReviewCard() {
   // Tomorrow's weather, from the evening summary it replaces.
   const wx = dayBriefing().lines.find((l) => /^Mañana \d+°/.test(l.t));
   if (wx) r.tomorrow.push(wx.t);
-  return `<section class="card brief rev-card" aria-labelledby="revTitle"><h2 id="revTitle">🌙 Repaso de hoy</h2>${reviewLines("Bien", r.wins, "✅")}${reviewLines("A mejorar", r.improve, "🔧")}${reviewLines("Mañana", r.tomorrow, "➡️")}
+  return `<section class="card brief rev-card" aria-labelledby="revTitle"><h2 id="revTitle">🌙 Repaso de hoy</h2>${reviewLines("Hecho", r.wins, "✅")}${reviewLines("Pendiente", r.improve, "•")}${reviewLines("Mañana y próximos días", r.tomorrow, "➡️")}
     ${reviewNote ? `<form id="reviewForm" class="stack"><label for="revNote" class="sr">Qué te llevas de hoy</label><textarea id="revNote" rows="2" maxlength="500" placeholder="Qué te llevas de hoy"></textarea><button class="btn" type="submit">Guardar y cerrar el día</button></form>`
     : `<div class="btns"><button class="btn" data-act="review-done">Hecho</button><button class="btn ghost" data-act="review-note">Apuntar algo</button></div>`}</section>`;
 }
@@ -4942,7 +4942,7 @@ function weekReviewCard() {
   if (!key) return "";
   const r = lastWeekReview();
   if (r.empty) return "";
-  return `<section class="card brief rev-card" aria-labelledby="wkTitle"><h2 id="wkTitle">🗓️ Tu semana</h2>${reviewLines("Bien", r.wins, "✅")}${reviewLines("A mejorar", r.improve, "🔧")}${reviewLines("Plan para la semana que viene", r.plan, "🎯")}<div class="btns"><button class="btn" data-act="week-done" data-key="${esc(key)}">Hecho</button></div></section>`;
+  return `<section class="card brief rev-card" aria-labelledby="wkTitle"><h2 id="wkTitle">🗓️ Tu semana</h2>${reviewLines("Hecho", r.wins, "✅")}${reviewLines("Pendiente", r.improve, "•")}${reviewLines("La semana que viene", r.next ?? [], "📅")}${reviewLines("Propuestas", r.plan, "🎯")}<div class="btns"><button class="btn" data-act="week-done" data-key="${esc(key)}">Hecho</button></div></section>`;
 }
 function docsSoonCard() {
   const seen = vault.settings.docsSeen ?? {};

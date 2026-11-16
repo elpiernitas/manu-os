@@ -174,6 +174,66 @@ for (const w of [320, 375, 390, 430]) {
   ok("vacío: sin errores", !e.errors.length);
   await e.ctx.close();
 }
+// 7. Accesibilidad: todo lo que se toca tiene nombre y mide al menos 44 px de alto.
+{
+  const { ctx, page } = await open();
+  const check = async (label) => {
+    const bad = await page.evaluate(() => [...document.querySelectorAll("#screen button, #screen a[href], #screen input:not([type=hidden]), #screen select, #screen textarea")].filter((e) => e.offsetParent !== null).filter((e) => {
+      const name = (e.getAttribute("aria-label") || e.textContent || e.getAttribute("placeholder") || (e.id && document.querySelector(`label[for="${e.id}"]`)?.textContent) || e.closest("label")?.textContent || "").trim();
+      return !name;
+    }).map((e) => e.outerHTML.slice(0, 80)));
+    ok(`${label}: todos los controles tienen nombre accesible${bad.length ? ` (${bad.join(" | ")})` : ""}`, !bad.length);
+  };
+  await check("Hoy");
+  const small = await page.evaluate(() => [...document.querySelectorAll(".ctl-row")].filter((e) => e.getBoundingClientRect().height < 44).length);
+  ok("Hoy: filas del centro de control de 44 px o más", small === 0);
+  await sub(page, "correo"); await check("Correo");
+  ok("Correo: cabeceras de 44 px o más", await page.evaluate(() => [...document.querySelectorAll(".mail-head")].every((e) => e.getBoundingClientRect().height >= 44)));
+  await page.click('[data-act="mail-open"][data-id="m1"]');
+  ok("Correo: botones de acción de 44 px o más", await page.evaluate(() => [...document.querySelectorAll(".mail-acts > *")].every((e) => e.getBoundingClientRect().height >= 44)));
+  ok("Correo: la cabecera dice si está desplegada", (await page.getAttribute('[data-act="mail-open"][data-id="m1"]', "aria-expanded")) === "true");
+  await sub(page, "biblioteca"); await check("Biblioteca");
+  await ctx.close();
+}
+
+// 8. Datos antiguos: un vault de antes (sin ledger, sin triaje, correo sin `triage`, reparto viejo) abre y no pierde nada.
+{
+  const old = { schema: 1, chat: [{ from: "me", text: "hola", at: t(9, 0, 1) }], inbox: [{ id: "i1", text: "idea vieja", status: "IDEA", at: t(9, 0, 1) }], settings: { google: { gmail: true } },
+    spending: [{ id: "bar", at: t(21, 0, 5), cents: 3000, merchant: "BAR PRUEBA", category: "FOOD_AND_DRINK", split: { mine: 1500, people: [{ key: "p1", name: "Luis", cents: 1500 }] } }],
+    income: [{ id: "n1", at: t(8, 0, 1), cents: 100000, concept: "NOMINA PRUEBA", payroll: true }],
+    people: [{ id: "p1", name: "Luis" }], library: [{ id: "lb", title: "Libro viejo", kind: "libro", status: "hecho", at: t(9, 0, 1) }],
+    mail: { syncedAt: t(9, 0, 15), total: 3, senders: [{ email: "news@x.test", name: "News", domain: "x.test", count: 3, unread: 1, unsub: null, last: 0 }], important: [{ id: "z", name: "Ana", subject: "Hola", at: 0 }] } };
+  const { ctx, page, errors } = await open({ vault: old });
+  for (const tb of ["hoy", "agenda", "manu", "dinero", "proyectos", "tu"]) { await page.click(`[data-tab="${tb}"]`); await page.waitForTimeout(200); }
+  await sub(page, "correo"); await sub(page, "biblioteca");
+  const v = await vaultOf(page);
+  ok("datos antiguos: sin errores en ninguna pantalla", !errors.length);
+  ok("datos antiguos: el movimiento y su reparto siguen intactos", JSON.stringify(v.spending[0]) === JSON.stringify(old.spending[0]));
+  ok("datos antiguos: biblioteca, ideas e ingresos conservados", v.library[0].title === "Libro viejo" && v.inbox[0].text === "idea vieja" && v.income[0].cents === 100000);
+  await page.click('[data-tab="dinero"]'); await page.waitForTimeout(200);
+  ok("datos antiguos: el reparto viejo cuenta solo tu parte (15,00)", /Consumo personal[\s\S]*?15,00/.test(await page.locator(".lg-sum").innerText()));
+  await ctx.close();
+}
+
+// 9. Repaso de la noche: hechos y pendiente, sin juicios.
+{
+  const ctx = await browser.newContext({ timezoneId: "Europe/Madrid", ...devices["iPhone 14"] });
+  const page = await ctx.newPage(); const errs = [];
+  page.on("pageerror", (e) => errs.push(String(e)));
+  await page.clock.install({ time: new Date("2026-11-16T21:30:00+01:00") });
+  await page.route(/^https:\/\/([^/]*\.)?(open-meteo\.com|supabase\.co|googleapis\.com|google\.com|spotify\.com|enablebanking\.com|gstatic\.com)\//, (r) => r.fulfill({ status: 503, body: "" }));
+  const v = { ...seed(), habits: [{ id: "h1", name: "Leer", done: [] }], inbox: [{ id: "t1", text: "Llamar al fontanero", status: "TASK", at: t(8, 0, 1) }, { id: "t2", text: "Enviar planos", status: "TASK", done: true, doneAt: t(12), at: t(8, 0, 10) }] };
+  await page.addInitScript((vv) => { if (sessionStorage.getItem("seeded")) return; sessionStorage.setItem("seeded", "1"); localStorage.setItem("manuos.vault", JSON.stringify(vv)); }, v);
+  await page.goto(B); await page.waitForTimeout(700);
+  const rev = page.locator(".rev-card").first();
+  const txt = (await rev.count()) ? await rev.innerText() : "";
+  ok("repaso de la noche visible", /Repaso de hoy/i.test(txt));
+  ok("repaso: lo hecho y lo pendiente", /Has cerrado 1 tarea: Enviar planos/.test(txt) && /Llamar al fontanero/.test(txt));
+  ok("repaso: sin juicios", !/a mejorar|aún estás a tiempo|bastante más/i.test(txt) && /Hábitos sin marcar hoy: Leer/.test(txt));
+  ok("repaso: sin errores", !errs.length);
+  await shot(page, "09-repaso");
+  await ctx.close();
+}
 await browser.close();
 console.log(`asistente.e2e: ${passes} correctas, ${fails} fallos`);
 process.exit(fails ? 1 : 0);
