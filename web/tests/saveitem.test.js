@@ -62,3 +62,9 @@ test("búsqueda real en biblioteca, documentos, fuentes de proyectos e ideas, co
   assert.deepEqual(searchSaved(v, "inexistente"), []);
   assert.deepEqual(searchSaved(v, ""), []);
 });
+
+test("seguridad: solo se abren dentro del navegador los tipos inertes; lo activo se descarga", async () => {
+  const { safeViewType } = await import("../core/saveitem.js");
+  for (const ok of ["image/png", "image/jpeg", "application/pdf", "text/plain", "video/mp4", "audio/mpeg"]) assert.equal(safeViewType(ok), true, ok);
+  for (const bad of ["text/html", "image/svg+xml", "application/xhtml+xml", "text/xml", "application/javascript", "text/javascript", "", null, "application/octet-stream", "image/png;x=svg"]) assert.equal(safeViewType(bad), false, String(bad));
+});

@@ -121,6 +121,15 @@ const sub = async (p, name) => { await p.evaluate((n) => { const b = document.cr
   ok("búsqueda: encuentra y dice dónde", /Pan de masa madre/.test(await page.locator(".find").innerText()) && /Biblioteca/.test(await page.locator(".find").innerText()));
   await page.fill("#libQ", "alquiler"); await page.press("#libQ", "Enter"); await page.waitForTimeout(200);
   ok("búsqueda: el archivo por su nombre", /contrato alquiler 2026/.test(await page.locator(".find").innerText()));
+  // Un archivo activo (HTML) no se abre con el origen de MANU: se descarga.
+  await page.setInputFiles("#saveFile", { name: "trampa.html", mimeType: "text/html", buffer: Buffer.from("<script>document.title='EJECUTADO'</script>") });
+  await page.waitForTimeout(300); await page.click('#saveConfirm button[type="submit"]'); await page.waitForTimeout(300);
+  const trampa = (await vaultOf(page)).library.find((x) => x.fileName === "trampa.html");
+  await page.evaluate((id) => { document.getElementById(`lib-${id}`).open = true; }, trampa.id);
+  const btnFile = page.locator(`#lib-${trampa.id} [data-act="lib-file"]`);
+  await btnFile.scrollIntoViewIfNeeded();
+  const [dl, pop] = await Promise.all([page.waitForEvent("download", { timeout: 5000 }).catch(() => null), ctx.waitForEvent("page", { timeout: 5000 }).catch(() => null), btnFile.click()]);
+  ok("HTML guardado: se descarga, no se abre como MANU", Boolean(dl) && !pop);
   await shot(page, "03-biblioteca");
   ok("Biblioteca: sin errores", !errors.length);
   await ctx.close();
@@ -232,6 +241,25 @@ for (const w of [320, 375, 390, 430]) {
   ok("repaso: sin juicios", !/a mejorar|aún estás a tiempo|bastante más/i.test(txt) && /Hábitos sin marcar hoy: Leer/.test(txt));
   ok("repaso: sin errores", !errs.length);
   await shot(page, "09-repaso");
+  await ctx.close();
+}
+// 10. Una acción de correo que propone la IA no toca Gmail sin confirmar el alcance exacto.
+{
+  const v = { ...seed(),
+    mail: { ...seed().mail, senders: [{ email: "news@tienda.test", name: "Tienda", domain: "tienda.test", count: 37, unread: 3, unsub: null, last: 0 }] } };
+  const ctx = await browser.newContext({ timezoneId: "Europe/Madrid", ...devices["iPhone 14"] });
+  const page = await ctx.newPage(); const gmail = []; let asked = "";
+  page.on("dialog", (d) => { asked = d.message(); d.dismiss(); });
+  await page.clock.install({ time: NOW });
+  await page.route(/^https:\/\/([^/]*\.)?(open-meteo\.com|supabase\.co|googleapis\.com|google\.com|spotify\.com|enablebanking\.com|gstatic\.com)\//, (r) => { gmail.push(r.request().url()); r.fulfill({ status: 503, body: "" }); });
+  await page.addInitScript((vv) => { if (sessionStorage.getItem("seeded")) return; sessionStorage.setItem("seeded", "1"); sessionStorage.setItem("manuos.tab", "manu"); localStorage.setItem("manuos.vault", JSON.stringify(vv)); }, v);
+  await page.goto(B); await page.waitForTimeout(700);
+  await page.fill("#msg", "manda a la papelera los correos de tienda"); await page.press("#msg", "Enter"); await page.waitForTimeout(500);
+  await page.click('#chat [data-act="ai-do"]'); await page.waitForTimeout(400);
+  ok("IA → papelera: pide confirmar con cuántos y de quién", /37 correos/.test(asked) && /news@tienda\.test/.test(asked) && /Lo propone MANU/.test(asked));
+  ok("al decir que no, no se toca Gmail", !gmail.some((u) => /gmail/.test(u)));
+  const st = (await page.evaluate(() => JSON.parse(localStorage.getItem("manuos.vault")))).chat.filter((m) => m.calls).at(-1)?.calls[0].state;
+  ok("y la propuesta sigue pendiente", st === null);
   await ctx.close();
 }
 await browser.close();
