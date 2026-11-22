@@ -27,3 +27,5 @@ export const deleteImage = (id) => tx("readwrite", (s) => s.delete(id));
 export function clearImages(idb = globalThis.indexedDB) {
   return new Promise((resolve) => { try { const r = idb.deleteDatabase(DB); r.onsuccess = r.onerror = r.onblocked = () => resolve(); } catch { resolve(); } });
 }
+/** Los ids guardados (WEB-122, limpieza digital): para encontrar fotos que ya nada usa. */
+export const listImageIds = () => tx("readonly", (s) => s.getAllKeys()).then((k) => (k ?? []).map(String));

@@ -1,9 +1,17 @@
 # MANU OS — Project State
 
-Última actualización: 2026-11-10
+Última actualización: 2026-11-22
 
 ## Estado actual
 
+- **Misión maestra (2026-11-22), WEB-119 a WEB-122:**
+  - tema `mp.` de la marca de Manu: inicial en instalaciones nuevas y ofrecido en las anteriores;
+  - segundo cerebro: repeticiones, Conexiones y Momentos;
+  - la semana: tipos, tiempo reservado y preparar la semana;
+  - Aficiones y aprender;
+  - limpieza digital y dejar listo.
+
+  Auditoría en `docs/audits/2026-11-22-mision-maestra.md`. Pendiente de Safari real y de aprobación visual de Manu.
 - **WEB-110 (2026-11-16):** se retira Bahía del cliente activo porque Manu ya no quiere la gamificación. Nueva navegación: Hoy, Agenda, MANU, Dinero, Proyectos, Tú. Los datos guardados del juego se conservan para no destruir el vault. Ver `docs/product/LEAN_MANU_OS.md`.
 
 

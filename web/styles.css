@@ -966,3 +966,7 @@ fieldset { border: 0; padding: 0; margin: 0; }
 .wk-advice { padding: 8px 10px; border-radius: 12px; background: var(--surface-2); }
 .wk-decline textarea { min-height: 72px; }
 .interest + .interest { border-top: 1px solid var(--line); padding-top: 12px; }
+/* WEB-122: dejar listo */
+.np-item { width: 100%; border: 0; background: none; color: inherit; text-align: left; cursor: pointer; padding: 0; }
+.np-item .check { display: grid; place-items: center; font-size: 14px; }
+.np-item .check.on { background: var(--ok); border-color: var(--ok); color: #fff; }

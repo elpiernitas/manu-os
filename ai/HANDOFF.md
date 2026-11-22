@@ -1,5 +1,38 @@
 # HANDOFF
 
+## WEB-122 · Limpieza digital, dejar listo, enlaces directos, Tú ordenado y auditoría (Claude, 2026-11-22)
+
+Auditoría completa en `docs/audits/2026-11-22-mision-maestra.md`: inventario, las 15 ideas, el cerebro verificado y la comparación PWA / Atajos / nativa.
+
+**Hecho:**
+- Tú → Limpieza digital (`core/cleanup.js`):
+  - propone juntar repetidos, archivar capturas viejas y pasar a ideas lo olvidado en la bandeja, todo con «Deshacer»;
+  - borrar fotos que ya nada usa pide confirmación, porque es definitivo;
+  - dice lo que una web no puede ver: carrete, apps y Safari.
+- Rutinas → «Dejar listo para mañana»: sale en Hoy de 20:00 a 2:00 si hay algo apuntado, sin rachas.
+- Atajos → enlaces directos `#ir=` para copiar.
+- Tu cerebro → «Descargar copia» en JSON, local.
+- Tú agrupado en «Lo que guardas», «Tu día a día», «Trabajo» y «Ajustes».
+- QAL-061 y QAL-062.
+- Versión 122.
+
+**Cerebro verificado en solo lectura:**
+- las tablas existen;
+- RLS devuelve `[]` a la clave pública;
+- `INSERT` público → 42501;
+- la función responde 401 sin llave, con llave falsa o con JWT falso.
+
+**Pruebas:**
+- `npm test`: 497 de 497.
+- `limpieza.e2e`: 15 de 15.
+- `mp.e2e`: 79 de 79.
+- Las 17 suites e2e en verde.
+
+**NO_VERIFICADO:**
+- Safari real.
+- `getAllKeys` de IndexedDB en Safari.
+- Copiar al portapapeles en iOS.
+
 ## WEB-121 · Tu semana, tiempo reservado, preparar la semana y aficiones (Claude, 2026-11-22)
 
 Detalle en `docs/SEMANA.md`.

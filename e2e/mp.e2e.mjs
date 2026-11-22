@@ -136,7 +136,7 @@ for (const s of ["clasico", "horizonte", "design"]) {
   await goTab(page, "proyectos"); await page.click('[data-act="proj-open"]'); await page.waitForTimeout(250);
   ok("contraste en el detalle de proyecto", (await contrast(page)).length === 0, (await contrast(page)).slice(0, 4).join(" ; "));
   await shot(page, "mp-proyecto");
-  for (const s of ["memoria", "biblioteca", "permisos", "apariencia", "repaso", "rutinas", "cerebro", "datos", "momentos", "aficiones"]) {
+  for (const s of ["memoria", "biblioteca", "permisos", "apariencia", "repaso", "rutinas", "cerebro", "datos", "momentos", "aficiones", "limpieza"]) {
     await goTab(page, "tu"); const b = page.locator(`[data-sub="${s}"]`).first();
     if (!(await b.count())) { ok(`existe Tú → ${s}`, false); continue; }
     await b.click(); await page.waitForTimeout(250);
