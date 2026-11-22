@@ -21,7 +21,8 @@ import { SCOPE, runServices, planTaskSync, listOpenTasks, insertTask, completeTa
 import { detectLink, linkInfo, PROVIDER_NAME, safeHref } from "./core/links.js";
 import { allowedToSend, buildContext, buildConversationPayload, CONTEXT_CATEGORIES, BASIC_CONTEXT, FULL_CONTEXT, AUTO_SAFE } from "./core/converse.js";
 import { newProject, addSource, buildProjectPayload, citations, PRESETS } from "./core/projects.js";
-import { putImage, getImage, deleteImage, clearImages } from "./core/imagestore.js";
+import { putImage, getImage, deleteImage, clearImages, listImageIds } from "./core/imagestore.js";
+import { cleanupReport, CANNOT } from "./core/cleanup.js";
 import { readChatgptExport, search as archiveSearch, stats as archiveStats, chatToDoc, staleChat } from "./core/archive.js";
 import { putDocs, allDocs, clearArchive } from "./core/archivestore.js";
 import { findExcerpts, askPayload, profileDigest, profilePayload, memoryContext } from "./core/recall.js";
@@ -86,7 +87,7 @@ import { SKINS, skinOf, cielo as hzCielo, variables as hzVars, tiempoDe, portada
 import { hzCara, hzPortada, hzBotella, hzMareas, hzConstelacion, hzAstillero, hzBarcoCarta, hzBotadura, hzBitacora, hzApariencia } from "./design/horizonte.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "121"; // = número de la última tarea WEB publicada (desde WEB-87)
+export const APP_VERSION = "122"; // = número de la última tarea WEB publicada (desde WEB-87)
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -1624,6 +1625,7 @@ const screens = {
       ${weekReviewCard()}
       ${nightReviewCard()}
       ${nightCard()}
+      ${nightPrepCard()}
       ${backupNudge()}
       ${mailCards()}
       ${inbox.length ? `<section class="card"><h2>Bandeja · ${inbox.length}</h2>${inbox.map((c) => `<div class="stack"><div>${esc(c.text)}</div><div class="btns">
@@ -1752,25 +1754,32 @@ const screens = {
       <section class="card"><div class="mood">${MOODS.map((m) => `<button data-act="mood" data-v="${m.value}" aria-pressed="${mood === m.value}" aria-label="${m.label}"><b class="mood-e" aria-hidden="true">${m.emoji}</b>${m.label}</button>`).join("")}</div>
         <div class="row"><span class="muted small">Últimos 7 días</span><span class="dots">${week.map((v) => `<i data-v="${v}" title="${v ? MOODS[v - 1].label : "Sin dato"}"></i>`).join("")}</span></div>
         ${mood === 1 ? '<button class="btn ghost" data-act="refuge">Abrir el Refugio</button>' : ""}</section>
-      ${sectionTitle("Tu vida")}
+      ${sectionTitle("Lo que guardas")}
       <div class="list">
         ${item("memoria", "box", "purple", "Memoria", (() => { const n = (vault.brain?.claims ?? []).filter((c) => c.status === "ACTIVE").length; const p = vault.brain ? memProposals(vault.brain, { spending: vault.spending, projects: vault.projects, now: new Date() }).length : 0; return p ? `${p} cosa${p === 1 ? "" : "s"} para ti · ${n} recuerdos` : n ? `${n} recuerdos` : "Lo que me cuentas, para que no se te olvide"; })())}
+        ${item("cerebro", "box", "purple", "Tu cerebro", cerEntries().length ? `${cerEntries().length} entradas de tus IAs${cerEntries().filter((e) => e.estado === "sin_revisar").length ? ` · ${cerEntries().filter((e) => e.estado === "sin_revisar").length} sin revisar` : ""}` : "Lo que guardan Claude y ChatGPT de cada conversación")}
+        ${item("biblioteca", "leaf", "teal", "Biblioteca · Guardar en MANU", vault.library?.length ? `${vault.library.length} cosas guardadas${vault.library.some((x) => x.needsReview) ? ` · ${vault.library.filter((x) => x.needsReview).length} por revisar` : ""}` : "Enlaces, vídeos, PDF, notas e ideas, con búsqueda")}
+        ${item("momentos", "shots", "orange", "Momentos", (vault.moments ?? []).length ? `${vault.moments.length} guardados` : "Recuerdos de días normales, con foto si quieres")}
+        ${item("documentos", "box", "orange", "Documentos", (() => { const s = expiringSoon(vault.docs, today(), 30); return s.length ? `${s[0].doc.title}: ${leftText(s[0].left)}` : vault.docs?.length ? `${vault.docs.length} guardados` : "Seguros, contratos y garantías"; })())}
+        ${item("archivo", "box", "teal", "Tu archivo", archive.stats?.count ? `${archive.stats.count} conversaciones guardadas` : "Tus conversaciones y tu exportación de ChatGPT")}
         ${item("capturas", "shots", "blue", "Bandeja de capturas", toReview(vault.captures).length ? `${toReview(vault.captures).length} por revisar` : "Suelta aquí tus capturas y MANU las ordena")}
-        ${item("fichaje", "clock", "blue", "Fichaje", (() => { const r = monthReport(vault.clock, localDay().slice(0, 7), { targetMin: clockTarget(), now: today() }); return r.days || r.openDays ? r.balance : "Entradas, pausas y lo que te debe RK"; })())}
+        ${item("limpieza", "box", "gray", "Limpieza digital", "Repetidos, olvidados y fotos que ya nada usa")}
+      </div>
+      ${sectionTitle("Tu día a día")}
+      <div class="list">
         ${item("repaso", "repeat", "purple", "Repaso", "Tu día y tu semana: lo que fue bien y el plan")}
+        ${item("rutinas", "repeat", "blue", "Rutinas de trabajo", (vault.routines ?? []).filter((r) => r.on).length ? `${(vault.routines ?? []).filter((r) => r.on).length} activas · se apuntan solas el día que tocan` : "Tareas que se repiten cada semana o cada mes")}
         ${item("habitos", "repeat", "green", "Hábitos", vault.habits.length ? `${habitsDone} de ${vault.habits.length} hechos hoy` : "Crea tu primer hábito")}
         ${item("salud", "pulse", "red", "Salud", hs.sleep !== null || hs.steps !== null ? [hs.sleep !== null ? `${dec(hs.sleep)} h de sueño` : null, hs.steps !== null ? `${Math.round(hs.steps)} pasos` : null].filter(Boolean).join(" · ") + " (media semanal)" : "Sueño, pasos y peso")}
         ${item("comidas", "fork", "orange", "Comidas", `${vault.meals.filter((m) => m.day === t).length} apuntadas hoy`)}
-        ${item("archivo", "box", "teal", "Tu archivo", archive.stats?.count ? `${archive.stats.count} conversaciones guardadas` : "Tus conversaciones y tu exportación de ChatGPT")}
-        ${item("documentos", "box", "orange", "Documentos", (() => { const s = expiringSoon(vault.docs, today(), 30); return s.length ? `${s[0].doc.title}: ${leftText(s[0].left)}` : vault.docs?.length ? `${vault.docs.length} guardados` : "Seguros, contratos y garantías"; })())}
-        ${item("cerebro", "box", "purple", "Tu cerebro", cerEntries().length ? `${cerEntries().length} entradas de tus IAs${cerEntries().filter((e) => e.estado === "sin_revisar").length ? ` · ${cerEntries().filter((e) => e.estado === "sin_revisar").length} sin revisar` : ""}` : "Lo que guardan Claude y ChatGPT de cada conversación")}
-        ${item("rutinas", "repeat", "blue", "Rutinas de trabajo", (vault.routines ?? []).filter((r) => r.on).length ? `${(vault.routines ?? []).filter((r) => r.on).length} activas · se apuntan solas el día que tocan` : "Tareas que se repiten cada semana o cada mes")}
-        ${item("tablero", "box", "orange", "Tablero RK", boardOn() ? (boardCache()?.feed ? `${boardSummary(boardCache().feed, today()).count} tarjetas activas · leído ${boardReadLabel(boardCache().readAt, today())}` : "Conectado, sin leer aún") : "Ver tu Tablero de marketing (solo lectura)")}
-        ${item("biblioteca", "leaf", "teal", "Biblioteca · Guardar en MANU", vault.library?.length ? `${vault.library.length} cosas guardadas${vault.library.some((x) => x.needsReview) ? ` · ${vault.library.filter((x) => x.needsReview).length} por revisar` : ""}` : "Enlaces, vídeos, PDF, notas e ideas, con búsqueda")}
         ${item("aficiones", "leaf", "green", "Aficiones y aprender", (vault.interests ?? []).length ? `${vault.interests.length} cosas tuyas` : "Lo que te gusta, sin metas")}
-        ${item("momentos", "shots", "orange", "Momentos", (vault.moments ?? []).length ? `${vault.moments.length} guardados` : "Recuerdos de días normales, con foto si quieres")}
         ${item("personas", "people", "purple", "Personas", vault.people.length ? `${vault.people.length} personas` : "Cumpleaños y detalles")}
         <button class="item" data-act="refuge"><span class="ico teal">${I.leaf}</span><span class="grow"><span>Refugio</span><br><span class="muted small">Para cuando no estás bien</span></span><span class="chev">${I.chev}</span></button>
+      </div>
+      ${sectionTitle("Trabajo")}
+      <div class="list">
+        ${item("fichaje", "clock", "blue", "Fichaje", (() => { const r = monthReport(vault.clock, localDay().slice(0, 7), { targetMin: clockTarget(), now: today() }); return r.days || r.openDays ? r.balance : "Entradas, pausas y lo que te debe RK"; })())}
+        ${item("tablero", "box", "orange", "Tablero RK", boardOn() ? (boardCache()?.feed ? `${boardSummary(boardCache().feed, today()).count} tarjetas activas · leído ${boardReadLabel(boardCache().readAt, today())}` : "Conectado, sin leer aún") : "Ver tu Tablero de marketing (solo lectura)")}
       </div>
       ${sectionTitle("Ajustes")}
       <div class="list">
@@ -1902,7 +1911,8 @@ const subpages = {
         ${cer.newKey ? `<div class="cer-newkey"><p class="small"><b>Llave para ${esc(CEREBRO_ORIGENES[cer.newKey.origen])}</b> (solo se ve ahora):</p><input id="cerKeyOut" readonly value="${esc(cer.newKey.llave)}" aria-label="Llave nueva"><div class="btns"><button class="btn small-btn" data-act="cer-copy">Copiar</button><button class="link small" data-act="cer-key-hide">Ya la he guardado</button></div></div>` : ""}
         <div class="btns">${["chatgpt", "claude", "claude-code", "codex"].map((o) => `<button class="btn ghost small-btn" data-act="cer-key-new" data-o="${o}">Llave para ${esc(CEREBRO_ORIGENES[o])}</button>`).join("")}</div>
         <button class="link small" data-act="cer-keys">Ver mis llaves</button>
-        ${keys.length ? `<div class="stack">${keys.map((k) => `<div class="row"><span class="grow small">${esc(CEREBRO_ORIGENES[k.origen] ?? k.origen)} · creada ${esc(new Date(k.creada).toLocaleDateString("es-ES"))}${k.usada ? ` · usada ${esc(new Date(k.usada).toLocaleDateString("es-ES"))}` : " · sin usar"}${k.revocada ? " · revocada" : ""}</span>${k.revocada ? "" : `<button class="link small danger-link" data-act="cer-key-revoke" data-id="${esc(k.id)}">Revocar</button>`}</div>`).join("")}</div>` : ""}</section>`;
+        ${keys.length ? `<div class="stack">${keys.map((k) => `<div class="row"><span class="grow small">${esc(CEREBRO_ORIGENES[k.origen] ?? k.origen)} · creada ${esc(new Date(k.creada).toLocaleDateString("es-ES"))}${k.usada ? ` · usada ${esc(new Date(k.usada).toLocaleDateString("es-ES"))}` : " · sin usar"}${k.revocada ? " · revocada" : ""}</span>${k.revocada ? "" : `<button class="link small danger-link" data-act="cer-key-revoke" data-id="${esc(k.id)}">Revocar</button>`}</div>`).join("")}</div>` : ""}</section>
+      ${cerEntries().length ? `<section class="card"><h2>Tu copia</h2><p class="muted small">Descarga lo que MANU tiene del cerebro en este dispositivo (${cerEntries().length} entradas) en un archivo JSON. No se envía a nadie.</p><button class="btn ghost" data-act="cer-export">Descargar copia</button></section>` : ""}`;
   },
   rutinas() {
     const list = vault.routines ?? [];
@@ -1913,7 +1923,19 @@ const subpages = {
       ${presets.length ? `<section class="card"><h2>Propuestas para tu marketing</h2><p class="muted small">Sacadas de cómo trabajas. Se añaden activas y las puedes cambiar o quitar.</p>${presets.map((p) => `<div class="row"><span class="grow">${esc(p.text)} <span class="muted small">· ${esc(routineWhen(p))}</span></span><button class="btn ghost small-btn" data-act="routine-preset" data-k="${esc(p.key)}">Añadir</button></div>`).join("")}</section>` : ""}
       <form class="card stack" id="routineForm"><h2>Nueva rutina</h2><label for="rtText" class="sr">Qué hay que hacer</label><input id="rtText" maxlength="140" placeholder="Qué hay que hacer" required>
         <div class="row"><label for="rtEvery" class="sr">Cada cuánto</label><select id="rtEvery">${Object.entries(ROUTINE_EVERY).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join("")}</select><label for="rtDay" class="sr">Qué día</label><select id="rtDay">${WEEKDAYS.slice(1, 6).map((w, i) => `<option value="${i + 1}">${esc(w)}</option>`).join("")}</select></div>
-        <button class="btn" type="submit">Añadir rutina</button></form>`;
+        <button class="btn" type="submit">Añadir rutina</button></form>
+      <section class="card"><h2>Antes de dormir · dejar listo</h2><p class="muted small">Cosas pequeñas para tener a mano mañana (la mochila, las llaves, la ropa). Salen por la noche solo si tienes algo apuntado. Sin rachas: si un día no lo haces, no pasa nada.</p>
+        ${(vault.settings.nightPrep ?? []).map((x) => `<div class="row"><span class="grow">${esc(x.text)}</span><button class="link small" data-act="np-del" data-id="${esc(x.id)}" aria-label="Quitar ${esc(x.text)}">Quitar</button></div>`).join("")}
+        <form id="npForm" class="composer-inline"><label for="npText" class="sr">Algo que dejar listo</label><input id="npText" maxlength="60" placeholder="Mochila lista" autocomplete="off"><button class="btn ghost" type="submit">Añadir</button></form></section>`;
+  },
+  limpieza() {
+    if (cleanUi.report === null && !cleanUi.loading) queueMicrotask(cleanScan); // también al entrar por #ir=tu/limpieza
+    const r = cleanUi.report;
+    return `${backBar("Limpieza digital")}<p class="subtitle">Ordeno lo que MANU guarda en este iPhone. Te propongo; tú decides.</p>
+      ${cleanUi.undo ? `<section class="card"><p>${esc(cleanUi.undo.msg)}</p><div class="btns"><button class="btn ghost" data-act="cl-undo">Deshacer</button></div></section>` : ""}
+      ${r === null ? '<section class="card"><p class="muted">Revisando…</p></section>' : r.length ? r.map((x) => `<section class="card"><h2>${esc(x.title)} · ${x.items.length}</h2><p class="muted small">${esc(x.why)}</p><ul class="small">${x.items.slice(0, 6).map((i) => `<li>${esc(i.label)}</li>`).join("")}</ul>${x.items.length > 6 ? `<p class="muted small">Y ${x.items.length - 6} más.</p>` : ""}
+        <div class="btns">${x.go ? `<button class="btn ghost" data-sub-go="${esc(x.go)}">${esc(x.action)}</button>` : `<button class="btn${x.risky ? " danger" : ""}" data-act="cl-do" data-k="${esc(x.key)}">${esc(x.action)}${x.risky ? ` (${x.items.length})` : ""}</button>`}</div></section>`).join("") : '<section class="card"><p>Todo en orden: nada repetido, nada olvidado.</p></section>'}
+      <section class="card"><h2>Lo que una web no puede ver</h2><p class="muted small">iOS no deja a MANU mirar el carrete, las apps ni Safari. Dónde hacerlo tú:</p>${CANNOT.map(([t, d]) => `<div class="stack"><b class="small">${esc(t)}</b><span class="muted small">${esc(d)}</span></div>`).join("")}</section>`;
   },
   tablero() {
     const bc = boardCache();
@@ -2129,7 +2151,10 @@ const subpages = {
       ${buzonCard()}
       ${sectionTitle(`Pendientes (${pending.length})`)}
       <div class="stack">${pending.map(card).join("") || '<p class="muted">Nada pendiente.</p>'}</div>
-      ${created.length ? `${sectionTitle(`Creados (${created.length})`)}<div class="stack">${created.map(card).join("")}</div>` : ""}`;
+      ${created.length ? `${sectionTitle(`Creados (${created.length})`)}<div class="stack">${created.map(card).join("")}</div>` : ""}
+      ${sectionTitle("Ir directo (para Atajos o la pantalla de inicio)")}
+      <section class="card"><p class="muted small">En Atajos: acción «Abrir URL» con una de estas direcciones. Abren MANU justo ahí. iOS no deja a una web crear accesos rápidos al mantener pulsado el icono: para eso están los atajos.</p>
+        ${[["Guardar un momento", "tu/momentos"], ["Mi semana", "agenda"], ["Preparar la semana", "tu/repaso"], ["Hablar con MANU", "manu"], ["Limpieza digital", "tu/limpieza"], ["Aficiones", "tu/aficiones"]].map(([t, r]) => `<div class="row"><span class="grow">${esc(t)}<br><span class="muted small num">${esc(`${SITE}#ir=${r}`)}</span></span><button class="link small" data-act="copy-link" data-v="${esc(`${SITE}#ir=${r}`)}">Copiar</button></div>`).join("")}</section>`;
   },
   spotify() {
     const id = vault.settings.spotifyClientId ?? "";
@@ -3659,6 +3684,38 @@ function hzProyecto(fn, msg, clearInput = false) {
   if (clearInput) $("hzPieza")?.focus();
   if (msg) toast(msg);
 }
+// ---------- WEB-122: limpieza digital y dejar listo ----------
+let cleanUi = { report: null, undo: null, loading: false };
+async function cleanScan() {
+  if (cleanUi.loading) return; cleanUi.loading = true;
+  let ids = null; try { ids = await listImageIds(); } catch { ids = null; }
+  cleanUi.report = cleanupReport(vault, new Date(), { imageIds: ids }); cleanUi.loading = false;
+  if (sub === "limpieza") render();
+}
+async function cleanAct(a) {
+  if (a.dataset.act === "cl-undo") { const u = cleanUi.undo; if (u) { for (const [k, val] of Object.entries(u.snapshot)) vault[k] = val; persist(); cleanUi.undo = null; toast("Deshecho"); cleanScan(); } return; }
+  const sec = (cleanUi.report ?? []).find((x) => x.key === a.dataset.k); if (!sec) return;
+  const ids = new Set(sec.items.map((i) => i.id));
+  const snap = (keys) => Object.fromEntries(keys.map((k) => [k, structuredClone(vault[k] ?? [])]));
+  if (sec.key === "dup-lib") {
+    const snapshot = snap(["library"]);
+    for (const d of sec.items) { const dup = vault.library.find((x) => x.id === d.id); vault.library = vault.library.filter((x) => x.id !== d.id).map((x) => (x.id === d.keep ? { ...addRepeat(x, dup?.at ?? new Date().toISOString()), ...(dup?.notes && !String(x.notes ?? "").includes(dup.notes) ? { notes: `${x.notes ? `${x.notes}\n\n` : ""}${dup.notes}`.slice(0, 4000) } : {}) } : x)); }
+    cleanUi.undo = { snapshot, msg: `Juntados ${sec.items.length} repetidos.` };
+  } else if (sec.key === "old-caps") {
+    const snapshot = snap(["captures"]);
+    vault.captures = vault.captures.map((c) => (ids.has(c.id) ? { ...c, status: "archived" } : c));
+    cleanUi.undo = { snapshot, msg: `Archivadas ${ids.size} capturas.` };
+  } else if (sec.key === "old-inbox") {
+    const snapshot = snap(["inbox"]);
+    vault.inbox = vault.inbox.map((i) => (ids.has(i.id) ? { ...i, status: "IDEA" } : i));
+    cleanUi.undo = { snapshot, msg: `${ids.size} cosas pasadas a ideas.` };
+  } else if (sec.key === "orphans") {
+    if (!window.confirm(`¿Borrar ${ids.size} fotos que ya nada usa de este iPhone? No se puede deshacer. Si dudas, haz antes una copia completa en Tú → Tus datos.`)) return;
+    for (const id of ids) { try { await deleteImage(id); imageCache.delete(id); } catch { /* sigue con las demás */ } }
+    cleanUi.undo = null; toast(`${ids.size} fotos borradas`);
+  }
+  persist(); cleanScan();
+}
 // ---------- WEB-121: la semana, el tiempo reservado y preparar la semana ----------
 let weekUi = { open: false, reserve: false, decline: null, prep: null };
 const TYPE_TAG = { evento: "Evento", recordatorio: "Recordatorio", reservado: "Reservado", propuesta: "Propuesta", tarea: "Tarea" };
@@ -3701,6 +3758,13 @@ function weekAct(a) {
 function reservedNow(now = new Date()) {
   const m = now.getHours() * 60 + now.getMinutes();
   return reservesOn(vault.settings.reserved, now).find((r) => { const [fh, fm] = r.from.split(":").map(Number), [th, tm] = r.to.split(":").map(Number); return m >= fh * 60 + fm && m < th * 60 + tm; }) ?? null;
+}
+// Antes de dormir: lo que Manu apuntó para dejar listo. Solo de 20:00 a 2:00 y solo si hay algo.
+function nightPrepCard() {
+  const list = vault.settings.nightPrep ?? []; const h = new Date().getHours();
+  if (!list.length || !(h >= 20 || h < 2)) return "";
+  const done = vault.settings.nightPrepDone?.day === localDay() ? vault.settings.nightPrepDone.ids : [];
+  return `<section class="card np-card"><h2>Dejar listo para mañana</h2>${list.map((x) => `<button class="row np-item" data-act="np-check" data-id="${esc(x.id)}" aria-pressed="${done.includes(x.id)}"><span class="check${done.includes(x.id) ? " on" : ""}" aria-hidden="true">${done.includes(x.id) ? "✓" : ""}</span><span class="grow">${esc(x.text)}</span></button>`).join("")}</section>`;
 }
 function reservedCard() {
   const r = reservedNow();
@@ -4040,7 +4104,7 @@ document.addEventListener("click", async (e) => {
   const sg = e.target.closest("[data-sub-go]");
   if (sg) { if (sg.dataset.act === "wk-prep") weekUi.prep = sg.dataset.v === "completo" ? "completo" : "rapido"; tab = "tu"; sub = sg.dataset.subGo; render({ focus: true }); scrollTo(0, 0); return; }
   const sb = e.target.closest("[data-sub]");
-  if (sb) { sub = sb.dataset.sub; cityResults = null; render({ focus: true, enter: "page" }); scrollTo(0, 0); return; }
+  if (sb) { sub = sb.dataset.sub; cityResults = null; if (sub === "limpieza") { cleanUi = { report: null, undo: null, loading: false }; cleanScan(); } render({ focus: true, enter: "page" }); scrollTo(0, 0); return; }
   const s = e.target.closest("[data-say]");
   if (s) { say(s.dataset.say); return; }
   const fill = e.target.closest("[data-fill]");
@@ -4054,6 +4118,11 @@ document.addEventListener("click", async (e) => {
   if (a.dataset.act.startsWith("hz-")) { hzAct(a); return; }
   if (a.dataset.act === "rel-ok" || a.dataset.act === "rel-no") { relAct(a); return; }
   if (a.dataset.act.startsWith("wk-")) { weekAct(a); return; }
+  if (a.dataset.act.startsWith("cl-")) { cleanAct(a); return; }
+  if (a.dataset.act === "cer-export") { const file = new File([JSON.stringify({ exportado: new Date().toISOString(), origen: "MANU OS · copia local del cerebro", entradas: cerEntries() }, null, 2)], `cerebro-${localDay()}.json`, { type: "application/json" }); const l = document.createElement("a"); l.href = URL.createObjectURL(file); l.download = file.name; document.body.appendChild(l); l.click(); setTimeout(() => { URL.revokeObjectURL(l.href); l.remove(); }, 1000); toast("Copia descargada"); return; }
+  if (a.dataset.act === "copy-link") { navigator.clipboard?.writeText(a.dataset.v).then(() => toast("Copiada")).catch(() => toast(a.dataset.v)); return; }
+  if (a.dataset.act === "np-del") { vault.settings.nightPrep = (vault.settings.nightPrep ?? []).filter((x) => x.id !== a.dataset.id); persist(); render(); return; }
+  if (a.dataset.act === "np-check") { const t = localDay(), st = vault.settings.nightPrepDone?.day === t ? vault.settings.nightPrepDone : { day: t, ids: [] }; const id = a.dataset.id; vault.settings.nightPrepDone = { day: t, ids: st.ids.includes(id) ? st.ids.filter((x) => x !== id) : [...st.ids, id] }; persist(); render(); return; }
   if (a.dataset.act === "int-del") { const x = (vault.interests ?? []).find((i) => i.id === a.dataset.id); if (x && window.confirm(`¿Quitar «${x.name}»?`)) { vault.interests = vault.interests.filter((i) => i.id !== x.id); persist(); render(); } return; }
   if (a.dataset.act === "int-books") { libFilter = "leer"; sub = "biblioteca"; render({ focus: true }); scrollTo(0, 0); return; }
   if (a.dataset.act === "int-reserve") { tab = "agenda"; sub = null; weekUi.reserve = true; render({ focus: true }); { const k = $("rsKind"); if (k) k.value = "aficion"; const l = $("rsLabel"); if (l) l.value = a.dataset.name.slice(0, 60); } $("reserveForm")?.scrollIntoView({ block: "center" }); return; }
@@ -4460,6 +4529,7 @@ document.addEventListener("submit", async (e) => {
   if (f === "projStepForm") { const p = (vault.projects ?? []).find((x) => x.id === e.target.dataset.id); const text = $("pStep").value.trim().slice(0, 140); if (p && text) { vault.inbox.push({ ...capture({ id: uid("c"), text: `${p.emoji ?? "📁"} ${text}`, at: new Date().toISOString() }), status: "TASK", project: p.id }); p.updatedAt = new Date().toISOString(); persist(); render(); toast("Apuntado: te lo propondré cuando toque"); } return; }
   if (f === "momentForm") { await momentSave(); return; }
   if (f === "reserveForm") { reserveSubmit(); return; }
+  if (f === "npForm") { const t = $("npText").value.replace(/\s+/g, " ").trim().slice(0, 60); if (!t) return; vault.settings.nightPrep = [...(vault.settings.nightPrep ?? []), { id: uid("np"), text: t }].slice(0, 12); persist(); render(); return; }
   if (f === "intForm") { try { vault.interests = [...(vault.interests ?? []), newInterest({ id: uid("in"), name: $("intName").value, kind: $("intKind").value, project: $("intProject").value || null })]; persist(); render(); toast("Añadido"); } catch (err) { toast(err.message); } return; }
   if (f === "momentFind") { momentUi = { ...momentUi, q: $("momentQ").value.trim().slice(0, 80) }; render(); return; }
   if (f === "projForm") {

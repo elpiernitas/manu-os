@@ -292,3 +292,11 @@ Regla: solo se muestran dentro del navegador los tipos inertes (imagen sin SVG, 
 ### QAL-060 — La confirmación de una acción no puede depender de por dónde se pidió
 
 En WEB-114, archivar o mandar a la papelera los correos de un remitente pedía «¿seguro?» con el número de correos desde el botón de la app, pero no desde la tarjeta que propone la IA, donde además el remitente se busca por parecido. Regla: la confirmación del alcance exacto vive en la función que ejecuta la acción (`runCall`), no en cada botón, y se prueba que al decir «no» no sale ninguna petición.
+
+### QAL-061 — El azul de marca pasa AA sobre blanco y no sobre gris claro
+
+En WEB-119, `#0066FF` da 4,8:1 sobre `#FFFFFF` y solo 4,4:1 sobre `#F5F5F7`, la superficie de las tarjetas del mismo tema. Una paleta aprobada «en blanco» falla en cuanto el texto cae en otra superficie. Regla: el contraste se calcula por cada pareja texto/superficie real del tema (prueba unitaria con las parejas) y se mide en la app (e2e que recorre el texto visible de cada pantalla). El color de marca se reserva para fondos de botones y logotipo, y el texto azul usa un tono que pase en todas las superficies (`#0057D9`).
+
+### QAL-062 — «Los datos no cambian» se compara después del primer guardado
+
+En WEB-119, la prueba «cambiar de tema no toca los datos» falló sin que el tema tocara nada: el primer `persist()` normaliza el vault (listas vacías por defecto) y el archivado automático (WEB-60) marca `filed` en las tareas. Regla: en una prueba de no alteración, la referencia se toma después del primer guardado de la app y se comparan los datos del usuario, no la forma. Una diferencia se diagnostica clave por clave antes de tocar el código.
