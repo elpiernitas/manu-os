@@ -948,3 +948,8 @@ button.chip.work-chip.on { opacity: 1; border-color: var(--accent); }
 .cer-sub { margin: 10px 0 2px; }
 .cer-newkey { background: var(--surface-2); border-radius: 12px; padding: 10px; display: grid; gap: 6px; margin-bottom: 8px; }
 .cer-newkey input { font-family: ui-monospace, Menlo, monospace; font-size: 13px; width: 100%; }
+/* WEB-120: conexiones y momentos */
+.rel-item + .rel-item { border-top: 1px solid var(--line); padding-top: 12px; }
+.moment-preview { width: 100%; max-height: 260px; object-fit: cover; border-radius: 14px; }
+.moment .link { flex: none; }
+fieldset { border: 0; padding: 0; margin: 0; }
