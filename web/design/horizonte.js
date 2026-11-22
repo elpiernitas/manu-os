@@ -1,6 +1,7 @@
 // HORIZONTE (WEB-108): piezas visuales del tema. Reciben datos ya calculados por core/horizonte.js
 // (o por los módulos de siempre) y devuelven HTML. Todo el texto pasa por `esc`. Sin estilos en
 // línea: la CSP de la app los prohíbe, así que los tamaños van como atributos SVG o clases.
+import { mpLogo } from "./mp-brand.js";
 import { euros } from "../core/money.js";
 import { FRANJAS, ESTADOS, describeCielo } from "../core/horizonte.js";
 
@@ -150,6 +151,6 @@ export function hzBitacora(grupos) {
 }
 export function hzApariencia(skin) {
   const op = (id, t, d) => `<button class="hz-tema" data-act="hz-skin" data-v="${id}" aria-pressed="${skin === id}"><span class="hz-tema-m hz-tema-${id}" aria-hidden="true"></span><span class="grow"><b>${t}</b><br><span class="muted small">${d}</span></span>${skin === id ? '<span class="hz-mini">en uso</span>' : ""}</button>`;
-  return `<section class="card"><h2>Apariencia</h2><div class="stack">${op("design", "Claude Design · original", "El diseño negro, blanco y azul eléctrico del primer prototipo. Es ahora el principal.")}${op("clasico", "Clásico", "La interfaz azul y negra anterior, con sus tarjetas.")}${op("horizonte", "Horizonte", "El diseño marítimo de papel y tinta, disponible como alternativa.")}</div>
+  return `<section class="card">${skin === "mp" ? mpLogo("mp. Manu Pernas") : ""}<h2>Apariencia</h2><div class="stack">${op("mp", "mp. · Manu Pernas", "La identidad de tu marca: blanco, negro y azul #0066FF, con Montserrat. El tema inicial de las instalaciones nuevas.")}${op("design", "Claude Design · original", "El diseño negro, blanco y azul eléctrico del primer prototipo.")}${op("clasico", "Clásico", "La interfaz azul y negra anterior, con sus tarjetas.")}${op("horizonte", "Horizonte", "El diseño marítimo de papel y tinta, disponible como alternativa.")}</div>
     <p class="muted small">Cambiar de tema no borra nada ni cierra ninguna sesión. La elección se guarda en este dispositivo y viaja con Tu nube si la usas.</p></section>`;
 }

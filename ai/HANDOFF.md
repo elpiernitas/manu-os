@@ -1,5 +1,25 @@
 # HANDOFF
 
+## WEB-119 · Tema «mp.» con la identidad de Manu Pernas (Claude, 2026-11-22)
+
+Misión maestra, fase 2. Detalle en `docs/design/MP_THEME.md`.
+
+**Hecho:**
+- Tema `mp` reversible, con Montserrat propia (OFL), logotipo `mp.` del portfolio y avatar provisional.
+- Instalación nueva → `mp`. Instalación anterior → conserva su tema y se le ofrece `mp.` una vez en Hoy. Una elección guardada siempre manda.
+- Cambiar de tema solo escribe `settings.skin`.
+- Versión 119.
+
+**Pruebas:**
+- `npm test`: 482 de 482, con 6 nuevas en `mp-theme`.
+- `e2e/mp.e2e.mjs`: 73 de 73, con contraste AA medido.
+- Resto de suites e2e sin regresión.
+
+**NO_VERIFICADO:**
+- Safari real, VoiceOver y Texto grande del sistema.
+- Aprobación visual de Manu y del avatar.
+- Icono de la app (sin cambiar).
+
 ## WEB-118 · El cerebro compartido de Manu (Claude, 2026-11-16)
 
 Manu quiere un «cerebro masivo» que alimenten Claude, Claude Code, Codex y ChatGPT con cada conversación, cada IA eligiendo la rama, y que MANU lo lea. Detalle en `docs/CEREBRO.md`.

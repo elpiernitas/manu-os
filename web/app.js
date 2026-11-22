@@ -77,11 +77,12 @@ import { observeText, setLearning, wipeObserved } from "./core/style.js";
 import { observeFiling, observeMisfile } from "./core/topics.js";
 import { removeJoke } from "./core/voice.js";
 import { memoriaPage, hoyMemCard, claimDetail } from "./core/memview.js";
+import { mpLogo, mpAvatar } from "./design/mp-brand.js";
 import { SKINS, skinOf, cielo as hzCielo, variables as hzVars, tiempoDe, portada as hzPortadaData, mareas as hzMareasData, constelacion as hzConsData, retrato as hzRetrato, barco as hzBarco, addPieza, marcarPieza, quitarPieza, botar as hzBotarP, varar as hzVarar } from "./core/horizonte.js";
 import { hzCara, hzPortada, hzBotella, hzMareas, hzConstelacion, hzAstillero, hzBarcoCarta, hzBotadura, hzBitacora, hzApariencia } from "./design/horizonte.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "118"; // = número de la última tarea WEB publicada (desde WEB-87)
+export const APP_VERSION = "119"; // = número de la última tarea WEB publicada (desde WEB-87)
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -98,11 +99,18 @@ let vault = loaded.vault;
 // ---------- Temas: Claude Design (predeterminado), Clásico y Horizonte ----------
 // La elección vive en vault.settings.skin (viaja con Tu nube). Cambiarla solo repinta: no recarga,
 // no cierra sesiones ni toca datos.
-const skin = () => skinOf(vault.settings);
+// WEB-119: en una instalación nueva (sin vault guardado) el tema inicial es «mp.». Se apunta en el
+// dispositivo, no en el vault: así no viaja por Tu nube ni cambia el aspecto de otro dispositivo.
+// Una elección explícita (vault.settings.skin) siempre manda.
+const DEVICE_SKIN_KEY = "manuos.skinDefault";
+let deviceSkin = null;
+try { if (loaded.fresh && !localStorage.getItem(DEVICE_SKIN_KEY)) localStorage.setItem(DEVICE_SKIN_KEY, "mp"); deviceSkin = localStorage.getItem(DEVICE_SKIN_KEY); } catch { deviceSkin = loaded.fresh ? "mp" : null; }
+const skin = () => skinOf(vault.settings, deviceSkin);
 const hz = () => skin() === "horizonte";
 const hzUi = { minutos: null, manu: "hablar", botar: null };
 let hzSky = null;
 const META_CLASICO = { theme: "#050608", scheme: "dark" };
+const META_MP = { theme: "#FFFFFF", scheme: "light" };
 function dialDate() { const d = new Date(); if (hzUi.minutos != null) d.setHours(Math.floor(hzUi.minutos / 60), hzUi.minutos % 60, 0, 0); return d; }
 function hzTiempoAhora(when) {
   const w = currentWeather()?.data;
@@ -119,7 +127,8 @@ function applySkin() {
   if (s !== "horizonte") {
     delete r.dataset.tema; delete r.dataset.astro; hzSky = null;
     for (const k of ["--cielo-1", "--cielo-2", "--mar", "--astro-x", "--astro-y"]) r.style.removeProperty(k);
-    if (mt) mt.content = META_CLASICO.theme; if (ms) ms.content = META_CLASICO.scheme;
+    const meta = s === "mp" ? META_MP : META_CLASICO;
+    if (mt) mt.content = meta.theme; if (ms) ms.content = meta.scheme;
     return;
   }
   const when = dialDate(), icon = hzTiempoAhora(when);
@@ -128,7 +137,7 @@ function applySkin() {
   r.dataset.tema = hzSky.oscuro ? "noche" : "dia"; r.dataset.astro = hzSky.astro.tipo;
   if (mt) mt.content = hzSky.colores.arriba; if (ms) ms.content = hzSky.oscuro ? "dark" : "light";
 }
-try { document.documentElement.dataset.skin = skinOf(vault?.settings); } catch { /* el primer render lo pone */ }
+try { document.documentElement.dataset.skin = skin(); } catch { /* el primer render lo pone */ }
 // WEB-110: Bahía retired. Old sessions (including "bahia") now open Hoy.
 const restoredTab = sessionStorage.getItem("manuos.tab");
 let tab = ["hoy", "agenda", "manu", "dinero", "proyectos", "tu"].includes(restoredTab) ? restoredTab : "hoy";
@@ -1590,6 +1599,7 @@ const screens = {
       <div class="ft-work stack">
       ${morningLaunch ? `<section class="card morning-hello"><h2>☀️ ${esc(greeting())}, Manu</h2><p class="muted small">Toca y te leo el día en voz alta.</p><div class="btns"><button class="btn" data-act="speak-day">🔊 Léemelo</button><button class="link small" data-act="morning-dismiss">Ahora no</button></div></section>` : ""}
       ${controlCard()}
+      ${mpOfferCard()}
       ${gentleCard()}
       ${vault.brain || vault.spending.length ? (hz() ? hzBotella : hoyMemCard)(topProposal(brain(), { spending: vault.spending, projects: vault.projects, now: new Date() })) : ""}
       <button class="cmdk-pill glass" data-act="cmdk" aria-label="Comando rápido">⚡ <span>Haz algo rápido…</span></button>
@@ -1652,7 +1662,7 @@ const screens = {
     const history = vault.chat.length ? vault.chat : [{ from: "manu", text: intro }];
     // WEB-108: la Constelación son tus recuerdos reales; tocar una estrella abre su ficha de Memoria.
     if (hz() && hzUi.manu === "cielo" && !refuge) return `<div class="manu-head"><div class="orb hz-orb" aria-hidden="true">${hzCara("calma")}</div><div><h1>MANU</h1><p class="subtitle">Constelación de tu memoria</p></div></div>${hzModos()}${hzConstelacion(hzConsData(brain(), { ahora: new Date() }), { sel: memUi.open, detalle: memUi.open ? claimDetail(brain(), memUi.open, memUi, new Date()) : "" })}`;
-    return `<div class="manu-head${empty ? " big" : ""}"><div class="orb${hz() ? " hz-orb" : ""}${thinking ? " thinking" : ""}" id="orb" aria-hidden="true">${hz() ? hzCara(thinking ? "piensa" : "calma") : "<span>M</span>"}</div><div><h1>MANU</h1><p class="subtitle">${aiReady() && aiMode().on ? "Gemini integrado · conversación" : `Tu asistente · ${aiReady() ? "IA disponible, siempre con tu confirmación" : '<button class="link small" data-act="gemini-guide">activar IA</button>'}`}</p></div></div>${hz() && !refuge ? hzModos() : ""}
+    return `<div class="manu-head${empty ? " big" : ""}"><div class="orb${hz() ? " hz-orb" : ""}${thinking ? " thinking" : ""}" id="orb" aria-hidden="true">${hz() ? hzCara(thinking ? "piensa" : "calma") : skin() === "mp" ? mpLogo("MANU") : "<span>M</span>"}</div><div><h1>MANU</h1><p class="subtitle">${aiReady() && aiMode().on ? "Gemini integrado · conversación" : `Tu asistente · ${aiReady() ? "IA disponible, siempre con tu confirmación" : '<button class="link small" data-act="gemini-guide">activar IA</button>'}`}</p></div></div>${hz() && !refuge ? hzModos() : ""}
       ${refuge ? `<div class="refuge-bar"><span>Refugio · no se guarda</span><button class="link" data-act="leave-refuge">Salir</button></div>` : ""}
       ${aiReady() && !aiMode().on && !refuge ? `<section class="card ai-offer"><b>💬 ¿Hablamos como con Gemini?</b><p class="muted small">MANU conversa contigo, sabe lo que elijas de tu vida y gestiona tus cosas. Lo que escribas irá a Google.</p><div class="btns"><button class="btn" data-act="ai-mode" data-v="full">Activar con todo</button><button class="btn ghost" data-act="ai-mode" data-v="basic">Solo lo básico</button></div><button class="link small" data-sub-go="ia">Elegir qué sabe</button></section>` : ""}
       ${refuge ? "" : mailCards()}
@@ -1726,7 +1736,7 @@ const screens = {
     const habitsDone = vault.habits.filter((h) => (h.done ?? []).includes(t)).length;
     const hs = healthSummary(vault.health);
     const item = (key, icon, color, title, detail) => `<button class="item" data-sub="${key}"><span class="ico ${color}">${I[icon]}</span><span class="grow"><span>${title}</span><br><span class="muted small">${esc(detail)}</span></span><span class="chev">${I.chev}</span></button>`;
-    return `<div class="row"><div class="avatar" aria-hidden="true">M</div><div class="grow"><h1>Manu</h1><p class="muted">${esc(longDate())}</p></div></div>
+    return `<div class="row">${skin() === "mp" ? mpAvatar() : '<div class="avatar" aria-hidden="true">M</div>'}<div class="grow"><h1>Manu</h1><p class="muted">${esc(longDate())}</p></div></div>
       ${findCard()}
       ${setupCard()}
       ${hz() ? hzBitacora(hzRetrato(brain(), { ahora: new Date() })) : ""}
@@ -3594,12 +3604,18 @@ function hzProyecto(fn, msg, clearInput = false) {
   if (clearInput) $("hzPieza")?.focus();
   if (msg) toast(msg);
 }
+// WEB-119: las instalaciones anteriores conservan su tema; se les ofrece «mp.» una vez, sin cambiarlo solas.
+function mpOfferCard() {
+  if (vault.settings.skin || deviceSkin === "mp" || vault.settings.mpOffer) return "";
+  return `<section class="card mp-offer"><h2>Nuevo aspecto: mp.</h2><p class="muted small">La identidad de tu marca personal en MANU: blanco, negro y azul. Puedes volver al de ahora cuando quieras en Tú → Apariencia; tus datos no cambian.</p><div class="btns"><button class="btn" data-act="hz-skin" data-v="mp">Probar mp.</button><button class="btn ghost" data-act="hz-mp-no">Ahora no</button></div></section>`;
+}
 function hzAct(a) {
   const d = a.dataset;
   switch (d.act) {
     case "hz-skin":
       if (!SKINS[d.v]) return;
-      vault.settings.skin = d.v; persist(); render(); toast(d.v === "horizonte" ? "Horizonte activado." : "Tema Clásico activado."); return;
+      vault.settings.skin = d.v; persist(); render(); toast(`Tema ${SKINS[d.v]} activado. Tus datos no cambian.`); return;
+    case "hz-mp-no": vault.settings.mpOffer = "no"; persist(); render(); toast("Vale. Lo tienes en Tú → Apariencia."); return;
     case "hz-dial-ahora": hzUi.minutos = null; render(); return;
     case "hz-manu": hzUi.manu = d.v === "cielo" ? "cielo" : "hablar"; memUi.open = null; memUi.correcting = null; render(); return;
     case "hz-estrella":

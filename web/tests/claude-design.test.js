@@ -11,7 +11,7 @@ test("Original Claude Design is default, old choices remain accessible", () => {
   assert.equal(skinOf({ skin: "design" }), "design");
   assert.equal(skinOf({ skin: "clasico" }), "clasico");
   assert.equal(skinOf({ skin: "horizonte" }), "horizonte");
-  assert.deepEqual(Object.keys(SKINS), ["design", "clasico", "horizonte"]);
+  assert.deepEqual(Object.keys(SKINS), ["mp", "design", "clasico", "horizonte"], "WEB-119 añade mp. sin quitar ninguno");
 });
 
 test("Appearance exposes 3 real themes with explicit controls, no fake data", () => {
@@ -43,6 +43,6 @@ test("PWA loads and precaches design skin without removing existing bank modules
   assert.match(sw, /design\/horizonte\.css/);
   assert.match(sw, /const VERSION = "manuos-v\d+"/); // el número exacto lo vigila sw-shell.test.js
   assert.match(app, /APP_VERSION = "\d+"/);
-  assert.match(app, /const skin = \(\) => skinOf\(vault\.settings\)/);
+  assert.match(app, /const skin = \(\) => skinOf\(vault\.settings, deviceSkin\)/);
   assert.match(app, /bankAisImport/);
 });
