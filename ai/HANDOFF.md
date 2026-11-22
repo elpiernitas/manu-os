@@ -1,5 +1,28 @@
 # HANDOFF
 
+## WEB-120 · Segundo cerebro: capturar una vez, relacionar y Momentos (Claude, 2026-11-22)
+
+Detalle en `docs/SEGUNDO_CEREBRO.md`.
+
+**Hecho:**
+- La misma idea o el mismo enlace ya no se duplican: se junta con lo que había y se guarda la fecha y el texto nuevo.
+- Conexiones en Hoy, como propuestas con su porqué y fuera del horario de trabajo:
+  - algo guardado con fecha → Agenda;
+  - una idea repetida tres veces → proyecto;
+  - un documento que vence → recordatorio.
+- Momentos en Tú: frase, foto, personas, lugar y fecha. Solo en el dispositivo y en la copia cifrada; no suben a Tu nube.
+- Versión 120.
+
+**Pruebas:**
+- `npm test`: 489 de 489.
+- `relaciones.e2e`: 29 de 29.
+- Resto de suites sin regresión.
+
+**NO_VERIFICADO:**
+- Safari real.
+- Elegir una foto desde la fototeca del iPhone.
+- La detección de fechas con textos reales de Manu.
+
 ## WEB-119 · Tema «mp.» con la identidad de Manu Pernas (Claude, 2026-11-22)
 
 Misión maestra, fase 2. Detalle en `docs/design/MP_THEME.md`.

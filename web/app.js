@@ -78,11 +78,13 @@ import { observeFiling, observeMisfile } from "./core/topics.js";
 import { removeJoke } from "./core/voice.js";
 import { memoriaPage, hoyMemCard, claimDetail } from "./core/memview.js";
 import { mpLogo, mpAvatar } from "./design/mp-brand.js";
+import { findRepeat, addRepeat, timesSaved, whenIn, conexiones } from "./core/relate.js";
+import { newMoment, byMonth as momentsByMonth, onThisDay, searchMoments } from "./core/moments.js";
 import { SKINS, skinOf, cielo as hzCielo, variables as hzVars, tiempoDe, portada as hzPortadaData, mareas as hzMareasData, constelacion as hzConsData, retrato as hzRetrato, barco as hzBarco, addPieza, marcarPieza, quitarPieza, botar as hzBotarP, varar as hzVarar } from "./core/horizonte.js";
 import { hzCara, hzPortada, hzBotella, hzMareas, hzConstelacion, hzAstillero, hzBarcoCarta, hzBotadura, hzBitacora, hzApariencia } from "./design/horizonte.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "119"; // = número de la última tarea WEB publicada (desde WEB-87)
+export const APP_VERSION = "120"; // = número de la última tarea WEB publicada (desde WEB-87)
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -774,7 +776,8 @@ function findEverywhere(q, limit = 30) {
   const docs = archive.docs ?? [];
   const arch = docs.length ? archiveSearch(docs, q, { limit: 8 }).map((r) => ({ kind: r.doc.source === "diario" ? "Diario" : "Archivo", icon: r.doc.source === "diario" ? "📔" : r.doc.source === "manu" ? "💬" : "🗂️", title: r.doc.title, detail: r.snippet, at: new Date(r.doc.at).toISOString(), go: { sub: "archivo" } })) : [];
   const cerb = cerebroBuscar(cerEntries(), q).slice(0, 8).map((e) => ({ kind: "Cerebro", icon: "🧠", title: e.titulo, detail: `Cerebro · ${CEREBRO_RAMAS[e.rama]?.label ?? e.rama} · ${CEREBRO_ORIGENES[e.origen] ?? e.origen}`, at: e.creado, go: { sub: "cerebro" } }));
-  return [...local, ...cerb, ...arch].slice(0, limit);
+  const mom = searchMoments(vault.moments ?? [], q, vault.people ?? []).slice(0, 8).map((m) => ({ kind: "Momento", icon: "📷", title: m.text || "Foto", detail: `Momento · ${m.day}${m.place ? ` · ${m.place}` : ""}`, go: { sub: "momentos" } }));
+  return [...local, ...mom, ...cerb, ...arch].slice(0, limit);
 }
 function findCard() {
   const res = findQ ? findEverywhere(findQ) : [];
@@ -1600,6 +1603,7 @@ const screens = {
       ${morningLaunch ? `<section class="card morning-hello"><h2>☀️ ${esc(greeting())}, Manu</h2><p class="muted small">Toca y te leo el día en voz alta.</p><div class="btns"><button class="btn" data-act="speak-day">🔊 Léemelo</button><button class="link small" data-act="morning-dismiss">Ahora no</button></div></section>` : ""}
       ${controlCard()}
       ${mpOfferCard()}
+      ${conexionesCard()}
       ${gentleCard()}
       ${vault.brain || vault.spending.length ? (hz() ? hzBotella : hoyMemCard)(topProposal(brain(), { spending: vault.spending, projects: vault.projects, now: new Date() })) : ""}
       <button class="cmdk-pill glass" data-act="cmdk" aria-label="Comando rápido">⚡ <span>Haz algo rápido…</span></button>
@@ -1646,7 +1650,7 @@ const screens = {
       ${sectionTitle("Tareas", addLink("TASK"))}
       <section class="card">${open.length ? (showAll.tasks ? open : open.slice(0, LIST_STEP)).map(taskRow).join("") + moreButton("tasks", open.length) : '<p class="muted">Sin tareas pendientes.</p>'}${done.length ? `<details><summary>Hechas (${done.length})</summary>${done.map(taskRow).join("")}</details>` : ""}</section>
       ${sectionTitle("Ideas", addLink("IDEA"))}
-      <section class="card">${idea.length ? (showAll.ideas ? idea : idea.slice(0, LIST_STEP)).map((i) => `<div class="row"><span class="grow">${esc(i.text)}</span>${attach(i)}<button class="link small" data-act="idea-to-task" data-id="${esc(i.id)}">Hacer tarea</button></div>`).join("") + moreButton("ideas", idea.length) : '<p class="muted">Tus ideas quedan aquí, sin convertirse en proyectos sin tu permiso.</p>'}</section>`;
+      <section class="card">${idea.length ? (showAll.ideas ? idea : idea.slice(0, LIST_STEP)).map((i) => `<div class="row"><span class="grow">${esc(i.text)}${i.repeats?.length ? ` <span class="chip" title="Guardada ${timesSaved(i)} veces">×${timesSaved(i)}</span>` : ""}${i.notes?.length ? `<br><span class="muted small">También: ${esc(i.notes.at(-1))}</span>` : ""}</span>${attach(i)}<button class="link small" data-act="idea-to-task" data-id="${esc(i.id)}">Hacer tarea</button></div>`).join("") + moreButton("ideas", idea.length) : '<p class="muted">Tus ideas quedan aquí, sin convertirse en proyectos sin tu permiso.</p>'}</section>`;
   },
   manu() {
     const chips = refuge ? ["quiero entender por qué", "buscar una solución", "necesito desconectar"] : null;
@@ -1759,6 +1763,7 @@ const screens = {
         ${item("rutinas", "repeat", "blue", "Rutinas de trabajo", (vault.routines ?? []).filter((r) => r.on).length ? `${(vault.routines ?? []).filter((r) => r.on).length} activas · se apuntan solas el día que tocan` : "Tareas que se repiten cada semana o cada mes")}
         ${item("tablero", "box", "orange", "Tablero RK", boardOn() ? (boardCache()?.feed ? `${boardSummary(boardCache().feed, today()).count} tarjetas activas · leído ${boardReadLabel(boardCache().readAt, today())}` : "Conectado, sin leer aún") : "Ver tu Tablero de marketing (solo lectura)")}
         ${item("biblioteca", "leaf", "teal", "Biblioteca · Guardar en MANU", vault.library?.length ? `${vault.library.length} cosas guardadas${vault.library.some((x) => x.needsReview) ? ` · ${vault.library.filter((x) => x.needsReview).length} por revisar` : ""}` : "Enlaces, vídeos, PDF, notas e ideas, con búsqueda")}
+        ${item("momentos", "shots", "orange", "Momentos", (vault.moments ?? []).length ? `${vault.moments.length} guardados` : "Recuerdos de días normales, con foto si quieres")}
         ${item("personas", "people", "purple", "Personas", vault.people.length ? `${vault.people.length} personas` : "Cumpleaños y detalles")}
         <button class="item" data-act="refuge"><span class="ico teal">${I.leaf}</span><span class="grow"><span>Refugio</span><br><span class="muted small">Para cuando no estás bien</span></span><span class="chev">${I.chev}</span></button>
       </div>
@@ -2009,6 +2014,28 @@ const subpages = {
         ${fav.length ? `<div class="suggest">${fav.map((f) => `<button type="button" data-act="meal-fav" data-text="${esc(f)}">${esc(f)}</button>`).join("")}</div>` : ""}</form>
       ${sectionTitle("Hoy")}
       <section class="card">${todays.length ? todays.map((m) => `<div class="row"><div class="grow"><div>${esc(m.text)}</div><div class="muted small">${esc(m.slot)} · ${esc(m.time)}</div></div><button class="link small" data-act="del" data-list="meals" data-id="${esc(m.id)}">Quitar</button></div>`).join("") : '<p class="muted">Aún nada hoy.</p>'}</section>`;
+  },
+  momentos() {
+    const list = vault.moments ?? [];
+    const ui = momentUi;
+    const people = vault.people ?? [];
+    const back = onThisDay(list, new Date());
+    const nameOf = new Map(people.map((p) => [p.id, p.name]));
+    const card = (m) => { const ev = eventsFor(m.day); return `<div class="row moment"><span class="grow"><b>${esc(new Date(`${m.day}T12:00:00`).toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" }))}</b>${m.place ? ` · ${esc(m.place)}` : ""}${m.text ? `<br>${esc(m.text)}` : ""}${m.people?.length ? `<br><span class="muted small">Con ${esc(m.people.map((id) => nameOf.get(id) ?? "alguien que ya no está en Personas").join(", "))}</span>` : ""}${ev.length ? `<br><span class="muted small">Ese día en tu agenda: ${esc(ev.slice(0, 3).map((x) => x.title).join(" · "))}</span>` : ""}</span>${attach(m)}<button class="link small" data-act="moment-del" data-id="${esc(m.id)}" aria-label="Borrar este momento">Borrar</button></div>`; };
+    return `${backBar("Momentos")}<p class="subtitle">Días normales que quieres recordar. Una frase basta.</p>
+      <section class="card"><h2>Guardar un momento</h2><form id="momentForm" class="stack">
+        <label for="momentText" class="muted small">Qué pasó (una frase)</label><textarea id="momentText" rows="2" maxlength="500" placeholder="Café al sol antes del trabajo">${esc(ui.text)}</textarea>
+        <div class="row"><label for="momentDay" class="muted small">Cuándo</label><input id="momentDay" type="date" value="${esc(ui.day || localDay())}" max="${esc(localDay())}"></div>
+        <label for="momentPlace" class="muted small">Dónde (opcional)</label><input id="momentPlace" maxlength="80" value="${esc(ui.place)}" autocomplete="off">
+        ${people.length ? `<fieldset class="stack"><legend class="muted small">Con quién (opcional)</legend><div class="btns">${people.slice(0, 40).map((p) => `<button type="button" class="chip" data-act="moment-person" data-id="${esc(p.id)}" aria-pressed="${ui.people.includes(p.id)}">${esc(p.name)}</button>`).join("")}</div></fieldset>` : ""}
+        <div class="btns"><label class="btn ghost" for="momentImage" role="button" tabindex="0">${ui.image ? "Cambiar foto" : "Elegir una foto (opcional)"}</label><input id="momentImage" type="file" accept="image/*" class="sr"></div>
+        ${ui.image ? `<img class="moment-preview" src="${esc(ui.image)}" alt="Foto elegida">` : ""}
+        <p class="muted small">La foto se queda en este iPhone (y en tu copia completa cifrada). Los momentos no suben a Tu nube ni a ninguna IA. Al guardarla, MANU quita la ubicación y los datos de la cámara.</p>
+        <button class="btn" type="submit">Guardar momento</button></form></section>
+      ${back.length ? `<section class="card"><h2>Tal día como hoy</h2>${back.map(card).join("")}</section>` : ""}
+      ${list.length ? `<form id="momentFind" class="composer-inline" role="search"><label for="momentQ" class="sr">Buscar en momentos</label><input id="momentQ" type="search" placeholder="Buscar: playa, un nombre, un sitio…" value="${esc(ui.q)}"><button class="btn ghost" type="submit">Buscar</button></form>` : ""}
+      ${ui.q ? `<section class="card"><h2>Resultados</h2>${searchMoments(list, ui.q, people).map(card).join("") || '<p class="muted">Nada con esas palabras.</p>'}</section>`
+        : momentsByMonth(list).map((g) => `${sectionTitle(cap(g.label))}<section class="card">${g.items.map(card).join("")}</section>`).join("") || '<section class="card"><p class="muted">Aún no hay momentos. El primero puede ser de hoy.</p></section>'}`;
   },
   personas() {
     const soon = upcomingBirthdays(vault.people, today(), 30);
@@ -2680,7 +2707,7 @@ También puedes buscar en Tú → 🔎.` });
     }
     converse(clean); return;
   }
-  let action = null;
+  let action = null, repeatedIdea = null;
   // WEB-51: «ayer gasté…» goes on that day (at midday, the hour is unknown).
   const onDay = (d) => (d ? new Date(`${d}T12:00:00`).toISOString() : at);
   if (intent.kind === "expense") vault.spending.push(newEntry({ id: uid("s"), cents: intent.cents, merchant: intent.merchant, at: onDay(intent.day) }, vault.settings.categoryRules ?? {}));
@@ -2688,7 +2715,12 @@ También puedes buscar en Tú → 🔎.` });
   if (intent.kind === "income") vault.income = [...(vault.income ?? []), { id: uid("n"), cents: intent.cents, concept: intent.concept ?? "Ingreso", at: onDay(intent.day), source: "MANU" }];
   if (intent.kind === "health") { const t = localDay(); vault.health = [...vault.health.filter((x) => !(x.day === t && x.kind === intent.metric)), { day: t, kind: intent.metric, value: intent.value }]; }
   if (intent.kind === "mood") vault.moods = setMood(vault.moods, localDay(), intent.value);
-  if (intent.kind === "idea") vault.inbox.push(capture({ id: uid("c"), text: intent.text, at }));
+  if (intent.kind === "idea") {
+    // WEB-120: si ya tenía esa idea, se junta en vez de abrir otra en la bandeja.
+    const pool = vault.inbox.filter((i) => i.status === "IDEA" && !i.done).map((i) => ({ id: i.id, text: i.text, url: i.url }));
+    if (findRepeat({ text: intent.text }, pool)) repeatedIdea = saveIdea(intent.text, at).msg;
+    else vault.inbox.push(capture({ id: uid("c"), text: intent.text, at }));
+  }
   if (intent.kind === "task") vault.inbox.push({ ...capture({ id: uid("c"), text: intent.text.slice(0, 140), at }), status: "TASK", ...workTag() });
   if (intent.kind === "alarm") action = { label: `Poner en el iPhone · ${intent.time}`, href: shortcutUrl(SHORTCUT_ALARM, intent.time) };
   if (intent.kind === "reminder") {
@@ -2719,7 +2751,7 @@ También puedes buscar en Tú → 🔎.` });
     vault.chat.push({ from: "me", text: clean, at }, { from: "manu", text: "Eso no lo sé hacer yo solo. ¿Se lo pregunto a Gemini?", at, proposal });
     persist(); render(); return;
   }
-  vault.chat.push({ from: "me", text: clean, at }, { from: "manu", text: localAnswer(intent) ?? reply(intent, variant++), at, ...(action ? { action } : {}) });
+  vault.chat.push({ from: "me", text: clean, at }, { from: "manu", text: repeatedIdea ? `${repeatedIdea}. No abro otra igual.` : localAnswer(intent) ?? reply(intent, variant++), at, ...(action ? { action } : {}) });
   persist();
   render();
 }
@@ -2888,6 +2920,7 @@ function undoCall(c) {
   if (!c?.undo) return;
   const u = c.undo;
   if (u.list === "inbox" && u.completed) vault.inbox = vault.inbox.map((i) => (i.id === u.id ? { ...i, done: false } : i));
+  else if (u.repeat) vault.inbox = vault.inbox.map((i) => (i.id === u.id ? { ...i, repeats: (i.repeats ?? []).slice(0, -1), ...(u.note ? { notes: (i.notes ?? []).filter((n) => n !== u.note) } : {}) } : i)); // WEB-120: deshacer la repetición, no la idea
   else if (u.list) vault[u.list] = (vault[u.list] ?? []).filter((x) => x.id !== u.id);
   c.state = "undone"; delete c.undo;
   persist(); render(); toast("Deshecho");
@@ -3064,7 +3097,7 @@ function runCall(c, { quiet = false } = {}) {
   const say = (t) => { if (!quiet) toast(t); };
   switch (c.name) {
     case "anadir_tarea": { const id = uid("c"); vault.inbox.push({ ...capture({ id, text: c.texto, at }), status: "TASK", ...workTag(), ...shared(c) }); c.undo = { list: "inbox", id }; say("Tarea añadida"); break; }
-    case "anadir_idea": { const id = uid("c"); vault.inbox.push({ ...capture({ id, text: c.texto, at }), status: "IDEA", ...shared(c) }); c.undo = { list: "inbox", id }; say("Idea guardada"); break; }
+    case "anadir_idea": { const r = saveIdea(c.texto, at, shared(c)); c.undo = r.repeated ? { repeat: true, id: r.id, note: r.note } : { list: "inbox", id: r.id }; say(r.msg); break; }
     case "completar_tarea": {
       const q = normalise(c.texto);
       const t = tasks(vault.inbox).find((x) => !x.done && normalise(x.text).includes(q)) ?? tasks(vault.inbox).find((x) => !x.done && q.includes(normalise(x.text)));
@@ -3604,6 +3637,64 @@ function hzProyecto(fn, msg, clearInput = false) {
   if (clearInput) $("hzPieza")?.focus();
   if (msg) toast(msg);
 }
+// ---------- WEB-120: capturar una vez y relacionar ----------
+let momentUi = { text: "", day: "", place: "", people: [], image: null, q: "" };
+async function momentSave() {
+  momentUi = { ...momentUi, text: $("momentText").value, day: $("momentDay").value, place: $("momentPlace").value };
+  let imageId = null;
+  if (momentUi.image) { imageId = uid("img"); try { await putImage(imageId, momentUi.image); imageCache.set(imageId, momentUi.image); } catch { toast("No he podido guardar la foto en este iPhone"); return; } }
+  let m;
+  try { m = newMoment({ id: uid("mo"), day: momentUi.day, text: momentUi.text, place: momentUi.place, people: momentUi.people, imageId }, new Date()); }
+  catch (err) { if (imageId) deleteImage(imageId).catch(() => {}); toast(err.message); return; }
+  vault.moments = [...(vault.moments ?? []), m];
+  momentUi = { text: "", day: "", place: "", people: [], image: null, q: "" };
+  persist(); render(); toast("Momento guardado");
+}
+// Guardar una idea: si ya existe (mismas o casi las mismas palabras, o el mismo enlace) se apunta
+// la repetición en la que ya había, con el texto nuevo como nota si cambia. Nada se borra.
+function saveIdea(text, at, extra = {}) {
+  const pool = vault.inbox.filter((i) => i.status === "IDEA" && !i.done).map((i) => ({ id: i.id, text: i.text, url: i.url }));
+  const r = findRepeat({ text, url: extra.url ?? null }, pool);
+  if (r) {
+    const old = vault.inbox.find((i) => i.id === r.id);
+    const note = normalise(old.text) === normalise(text) ? null : String(text).slice(0, 400);
+    vault.inbox = vault.inbox.map((i) => (i.id === r.id ? addRepeat(i, at, { note }) : i));
+    const n = timesSaved(vault.inbox.find((i) => i.id === r.id));
+    return { id: r.id, repeated: n, note, msg: `Ya la tenías: la junto con la que guardaste (${n} veces)` };
+  }
+  const id = uid("c");
+  vault.inbox.push({ ...capture({ id, text, at }), status: "IDEA", ...extra });
+  const w = whenIn(text, new Date());
+  return { id, repeated: 0, msg: w ? `Idea guardada. Parece que tiene fecha (${w.label}): te lo propongo en Hoy` : "Idea guardada" };
+}
+const relDismissed = () => vault.settings.relDismissed ?? [];
+function conexionesCard() {
+  if (fr().key === "WORK") return ""; // WEB-115: en horario de trabajo, solo lo de trabajo
+  const list = conexiones(vault, new Date(), { dismissed: relDismissed(), max: 3 });
+  if (!list.length) return "";
+  const row = (c) => `<div class="stack rel-item"><div><b>${c.kind === "proyecto" ? "📁" : "🗓️"} ${esc(c.title)}</b><p class="muted small">${c.kind === "agenda" ? `Propuesta: recordatorio el ${esc(c.label)}. ` : ""}${esc(c.why)}</p></div>
+    <div class="btns"><button class="btn" data-act="rel-ok" data-k="${esc(c.key)}">${c.kind === "proyecto" ? "Crear proyecto" : "Pasar a Agenda"}</button><button class="btn ghost" data-act="rel-no" data-k="${esc(c.key)}">No, gracias</button></div></div>`;
+  return `<section class="card rel-card"><h2>Conexiones</h2><p class="muted small">Lo que has guardado y podría ir a otro sitio. Son propuestas: no hago nada sin tu toque.</p>${list.map(row).join("")}</section>`;
+}
+async function relAct(a) {
+  const key = a.dataset.k;
+  if (a.dataset.act === "rel-no") { vault.settings.relDismissed = [...relDismissed(), key].slice(-300); persist(); render(); toast("Vale, no te lo vuelvo a proponer"); return; }
+  const c = conexiones(vault, new Date(), { dismissed: relDismissed(), max: 50 }).find((x) => x.key === key);
+  if (!c) { render(); return; }
+  if (c.kind === "agenda") {
+    const id = uid("r");
+    vault.reminders.push({ id, text: c.title.slice(0, 140), at: c.at, done: false, notified: false, from: c.source });
+    persist(); render(); toast(`Recordatorio creado: ${c.label}. Está en Agenda`); return;
+  }
+  if (c.kind === "proyecto") {
+    try {
+      const { p } = await createProject({ name: c.title.slice(0, 40), emoji: "💡", why: "" });
+      vault.inbox = vault.inbox.map((i) => (i.id === c.source.id ? { ...i, filed: p.id } : i));
+      Object.assign(p, addSource(p, { id: uid("src"), kind: "note", title: "💡 La idea", text: vault.inbox.find((i) => i.id === c.source.id)?.text ?? c.title }));
+      persist(); openProject = p.id; tab = "proyectos"; render({ focus: true, enter: "page" }); toast("Proyecto creado con la idea dentro");
+    } catch (err) { toast(err.message); }
+  }
+}
 // WEB-119: las instalaciones anteriores conservan su tema; se les ofrece «mp.» una vez, sin cambiarlo solas.
 function mpOfferCard() {
   if (vault.settings.skin || deviceSkin === "mp" || vault.settings.mpOffer) return "";
@@ -3876,9 +3967,17 @@ document.addEventListener("click", async (e) => {
   if (a.dataset.act.startsWith("mem-")) { memAct(a); return; }
   if (a.dataset.act.startsWith("lg-") || a.dataset.act.startsWith("mv-")) { lgAct(a); return; }
   if (a.dataset.act.startsWith("hz-")) { hzAct(a); return; }
+  if (a.dataset.act === "rel-ok" || a.dataset.act === "rel-no") { relAct(a); return; }
+  if (a.dataset.act === "moment-person") { const id = a.dataset.id; momentUi = { ...momentUi, text: $("momentText")?.value ?? momentUi.text, place: $("momentPlace")?.value ?? momentUi.place, day: $("momentDay")?.value ?? momentUi.day, people: momentUi.people.includes(id) ? momentUi.people.filter((x) => x !== id) : [...momentUi.people, id] }; render(); return; }
+  if (a.dataset.act === "moment-del") { const m = (vault.moments ?? []).find((x) => x.id === a.dataset.id); if (m && window.confirm("¿Borrar este momento? Se borra también su foto de este iPhone.")) { if (m.imageId) deleteImage(m.imageId).catch(() => {}); vault.moments = vault.moments.filter((x) => x.id !== m.id); persist(); render(); toast("Momento borrado"); } return; }
   switch (a.dataset.act) {
     case "task": updateItem(id, (i) => confirm(i, "TASK")); toast("Guardada como tarea"); break;
-    case "idea": updateItem(id, (i) => confirm(i, "IDEA")); toast("Guardada como idea"); break;
+    case "idea": {
+      const pend = vault.inbox.find((i) => i.id === id);
+      const pool = vault.inbox.filter((i) => i.status === "IDEA" && !i.done && i.id !== id).map((i) => ({ id: i.id, text: i.text, url: i.url }));
+      if (pend && findRepeat({ text: pend.text, url: pend.url ?? null }, pool)) { vault.inbox = vault.inbox.filter((i) => i.id !== id); toast(saveIdea(pend.text, pend.at ?? new Date().toISOString(), pend.url ? { url: pend.url } : {}).msg); persist(); render(); break; }
+      updateItem(id, (i) => confirm(i, "IDEA")); toast("Guardada como idea"); break;
+    }
     case "idea-to-task": updateItem(id, (i) => ({ ...i, status: "TASK" })); toast("Ahora es una tarea"); break;
     case "forget": updateItem(id, markUnclassified); break;
     case "toggle": updateItem(id, toggleDone); break;
@@ -4254,7 +4353,7 @@ document.addEventListener("submit", async (e) => {
   if (f === "nubeMail") { nubeMail($("nubeEmail").value.trim()); return; }
   if (f === "bzIdea") { // WEB-91: an idea goes straight to MANU as an idea, no questions
     const text = $("bzIdeaIn").value.trim().slice(0, 280); if (!text) return;
-    vault.inbox.push({ ...capture({ id: uid("i"), text, at: new Date().toISOString() }), status: "IDEA" });
+    saveIdea(text, new Date().toISOString());
     brain().style = observeText(brain().style, text); // WEB-95: his ideas are his words too
     persist(); render(); toast("Una servilleta más en el Café"); return;
   }
@@ -4270,6 +4369,8 @@ document.addEventListener("submit", async (e) => {
   if (f === "routineForm") { try { const r = newRoutine({ id: uid("rt"), text: $("rtText").value, every: $("rtEvery").value, weekday: $("rtDay").value }); vault.routines = [...(vault.routines ?? []), r]; persist(); render(); toast(`Rutina añadida: ${routineWhen(r).toLowerCase()}`); } catch (err) { toast(err.message); } return; }
   if (f === "projWhyForm") { const p = (vault.projects ?? []).find((x) => x.id === e.target.dataset.id); if (p) { const w = $("pWhy").value.replace(/\s+/g, " ").trim().slice(0, 200); if (w) p.why = w; else delete p.why; persist(); toast("Guardado"); } return; }
   if (f === "projStepForm") { const p = (vault.projects ?? []).find((x) => x.id === e.target.dataset.id); const text = $("pStep").value.trim().slice(0, 140); if (p && text) { vault.inbox.push({ ...capture({ id: uid("c"), text: `${p.emoji ?? "📁"} ${text}`, at: new Date().toISOString() }), status: "TASK", project: p.id }); p.updatedAt = new Date().toISOString(); persist(); render(); toast("Apuntado: te lo propondré cuando toque"); } return; }
+  if (f === "momentForm") { await momentSave(); return; }
+  if (f === "momentFind") { momentUi = { ...momentUi, q: $("momentQ").value.trim().slice(0, 80) }; render(); return; }
   if (f === "projForm") {
     try {
       const { p, n } = await createProject({ name: $("projName").value, emoji: $("projEmoji").value || "📁", why: $("projWhy")?.value ?? "" });
@@ -4460,12 +4561,12 @@ document.addEventListener("submit", async (e) => {
     if (link) raw = link.rest || raw.replace(link.url, "").trim() || `Vídeo de ${PROVIDER_NAME[link.provider]}`;
     if (!raw && imageId) raw = "Captura";
     const at = new Date().toISOString();
-    const k = sheet.kind;
+    const k = sheet.kind; let ideaMsg = null;
     const d = quickDetect(raw, today());
     // Use the cleaned text MANU understood («sacar la basura», not the whole sentence).
     const text = (d.kind === k && d.text) || (k === "EXPENSE" && d.kind === "EXPENSE" ? d.merchant ?? "" : raw);
     if (k === "TASK" && text) vault.inbox.push({ ...capture({ id: uid("c"), text: text.slice(0, 140), at }), status: "TASK", ...workTag(), ...extra });
-    else if (k === "IDEA" && text) vault.inbox.push({ ...capture({ id: uid("c"), text: text.slice(0, 400), at }), status: "IDEA", ...extra });
+    else if (k === "IDEA" && text) ideaMsg = saveIdea(text.slice(0, 400), at, extra).msg;
     else if (k === "EXPENSE") {
       // WEB-52: «12.50» is 12,50 € (before, every dot was removed: 1.250 €); «1.200» is 1.200 €.
       const cents = amountCents(($("qAmount")?.value ?? "").replace(/\s|€/g, ""));
@@ -4486,7 +4587,7 @@ document.addEventListener("submit", async (e) => {
       vault.reminders.push({ id: uid("r"), text: text.slice(0, 140), at: when.toISOString(), done: false, notified: false, ...extra });
     } else { toast("Escribe algo primero"); $("qText")?.focus(); return; }
     sheet = null; persist(); render();
-    toast({ TASK: "Tarea añadida", IDEA: "Idea guardada", EXPENSE: "Gasto apuntado", REMINDER: "Recordatorio creado" }[k]);
+    toast(ideaMsg ?? { TASK: "Tarea añadida", IDEA: "Idea guardada", EXPENSE: "Gasto apuntado", REMINDER: "Recordatorio creado" }[k]);
   }
 });
 
@@ -4502,6 +4603,11 @@ document.addEventListener("change", async (e) => {
   if (e.target.id === "hzDial") { render(); $("hzDial")?.focus({ preventScroll: true }); return; }
   if (e.target.id === "chatImage" && e.target.files?.[0]) {
     try { chatImage = await compressImage(e.target.files[0]); render(); $("msg")?.focus(); } catch (err) { toast(err.message); }
+    return;
+  }
+  if (e.target.id === "momentImage" && e.target.files?.[0]) {
+    momentUi = { ...momentUi, text: $("momentText")?.value ?? momentUi.text, place: $("momentPlace")?.value ?? momentUi.place, day: $("momentDay")?.value ?? momentUi.day };
+    try { momentUi.image = await compressImage(e.target.files[0]); render(); } catch (err) { toast(err.message); }
     return;
   }
   if (e.target.id === "projImage" && e.target.files?.[0]) { await addProjectImage(e.target.files[0]); return; }
@@ -5097,6 +5203,13 @@ async function saveConfirm() {
     const fileId = uid("f");
     try { await putImage(fileId, saveUi.file.data); Object.assign(it, { fileId, fileType: saveUi.file.type, fileName: saveUi.file.name.slice(0, 120) }); }
     catch { toast("No he podido guardar el archivo en este dispositivo"); return; }
+  }
+  // WEB-120: lo mismo guardado otra vez (mismo enlace o mismo título) se junta con lo que ya había.
+  const again = !saveUi.file && findRepeat({ text: it.title, url: it.url ?? null }, (vault.library ?? []).map((x) => ({ id: x.id, text: x.title, url: x.url })), { min: 0.9 });
+  if (again) {
+    vault.library = vault.library.map((x) => (x.id === again.id ? { ...addRepeat(x, it.at ?? new Date().toISOString()), ...(it.notes && !String(x.notes ?? "").includes(it.notes) ? { notes: `${x.notes ? `${x.notes}\n\n` : ""}${it.notes}`.slice(0, 4000) } : {}) } : x));
+    saveUi = { prop: null, file: null, text: "" }; libFilter = "todo"; libOpen = again.id;
+    persist(); render(); toast(`Ya lo tenías guardado (${again.why.toLowerCase()}): lo he juntado, sin duplicarlo`); return;
   }
   vault.library = [...(vault.library ?? []), it];
   // También como fuente del proyecto, para que se vea (y se pueda preguntar) desde allí.

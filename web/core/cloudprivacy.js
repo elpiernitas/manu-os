@@ -56,6 +56,9 @@ export function cloudPayload(vault) {
   // El correo leído (remitentes y asuntos) se queda en el dispositivo: se vuelve a leer de Gmail.
   // Lo que sí viaja son tus correcciones y lo que marcaste como revisado (vault.mailTriage).
   delete out.mail;
+  // WEB-120: los momentos (recuerdos con fotos y personas) son íntimos: se quedan en el dispositivo
+  // y en la copia completa cifrada; no suben a Tu nube.
+  delete out.moments;
   if (Array.isArray(out.projects)) out.projects = out.projects.map((p) => { const { chat, ...rest } = p; return rest; });
   if (!brainInCloud(vault)) { delete out.brain; return out; }
   if (out.brain) {
@@ -75,6 +78,7 @@ export function applyRemote(remote, local) {
   // Conversations never travel: this device's stay.
   out.chat = Array.isArray(local?.chat) ? local.chat : [];
   if (local?.mail) out.mail = local.mail; else delete out.mail;
+  if (Array.isArray(local?.moments)) out.moments = local.moments; else delete out.moments;
   if (Array.isArray(out.projects)) { const mine = new Map((local?.projects ?? []).map((p) => [p.id, p.chat])); out.projects = out.projects.map((p) => ({ ...p, chat: mine.get(p.id) ?? p.chat ?? [] })); }
   if (!brainInCloud(remote)) {
     if (local?.brain !== undefined) out.brain = local.brain; else delete out.brain;
