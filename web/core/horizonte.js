@@ -10,10 +10,12 @@ const DIA = 864e5;
 const RAD = Math.PI / 180;
 
 // ---------- Temas ----------
-export const SKINS = { design: "Claude Design", clasico: "Clásico", horizonte: "Horizonte" };
-/** El diseño original de Claude Design es el predeterminado.
- *  Respeta las elecciones explícitas de otros temas y nunca toca el vault. */
-export const skinOf = (settings) => (settings?.skin === "horizonte" || settings?.skin === "clasico" || settings?.skin === "design" ? settings.skin : "design");
+export const SKINS = { mp: "mp. · Manu Pernas", design: "Claude Design", clasico: "Clásico", horizonte: "Horizonte" };
+/** Tema efectivo. Una elección explícita guardada (vault.settings.skin) siempre manda.
+ *  Sin elección: el predeterminado del dispositivo (WEB-119: «mp» solo en instalaciones nuevas,
+ *  guardado fuera del vault para que Tu nube no lo lleve a otros dispositivos) o, si no hay,
+ *  Claude Design, que es lo que veían las instalaciones anteriores. Nunca toca el vault. */
+export const skinOf = (settings, deviceDefault) => (SKINS[settings?.skin] ? settings.skin : SKINS[deviceDefault] ? deviceDefault : "design");
 
 // ---------- Cielo ----------
 export const GIJON = { latitude: 43.53573, longitude: -5.66152 };

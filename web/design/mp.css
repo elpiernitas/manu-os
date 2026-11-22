@@ -1,0 +1,181 @@
+/* Tema «mp.» (WEB-119): la identidad de Manu Pernas en MANU OS.
+   Fuente: elpiernitas/manupernas-web, rama design/mp-identidad-2026-11-22
+   (docs/IDENTIDAD-VISUAL-APROBADA-2026-11-22.md). Montserrat, blanco predominante,
+   negro #0B0B0D para el texto y azul #0066FF como acento. Sin las tres diagonales y sin
+   símbolos inventados: el único logotipo es «mp.».
+   Contraste AA comprobado (e2e/mp.e2e.mjs):
+   - #0066FF solo detrás de texto blanco (4,8:1) o en el logotipo;
+   - texto azul #0057D9 (5,9:1 sobre blanco, 5,4:1 sobre #F5F5F7);
+   - texto secundario #5E6270 (6,0:1 sobre blanco, 5,5:1 sobre #F5F5F7).
+   Los estados de error, aviso y éxito conservan sus colores semánticos. */
+
+@font-face {
+  font-family: "Montserrat";
+  src: url("fonts/montserrat.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+html[data-skin="mp"] {
+  --mp-blue: #0066FF; --mp-blue-text: #0057D9; --mp-black: #0B0B0D; --mp-white: #FFFFFF; --mp-gray: #F5F5F7;
+  --bg: #FFFFFF; --surface: #F5F5F7; --surface-2: #ECECF0; --line: rgba(11,11,13,.09);
+  --text: #0B0B0D; --muted: #5E6270; --fill: #0066FF; --accent: #0057D9;
+  --danger: #C62F28; --ok: #187A4C; --warm: #A35F00;
+  --glass: rgba(255,255,255,.86); --glass-strong: rgba(255,255,255,.95);
+  --glass-edge: rgba(11,11,13,.08); --glass-hi: rgba(255,255,255,.7);
+  --ambient-1: transparent; --ambient-2: transparent;
+  --font: "Montserrat", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  --display: "Montserrat", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  --mo-bg: #FFFFFF; --mo-surface: #F5F5F7; --mo-surface-2: #ECECF0; --mo-text: #0B0B0D; --mo-text-2: #5E6270; --mo-text-3: #5E6270;
+  --mo-blue: #0066FF; --mo-blue-active: #0057D9; --mo-blue-soft: rgba(0,102,255,.08);
+  --mo-line: rgba(11,11,13,.09); --mo-line-strong: rgba(11,11,13,.16); --mo-glass: rgba(255,255,255,.9);
+  color-scheme: light;
+}
+html[data-skin="mp"] body { background: #FFFFFF; color: #0B0B0D; font-weight: 500; letter-spacing: -.005em; }
+html[data-skin="mp"] body[data-mode] { --ambient-1: transparent; --ambient-2: transparent; }
+html[data-skin="mp"] .ambient { background: #FFFFFF; }
+html[data-skin="mp"] .ambient .blob, html[data-skin="mp"] .sky { display: none; }
+
+/* Tipografía: Montserrat 800 en títulos, 700 en secciones, 600 en botones, 500 en texto.
+   Las cifras usan números tabulares para que no bailen. */
+html[data-skin="mp"] h1 { font: 800 32px/1.1 var(--display); letter-spacing: -.03em; }
+html[data-skin="mp"] h2, html[data-skin="mp"] .section-title h2 { font: 700 12px/1.25 var(--font); letter-spacing: .07em; color: var(--muted); }
+html[data-skin="mp"] .card h2 { color: var(--text); }
+html[data-skin="mp"] .subtitle, html[data-skin="mp"] .muted { color: var(--muted); }
+html[data-skin="mp"] .num, html[data-skin="mp"] .big-money, html[data-skin="mp"] .ft-temp, html[data-skin="mp"] .ft-next-time { font-variant-numeric: tabular-nums lining-nums; }
+html[data-skin="mp"] .big-money { font-weight: 700; letter-spacing: -.03em; }
+html[data-skin="mp"] .bubble, html[data-skin="mp"] .mem-sample, html[data-skin="mp"] .card p { line-height: 1.5; }
+
+/* Superficies: gris claro sin bordes ni degradados. */
+html[data-skin="mp"] .card, html[data-skin="mp"] .list { background: #F5F5F7; border: 0; border-radius: 18px; }
+html[data-skin="mp"] .hero, html[data-skin="mp"] .money-hero { background: #F5F5F7; }
+html[data-skin="mp"] .hero.scene-card { background: #F5F5F7 !important; }
+html[data-skin="mp"] .scene-card .scene, html[data-skin="mp"] .scene-night i, html[data-skin="mp"] .scene-snow i { display: none; }
+html[data-skin="mp"] .wx-emoji { filter: none; }
+html[data-skin="mp"] body[data-screen="weather"] .card { background: #F5F5F7; border-color: transparent; }
+html[data-skin="mp"] body[data-screen="weather"] .muted, html[data-skin="mp"] body[data-screen="weather"] .section-title { color: var(--muted); }
+html[data-skin="mp"] .item + .item, html[data-skin="mp"] .row + .row { border-top-color: rgba(11,11,13,.08); }
+
+/* Controles. */
+html[data-skin="mp"] .btn { background: #0066FF; color: #FFFFFF; font-weight: 600; }
+html[data-skin="mp"] .btn.ghost { background: rgba(0,102,255,.08); color: #0057D9; }
+html[data-skin="mp"] .btn.danger { background: rgba(198,47,40,.09); color: #C62F28; }
+html[data-skin="mp"] .link { color: #0057D9; font-weight: 600; }
+html[data-skin="mp"] .chip { background: rgba(0,102,255,.08); color: #0057D9; }
+html[data-skin="mp"] button.chip, html[data-skin="mp"] .cat-chip { background: #FFFFFF; border: 1px solid rgba(11,11,13,.12); color: var(--text); }
+html[data-skin="mp"] button.chip[aria-pressed="true"], html[data-skin="mp"] .cat-chip[aria-pressed="true"] { background: #0B0B0D; border-color: #0B0B0D; color: #FFFFFF; }
+html[data-skin="mp"] input[type=text], html[data-skin="mp"] input[type=search], html[data-skin="mp"] input:not([type]),
+html[data-skin="mp"] input[type=number], html[data-skin="mp"] input[type=date], html[data-skin="mp"] input[type=time],
+html[data-skin="mp"] textarea, html[data-skin="mp"] select { background: #FFFFFF; border: 1px solid rgba(11,11,13,.16); color: var(--text); }
+html[data-skin="mp"] input::placeholder, html[data-skin="mp"] textarea::placeholder { color: #6B6F7B; }
+html[data-skin="mp"] :focus-visible { outline: 2px solid #0066FF; outline-offset: 2px; }
+html[data-skin="mp"] .check { border-color: #5E6270; }
+html[data-skin="mp"] .bar, html[data-skin="mp"] .range, html[data-skin="mp"] .dots i, html[data-skin="mp"] .rank, html[data-skin="mp"] .src-n { background: rgba(11,11,13,.08); }
+html[data-skin="mp"] .segmented { background: rgba(11,11,13,.06); }
+html[data-skin="mp"] .segmented button[aria-pressed="true"] { background: #FFFFFF; color: var(--text); box-shadow: 0 1px 3px rgba(11,11,13,.12); }
+html[data-skin="mp"] .mood button, html[data-skin="mp"] .suggest button, html[data-skin="mp"] .qa-kind, html[data-skin="mp"] .qcard,
+html[data-skin="mp"] .qa-attach, html[data-skin="mp"] .stat-tile, html[data-skin="mp"] .proj-card { background: #FFFFFF; border: 1px solid rgba(11,11,13,.1); }
+html[data-skin="mp"] .card .proj-card, html[data-skin="mp"] .proj-grid .proj-card { background: #F5F5F7; border-color: transparent; }
+html[data-skin="mp"] .mood button[aria-pressed="true"] { background: #0066FF; border-color: #0066FF; color: #FFFFFF; }
+html[data-skin="mp"] .ie-col.sel, html[data-skin="mp"] .cal-day.sel { background: rgba(0,102,255,.06); }
+html[data-skin="mp"] .qa-close, html[data-skin="mp"] .composer-attach { background: rgba(11,11,13,.06); color: var(--text); }
+html[data-skin="mp"] .qa-note, html[data-skin="mp"] .mem-sample, html[data-skin="mp"] .payload, html[data-skin="mp"] pre.code { background: #FFFFFF; color: var(--text); border: 1px solid rgba(11,11,13,.08); }
+html[data-skin="mp"] .ai-call { background: #FFFFFF; border-color: rgba(11,11,13,.1); }
+html[data-skin="mp"] .thumb { background: #FFFFFF; }
+html[data-skin="mp"] .clock-events { border-left-color: rgba(11,11,13,.12); }
+html[data-skin="mp"] .city-dots button::before { background: rgba(11,11,13,.25); }
+html[data-skin="mp"] .city-dots button[aria-selected="true"]::before { background: #0066FF; }
+html[data-skin="mp"] .grabber { background: rgba(11,11,13,.22); }
+
+/* Capas flotantes: hojas, barra de comandos y avisos sobre blanco. */
+html[data-skin="mp"] .glass { background: rgba(255,255,255,.9); border-color: rgba(11,11,13,.08); box-shadow: 0 8px 30px rgba(11,11,13,.08); }
+html[data-skin="mp"] .sheet { background: #FFFFFF; color: var(--text); box-shadow: 0 -10px 40px rgba(11,11,13,.12); }
+html[data-skin="mp"] .sheet-bg { background: rgba(11,11,13,.32); }
+html[data-skin="mp"] .cmdk-bg { background: rgba(11,11,13,.36); }
+html[data-skin="mp"] .cmdk { background: #FFFFFF; box-shadow: 0 20px 60px rgba(11,11,13,.18); }
+html[data-skin="mp"] .cmdk-pill { background: #F5F5F7; border-color: transparent; box-shadow: none; color: var(--muted); }
+html[data-skin="mp"] .topbar.show { background: rgba(255,255,255,.97); color: #0B0B0D; box-shadow: 0 1px 0 rgba(11,11,13,.08); }
+html[data-skin="mp"] .banner { background: #0B0B0D; color: #FFFFFF; }
+
+/* Chat MANU. */
+html[data-skin="mp"] .bubble.manu { background: #F5F5F7; color: var(--text); }
+html[data-skin="mp"] .bubble.me { background: #0066FF; color: #FFFFFF; }
+html[data-skin="mp"] .composer { background: #FFFFFF; border: 1px solid rgba(11,11,13,.12); box-shadow: 0 6px 24px rgba(11,11,13,.08); }
+html[data-skin="mp"] .orb { background: #0B0B0D; color: #FFFFFF; box-shadow: 0 0 0 3px #FFFFFF, 0 0 0 5px #0066FF; }
+html[data-skin="mp"] .orb .mp-logo { width: 32px; }
+html[data-skin="mp"] .orb.listening { box-shadow: 0 0 0 3px #FFFFFF, 0 0 0 6px #0066FF; }
+
+/* Barra inferior: blanca, plana, el azul solo marca dónde estás. */
+html[data-skin="mp"] .tabbar {
+  position: fixed; z-index: 10; left: 0; right: 0; bottom: 0; transform: none; width: 100%;
+  height: calc(66px + env(safe-area-inset-bottom, 0px));
+  padding: 6px 6px calc(6px + env(safe-area-inset-bottom, 0px));
+  display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0;
+  border: 0; border-top: 1px solid rgba(11,11,13,.08); border-radius: 0;
+  background: rgba(255,255,255,.94); -webkit-backdrop-filter: blur(18px) saturate(140%); backdrop-filter: blur(18px) saturate(140%);
+  box-shadow: none;
+}
+html[data-skin="mp"] .tabbar .tab-pill { display: none; }
+html[data-skin="mp"] .tab { color: #5E6270; border-radius: 10px; font-weight: 600; }
+html[data-skin="mp"] .tab[aria-selected="true"] { color: #0057D9; background: rgba(0,102,255,.07); }
+html[data-skin="mp"] .tab[data-tab="manu"] { color: #0B0B0D; }
+html[data-skin="mp"] .tab .dot, html[data-skin="mp"] .tab[data-fable="true"] .dot.fable-brand { background: #0B0B0D; color: #FFFFFF; border-radius: 50%; box-shadow: 0 0 0 2px #FFFFFF, 0 0 0 3.5px #0066FF; }
+html[data-skin="mp"] .tab[data-tab="manu"][aria-selected="true"] { color: #0057D9; }
+html[data-skin="mp"] .tab[data-fable="true"][aria-selected="true"] > svg { color: #0057D9; }
+html[data-skin="mp"] .fab { right: 14px; bottom: calc(78px + env(safe-area-inset-bottom, 0px)); width: 52px; height: 52px; border-radius: 16px; background: #0066FF; color: #FFFFFF; }
+html[data-skin="mp"] .app { padding-bottom: calc(146px + env(safe-area-inset-bottom, 0px)); }
+html[data-skin="mp"] .chat-down { background: #FFFFFF; color: var(--text); }
+
+/* Hoy (fable-today.css usaba grises pensados para fondo negro). */
+html[data-skin="mp"] .fable-hoy { --ft-white: #0B0B0D; --ft-blue: #0057D9; }
+html[data-skin="mp"] .ft-kicker, html[data-skin="mp"] .ft-more, html[data-skin="mp"] .ft-subline,
+html[data-skin="mp"] .ft-weather-info > span, html[data-skin="mp"] .ft-weather-info small, html[data-skin="mp"] .ft-weather-empty,
+html[data-skin="mp"] .ft-weather-placeholder, html[data-skin="mp"] .ft-next-arrow, html[data-skin="mp"] .ft-next-empty .ft-next-title,
+html[data-skin="mp"] .ft-overline, html[data-skin="mp"] .ft-section-label, html[data-skin="mp"] .ft-section-label span,
+html[data-skin="mp"] .ft-briefline, html[data-skin="mp"] .ft-service-copy small, html[data-skin="mp"] .ft-service-copy .ft-service-hint { color: #5E6270; }
+html[data-skin="mp"] .ft-tag { border-color: rgba(11,11,13,.14); color: #0B0B0D; }
+html[data-skin="mp"] .ft-weather, html[data-skin="mp"] .ft-next, html[data-skin="mp"] .ft-work .now-card, html[data-skin="mp"] .ft-service { border-bottom-color: rgba(11,11,13,.09); }
+html[data-skin="mp"] .ft-services { border-top-color: rgba(11,11,13,.09); }
+html[data-skin="mp"] .ft-greeting { font-weight: 800; letter-spacing: -.035em; color: #0B0B0D; }
+html[data-skin="mp"] .ft-dot { color: #0066FF; }
+html[data-skin="mp"] .ft-service-icon { background: rgba(0,102,255,.08); color: #0057D9; border-radius: 12px; }
+html[data-skin="mp"] .ft-status-dot { border-color: rgba(11,11,13,.12); }
+html[data-skin="mp"] .ft-work .mem-hoy { background: #F5F5F7; border: 0; border-radius: 18px; }
+
+/* Firma «mp.»: la m toma el color del texto y la p. es siempre azul. No se repite en cada tarjeta. */
+.mp-logo { display: inline-block; width: 44px; height: auto; color: var(--text); vertical-align: middle; }
+.mp-logo svg { display: block; width: 100%; height: auto; }
+.mp-brand { display: flex; align-items: center; gap: 10px; margin: 4px 0 10px; }
+.mp-brand .mp-logo { width: 48px; }
+.mp-brand span { font-size: 13px; color: var(--muted); font-weight: 600; }
+/* El aro azul ya forma parte del avatar: no se añade otro. */
+.mp-avatar { width: 68px; height: 66px; flex: none; display: grid; place-items: center; margin-bottom: 8px; }
+.mp-avatar img { width: 100%; height: auto; }
+.hz-tema-mp { background: #FFFFFF; border: 1px solid rgba(11,11,13,.14); position: relative; }
+.hz-tema-mp::after { content: ""; position: absolute; right: 22%; bottom: 22%; width: 26%; height: 26%; border-radius: 50%; background: #0066FF; }
+
+@media (min-width: 900px) {
+  html[data-skin="mp"] .app { max-width: 1040px; margin: 0 0 0 236px; padding: 44px 40px 80px; }
+  html[data-skin="mp"] .tabbar { top: 0; right: auto; width: 220px; height: 100dvh; display: flex; flex-direction: column; gap: 6px; padding: 70px 12px 82px; border-top: 0; border-right: 1px solid rgba(11,11,13,.08); }
+  html[data-skin="mp"] .tab { min-height: 48px; width: 100%; display: flex; flex-direction: row; justify-content: flex-start; gap: 12px; padding: 8px 12px; font-size: 14px; border-radius: 12px; }
+  html[data-skin="mp"] .fab { left: 20px; right: auto; bottom: 20px; }
+}
+@media (max-width: 374px) {
+  html[data-skin="mp"] h1 { font-size: 28px; }
+  html[data-skin="mp"] .tab { font-size: 9px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-skin="mp"] .btn, html[data-skin="mp"] .tab svg { transition: none; }
+}
+
+/* Ajustes de contraste detectados por e2e/mp.e2e.mjs (texto blanco sobre iconos y estados). */
+html[data-skin="mp"] .ico.orange { background: #A35F00; }
+html[data-skin="mp"] .ico.green { background: #187A4C; }
+html[data-skin="mp"] .ico.blue { background: #0066FF; }
+html[data-skin="mp"] .cal-day.sel .num-d { background: #0066FF; }
+html[data-skin="mp"] .cal-day.today.sel .num-d { background: #C62F28; }
+html[data-skin="mp"] .cap-state { background: #FFFFFF; }
+html[data-skin="mp"] .orb .mp-logo { color: #FFFFFF; width: 34px; }
+html[data-skin="mp"] .tab[data-tab="manu"] .dot { width: 34px; height: 34px; margin-bottom: 2px; }

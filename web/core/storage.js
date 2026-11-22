@@ -70,7 +70,7 @@ export class LocalStore {
   load() {
     let raw = null;
     try { raw = this.backend.getItem(this.key); } catch { return { vault: emptyVault(), warning: "No se puede leer el almacenamiento." }; }
-    if (!raw) return { vault: emptyVault(), warning: null };
+    if (!raw) return { vault: emptyVault(), warning: null, fresh: true };
     try {
       const result = validateVault(JSON.parse(raw));
       if (result.ok) return { vault: result.vault, warning: null };
