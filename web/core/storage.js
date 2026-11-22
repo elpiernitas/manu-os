@@ -4,10 +4,10 @@ import { validateBrain } from "./brain.js";
 
 export const SCHEMA_VERSION = 1;
 
-const OPTIONAL_LISTS = ["reminders", "habits", "people", "meals", "health", "moods", "income", "projects", "places", "captures", "clock", "docs", "library", "reviews", "moments"];
+const OPTIONAL_LISTS = ["reminders", "habits", "people", "meals", "health", "moods", "income", "projects", "places", "captures", "clock", "docs", "library", "reviews", "moments", "interests"];
 
 export function emptyVault() {
-  return { schema: SCHEMA_VERSION, inbox: [], spending: [], chat: [], settings: {}, income: [], projects: [], reminders: [], habits: [], people: [], meals: [], health: [], moods: [], places: [], captures: [], clock: [], docs: [], library: [], reviews: [], moments: [] };
+  return { schema: SCHEMA_VERSION, inbox: [], spending: [], chat: [], settings: {}, income: [], projects: [], reminders: [], habits: [], people: [], meals: [], health: [], moods: [], places: [], captures: [], clock: [], docs: [], library: [], reviews: [], moments: [], interests: [] };
 }
 
 // Validates a vault read from storage or from a backup file.

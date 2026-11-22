@@ -1,5 +1,31 @@
 # HANDOFF
 
+## WEB-121 · Tu semana, tiempo reservado, preparar la semana y aficiones (Claude, 2026-11-22)
+
+Detalle en `docs/SEMANA.md`.
+
+**Hecho:**
+- Agenda → Tu semana:
+  - eventos, recordatorios, ratos reservados y propuestas, cada uno con su etiqueta;
+  - avisa de choques y de semanas cargadas sin descanso;
+  - «Decir que no» prepara un texto para copiar, sin enviarlo.
+- Reservar tiempo sin compromisos. Durante ese rato, Hoy no propone nada.
+- Repaso → Preparar la semana, rápido (10 min) o completo.
+- Tú → Aficiones y aprender.
+- Biblioteca → filtro «para leer».
+- Versión 121.
+
+**Pruebas:**
+- `npm test`: 495 de 495.
+- `semana.e2e`: 22 de 22.
+- `mp.e2e`: 77 de 77.
+- Resto de suites sin regresión.
+
+**NO_VERIFICADO:**
+- Safari real.
+- Copiar al portapapeles en iOS.
+- El uso real de los ratos reservados con el calendario de Google de Manu.
+
 ## WEB-120 · Segundo cerebro: capturar una vez, relacionar y Momentos (Claude, 2026-11-22)
 
 Detalle en `docs/SEGUNDO_CEREBRO.md`.
