@@ -40,16 +40,13 @@ jobs:
 
   # Publishes web/ to GitHub Pages. Only from main, and only once Manu has
   # enabled Pages with "GitHub Actions" as the source (ADR-0012).
-  deploy:
+  # Publicar en dos trabajos (patrón de GitHub Pages): el artefacto ya está registrado cuando
+  # deploy-pages lo busca. En un solo trabajo, desde el 22-11-2026, deploy-pages no lo encontraba
+  # («No artifacts named github-pages», 3 veces seguidas) y la web se quedó en v120.
+  build:
     needs: test
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
@@ -62,5 +59,16 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
       - id: deployment
         uses: actions/deploy-pages@v4

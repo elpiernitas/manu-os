@@ -1,5 +1,16 @@
 # HANDOFF
 
+## WEB-122b · Publicación en dos pasos (Claude, 2026-11-23)
+
+**Problema:**
+- Desde el 22-11, `deploy-pages` no encontraba el artefacto recién subido (`No artifacts named "github-pages"`).
+- Ocurrió en tres ejecuciones seguidas, también al relanzar y en una ejecución manual, así que Pages se quedó en v120.
+- El código no era la causa: tests y subida correctos.
+
+**Cambio:** `web.yml` separa `build` (sube el artefacto) y `deploy` (lo publica), que es el patrón de GitHub Pages.
+
+**NO_VERIFICADO hasta que se ejecute en `main`.**
+
 ## WEB-122 · Limpieza digital, dejar listo, enlaces directos, Tú ordenado y auditoría (Claude, 2026-11-22)
 
 Auditoría completa en `docs/audits/2026-11-22-mision-maestra.md`: inventario, las 15 ideas, el cerebro verificado y la comparación PWA / Atajos / nativa.
