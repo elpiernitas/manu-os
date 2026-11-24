@@ -21,6 +21,11 @@ export const SCREENS = [
   ["tu/spotify", "Spotify", "musica altavoz"], ["tu/gcal", "Google", "cuenta google conectar"],
   ["tu/repaso", "Repaso", "semana revision noche plan"], ["tu/documentos", "Documentos", "seguros contratos polizas garantias vencimientos"],
   ["tu/biblioteca", "Biblioteca", "libros podcasts videos aprendi lecturas"],
+  ["tu/momentos", "Momentos", "fotos recuerdos tal dia como hoy"], ["tu/aficiones", "Aficiones y aprender", "aficion aprender curso guitarra"],
+  ["tu/limpieza", "Limpieza digital", "repetidos olvidados ordenar"], ["tu/dj", "DJ", "musica pinchar sesion"],
+  ["tu/cerebro", "Tu cerebro", "segundo cerebro gpt compartido"], ["tu/memoria", "Memoria", "recuerdos lo que sabe manu decisiones"],
+  ["tu/apariencia", "Apariencia", "tema oscuro claro modo noche"], ["tu/permisos", "Permisos", "conexiones privacidad"],
+  ["tu/rutinas", "Rutinas", "manana noche dejar listo"],
 ];
 
 const MOOD_WORDS = { "muy bien": 4, genial: 4, "de lujo": 4, bien: 3, regular: 2, "asi asi": 2, mal: 1, "1": 1, "2": 2, "3": 3, "4": 4 };

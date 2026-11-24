@@ -1,5 +1,59 @@
 # HANDOFF
 
+## WEB-124 · Centro de operaciones en escritorio, panel de MANU, ⌘K y mp. oscuro (Claude, 2026-11-24)
+
+Detalle en `docs/ESCRITORIO.md`.
+
+**Hecho:**
+- **Escritorio (≥ 1024 px, mp. y Claude Design):**
+  - barra lateral fija con las seis áreas, sus subpantallas y tus proyectos; se puede contraer;
+  - zona central ancha;
+  - panel de MANU a la derecha (⌘J o Ctrl+J para abrir, Esc para cerrar).
+  - En móvil no cambia nada.
+- **Panel de MANU con contexto:**
+  - separa «Lo sé» (con fuente), «Lo deduzco» (con porqué), «Te propongo» (un toque) y «Me falta»;
+  - no se inventa nada.
+  - En Tú explica qué se sincroniza y qué se queda en el dispositivo.
+- **⌘K:**
+  - pantallas nuevas;
+  - resultados de tus datos con su procedencia, sin IA;
+  - abre lo que eliges.
+- **Vistas anchas:**
+  - Agenda: la semana en 7 columnas;
+  - Dinero: dos columnas;
+  - Tú: grupos en dos columnas.
+- **mp. oscuro:**
+  - colores pasados a variables;
+  - Tú → Apariencia ofrece Claro, Oscuro o Como el sistema; por defecto, Claro;
+  - los temas anteriores siguen.
+- **Flujos A y B:**
+  - una idea suelta se propone para el proyecto con el que comparte palabras (dice cuáles; aceptar la enlaza sin duplicar);
+  - las fechas se marcan como explícitas o interpretadas, y el recordatorio guarda de dónde salió.
+- Versión 124. `shell/` en la caché sin conexión, con una prueba que lo exige.
+
+**Pruebas:**
+- `npm test`: 541 de 541.
+- `escritorio.e2e`: 161 de 161. Cubre:
+  - 1024, 1440 y 1920 en escritorio;
+  - 320, 390 y 768 en móvil;
+  - teclado, foco y Esc;
+  - movimiento reducido;
+  - contraste AA en claro, oscuro y sistema, en las seis áreas;
+  - ⌘K;
+  - el flujo A.
+- Las otras 18 suites e2e, en verde. Horizonte detectó que la app no abría sin conexión hasta añadir `shell/` al service worker.
+
+**NO_VERIFICADO:**
+- Safari y WebKit (no instalados).
+- Un Mac o un PC reales.
+- VoiceOver y NVDA.
+- La aprobación visual de Manu del escritorio y del modo oscuro.
+
+**Pendiente:**
+- Tabla de movimientos con filtros en Dinero escritorio.
+- Calendario por horas en Agenda.
+- Avatar vectorial con `currentColor`.
+
 ## WEB-123 · DJ funcionando con Spotify + panel de acciones en Hoy (Claude, 2026-11-24)
 
 Detalle en `docs/dj/DJ.md`.

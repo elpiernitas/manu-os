@@ -4,7 +4,18 @@ Status: **IN_PROGRESS**
 
 ## Tarea activa
 
-WEB-113 (sobre WEB-112): MANU como asistente real (`docs/ASISTENTE.md`, `ai/HANDOFF.md` «WEB-112»). Manu autorizó el 2026-11-16 implementar, fusionar y publicar los bloques seguros sin pedir permiso entre fases. Antes, WEB-111 (Dinero 2.0) ya está fusionado y publicado (v111).
+WEB-124 (2026-11-24), dentro de la «Operación MANU OS: segundo cerebro y centro de operaciones»:
+- escritorio con barra lateral, zona central y panel de MANU con contexto;
+- ⌘K con procedencia;
+- mp. claro y oscuro;
+- flujos A y B del segundo cerebro.
+
+Ver `docs/ESCRITORIO.md` y `ai/HANDOFF.md` («WEB-124»).
+
+Después siguen:
+- la tabla de movimientos de Dinero en escritorio;
+- el calendario por horas en Agenda;
+- la verificación en Safari real.
 
 ## Autorización
 

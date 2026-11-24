@@ -300,3 +300,12 @@ En WEB-119, `#0066FF` da 4,8:1 sobre `#FFFFFF` y solo 4,4:1 sobre `#F5F5F7`, la 
 ### QAL-062 — «Los datos no cambian» se compara después del primer guardado
 
 En WEB-119, la prueba «cambiar de tema no toca los datos» falló sin que el tema tocara nada: el primer `persist()` normaliza el vault (listas vacías por defecto) y el archivado automático (WEB-60) marca `filed` en las tareas. Regla: en una prueba de no alteración, la referencia se toma después del primer guardado de la app y se comparan los datos del usuario, no la forma. Una diferencia se diagnostica clave por clave antes de tocar el código.
+
+### QAL-063 — Una carpeta nueva de la app tiene que entrar en la caché sin conexión el mismo día
+
+En WEB-124, `shell/context.js` y `shell/shell.css` se cargaban desde `index.html` y `app.js`, pero no estaban en `SHELL` de `sw.js`. Todo funcionaba con red y la app no abría sin conexión. Lo detectó la e2e de Horizonte («sin conexión: la app abre»), no la prueba unitaria del service worker, que solo miraba `core/`. Regla: la prueba del service worker recorre lo que enlaza `index.html` y todas las carpetas de módulos (`shell/`, `dj/`, `core/`), no una lista fija de carpetas. Se comprueba que la prueba falla al quitar la línea.
+
+### QAL-064 — Reescribir CSS con expresiones regulares rompe los bloques anidados
+
+En WEB-124, el script que pasó los colores de `mp.css` a variables trataba cada `selector { … }` como plano y se comió las envolturas de `@media (max-width: 374px)` y `@media (prefers-reduced-motion)`. Las reglas quedaron sueltas y aplicadas siempre. Lo detectó una prueba unitaria que exige el bloque de movimiento reducido. Regla: tras una transformación automática de CSS se compara con el original ignorando solo las sustituciones previstas (`diff` filtrado), y cualquier otra diferencia se revisa antes de seguir.
+

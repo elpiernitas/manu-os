@@ -1,9 +1,17 @@
 # MANU OS — Project State
 
-Última actualización: 2026-11-22
+Última actualización: 2026-11-24
 
 ## Estado actual
 
+- **WEB-124 (2026-11-24): centro de operaciones en escritorio.**
+  - Barra lateral, zona central ancha y panel de MANU con «Lo sé / Lo deduzco / Te propongo / Me falta».
+  - ⌘K con procedencia.
+  - mp. claro, oscuro o como el sistema.
+  - Flujos A (idea → proyecto) y B (fecha explícita o interpretada).
+  - Ver `docs/ESCRITORIO.md`.
+  - Pendiente de Safari real y de aprobación visual de Manu.
+- **WEB-123 (2026-11-24):** el DJ con Spotify y el panel de acciones en Hoy. Pendiente de que Manu vuelva a conectar Spotify.
 - **Misión maestra (2026-11-22), WEB-119 a WEB-122:**
   - tema `mp.` de la marca de Manu: inicial en instalaciones nuevas y ofrecido en las anteriores;
   - segundo cerebro: repeticiones, Conexiones y Momentos;

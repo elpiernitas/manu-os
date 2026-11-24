@@ -1,5 +1,5 @@
 // Offline shell: every file of the app is cached.
-const VERSION = "manuos-v123";
+const VERSION = "manuos-v124";
 const SHELL = [
   "./", "index.html", "styles.css", "app.js", "manifest.webmanifest",
   "design/fable-tokens.css", "design/fable-icons.js", "design/fable-mark.svg",
@@ -8,6 +8,7 @@ const SHELL = [
   "core/text.js", "core/money.js", "core/modes.js", "core/assistant.js",
   "core/inbox.js", "core/refuge.js", "core/storage.js", "core/notify.js", "core/intake.js", "core/weather.js", "core/bank.js", "core/night.js", "core/life.js", "core/gcal.js", "core/google.js", "core/ai.js", "core/crypto.js", "core/spotify.js", "core/hub.js", "core/insights.js", "core/converse.js", "core/imagestore.js", "core/links.js", "core/projects.js", "core/scene.js", "core/gmail.js", "core/archive.js", "core/archivestore.js", "core/recall.js", "core/diary.js", "core/buzon.js", "core/backup-manager.js", "core/briefing.js", "core/budget.js", "core/find.js", "core/now.js", "core/captures.js", "core/autofile.js", "core/zipwrite.js", "core/contacts.js", "core/closing.js", "core/lowmode.js", "core/clock.js", "core/sync.js", "core/nudges.js", "core/commands.js", "core/split.js", "core/bankshot.js", "core/review.js", "core/docs.js", "core/library.js", "core/quickmoney.js",  "core/brain.js", "core/learn.js", "core/proposals.js", "core/conocernos.js", "core/voice.js", "core/memchat.js", "core/memview.js", "core/style.js", "core/topics.js", "core/capabilities.js", "core/cloudprivacy.js", "core/push.js", "core/bankcallback.js", "core/enablebanking.js", "core/bank-ais-view.js", "core/bankimport.js", "core/places.js", "core/ledger.js", "core/ledger-view.js", "core/mailtriage.js", "core/saveitem.js", "core/control.js", "core/daymode.js", "core/tablero.js", "core/routines.js", "core/cerebro.js", "core/relate.js", "core/moments.js", "core/week.js", "core/interests.js", "core/cleanup.js", "core/horizonte.js",
   "dj/brain/brain.js", "dj/brain/defaults.js", "dj/brain/events.js", "dj/brain/memory/context.js", "dj/brain/memory/explicit.js", "dj/brain/memory/playlists.js", "dj/brain/memory/session.js", "dj/brain/memory/taste.js", "dj/brain/playlistRefresh.js", "dj/brain/pools.js", "dj/brain/scoring.js", "dj/brain/signals.js", "dj/brain/similarity.js", "dj/catalog.js", "dj/controller.js", "dj/history.js", "dj/language.js", "dj/runner.js", "dj/spotify.js", "dj/store.js",
+  "shell/context.js", "shell/shell.css",
   "icons/icon-180.png", "icons/icon-192.png", "icons/icon-512.png",
 ];
 

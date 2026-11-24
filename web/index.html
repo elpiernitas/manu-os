@@ -22,6 +22,7 @@
 <link rel="stylesheet" href="design/horizonte.css">
 <link rel="stylesheet" href="design/claude-design.css">
 <link rel="stylesheet" href="design/mp.css">
+<link rel="stylesheet" href="shell/shell.css">
 <link rel="preload" href="design/fonts/fraunces-italic.woff2" as="font" type="font/woff2" crossorigin>
 <script type="module" src="app.js"></script>
 </head>
@@ -32,7 +33,13 @@
   <div class="banner" id="banner" hidden></div>
   <main id="screen" tabindex="-1"></main>
 </div>
-<nav class="tabbar glass" role="tablist" aria-label="Secciones" id="tabs"></nav>
+<aside class="sidebar" id="sidebar" aria-label="Navegación de MANU OS">
+  <div class="side-head" id="sideHead"></div>
+  <nav class="tabbar glass" role="tablist" aria-label="Secciones" id="tabs"></nav>
+  <nav class="side-sub" id="sideSub" aria-label="Dentro de esta sección"></nav>
+  <div class="side-foot" id="sideFoot"></div>
+</aside>
+<aside class="ctx-panel" id="ctxPanel" aria-label="MANU: lo que sé de lo que ves" hidden></aside>
 <button class="chat-down glass" id="chatDown" type="button" aria-label="Bajar al último mensaje" hidden>↓</button>
 <div id="sheetRoot"></div>
 <noscript><p>MANU OS necesita JavaScript activado.</p></noscript>

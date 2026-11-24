@@ -60,3 +60,41 @@ test("conexiones: proponen, explican y respetan lo descartado", () => {
   assert.ok(!conexiones(v2, now).some((x) => x.key === "agenda:i1"), "ya pasado a Agenda: no se repite");
   assert.deepEqual(conexiones({}, now), []);
 });
+
+// WEB-124 · flujo B: fecha explícita frente a interpretada, y por qué.
+test("whenIn distingue fecha explícita de interpretada y lo explica", () => {
+  const now = new Date(2026, 10, 20, 10);
+  const a = whenIn("Dentista el 3 de diciembre a las 17:30", now);
+  assert.equal(a.certainty, "explicita"); assert.match(a.how, /escrito tal cual/);
+  assert.equal(whenIn("boda 12/12/2026", now).certainty, "explicita");
+  const b = whenIn("cita mañana a las 10", now);
+  assert.equal(b.certainty, "interpretada"); assert.match(b.how, /«mañana a las 10» contado desde el 20\/11/);
+  const c = whenIn("revisión ITV 4/1", now);
+  assert.equal(c.certainty, "interpretada"); assert.match(c.how, /sin año: entiendo el de 2027/);
+  assert.equal(whenIn("el viernes", now).certainty, "interpretada");
+});
+
+test("conexiones: la propuesta de Agenda dice si la fecha es explícita o interpretada", () => {
+  const now = new Date(2026, 10, 20, 10);
+  const v = { inbox: [{ id: "a", status: "IDEA", text: "Dentista el 3 de diciembre a las 17:30", at: "x" }, { id: "b", status: "IDEA", text: "llamar mañana a las 10", at: "x" }] };
+  const [x, y] = conexiones(v, now);
+  assert.equal(x.certainty, "explicita"); assert.match(x.why, /^Fecha explícita/);
+  assert.equal(y.certainty, "interpretada"); assert.match(y.why, /^Fecha interpretada.*suposición/);
+});
+
+// WEB-124 · flujo A: idea suelta → proyecto existente, con el motivo y sin duplicar.
+test("conexiones: propone añadir una idea suelta al proyecto con el que comparte palabras, diciendo cuáles", () => {
+  const now = new Date(2026, 10, 20, 10);
+  const v = { inbox: [{ id: "i1", status: "IDEA", text: "Diseñar el logo nuevo para la marca personal", at: "x" }, { id: "i2", status: "IDEA", text: "Comprar pan", at: "x" }],
+    projects: [{ id: "p1", name: "Marca personal", emoji: "🎨", why: "web y logo" }, { id: "p2", name: "Huerto" }] };
+  const list = conexiones(v, now).filter((c) => c.kind === "al-proyecto");
+  assert.equal(list.length, 1);
+  assert.equal(list[0].projectId, "p1");
+  assert.match(list[0].why, /«logo»/); assert.match(list[0].why, /Marca personal/); assert.match(list[0].why, /suposición/);
+  // Ya archivada en un proyecto → no se vuelve a proponer.
+  v.inbox[0].filed = "p1";
+  assert.equal(conexiones(v, now).filter((c) => c.kind === "al-proyecto").length, 0);
+  // Descartada → no vuelve.
+  v.inbox[0].filed = undefined;
+  assert.equal(conexiones(v, now, { dismissed: ["al-proyecto:i1:p1"] }).filter((c) => c.kind === "al-proyecto").length, 0);
+});
