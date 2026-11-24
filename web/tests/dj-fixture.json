@@ -1,0 +1,1005 @@
+{
+ "ficticio": true,
+ "nota": "Catálogo inventado para pruebas. Ningún nombre, canción ni dato es real.",
+ "tracks": [
+  {
+   "id": "t-a-uno-1",
+   "title": "Canción 1 de Artista Uno",
+   "artistId": "a-uno",
+   "artistName": "Artista Uno",
+   "durationMs": 187000,
+   "language": "es",
+   "tags": [
+    "indie-pop",
+    "suave",
+    "nocturno"
+   ],
+   "popularity": 0.82
+  },
+  {
+   "id": "t-a-uno-2",
+   "title": "Canción 2 de Artista Uno",
+   "artistId": "a-uno",
+   "artistName": "Artista Uno",
+   "durationMs": 194000,
+   "language": "es",
+   "tags": [
+    "indie-pop",
+    "suave",
+    "nocturno"
+   ],
+   "popularity": 0.64
+  },
+  {
+   "id": "t-a-uno-3",
+   "title": "Canción 3 de Artista Uno",
+   "artistId": "a-uno",
+   "artistName": "Artista Uno",
+   "durationMs": 201000,
+   "language": "es",
+   "tags": [
+    "indie-pop",
+    "suave",
+    "nocturno"
+   ],
+   "popularity": 0.46
+  },
+  {
+   "id": "t-a-uno-4",
+   "title": "Canción 4 de Artista Uno",
+   "artistId": "a-uno",
+   "artistName": "Artista Uno",
+   "durationMs": 208000,
+   "language": "es",
+   "tags": [
+    "indie-pop",
+    "suave",
+    "nocturno"
+   ],
+   "popularity": 0.28
+  },
+  {
+   "id": "t-a-uno-5",
+   "title": "Canción 5 de Artista Uno",
+   "artistId": "a-uno",
+   "artistName": "Artista Uno",
+   "durationMs": 215000,
+   "language": "es",
+   "tags": [
+    "indie-pop",
+    "suave",
+    "nocturno"
+   ],
+   "popularity": 0.1
+  },
+  {
+   "id": "t-a-dos-1",
+   "title": "Canción 1 de Artista Dos",
+   "artistId": "a-dos",
+   "artistName": "Artista Dos",
+   "durationMs": 187000,
+   "language": "es",
+   "tags": [
+    "indie-pop",
+    "suave",
+    "guitarras"
+   ],
+   "popularity": 0.82
+  },
+  {
+   "id": "t-a-dos-2",
+   "title": "Canción 2 de Artista Dos",
+   "artistId": "a-dos",
+   "artistName": "Artista Dos",
+   "durationMs": 194000,
+   "language": "es",
+   "tags": [
+    "indie-pop",
+    "suave",
+    "guitarras"
+   ],
+   "popularity": 0.64
+  },
+  {
+   "id": "t-a-dos-3",
+   "title": "Canción 3 de Artista Dos",
+   "artistId": "a-dos",
+   "artistName": "Artista Dos",
+   "durationMs": 201000,
+   "language": "es",
+   "tags": [
+    "indie-pop",
+    "suave",
+    "guitarras"
+   ],
+   "popularity": 0.46
+  },
+  {
+   "id": "t-a-dos-4",
+   "title": "Canción 4 de Artista Dos",
+   "artistId": "a-dos",
+   "artistName": "Artista Dos",
+   "durationMs": 208000,
+   "language": "es",
+   "tags": [
+    "indie-pop",
+    "suave",
+    "guitarras"
+   ],
+   "popularity": 0.28
+  },
+  {
+   "id": "t-a-dos-5",
+   "title": "Canción 5 de Artista Dos",
+   "artistId": "a-dos",
+   "artistName": "Artista Dos",
+   "durationMs": 215000,
+   "language": "es",
+   "tags": [
+    "indie-pop",
+    "suave",
+    "guitarras"
+   ],
+   "popularity": 0.1
+  },
+  {
+   "id": "t-a-tres-1",
+   "title": "Canción 1 de Artista Tres",
+   "artistId": "a-tres",
+   "artistName": "Artista Tres",
+   "durationMs": 187000,
+   "language": "multi",
+   "tags": [
+    "indie-pop",
+    "nocturno",
+    "sintes"
+   ],
+   "popularity": 0.82
+  },
+  {
+   "id": "t-a-tres-2",
+   "title": "Canción 2 de Artista Tres",
+   "artistId": "a-tres",
+   "artistName": "Artista Tres",
+   "durationMs": 194000,
+   "language": "multi",
+   "tags": [
+    "indie-pop",
+    "nocturno",
+    "sintes"
+   ],
+   "popularity": 0.64
+  },
+  {
+   "id": "t-a-tres-3",
+   "title": "Canción 3 de Artista Tres",
+   "artistId": "a-tres",
+   "artistName": "Artista Tres",
+   "durationMs": 201000,
+   "language": "multi",
+   "tags": [
+    "indie-pop",
+    "nocturno",
+    "sintes"
+   ],
+   "popularity": 0.46
+  },
+  {
+   "id": "t-a-tres-4",
+   "title": "Canción 4 de Artista Tres",
+   "artistId": "a-tres",
+   "artistName": "Artista Tres",
+   "durationMs": 208000,
+   "language": "multi",
+   "tags": [
+    "indie-pop",
+    "nocturno",
+    "sintes"
+   ],
+   "popularity": 0.28
+  },
+  {
+   "id": "t-a-tres-5",
+   "title": "Canción 5 de Artista Tres",
+   "artistId": "a-tres",
+   "artistName": "Artista Tres",
+   "durationMs": 215000,
+   "language": "multi",
+   "tags": [
+    "indie-pop",
+    "nocturno",
+    "sintes"
+   ],
+   "popularity": 0.1
+  },
+  {
+   "id": "t-a-cuatro-1",
+   "title": "Canción 1 de Artista Cuatro",
+   "artistId": "a-cuatro",
+   "artistName": "Artista Cuatro",
+   "durationMs": 187000,
+   "language": "es",
+   "tags": [
+    "urbano",
+    "energia",
+    "baile"
+   ],
+   "popularity": 0.82
+  },
+  {
+   "id": "t-a-cuatro-2",
+   "title": "Canción 2 de Artista Cuatro",
+   "artistId": "a-cuatro",
+   "artistName": "Artista Cuatro",
+   "durationMs": 194000,
+   "language": "es",
+   "tags": [
+    "urbano",
+    "energia",
+    "baile"
+   ],
+   "popularity": 0.64
+  },
+  {
+   "id": "t-a-cuatro-3",
+   "title": "Canción 3 de Artista Cuatro",
+   "artistId": "a-cuatro",
+   "artistName": "Artista Cuatro",
+   "durationMs": 201000,
+   "language": "es",
+   "tags": [
+    "urbano",
+    "energia",
+    "baile"
+   ],
+   "popularity": 0.46
+  },
+  {
+   "id": "t-a-cuatro-4",
+   "title": "Canción 4 de Artista Cuatro",
+   "artistId": "a-cuatro",
+   "artistName": "Artista Cuatro",
+   "durationMs": 208000,
+   "language": "es",
+   "tags": [
+    "urbano",
+    "energia",
+    "baile"
+   ],
+   "popularity": 0.28
+  },
+  {
+   "id": "t-a-cuatro-5",
+   "title": "Canción 5 de Artista Cuatro",
+   "artistId": "a-cuatro",
+   "artistName": "Artista Cuatro",
+   "durationMs": 215000,
+   "language": "es",
+   "tags": [
+    "urbano",
+    "energia",
+    "baile"
+   ],
+   "popularity": 0.1
+  },
+  {
+   "id": "t-a-cinco-1",
+   "title": "Canción 1 de Artista Cinco",
+   "artistId": "a-cinco",
+   "artistName": "Artista Cinco",
+   "durationMs": 187000,
+   "language": "es",
+   "tags": [
+    "urbano",
+    "baile",
+    "verano"
+   ],
+   "popularity": 0.82
+  },
+  {
+   "id": "t-a-cinco-2",
+   "title": "Canción 2 de Artista Cinco",
+   "artistId": "a-cinco",
+   "artistName": "Artista Cinco",
+   "durationMs": 194000,
+   "language": "es",
+   "tags": [
+    "urbano",
+    "baile",
+    "verano"
+   ],
+   "popularity": 0.64
+  },
+  {
+   "id": "t-a-cinco-3",
+   "title": "Canción 3 de Artista Cinco",
+   "artistId": "a-cinco",
+   "artistName": "Artista Cinco",
+   "durationMs": 201000,
+   "language": "es",
+   "tags": [
+    "urbano",
+    "baile",
+    "verano"
+   ],
+   "popularity": 0.46
+  },
+  {
+   "id": "t-a-cinco-4",
+   "title": "Canción 4 de Artista Cinco",
+   "artistId": "a-cinco",
+   "artistName": "Artista Cinco",
+   "durationMs": 208000,
+   "language": "es",
+   "tags": [
+    "urbano",
+    "baile",
+    "verano"
+   ],
+   "popularity": 0.28
+  },
+  {
+   "id": "t-a-cinco-5",
+   "title": "Canción 5 de Artista Cinco",
+   "artistId": "a-cinco",
+   "artistName": "Artista Cinco",
+   "durationMs": 215000,
+   "language": "es",
+   "tags": [
+    "urbano",
+    "baile",
+    "verano"
+   ],
+   "popularity": 0.1
+  },
+  {
+   "id": "t-a-seis-1",
+   "title": "Canción 1 de Artista Seis",
+   "artistId": "a-seis",
+   "artistName": "Artista Seis",
+   "durationMs": 187000,
+   "language": "en",
+   "tags": [
+    "rock",
+    "guitarras",
+    "energia"
+   ],
+   "popularity": 0.82
+  },
+  {
+   "id": "t-a-seis-2",
+   "title": "Canción 2 de Artista Seis",
+   "artistId": "a-seis",
+   "artistName": "Artista Seis",
+   "durationMs": 194000,
+   "language": "en",
+   "tags": [
+    "rock",
+    "guitarras",
+    "energia"
+   ],
+   "popularity": 0.64
+  },
+  {
+   "id": "t-a-seis-3",
+   "title": "Canción 3 de Artista Seis",
+   "artistId": "a-seis",
+   "artistName": "Artista Seis",
+   "durationMs": 201000,
+   "language": "en",
+   "tags": [
+    "rock",
+    "guitarras",
+    "energia"
+   ],
+   "popularity": 0.46
+  },
+  {
+   "id": "t-a-seis-4",
+   "title": "Canción 4 de Artista Seis",
+   "artistId": "a-seis",
+   "artistName": "Artista Seis",
+   "durationMs": 208000,
+   "language": "en",
+   "tags": [
+    "rock",
+    "guitarras",
+    "energia"
+   ],
+   "popularity": 0.28
+  },
+  {
+   "id": "t-a-seis-5",
+   "title": "Canción 5 de Artista Seis",
+   "artistId": "a-seis",
+   "artistName": "Artista Seis",
+   "durationMs": 215000,
+   "language": "en",
+   "tags": [
+    "rock",
+    "guitarras",
+    "energia"
+   ],
+   "popularity": 0.1
+  },
+  {
+   "id": "t-a-siete-1",
+   "title": "Canción 1 de Artista Siete",
+   "artistId": "a-siete",
+   "artistName": "Artista Siete",
+   "durationMs": 187000,
+   "language": "en",
+   "tags": [
+    "rock",
+    "guitarras",
+    "nostalgia"
+   ],
+   "popularity": 0.82
+  },
+  {
+   "id": "t-a-siete-2",
+   "title": "Canción 2 de Artista Siete",
+   "artistId": "a-siete",
+   "artistName": "Artista Siete",
+   "durationMs": 194000,
+   "language": "en",
+   "tags": [
+    "rock",
+    "guitarras",
+    "nostalgia"
+   ],
+   "popularity": 0.64
+  },
+  {
+   "id": "t-a-siete-3",
+   "title": "Canción 3 de Artista Siete",
+   "artistId": "a-siete",
+   "artistName": "Artista Siete",
+   "durationMs": 201000,
+   "language": "en",
+   "tags": [
+    "rock",
+    "guitarras",
+    "nostalgia"
+   ],
+   "popularity": 0.46
+  },
+  {
+   "id": "t-a-siete-4",
+   "title": "Canción 4 de Artista Siete",
+   "artistId": "a-siete",
+   "artistName": "Artista Siete",
+   "durationMs": 208000,
+   "language": "en",
+   "tags": [
+    "rock",
+    "guitarras",
+    "nostalgia"
+   ],
+   "popularity": 0.28
+  },
+  {
+   "id": "t-a-siete-5",
+   "title": "Canción 5 de Artista Siete",
+   "artistId": "a-siete",
+   "artistName": "Artista Siete",
+   "durationMs": 215000,
+   "language": "en",
+   "tags": [
+    "rock",
+    "guitarras",
+    "nostalgia"
+   ],
+   "popularity": 0.1
+  },
+  {
+   "id": "t-a-ocho-1",
+   "title": "Canción 1 de Artista Ocho",
+   "artistId": "a-ocho",
+   "artistName": "Artista Ocho",
+   "durationMs": 187000,
+   "language": "instrumental",
+   "tags": [
+    "electronica",
+    "sintes",
+    "baile"
+   ],
+   "popularity": 0.82
+  },
+  {
+   "id": "t-a-ocho-2",
+   "title": "Canción 2 de Artista Ocho",
+   "artistId": "a-ocho",
+   "artistName": "Artista Ocho",
+   "durationMs": 194000,
+   "language": "instrumental",
+   "tags": [
+    "electronica",
+    "sintes",
+    "baile"
+   ],
+   "popularity": 0.64
+  },
+  {
+   "id": "t-a-ocho-3",
+   "title": "Canción 3 de Artista Ocho",
+   "artistId": "a-ocho",
+   "artistName": "Artista Ocho",
+   "durationMs": 201000,
+   "language": "instrumental",
+   "tags": [
+    "electronica",
+    "sintes",
+    "baile"
+   ],
+   "popularity": 0.46
+  },
+  {
+   "id": "t-a-ocho-4",
+   "title": "Canción 4 de Artista Ocho",
+   "artistId": "a-ocho",
+   "artistName": "Artista Ocho",
+   "durationMs": 208000,
+   "language": "instrumental",
+   "tags": [
+    "electronica",
+    "sintes",
+    "baile"
+   ],
+   "popularity": 0.28
+  },
+  {
+   "id": "t-a-ocho-5",
+   "title": "Canción 5 de Artista Ocho",
+   "artistId": "a-ocho",
+   "artistName": "Artista Ocho",
+   "durationMs": 215000,
+   "language": "instrumental",
+   "tags": [
+    "electronica",
+    "sintes",
+    "baile"
+   ],
+   "popularity": 0.1
+  },
+  {
+   "id": "t-a-nueve-1",
+   "title": "Canción 1 de Artista Nueve",
+   "artistId": "a-nueve",
+   "artistName": "Artista Nueve",
+   "durationMs": 187000,
+   "language": "en",
+   "tags": [
+    "acustico",
+    "triste",
+    "suave"
+   ],
+   "popularity": 0.82
+  },
+  {
+   "id": "t-a-nueve-2",
+   "title": "Canción 2 de Artista Nueve",
+   "artistId": "a-nueve",
+   "artistName": "Artista Nueve",
+   "durationMs": 194000,
+   "language": "en",
+   "tags": [
+    "acustico",
+    "triste",
+    "suave"
+   ],
+   "popularity": 0.64
+  },
+  {
+   "id": "t-a-nueve-3",
+   "title": "Canción 3 de Artista Nueve",
+   "artistId": "a-nueve",
+   "artistName": "Artista Nueve",
+   "durationMs": 201000,
+   "language": "en",
+   "tags": [
+    "acustico",
+    "triste",
+    "suave"
+   ],
+   "popularity": 0.46
+  },
+  {
+   "id": "t-a-nueve-4",
+   "title": "Canción 4 de Artista Nueve",
+   "artistId": "a-nueve",
+   "artistName": "Artista Nueve",
+   "durationMs": 208000,
+   "language": "en",
+   "tags": [
+    "acustico",
+    "triste",
+    "suave"
+   ],
+   "popularity": 0.28
+  },
+  {
+   "id": "t-a-nueve-5",
+   "title": "Canción 5 de Artista Nueve",
+   "artistId": "a-nueve",
+   "artistName": "Artista Nueve",
+   "durationMs": 215000,
+   "language": "en",
+   "tags": [
+    "acustico",
+    "triste",
+    "suave"
+   ],
+   "popularity": 0.1
+  },
+  {
+   "id": "t-a-diez-1",
+   "title": "Canción 1 de Artista Diez",
+   "artistId": "a-diez",
+   "artistName": "Artista Diez",
+   "durationMs": 187000,
+   "language": "es",
+   "tags": [
+    "acustico",
+    "triste",
+    "piano"
+   ],
+   "popularity": 0.82
+  },
+  {
+   "id": "t-a-diez-2",
+   "title": "Canción 2 de Artista Diez",
+   "artistId": "a-diez",
+   "artistName": "Artista Diez",
+   "durationMs": 194000,
+   "language": "es",
+   "tags": [
+    "acustico",
+    "triste",
+    "piano"
+   ],
+   "popularity": 0.64
+  },
+  {
+   "id": "t-a-diez-3",
+   "title": "Canción 3 de Artista Diez",
+   "artistId": "a-diez",
+   "artistName": "Artista Diez",
+   "durationMs": 201000,
+   "language": "es",
+   "tags": [
+    "acustico",
+    "triste",
+    "piano"
+   ],
+   "popularity": 0.46
+  },
+  {
+   "id": "t-a-diez-4",
+   "title": "Canción 4 de Artista Diez",
+   "artistId": "a-diez",
+   "artistName": "Artista Diez",
+   "durationMs": 208000,
+   "language": "es",
+   "tags": [
+    "acustico",
+    "triste",
+    "piano"
+   ],
+   "popularity": 0.28
+  },
+  {
+   "id": "t-a-diez-5",
+   "title": "Canción 5 de Artista Diez",
+   "artistId": "a-diez",
+   "artistName": "Artista Diez",
+   "durationMs": 215000,
+   "language": "es",
+   "tags": [
+    "acustico",
+    "triste",
+    "piano"
+   ],
+   "popularity": 0.1
+  },
+  {
+   "id": "t-a-once-1",
+   "title": "Canción 1 de Artista Once",
+   "artistId": "a-once",
+   "artistName": "Artista Once",
+   "durationMs": 187000,
+   "language": "en",
+   "tags": [
+    "pop-oficina",
+    "radio",
+    "energia"
+   ],
+   "popularity": 0.82
+  },
+  {
+   "id": "t-a-once-2",
+   "title": "Canción 2 de Artista Once",
+   "artistId": "a-once",
+   "artistName": "Artista Once",
+   "durationMs": 194000,
+   "language": "en",
+   "tags": [
+    "pop-oficina",
+    "radio",
+    "energia"
+   ],
+   "popularity": 0.64
+  },
+  {
+   "id": "t-a-once-3",
+   "title": "Canción 3 de Artista Once",
+   "artistId": "a-once",
+   "artistName": "Artista Once",
+   "durationMs": 201000,
+   "language": "en",
+   "tags": [
+    "pop-oficina",
+    "radio",
+    "energia"
+   ],
+   "popularity": 0.46
+  },
+  {
+   "id": "t-a-once-4",
+   "title": "Canción 4 de Artista Once",
+   "artistId": "a-once",
+   "artistName": "Artista Once",
+   "durationMs": 208000,
+   "language": "en",
+   "tags": [
+    "pop-oficina",
+    "radio",
+    "energia"
+   ],
+   "popularity": 0.28
+  },
+  {
+   "id": "t-a-once-5",
+   "title": "Canción 5 de Artista Once",
+   "artistId": "a-once",
+   "artistName": "Artista Once",
+   "durationMs": 215000,
+   "language": "en",
+   "tags": [
+    "pop-oficina",
+    "radio",
+    "energia"
+   ],
+   "popularity": 0.1
+  },
+  {
+   "id": "t-a-doce-1",
+   "title": "Canción 1 de Artista Doce",
+   "artistId": "a-doce",
+   "artistName": "Artista Doce",
+   "durationMs": 187000,
+   "language": "en",
+   "tags": [
+    "jazz",
+    "suave",
+    "nocturno"
+   ],
+   "popularity": 0.82
+  },
+  {
+   "id": "t-a-doce-2",
+   "title": "Canción 2 de Artista Doce",
+   "artistId": "a-doce",
+   "artistName": "Artista Doce",
+   "durationMs": 194000,
+   "language": "en",
+   "tags": [
+    "jazz",
+    "suave",
+    "nocturno"
+   ],
+   "popularity": 0.64
+  },
+  {
+   "id": "t-a-doce-3",
+   "title": "Canción 3 de Artista Doce",
+   "artistId": "a-doce",
+   "artistName": "Artista Doce",
+   "durationMs": 201000,
+   "language": "en",
+   "tags": [
+    "jazz",
+    "suave",
+    "nocturno"
+   ],
+   "popularity": 0.46
+  },
+  {
+   "id": "t-a-doce-4",
+   "title": "Canción 4 de Artista Doce",
+   "artistId": "a-doce",
+   "artistName": "Artista Doce",
+   "durationMs": 208000,
+   "language": "en",
+   "tags": [
+    "jazz",
+    "suave",
+    "nocturno"
+   ],
+   "popularity": 0.28
+  },
+  {
+   "id": "t-a-doce-5",
+   "title": "Canción 5 de Artista Doce",
+   "artistId": "a-doce",
+   "artistName": "Artista Doce",
+   "durationMs": 215000,
+   "language": "en",
+   "tags": [
+    "jazz",
+    "suave",
+    "nocturno"
+   ],
+   "popularity": 0.1
+  },
+  {
+   "id": "t-a-trece-1",
+   "title": "Canción 1 de Artista Trece",
+   "artistId": "a-trece",
+   "artistName": "Artista Trece",
+   "durationMs": 187000,
+   "language": "en",
+   "tags": [
+    "folk",
+    "guitarras",
+    "suave"
+   ],
+   "popularity": 0.82
+  },
+  {
+   "id": "t-a-trece-2",
+   "title": "Canción 2 de Artista Trece",
+   "artistId": "a-trece",
+   "artistName": "Artista Trece",
+   "durationMs": 194000,
+   "language": "en",
+   "tags": [
+    "folk",
+    "guitarras",
+    "suave"
+   ],
+   "popularity": 0.64
+  },
+  {
+   "id": "t-a-trece-3",
+   "title": "Canción 3 de Artista Trece",
+   "artistId": "a-trece",
+   "artistName": "Artista Trece",
+   "durationMs": 201000,
+   "language": "en",
+   "tags": [
+    "folk",
+    "guitarras",
+    "suave"
+   ],
+   "popularity": 0.46
+  },
+  {
+   "id": "t-a-trece-4",
+   "title": "Canción 4 de Artista Trece",
+   "artistId": "a-trece",
+   "artistName": "Artista Trece",
+   "durationMs": 208000,
+   "language": "en",
+   "tags": [
+    "folk",
+    "guitarras",
+    "suave"
+   ],
+   "popularity": 0.28
+  },
+  {
+   "id": "t-a-trece-5",
+   "title": "Canción 5 de Artista Trece",
+   "artistId": "a-trece",
+   "artistName": "Artista Trece",
+   "durationMs": 215000,
+   "language": "en",
+   "tags": [
+    "folk",
+    "guitarras",
+    "suave"
+   ],
+   "popularity": 0.1
+  },
+  {
+   "id": "t-a-catorce-1",
+   "title": "Canción 1 de Artista Catorce",
+   "artistId": "a-catorce",
+   "artistName": "Artista Catorce",
+   "durationMs": 187000,
+   "language": "unknown",
+   "tags": [
+    "hiphop",
+    "nocturno",
+    "energia"
+   ],
+   "popularity": 0.82
+  },
+  {
+   "id": "t-a-catorce-2",
+   "title": "Canción 2 de Artista Catorce",
+   "artistId": "a-catorce",
+   "artistName": "Artista Catorce",
+   "durationMs": 194000,
+   "language": "unknown",
+   "tags": [
+    "hiphop",
+    "nocturno",
+    "energia"
+   ],
+   "popularity": 0.64
+  },
+  {
+   "id": "t-a-catorce-3",
+   "title": "Canción 3 de Artista Catorce",
+   "artistId": "a-catorce",
+   "artistName": "Artista Catorce",
+   "durationMs": 201000,
+   "language": "unknown",
+   "tags": [
+    "hiphop",
+    "nocturno",
+    "energia"
+   ],
+   "popularity": 0.46
+  },
+  {
+   "id": "t-a-catorce-4",
+   "title": "Canción 4 de Artista Catorce",
+   "artistId": "a-catorce",
+   "artistName": "Artista Catorce",
+   "durationMs": 208000,
+   "language": "unknown",
+   "tags": [
+    "hiphop",
+    "nocturno",
+    "energia"
+   ],
+   "popularity": 0.28
+  },
+  {
+   "id": "t-a-catorce-5",
+   "title": "Canción 5 de Artista Catorce",
+   "artistId": "a-catorce",
+   "artistName": "Artista Catorce",
+   "durationMs": 215000,
+   "language": "unknown",
+   "tags": [
+    "hiphop",
+    "nocturno",
+    "energia"
+   ],
+   "popularity": 0.1
+  }
+ ],
+ "playlists": {
+  "pl-nucleo": {
+   "role": "core",
+   "label": "Núcleo (ficticia)"
+  },
+  "pl-triste": {
+   "role": "mode",
+   "mode": "triste",
+   "label": "Modo triste (ficticia)"
+  },
+  "pl-oficina": {
+   "role": "shared",
+   "label": "Sesión compartida de oficina (ficticia)"
+  },
+  "pl-descubre": {
+   "role": "discovery",
+   "label": "Descubrimiento (ficticia)"
+  }
+ }
+}

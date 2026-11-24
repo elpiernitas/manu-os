@@ -79,6 +79,7 @@ import { observeFiling, observeMisfile } from "./core/topics.js";
 import { removeJoke } from "./core/voice.js";
 import { memoriaPage, hoyMemCard, claimDetail } from "./core/memview.js";
 import { mpLogo, mpAvatar } from "./design/mp-brand.js";
+import { createDj } from "./dj/controller.js";
 import { findRepeat, addRepeat, timesSaved, whenIn, conexiones } from "./core/relate.js";
 import { newMoment, byMonth as momentsByMonth, onThisDay, searchMoments } from "./core/moments.js";
 import { newInterest, resourcesFor, INTEREST_KINDS } from "./core/interests.js";
@@ -87,7 +88,7 @@ import { SKINS, skinOf, cielo as hzCielo, variables as hzVars, tiempoDe, portada
 import { hzCara, hzPortada, hzBotella, hzMareas, hzConstelacion, hzAstillero, hzBarcoCarta, hzBotadura, hzBitacora, hzApariencia } from "./design/horizonte.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "122"; // = número de la última tarea WEB publicada (desde WEB-87)
+export const APP_VERSION = "123"; // = número de la última tarea WEB publicada (desde WEB-87)
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -1126,7 +1127,7 @@ async function spotifyToken() {
   if (!t) return null;
   if (Date.now() > t.expires - 60000) {
     if (!t.refresh) return null;
-    t = await refreshTokens({ clientId: spClientId(), refresh: t.refresh });
+    t = await refreshTokens({ clientId: spClientId(), refresh: t.refresh, scope: t.scope ?? null });
     spotifyStore.tokens = t;
   }
   return t.access;
@@ -1142,6 +1143,37 @@ async function startSpotifyAuth() {
 function openSpotifyApp() {
   location.href = "spotify:";
 }
+
+// ---------- WEB-123: panel de acciones (como Atajos: abrir → ver mis acciones → tocar → pasa algo) ----------
+function actionPanel() {
+  const d = dj.state.runner?.s;
+  const djSub = d && ["playing", "paused"].includes(d.status) && d.current ? `Sonando: ${d.current.title}` : "Reproducir";
+  const tiles = [
+    ["dj", "🎧", "DJ", djSub, 'data-act="panel" data-go="tu" data-to="dj"'],
+    ["manana", "☀️", "Mi mañana", "Te leo el día", 'data-act="speak-day"'],
+    ["semana", "🗓️", "Mi semana", "Agenda y huecos", 'data-act="panel" data-go="agenda"'],
+    ["trabajo", "💼", "Trabajo", "Fichar y jornada", 'data-act="panel" data-go="tu" data-to="fichaje"'],
+    ["idea", "💡", "Idea", "Apúntala ya", 'data-act="sheet" data-kind="IDEA"'],
+    ["gasto", "💸", "Gasto", "Apuntar", 'data-act="sheet" data-kind="EXPENSE"'],
+    ["momento", "📷", "Momento", "Guardar un recuerdo", 'data-act="panel" data-go="tu" data-to="momentos"'],
+    ["manu", "💬", "MANU", "Pregúntale", 'data-act="panel" data-go="manu"'],
+  ];
+  return `<nav class="action-panel" aria-label="Tus acciones">${tiles.map(([k, e, t, sub, attrs]) => `<button class="action-tile tile-${k}" ${attrs}><span class="tile-e" aria-hidden="true">${e}</span><span class="tile-t">${esc(t)}</span><span class="tile-s">${esc(sub)}</span></button>`).join("")}</nav>`;
+}
+function panelAct(a) {
+  tab = a.dataset.go; sub = a.dataset.to ?? null; subFrom = sub ? "hoy" : null;
+  try { sessionStorage.setItem("manuos.tab", tab); } catch {}
+  render({ focus: true, enter: "page" }); scrollTo(0, 0);
+}
+
+// ---------- WEB-123: el DJ (DJ-BRAIN decide, Spotify reproduce) ----------
+const dj = createDj({
+  getTokens: async () => { const access = await spotifyToken(); return access ? { access, scope: spotifyStore.tokens?.scope ?? null } : null; },
+  startAuth: () => startSpotifyAuth(),
+  render: () => { if (sub === "dj" || tab === "hoy") render(); },
+  toast: (m) => toast(m),
+  openSpotify: () => openSpotifyApp(),
+});
 
 async function musicToSpeaker() {
   if (!spotifyReady()) { openSpotifyApp(); return; }
@@ -1596,6 +1628,7 @@ const screens = {
     const actualWeather = vault.weather?.city?.name === city.name ? vault.weather.data : null;
     const cloudState = nube.state;
     return `<div class="fable-hoy">
+      ${actionPanel()}
       ${hz() ? hzPortada({ p: hzPortadaData({ agenda: agendaToday(), reminders: vault.reminders, ahora: dialDate(), real: new Date() }), c: hzSky, w: actualWeather, ciudad: city.name, fecha: new Date(), minutos: hzUi.minutos, modo: MODE_TITLES[m.mode] }) : fableHoyIntro({
         greeting: greeting(), date: longDate(), mode: MODE_TITLES[m.mode],
         city: city.name, weather: actualWeather,
@@ -1813,7 +1846,8 @@ function setupCard() {
 
 // WEB-57: the profile form, also for pasting one written elsewhere.
 const profileForm = (text) => `<form id="profileForm" class="stack"><label for="profileText" class="sr">Tu perfil</label><textarea id="profileText" rows="14" placeholder="Quién eres, cómo quieres que te hable MANU, tu día a día, lo que te importa…">${esc(text)}</textarea><div class="btns"><button class="btn" type="submit">Guardar</button><button class="btn ghost" type="button" data-act="profile-cancel">Cancelar</button></div></form>`;
-const backBar = (title) => `<button class="link" data-act="back">${I.back} Tú</button><h1>${title}</h1>`;
+const backBar = (title) => `<button class="link" data-act="back">${I.back} ${subFrom === "hoy" ? "Hoy" : "Tú"}</button><h1>${title}</h1>`;
+let subFrom = null; // WEB-123: el DJ y los atajos del panel vuelven a Hoy si se abrieron desde Hoy
 
 // WEB-98: what of Manu's memory is in the cloud (counts only) and the switch to keep it per device.
 function nubeBrainCard() {
@@ -2059,6 +2093,7 @@ const subpages = {
       ${list.length ? `<section class="card">${list.map(row).join("")}</section>` : '<section class="card"><p class="muted">Aún nada. No hace falta que todo sea productivo.</p></section>'}
       <section class="card"><h2>Lectura</h2><p class="muted small">Tus libros están en la Biblioteca, sin pestaña aparte.${books ? ` Tienes ${books} para leer.` : ""}</p><button class="btn ghost" data-act="int-books">Ver libros para leer</button></section>`;
   },
+  dj() { return `${backBar("DJ")}${dj.view()}`; },
   momentos() {
     const list = vault.moments ?? [];
     const ui = momentUi;
@@ -4104,7 +4139,7 @@ document.addEventListener("click", async (e) => {
   const sg = e.target.closest("[data-sub-go]");
   if (sg) { if (sg.dataset.act === "wk-prep") weekUi.prep = sg.dataset.v === "completo" ? "completo" : "rapido"; tab = "tu"; sub = sg.dataset.subGo; render({ focus: true }); scrollTo(0, 0); return; }
   const sb = e.target.closest("[data-sub]");
-  if (sb) { sub = sb.dataset.sub; cityResults = null; if (sub === "limpieza") { cleanUi = { report: null, undo: null, loading: false }; cleanScan(); } render({ focus: true, enter: "page" }); scrollTo(0, 0); return; }
+  if (sb) { sub = sb.dataset.sub; subFrom = null; cityResults = null; if (sub === "limpieza") { cleanUi = { report: null, undo: null, loading: false }; cleanScan(); } render({ focus: true, enter: "page" }); scrollTo(0, 0); return; }
   const s = e.target.closest("[data-say]");
   if (s) { say(s.dataset.say); return; }
   const fill = e.target.closest("[data-fill]");
@@ -4118,6 +4153,8 @@ document.addEventListener("click", async (e) => {
   if (a.dataset.act.startsWith("hz-")) { hzAct(a); return; }
   if (a.dataset.act === "rel-ok" || a.dataset.act === "rel-no") { relAct(a); return; }
   if (a.dataset.act.startsWith("wk-")) { weekAct(a); return; }
+  if (a.dataset.act.startsWith("dj-")) { dj.act(a).then(() => render()); return; }
+  if (a.dataset.act === "panel") { panelAct(a); return; }
   if (a.dataset.act.startsWith("cl-")) { cleanAct(a); return; }
   if (a.dataset.act === "cer-export") { const file = new File([JSON.stringify({ exportado: new Date().toISOString(), origen: "MANU OS · copia local del cerebro", entradas: cerEntries() }, null, 2)], `cerebro-${localDay()}.json`, { type: "application/json" }); const l = document.createElement("a"); l.href = URL.createObjectURL(file); l.download = file.name; document.body.appendChild(l); l.click(); setTimeout(() => { URL.revokeObjectURL(l.href); l.remove(); }, 1000); toast("Copia descargada"); return; }
   if (a.dataset.act === "copy-link") { navigator.clipboard?.writeText(a.dataset.v).then(() => toast("Copiada")).catch(() => toast(a.dataset.v)); return; }
@@ -4231,7 +4268,7 @@ document.addEventListener("click", async (e) => {
     case "sheet-close": closeSheet(); break;
     case "refuge": refuge = { state: initialRefuge(), messages: [{ from: "manu", text: "Estoy aquí. ¿Qué te vendría mejor ahora: entender por qué estás así, buscar una solución o cambiar de aire?" }] }; go("manu"); break;
     case "leave-refuge": refuge = null; render(); break;
-    case "back": sub = null; render({ focus: true, enter: "tab" }); break;
+    case "back": sub = null; if (subFrom === "hoy") tab = "hoy"; subFrom = null; render({ focus: true, enter: "tab" }); break;
     case "weather-open": overlay = "weather"; render({ focus: true, enter: "page" }); scrollTo(0, 0); refreshWeather(); break;
     case "gemini-guide": overlay = "gemini"; guideStep = 0; render({ focus: true, enter: "page" }); scrollTo(0, 0); break;
     case "guide-step": guideStep = Math.max(guideStep, Number(a.dataset.n)); setTimeout(render, 400); break;
@@ -4766,6 +4803,8 @@ document.addEventListener("change", async (e) => {
     try { chatImage = await compressImage(e.target.files[0]); render(); $("msg")?.focus(); } catch (err) { toast(err.message); }
     return;
   }
+  if (e.target.dataset?.djRole) { dj.onRole(e.target.dataset.djRole, e.target.value); return; }
+  if (e.target.id === "djHistory" && e.target.files?.length) { await dj.onHistoryFiles([...e.target.files]); e.target.value = ""; return; }
   if (e.target.id === "momentImage" && e.target.files?.[0]) {
     momentUi = { ...momentUi, text: $("momentText")?.value ?? momentUi.text, place: $("momentPlace")?.value ?? momentUi.place, day: $("momentDay")?.value ?? momentUi.day };
     try { momentUi.image = await compressImage(e.target.files[0]); render(); } catch (err) { toast(err.message); }
@@ -5300,7 +5339,8 @@ if (returned.has("guardar")) {
 if (returned.has("code") && returned.has("state")) {
   history.replaceState(null, "", location.pathname);
   tab = "tu"; sub = "spotify";
-  finishSpotifyAuth(returned).then(() => render());
+  try { if (localStorage.getItem("manuos.dj.return")) { localStorage.removeItem("manuos.dj.return"); sub = "dj"; } } catch {}
+  finishSpotifyAuth(returned).then(() => { if (sub === "dj") dj.ensure({ force: true }); render(); });
 } else if (returned.has("error") && returned.has("state")) {
   history.replaceState(null, "", location.pathname);
   try { localStorage.removeItem("manuos.spotify.pkce"); } catch {}
