@@ -149,8 +149,10 @@ export function hzBitacora(grupos) {
     ${grupos.map((g) => `<h3 class="hz-ante">${esc(g.titulo)}</h3><p class="hz-retrato">${g.frases.map((f) => `<button class="hz-frase hz-frase-${f.estado}" data-act="hz-frase" data-id="${esc(f.id)}" aria-label="${esc(ESTADOS[f.estado])}: ${esc(f.texto)}">${esc(f.texto)}</button>`).join('<span aria-hidden="true"> · </span>')}</p>`).join("")}
     <p class="hz-leyenda"><span><b class="hz-frase hz-frase-confirmada">firme</b> confirmada</span><span><b class="hz-frase hz-frase-inferida">a rayas</b> inferida</span><span><b class="hz-frase hz-frase-pendiente">punteada</b> pendiente</span><span><b class="hz-frase hz-frase-caducada">ondulada</b> en duda o caducada</span></p></section>`;
 }
-export function hzApariencia(skin) {
+export const MP_LOOKS = { light: "Claro", dark: "Oscuro", auto: "Como el sistema" };
+export function hzApariencia(skin, look = "light") {
   const op = (id, t, d) => `<button class="hz-tema" data-act="hz-skin" data-v="${id}" aria-pressed="${skin === id}"><span class="hz-tema-m hz-tema-${id}" aria-hidden="true"></span><span class="grow"><b>${t}</b><br><span class="muted small">${d}</span></span>${skin === id ? '<span class="hz-mini">en uso</span>' : ""}</button>`;
   return `<section class="card">${skin === "mp" ? mpLogo("mp. Manu Pernas") : ""}<h2>Apariencia</h2><div class="stack">${op("mp", "mp. · Manu Pernas", "La identidad de tu marca: blanco, negro y azul #0066FF, con Montserrat. El tema inicial de las instalaciones nuevas.")}${op("design", "Claude Design · original", "El diseño negro, blanco y azul eléctrico del primer prototipo.")}${op("clasico", "Clásico", "La interfaz azul y negra anterior, con sus tarjetas.")}${op("horizonte", "Horizonte", "El diseño marítimo de papel y tinta, disponible como alternativa.")}</div>
+    ${skin === "mp" ? `<h3 class="small">Claro u oscuro</h3><div class="segmented" role="group" aria-label="Claro u oscuro">${Object.entries(MP_LOOKS).map(([k, l]) => `<button data-act="hz-look" data-v="${k}" aria-pressed="${look === k}">${l}</button>`).join("")}</div>` : ""}
     <p class="muted small">Cambiar de tema no borra nada ni cierra ninguna sesión. La elección se guarda en este dispositivo y viaja con Tu nube si la usas.</p></section>`;
 }

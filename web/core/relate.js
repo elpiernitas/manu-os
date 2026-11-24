@@ -60,7 +60,7 @@ const pad = (n) => String(n).padStart(2, "0");
  */
 export function whenIn(text, now = new Date()) {
   const t = normalise(text);
-  let day = null, matched = [];
+  let day = null, matched = [], explicit = false;
   const base = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   let m;
   if ((m = t.match(/\bpasado manana\b/))) { day = new Date(base); day.setDate(day.getDate() + 2); matched.push(m[0]); }
@@ -71,13 +71,13 @@ export function whenIn(text, now = new Date()) {
     let y = m[3] ? +m[3] : now.getFullYear();
     let d = new Date(y, mo, +m[1]);
     if (!m[3] && d < base) d = new Date(y + 1, mo, +m[1]);
-    if (d.getMonth() === mo) { day = d; matched.push(m[0]); }
+    if (d.getMonth() === mo) { day = d; matched.push(m[0]); explicit = Boolean(m[3]) || d.getFullYear() === now.getFullYear(); }
   }
   if (!day && (m = t.match(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/))) {
     const y = m[3] ? (m[3].length === 2 ? 2000 + +m[3] : +m[3]) : now.getFullYear();
     let d = new Date(y, +m[2] - 1, +m[1]);
     if (!m[3] && d < base) d = new Date(y + 1, +m[2] - 1, +m[1]);
-    if (+m[2] >= 1 && +m[2] <= 12 && d.getDate() === +m[1]) { day = d; matched.push(m[0]); }
+    if (+m[2] >= 1 && +m[2] <= 12 && d.getDate() === +m[1]) { day = d; matched.push(m[0]); explicit = Boolean(m[3]) || d.getFullYear() === now.getFullYear(); }
   }
   if (!day && (m = t.match(/\b(?:el |este |proximo |el proximo )?(lunes|martes|miercoles|jueves|viernes|sabado|domingo)\b/))) {
     const want = DAYS.indexOf(m[1]);
@@ -96,7 +96,12 @@ export function whenIn(text, now = new Date()) {
   if (allDay) day.setHours(9, 0, 0, 0);
   if (day < now && (allDay ? day.getTime() < base.getTime() : true)) return null;
   const label = `${DAYS[day.getDay()]} ${day.getDate()} de ${MONTHS[day.getMonth()]}${allDay ? "" : ` a las ${pad(day.getHours())}:${pad(day.getMinutes())}`}`.replace("miercoles", "miércoles").replace("sabado", "sábado");
-  return { at: day, allDay, label, matched: matched.join(" · ") };
+  // Explícita: el texto dice el día del calendario (y el año, o es este año). Interpretada: «mañana», «el
+  // viernes», o un día sin año que MANU ha llevado al año que viene. Las dos son propuestas; solo cambia la cautela.
+  const certainty = explicit ? "explicita" : "interpretada";
+  const shown = matched.join(" ").replace(/\bmanana\b/g, "mañana").replace(/\bmiercoles\b/g, "miércoles").replace(/\bsabado\b/g, "sábado");
+  const how = explicit ? `escrito tal cual: «${shown}»` : /^\d/.test(matched[0] ?? "") ? `«${shown}» sin año: entiendo el de ${day.getFullYear()}` : `«${shown}» contado desde el ${now.getDate()}/${now.getMonth() + 1}`;
+  return { at: day, allDay, label, matched: matched.join(" · "), certainty, how };
 }
 
 // ---------- Conexiones (propuestas) ----------
@@ -122,12 +127,25 @@ export function conexiones(v, now = new Date(), { dismissed = [], max = 6 } = {}
     if (!w || w.at.getTime() - now.getTime() > 120 * DAY) continue;
     const list = i.list ?? "inbox";
     push({ key: `agenda:${i.id}`, kind: "agenda", title: String(i.text ?? i.title).slice(0, 120), at: w.at.toISOString(), allDay: w.allDay, label: w.label,
-      why: `Parece una fecha: «${w.matched}». Es una suposición: revisa el día antes de guardarlo.`, source: { list, id: i.id } });
+      certainty: w.certainty,
+      why: w.certainty === "explicita" ? `Fecha explícita (${w.how}). Aun así es una suposición mía que sea una cita: revísalo antes de guardarlo.` : `Fecha interpretada (${w.how}). Es una suposición: revisa el día antes de guardarlo.`, source: { list, id: i.id } });
   }
   // 2) Idea repetida (3 veces o más) que no está en ningún proyecto → proponer proyecto.
   for (const i of ideas) {
     if (timesSaved(i) < 3 || i.filed || i.project) continue;
     push({ key: `proyecto:${i.id}`, kind: "proyecto", title: String(i.text).slice(0, 60), why: `La has guardado ${timesSaved(i)} veces. ¿Le damos un proyecto para que no se pierda?`, source: { list: "inbox", id: i.id } });
+  }
+  // 2b) Idea suelta que comparte palabras con un proyecto que ya existe → proponer añadirla, diciendo cuáles.
+  const projects = (v?.projects ?? []).map((p) => ({ p, w: new Set(words(`${p.name} ${p.why ?? ""} ${(p.sources ?? []).map((x) => x.title ?? "").join(" ")}`)) }));
+  for (const i of ideas) {
+    if (i.filed || i.project) continue;
+    const iw = [...new Set(words(i.text ?? ""))];
+    let best = null;
+    for (const { p, w } of projects) { const common = iw.filter((x) => w.has(x)); if (common.length && (!best || common.length > best.common.length)) best = { p, common }; }
+    if (!best) continue;
+    const shown = normalise(i.text ?? "").split(/[^a-z0-9ñ]+/).filter((x) => best.common.includes(x.length >= 6 ? x.slice(0, 5) : x.replace(/(es|s)$/, ""))).slice(0, 3);
+    push({ key: `al-proyecto:${i.id}:${best.p.id}`, kind: "al-proyecto", title: String(i.text).slice(0, 80), label: `${best.p.emoji ?? "📁"} ${best.p.name}`, projectId: best.p.id,
+      why: `Comparte ${shown.length ? shown.map((x) => `«${x}»`).join(", ") : "palabras"} con el proyecto «${best.p.name}». Es una suposición: tú decides.`, source: { list: "inbox", id: i.id } });
   }
   // 3) Documento que vence en 45 días y sin recordatorio → recordatorio una semana antes (o mañana).
   for (const d of v?.docs ?? []) {

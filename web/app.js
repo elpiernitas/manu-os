@@ -1,6 +1,6 @@
 import { normalise } from "./core/text.js";
 import { parse, reply, quickDetect, amountCents } from "./core/assistant.js";
-import { CATEGORIES, CATEGORY_EMOJI, euros, newEntry, learnCategory, toCents, rulesFromRows, applyRules } from "./core/money.js";
+import { CATEGORIES, CATEGORY_EMOJI, euros, newEntry, learnCategory, toCents, rulesFromRows, applyRules, merchantKey } from "./core/money.js";
 import { MODE_TITLES, modeState } from "./core/modes.js";
 import { capture, confirm, markUnclassified, pending, tasks, ideas, toggleDone } from "./core/inbox.js";
 import { initialRefuge, refugeReply } from "./core/refuge.js";
@@ -80,15 +80,16 @@ import { removeJoke } from "./core/voice.js";
 import { memoriaPage, hoyMemCard, claimDetail } from "./core/memview.js";
 import { mpLogo, mpAvatar } from "./design/mp-brand.js";
 import { createDj } from "./dj/controller.js";
+import { contextHtml, sideSubHtml } from "./shell/context.js";
 import { findRepeat, addRepeat, timesSaved, whenIn, conexiones } from "./core/relate.js";
 import { newMoment, byMonth as momentsByMonth, onThisDay, searchMoments } from "./core/moments.js";
 import { newInterest, resourcesFor, INTEREST_KINDS } from "./core/interests.js";
 import { weekView, weekAdvice, newReserve, RESERVE_KINDS, declineText, prepareWeek, reservesOn } from "./core/week.js";
 import { SKINS, skinOf, cielo as hzCielo, variables as hzVars, tiempoDe, portada as hzPortadaData, mareas as hzMareasData, constelacion as hzConsData, retrato as hzRetrato, barco as hzBarco, addPieza, marcarPieza, quitarPieza, botar as hzBotarP, varar as hzVarar } from "./core/horizonte.js";
-import { hzCara, hzPortada, hzBotella, hzMareas, hzConstelacion, hzAstillero, hzBarcoCarta, hzBotadura, hzBitacora, hzApariencia } from "./design/horizonte.js";
+import { hzCara, hzPortada, hzBotella, hzMareas, hzConstelacion, hzAstillero, hzBarcoCarta, hzBotadura, hzBitacora, hzApariencia, MP_LOOKS } from "./design/horizonte.js";
 import { toggleHabit, streak, lastDays, dayKey, daysUntilBirthday, upcomingBirthdays, longTimeNoTalk, mealSlot, frequentMeals, healthSummary, MOODS, setMood, dueReminders } from "./core/life.js";
 
-export const APP_VERSION = "123"; // = número de la última tarea WEB publicada (desde WEB-87)
+export const APP_VERSION = "124"; // = número de la última tarea WEB publicada (desde WEB-87)
 const SITE = new URL(".", location.href).href;
 const SHORTCUT_ALARM = "MANU Alarma";
 const SHORTCUT_REMINDER = "MANU Recordatorio";
@@ -117,6 +118,11 @@ const hzUi = { minutos: null, manu: "hablar", botar: null };
 let hzSky = null;
 const META_CLASICO = { theme: "#050608", scheme: "dark" };
 const META_MP = { theme: "#FFFFFF", scheme: "light" };
+const META_MP_DARK = { theme: "#0B0B0D", scheme: "dark" };
+// mp. claro / oscuro / como el sistema (WEB-124). Por defecto claro: quien ya usaba mp. lo ve igual.
+const mpLook = () => (MP_LOOKS[vault.settings?.mpLook] ? vault.settings.mpLook : "light");
+const darkSystem = () => globalThis.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false;
+globalThis.matchMedia?.("(prefers-color-scheme: dark)").addEventListener?.("change", () => { try { applySkin(); } catch {} });
 function dialDate() { const d = new Date(); if (hzUi.minutos != null) d.setHours(Math.floor(hzUi.minutos / 60), hzUi.minutos % 60, 0, 0); return d; }
 function hzTiempoAhora(when) {
   const w = currentWeather()?.data;
@@ -127,13 +133,14 @@ function hzTiempoAhora(when) {
 }
 function applySkin() {
   const r = document.documentElement, s = skin();
-  if (r.dataset.skin !== s) { r.dataset.skin = s; const nav = $("tabs"); if (nav) nav.innerHTML = ""; }
+  if (r.dataset.skin !== s) { r.dataset.skin = s; const nav = $("tabs"); if (nav) nav.innerHTML = ""; const h = $("sideHead"); if (h) h.innerHTML = ""; }
   try { localStorage.setItem("manuos.skin", s); } catch { /* sin almacenamiento: no pasa nada */ }
   const mt = document.querySelector('meta[name="theme-color"]'), ms = document.querySelector('meta[name="color-scheme"]');
   if (s !== "horizonte") {
     delete r.dataset.tema; delete r.dataset.astro; hzSky = null;
     for (const k of ["--cielo-1", "--cielo-2", "--mar", "--astro-x", "--astro-y"]) r.style.removeProperty(k);
-    const meta = s === "mp" ? META_MP : META_CLASICO;
+    if (s === "mp") r.dataset.look = mpLook(); else delete r.dataset.look;
+    const meta = s === "mp" ? (mpLook() === "dark" || (mpLook() === "auto" && darkSystem()) ? META_MP_DARK : META_MP) : META_CLASICO;
     if (mt) mt.content = meta.theme; if (ms) ms.content = meta.scheme;
     return;
   }
@@ -143,7 +150,7 @@ function applySkin() {
   r.dataset.tema = hzSky.oscuro ? "noche" : "dia"; r.dataset.astro = hzSky.astro.tipo;
   if (mt) mt.content = hzSky.colores.arriba; if (ms) ms.content = hzSky.oscuro ? "dark" : "light";
 }
-try { document.documentElement.dataset.skin = skin(); } catch { /* el primer render lo pone */ }
+try { const r = document.documentElement; r.dataset.skin = skin(); if (r.dataset.skin === "mp") r.dataset.look = mpLook(); } catch { /* el primer render lo pone */ }
 // WEB-110: Bahía retired. Old sessions (including "bahia") now open Hoy.
 const restoredTab = sessionStorage.getItem("manuos.tab");
 let tab = ["hoy", "agenda", "manu", "dinero", "proyectos", "tu"].includes(restoredTab) ? restoredTab : "hoy";
@@ -1144,6 +1151,127 @@ function openSpotifyApp() {
   location.href = "spotify:";
 }
 
+// ---------- WEB-124: centro de operaciones (barra lateral, panel de MANU con contexto) ----------
+const shellUi = (() => { try { return { collapsed: false, ctx: false, ...JSON.parse(localStorage.getItem("manuos.shell") || "{}"), reply: null }; } catch { return { collapsed: false, ctx: false, reply: null }; } })();
+const saveShell = () => { try { localStorage.setItem("manuos.shell", JSON.stringify({ collapsed: shellUi.collapsed, ctx: shellUi.ctx })); } catch {} };
+function applyShell() {
+  const r = document.documentElement;
+  r.dataset.side = shellUi.collapsed ? "collapsed" : "open";
+  r.dataset.ctx = shellUi.ctx ? "open" : "closed";
+  const head = $("sideHead");
+  if (head && !head.firstChild) head.innerHTML = `<span class="side-brand">${mpLogo("mp.")}<span class="side-brand-name">MANU OS</span></span><button class="side-btn" data-act="side-collapse" aria-label="Contraer la barra lateral" aria-expanded="true">«</button>`;
+  head?.querySelector("[data-act=side-collapse]")?.setAttribute("aria-expanded", String(!shellUi.collapsed));
+  const foot = $("sideFoot");
+  if (foot && !foot.firstChild) foot.innerHTML = `<button data-act="cmdk" aria-label="Buscar o hacer algo (Ctrl o Cmd + K)"><span><span aria-hidden="true">🔎</span> <span class="lbl">Buscar</span></span><kbd>⌘K</kbd></button><button data-act="ctx-toggle" id="ctxToggle" aria-controls="ctxPanel" aria-expanded="false" aria-label="Panel de MANU (Ctrl o Cmd + J)"><span><span aria-hidden="true">💬</span> <span class="lbl">MANU</span></span><kbd>⌘J</kbd></button>`;
+  $("ctxToggle")?.setAttribute("aria-expanded", String(shellUi.ctx));
+  const sideSub = $("sideSub");
+  if (sideSub) sideSub.innerHTML = sideSubHtml(tab, { sub, projects: vault.projects ?? [], openProject });
+  const panel = $("ctxPanel");
+  if (!panel) return;
+  if (!shellUi.ctx) { panel.hidden = true; return; }
+  const typingHere = document.activeElement?.id === "ctxQ" ? document.activeElement.value : null;
+  panel.hidden = false;
+  panel.innerHTML = contextHtml(ctxModelFor(), { reply: shellUi.reply });
+  if (typingHere !== null) { const q = $("ctxQ"); if (q) { q.value = typingHere; q.focus(); } }
+}
+function toggleCtx(force) {
+  shellUi.ctx = force ?? !shellUi.ctx; shellUi.reply = null; saveShell(); applyShell();
+  if (shellUi.ctx) $("ctxPanel")?.querySelector("button, input")?.focus(); else $("ctxToggle")?.focus();
+}
+// Lo que MANU sabe de la vista actual. Solo datos del vault (con su fuente), deducciones marcadas y
+// propuestas que Manu confirma. Nada de servicios que no estén conectados.
+function ctxModelFor() {
+  const now = new Date(), day = localDay();
+  const calSrc = vault.calendar?.days?.[day] ? "Google Calendar" : vault.agenda?.day === day ? "Agenda pegada" : "Personas (cumpleaños)";
+  const props = (kind) => conexiones(vault, now, { dismissed: relDismissed(), max: 8 }).filter((c) => !kind || c.kind === kind);
+  const propOf = (c) => ({ text: `${c.title}${c.label ? ` → ${c.label}` : ""}. ${c.why}`, label: c.kind === "agenda" ? "Pasar a Agenda" : c.kind === "al-proyecto" ? "Añadir al proyecto" : "Crear proyecto", attrs: { "data-act": "rel-ok", "data-k": c.key } });
+  const gCal = isClientId(gClientId()) && googleOn("calendar");
+  if (tab === "hoy") {
+    const evs = eventsFor(day), open = tasks(vault.inbox).filter((t) => !t.done), rems = vault.reminders.filter((r) => !r.done && dayKey(new Date(r.at)) === day);
+    const resv = reservedNow();
+    return {
+      title: "Hoy",
+      know: [...evs.slice(0, 6).map((e) => ({ text: `${e.time ?? "Todo el día"} · ${e.title}`, src: calSrc })),
+        ...rems.slice(0, 4).map((r) => ({ text: `Recordatorio ${new Date(r.at).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })} · ${r.text}`, src: "Tus recordatorios" })),
+        open.length ? { text: `${open.length} tareas abiertas; la más antigua: «${open[0].text}»`, src: "Tus tareas" } : null,
+        resv ? { text: `Rato reservado hasta las ${resv.to}`, src: "Tu tiempo reservado" } : null],
+      infer: [{ text: `Franja: ${fr().title ?? MODE_TITLES[modeState(today(), undefined, vault.settings.override).mode]}`, why: "tu horario y la hora" }],
+      propose: props().slice(0, 3).map(propOf),
+      gaps: gCal ? [] : ["Tu calendario de Google no está conectado: solo veo lo pegado y los cumpleaños."],
+    };
+  }
+  if (tab === "agenda") {
+    const w = weekView(vault, now, { eventsFor }), adv = weekAdvice(w);
+    const count = (t) => w.reduce((n, d) => n + d.items.filter((x) => x.type === t).length, 0);
+    return {
+      title: "Tu semana",
+      know: [{ text: `${count("evento")} eventos, ${count("recordatorio")} recordatorios y ${count("reservado")} ratos reservados en 7 días`, src: `${gCal ? "Google Calendar" : "Agenda pegada"} y tus recordatorios` },
+        ...w.flatMap((d) => d.conflicts.map((c) => ({ text: `${d.label}: «${c.event}» choca con tu rato reservado ${c.from}–${c.to}`, src: "Agenda + tiempo reservado" })))],
+      infer: [...w.filter((d) => d.heavy).map((d) => ({ text: `${d.label} va lleno`, why: `${d.load} cosas con hora` })), ...adv.filter((a) => a.kind === "proteger").map((a) => ({ text: a.text, why: "días llenos y ningún rato para ti" }))],
+      propose: [...props("agenda").slice(0, 4).map(propOf), { text: "Repasa la semana en 10 minutos: citas, tareas, documentos, pagos y tu tiempo.", label: "Preparar la semana", attrs: { "data-sub-go": "repaso", "data-act": "wk-prep", "data-v": "rapido" } }],
+      gaps: gCal ? [] : ["Sin Google Calendar conectado solo veo lo pegado."],
+    };
+  }
+  if (tab === "proyectos") {
+    const p = openProject ? (vault.projects ?? []).find((x) => x.id === openProject) : null;
+    if (!p) {
+      const quiet = (vault.projects ?? []).filter((x) => !(vault.inbox ?? []).some((i) => i.filed === x.id && Date.now() - Date.parse(i.at) < 21 * 864e5));
+      return { title: "Proyectos", know: [{ text: `${(vault.projects ?? []).length} proyectos`, src: "Proyectos" }], infer: quiet.slice(0, 4).map((x) => ({ text: `«${x.name}» lleva tiempo sin nada nuevo`, why: "no ha entrado nada en 3 semanas" })), propose: props("proyecto").map(propOf), gaps: [] };
+    }
+    const filed = (vault.inbox ?? []).filter((i) => i.filed === p.id);
+    const words = slugWords(p.name);
+    const decisions = (vault.brain?.claims ?? []).filter((c) => c.status === "ACTIVE" && c.kind === "DECISION" && words.some((w) => slugWords(`${c.text} ${(c.tags ?? []).join(" ")}`).includes(w)));
+    const cer = cerebroDeProyecto(cerEntries(), p.name);
+    const last = Math.max(0, ...filed.map((i) => Date.parse(i.at) || 0), ...(p.sources ?? []).map((s) => Date.parse(s.at) || 0), Date.parse(p.createdAt) || 0);
+    return {
+      title: `${p.emoji ?? "📁"} ${p.name}`,
+      know: [p.why ? { text: `Para qué: ${p.why}`, src: "Lo escribiste al crearlo" } : null,
+        { text: `${(p.sources ?? []).length} fuentes, ${filed.filter((i) => i.status === "TASK" && !i.done).length} tareas abiertas y ${filed.filter((i) => i.status === "IDEA").length} ideas`, src: "Proyecto e ideas archivadas en él" },
+        ...decisions.slice(0, 4).map((c) => ({ text: `Decisión: ${c.text}`, src: `Memoria · ${new Date(c.recordedAt).toLocaleDateString("es-ES")} · ${c.source?.kind === "manu" ? "lo dijiste tú" : c.source?.kind ?? "memoria"}` })),
+        ...cer.slice(0, 3).map((e) => ({ text: `${e.titulo}: ${e.resumen}`, src: `Cerebro · ${CEREBRO_ORIGENES[e.origen] ?? e.origen}` }))],
+      infer: last ? [{ text: `Lo último entró hace ${Math.round((Date.now() - last) / 864e5)} días`, why: "fecha de la última fuente, tarea o idea" }] : [],
+      propose: props("al-proyecto").filter((c) => c.projectId === p.id).map(propOf),
+      gaps: decisions.length ? [] : ["No tengo decisiones guardadas sobre este proyecto. Dímelas en el chat («recuerda que decidí…») y las enlazo."],
+    };
+  }
+  if (tab === "dinero") {
+    const [s0, s1] = monthRange();
+    const sum = lgSummary(vault, { from: s0, to: s1 });
+    const rec = detectRecurring(money().spend).slice(0, 4);
+    const mv = lgUi.key ? money().byKey.get(lgUi.key) : null;
+    const mk = mv ? merchantKey(mv.name ?? mv.concept ?? "") : null;
+    const same = mk ? money().spend.filter((x) => merchantKey(x.merchant) === mk) : [];
+    return {
+      title: "Dinero",
+      know: [{ text: `Este mes: ${eurosTxt(sum.consumo)} de consumo personal`, src: `Dinero 2.0 · fiabilidad: ${sum.nivelLabel ?? "—"}` },
+        mv ? { text: `Este movimiento: ${mv.name ?? mv.concept ?? "sin concepto"} · ${catLabel(mv.category ?? "OTHER")}${mk ? ` · ${same.length} veces en tu historial` : ""}`, src: "Tus movimientos" } : null],
+      infer: rec.map((r) => ({ text: `«${r.merchant}» parece un cargo fijo de ~${eurosTxt(r.cents)} (el día ${r.dayOfMonth})`, why: `${r.occurrences} cargos parecidos cada mes` })),
+      propose: [],
+      gaps: ["No hago operaciones con el banco: solo leo lo que importaste o conectaste."],
+    };
+  }
+  if (tab === "tu" && sub === "biblioteca") {
+    const lib = vault.library ?? [];
+    const toRead = lib.filter((i) => i.kind === "libro" && i.status !== "hecho");
+    const linked = lib.filter((i) => i.project).map((i) => ({ i, p: (vault.projects ?? []).find((x) => x.id === i.project) })).filter((x) => x.p);
+    return { title: "Biblioteca", know: [{ text: `${lib.length} cosas guardadas; ${toRead.length} libros para leer`, src: "Biblioteca" }, ...linked.slice(0, 4).map(({ i, p }) => ({ text: `«${i.title}» va con el proyecto «${p.name}»`, src: "Lo enlazaste al guardar" }))], infer: [], propose: [], gaps: [] };
+  }
+  if (tab === "tu" && sub === "momentos") {
+    const back = onThisDay(vault.moments ?? [], now);
+    return { title: "Momentos", know: [{ text: `${(vault.moments ?? []).length} momentos guardados en este dispositivo`, src: "Momentos (no suben a Tu nube)" }, ...back.map((m) => ({ text: `Tal día como hoy (${m.day.slice(0, 4)}): ${m.text || "una foto"}`, src: "Momentos" }))], infer: [], propose: [], gaps: [] };
+  }
+  // Tú y el resto: qué se sincroniza y qué no (sección 8 de la misión).
+  return {
+    title: "Tus datos",
+    know: [{ text: nubeOn() ? "Tu nube está conectada: tareas, ideas, gastos, proyectos, agenda y ajustes viajan entre tus dispositivos." : "Tu nube no está conectada: todo vive solo en este dispositivo.", src: "Tú → Tu nube" },
+      { text: "Se quedan siempre en este dispositivo: las conversaciones con MANU, el correo leído, los Momentos y sus fotos, los archivos, los datos del DJ y tus claves.", src: "Reglas de privacidad de Tu nube" },
+      nubeOn() ? { text: brainInCloud(vault) ? "Tu memoria viaja con Tu nube (lo íntimo y lo de otras personas se queda aquí)." : "Tu memoria no viaja con Tu nube.", src: "Tú → Memoria" } : null,
+      { text: `Tu cerebro compartido: ${cerEntries().length} entradas en este dispositivo`, src: "Tú → Tu cerebro" }],
+    infer: [], propose: [], gaps: ["La copia completa cifrada (Tú → Tus datos) es lo único que lo guarda todo."],
+  };
+}
+const slugWords = (t) => normalise(String(t ?? "")).split(/[^a-z0-9ñ]+/).filter((w) => w.length >= 4).map((w) => w.slice(0, 6));
+
 // ---------- WEB-123: panel de acciones (como Atajos: abrir → ver mis acciones → tocar → pasa algo) ----------
 function actionPanel() {
   const d = dj.state.runner?.s;
@@ -1541,15 +1669,21 @@ function upcomingItems(now = today(), hours = 48) {
   }
   for (const r of vault.reminders) {
     const at = new Date(r.at);
-    if (!r.done && at >= now && at <= until) items.push({ at, allDay: false, title: r.text, color: null, kind: "reminder" });
+    if (!r.done && at >= now && at <= until) items.push({ at, allDay: false, title: r.text, color: null, kind: "reminder", src: reminderSource(r) });
   }
   return items.sort((a, b) => a.at - b.at || (a.allDay ? -1 : 1)).slice(0, 6);
 }
 
+// De dónde salió un recordatorio creado desde una propuesta (WEB-124, flujo B).
+function reminderSource(r) {
+  if (!r.from?.list) return "";
+  const where = { inbox: "de una idea o tarea guardada", library: "de tu biblioteca", docs: "de un documento" }[r.from.list] ?? "de algo guardado";
+  return `${where}${r.dateFrom === "explicita" ? " · fecha escrita" : r.dateFrom === "interpretada" ? " · fecha interpretada" : ""}`;
+}
 function upcomingCard() {
   const items = upcomingItems();
   const dayWord = (d) => { const k = dayKey(d); return k === localDay() ? "Hoy" : k === tomorrowKey() ? "Mañana" : cap(d.toLocaleDateString("es-ES", { weekday: "long" })); };
-  return `<section class="card upcoming"><h2>Lo próximo</h2>${items.length ? `<ol class="timeline">${items.map((it) => `<li class="tl-item${it.kind === "reminder" ? " rem" : ""}"><span class="tl-dot" data-c="${esc(it.color ?? "")}"></span><div class="grow"><div>${it.kind === "reminder" ? "🔔 " : ""}${esc(it.title)}</div><div class="muted small">${dayWord(it.at)} · ${it.allDay ? "todo el día" : hhmm(it.at)}</div></div></li>`).join("")}</ol>` : '<p class="muted">Nada en las próximas 48 horas. 🌿</p>'}</section>`;
+  return `<section class="card upcoming"><h2>Lo próximo</h2>${items.length ? `<ol class="timeline">${items.map((it) => `<li class="tl-item${it.kind === "reminder" ? " rem" : ""}"><span class="tl-dot" data-c="${esc(it.color ?? "")}"></span><div class="grow"><div>${it.kind === "reminder" ? "🔔 " : ""}${esc(it.title)}</div><div class="muted small">${dayWord(it.at)} · ${it.allDay ? "todo el día" : hhmm(it.at)}${it.src ? ` · ${esc(it.src)}` : ""}</div></div></li>`).join("")}</ol>` : '<p class="muted">Nada en las próximas 48 horas. 🌿</p>'}</section>`;
 }
 
 function calendarCard(canCreate) {
@@ -1731,7 +1865,7 @@ const screens = {
     const max = cats[0]?.[1] ?? 1;
     const imp = vault.settings.lastImport;
     return `<h1>Dinero</h1><p class="subtitle">${esc(cap(monthName))}</p>
-      <div class="stack">
+      <div class="stack money-desk">
       ${moneyMonth === 0 ? lgSummaryCard(lsum, { monthName: cap(monthName.replace(/ de \d{4}$/, "")) }) : lgSummaryCard(lsum, { monthName: cap(monthName) })}
       ${lgSuggestionsCard(lgSuggestions(vault, { max: 5 }), money().byKey)}
       ${bankAisCard(bankAisUi, nubeOn())}
@@ -1787,7 +1921,7 @@ const screens = {
       <section class="card"><div class="mood">${MOODS.map((m) => `<button data-act="mood" data-v="${m.value}" aria-pressed="${mood === m.value}" aria-label="${m.label}"><b class="mood-e" aria-hidden="true">${m.emoji}</b>${m.label}</button>`).join("")}</div>
         <div class="row"><span class="muted small">Últimos 7 días</span><span class="dots">${week.map((v) => `<i data-v="${v}" title="${v ? MOODS[v - 1].label : "Sin dato"}"></i>`).join("")}</span></div>
         ${mood === 1 ? '<button class="btn ghost" data-act="refuge">Abrir el Refugio</button>' : ""}</section>
-      ${sectionTitle("Lo que guardas")}
+      <div class="tu-groups"><div class="tu-group">${sectionTitle("Lo que guardas")}
       <div class="list">
         ${item("memoria", "box", "purple", "Memoria", (() => { const n = (vault.brain?.claims ?? []).filter((c) => c.status === "ACTIVE").length; const p = vault.brain ? memProposals(vault.brain, { spending: vault.spending, projects: vault.projects, now: new Date() }).length : 0; return p ? `${p} cosa${p === 1 ? "" : "s"} para ti · ${n} recuerdos` : n ? `${n} recuerdos` : "Lo que me cuentas, para que no se te olvide"; })())}
         ${item("cerebro", "box", "purple", "Tu cerebro", cerEntries().length ? `${cerEntries().length} entradas de tus IAs${cerEntries().filter((e) => e.estado === "sin_revisar").length ? ` · ${cerEntries().filter((e) => e.estado === "sin_revisar").length} sin revisar` : ""}` : "Lo que guardan Claude y ChatGPT de cada conversación")}
@@ -1798,7 +1932,7 @@ const screens = {
         ${item("capturas", "shots", "blue", "Bandeja de capturas", toReview(vault.captures).length ? `${toReview(vault.captures).length} por revisar` : "Suelta aquí tus capturas y MANU las ordena")}
         ${item("limpieza", "box", "gray", "Limpieza digital", "Repetidos, olvidados y fotos que ya nada usa")}
       </div>
-      ${sectionTitle("Tu día a día")}
+      </div><div class="tu-group">${sectionTitle("Tu día a día")}
       <div class="list">
         ${item("repaso", "repeat", "purple", "Repaso", "Tu día y tu semana: lo que fue bien y el plan")}
         ${item("rutinas", "repeat", "blue", "Rutinas de trabajo", (vault.routines ?? []).filter((r) => r.on).length ? `${(vault.routines ?? []).filter((r) => r.on).length} activas · se apuntan solas el día que tocan` : "Tareas que se repiten cada semana o cada mes")}
@@ -1809,12 +1943,12 @@ const screens = {
         ${item("personas", "people", "purple", "Personas", vault.people.length ? `${vault.people.length} personas` : "Cumpleaños y detalles")}
         <button class="item" data-act="refuge"><span class="ico teal">${I.leaf}</span><span class="grow"><span>Refugio</span><br><span class="muted small">Para cuando no estás bien</span></span><span class="chev">${I.chev}</span></button>
       </div>
-      ${sectionTitle("Trabajo")}
+      </div><div class="tu-group">${sectionTitle("Trabajo")}
       <div class="list">
         ${item("fichaje", "clock", "blue", "Fichaje", (() => { const r = monthReport(vault.clock, localDay().slice(0, 7), { targetMin: clockTarget(), now: today() }); return r.days || r.openDays ? r.balance : "Entradas, pausas y lo que te debe RK"; })())}
         ${item("tablero", "box", "orange", "Tablero RK", boardOn() ? (boardCache()?.feed ? `${boardSummary(boardCache().feed, today()).count} tarjetas activas · leído ${boardReadLabel(boardCache().readAt, today())}` : "Conectado, sin leer aún") : "Ver tu Tablero de marketing (solo lectura)")}
       </div>
-      ${sectionTitle("Ajustes")}
+      </div><div class="tu-group">${sectionTitle("Ajustes")}
       <div class="list">
         ${item("permisos", "bolt", "teal", "Permisos y conexiones", capProbe ? capSummary(capItems()) : "Qué usa MANU del iPhone y de fuera")}
         ${item("tiempo", "pin", "blue", "Tiempo y ciudades", `Casa: ${(vault.settings.homeCity ?? CITIES.GIJON).name}`)}
@@ -1827,7 +1961,7 @@ const screens = {
         ${item("nube", "box", "blue", "Tu nube", nubeOn() ? (nube.state.conflict ? "Elige con qué datos te quedas" : nube.state.error ? "Revisar" : `Sincronizada${nube.state.lastAt ? ` · ${new Date(nube.state.lastAt).toLocaleString("es-ES", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}` : ""}`) : "iPhone y Mac con los mismos datos (sin fotos ni «Tu archivo»)")}
         ${item("apariencia", "leaf", "gray", "Apariencia", `Tema: ${SKINS[skin()]}`)}
         ${item("datos", "box", "gray", "Tus datos", "Copia, restaurar y borrar")}
-      </div>
+      </div></div></div>
       <p class="muted small">MANU OS web · versión ${APP_VERSION} · ${nubeOn() ? "sincronizado con tu nube" : "datos solo en este dispositivo"}</p>`;
   },
 };
@@ -1893,7 +2027,7 @@ function pushCard() {
 }
 
 const subpages = {
-  apariencia() { return `${backBar("Apariencia")}${hzApariencia(skin())}`; },
+  apariencia() { return `${backBar("Apariencia")}${hzApariencia(skin(), mpLook())}`; },
   permisos() {
     if (!capProbe) refreshCaps();
     const items = capItems();
@@ -2576,6 +2710,7 @@ function render({ focus = false, enter = null } = {}) {
   $("screen").querySelectorAll(".week-bars i[data-h], .ie-bars i[data-h]").forEach((el) => { el.style.height = `${Math.max(Number(el.dataset.h) ? 2 : 0, Number(el.dataset.h))}%`; });
   $("screen").querySelectorAll("[data-c]").forEach((el) => { if (/^#[0-9a-f]{6}$/i.test(el.dataset.c)) el.style.setProperty("--ev", el.dataset.c); });
   hydrateImages($("screen"));
+  applyShell();
   $("topTitle").textContent = sub ? { habitos: "Hábitos", salud: "Salud", comidas: "Comidas", personas: "Personas", tiempo: "Tiempo", avisos: "Avisos", datos: "Tus datos", gcal: "Google", correo: "Correo", archivo: "Tu archivo", capturas: "Capturas", ia: "IA", spotify: "Spotify", atajos: "Atajos", fichaje: "Fichaje", repaso: "Repaso", documentos: "Documentos", biblioteca: "Biblioteca", memoria: "Memoria", permisos: "Permisos", apariencia: "Apariencia" }[sub] : TABS.find(([id]) => id === tab)[1];
   const sheetKey = sheet ? sheet.kind : null;
   if (sheetKey !== renderedSheetKind || !sheet) {
@@ -3758,15 +3893,14 @@ const recurringSoon = () => upcomingRecurring(detectRecurring(vault.spending ?? 
 function weekCard() {
   const w = weekView(vault, new Date(), { eventsFor });
   const adv = weekAdvice(w);
-  const days = weekUi.open ? w : w.slice(0, 3);
   const item = (x) => `<li class="wk-item wk-${x.type}"><span class="wk-tag">${TYPE_TAG[x.type]}</span><span class="grow">${x.time ? `<span class="num">${esc(x.time)}${x.end ? `–${esc(x.end)}` : ""}</span> ` : ""}${esc(x.title)}${x.type === "propuesta" ? ' <span class="muted small">(suposición: acéptala en Hoy)</span>' : ""}</span>${x.type === "evento" ? `<button class="link small" data-act="wk-decline" data-t="${esc(x.title)}">Decir que no</button>` : x.type === "reservado" ? `<button class="link small" data-act="wk-unreserve" data-id="${esc(x.id)}" aria-label="Quitar este rato reservado">Quitar</button>` : ""}</li>`;
   const kinds = Object.entries(RESERVE_KINDS).map(([k, l]) => `<option value="${k}">${l}</option>`).join("");
   const dayOpts = w.map((d) => `<option value="d:${d.key}">${esc(d.label)}</option>`).join("") + ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"].map((n, i) => `<option value="w:${i}">Cada ${n.toLowerCase()}</option>`).join("");
-  return `<section class="card week-card"><div class="row"><h2>Tu semana</h2><button class="link small" data-act="wk-toggle">${weekUi.open ? "Ver menos" : "Ver los 7 días"}</button></div>
+  return `<section class="card week-card"><div class="row"><h2>Tu semana</h2><button class="link small wk-toggle" data-act="wk-toggle">${weekUi.open ? "Ver menos" : "Ver los 7 días"}</button></div>
     <p class="muted small">Cada cosa por lo que es. Los huecos libres se quedan libres: MANU no los rellena.</p>
     ${adv.map((a) => `<p class="wk-advice small">${esc(a.text)}${a.kind === "proteger" ? ` <button class="link small" data-act="wk-reserve-open" data-day="${esc(a.day ?? "")}">Reservar</button>` : ""}</p>`).join("")}
     ${weekUi.decline ? `<div class="wk-decline stack"><b class="small">Respuesta para copiar (MANU no la envía)</b><textarea id="wkDeclineText" rows="3" aria-label="Respuesta">${esc(weekUi.decline)}</textarea><div class="btns"><button class="btn" data-act="wk-decline-copy">Copiar</button><button class="btn ghost" data-act="wk-decline-close">Cerrar</button></div></div>` : ""}
-    ${days.map((d) => `<div class="wk-day${d.heavy ? " heavy" : ""}"><b class="small">${esc(d.label)}${d.heavy ? " · día lleno" : ""}</b>${d.items.length ? `<ul class="wk-list">${d.items.map(item).join("")}</ul>` : '<p class="muted small">Libre.</p>'}</div>`).join("")}
+    <div class="wk-days${weekUi.open ? " open" : ""}">${w.map((d, i) => `<div class="wk-day${d.heavy ? " heavy" : ""}${i === 0 ? " today" : ""}${i >= 3 ? " wk-more" : ""}"><b class="small">${esc(d.label)}${d.heavy ? " · día lleno" : ""}</b>${d.items.length ? `<ul class="wk-list">${d.items.map(item).join("")}</ul>` : '<p class="muted small">Libre.</p>'}</div>`).join("")}</div>
     ${weekUi.reserve ? `<form id="reserveForm" class="stack wk-reserve"><b class="small">Reservar tiempo sin compromisos</b>
       <label for="rsDay" class="sr">Día</label><select id="rsDay">${dayOpts}</select>
       <div class="row"><label for="rsFrom" class="muted small">De</label><input id="rsFrom" type="time" value="18:00"><label for="rsTo" class="muted small">a</label><input id="rsTo" type="time" value="21:00"></div>
@@ -3856,8 +3990,8 @@ function conexionesCard() {
   if (fr().key === "WORK" || reservedNow()) return ""; // WEB-115: en el trabajo, solo trabajo; WEB-121: en tu rato reservado, nada
   const list = conexiones(vault, new Date(), { dismissed: relDismissed(), max: 3 });
   if (!list.length) return "";
-  const row = (c) => `<div class="stack rel-item"><div><b>${c.kind === "proyecto" ? "📁" : "🗓️"} ${esc(c.title)}</b><p class="muted small">${c.kind === "agenda" ? `Propuesta: recordatorio el ${esc(c.label)}. ` : ""}${esc(c.why)}</p></div>
-    <div class="btns"><button class="btn" data-act="rel-ok" data-k="${esc(c.key)}">${c.kind === "proyecto" ? "Crear proyecto" : "Pasar a Agenda"}</button><button class="btn ghost" data-act="rel-no" data-k="${esc(c.key)}">No, gracias</button></div></div>`;
+  const row = (c) => `<div class="stack rel-item"><div><b>${c.kind === "agenda" ? "🗓️" : "📁"} ${esc(c.title)}</b><p class="muted small">${c.kind === "agenda" ? `Propuesta: recordatorio el ${esc(c.label)}. ` : c.kind === "al-proyecto" ? `Propuesta: añadirla a ${esc(c.label)}. ` : ""}${esc(c.why)}</p></div>
+    <div class="btns"><button class="btn" data-act="rel-ok" data-k="${esc(c.key)}">${c.kind === "proyecto" ? "Crear proyecto" : c.kind === "al-proyecto" ? "Añadir al proyecto" : "Pasar a Agenda"}</button><button class="btn ghost" data-act="rel-no" data-k="${esc(c.key)}">No, gracias</button></div></div>`;
   return `<section class="card rel-card"><h2>Conexiones</h2><p class="muted small">Lo que has guardado y podría ir a otro sitio. Son propuestas: no hago nada sin tu toque.</p>${list.map(row).join("")}</section>`;
 }
 async function relAct(a) {
@@ -3867,8 +4001,15 @@ async function relAct(a) {
   if (!c) { render(); return; }
   if (c.kind === "agenda") {
     const id = uid("r");
-    vault.reminders.push({ id, text: c.title.slice(0, 140), at: c.at, done: false, notified: false, from: c.source });
+    vault.reminders.push({ id, text: c.title.slice(0, 140), at: c.at, done: false, notified: false, from: c.source, ...(c.certainty ? { dateFrom: c.certainty } : {}) });
     persist(); render(); toast(`Recordatorio creado: ${c.label}. Está en Agenda`); return;
+  }
+  if (c.kind === "al-proyecto") {
+    const p = (vault.projects ?? []).find((x) => x.id === c.projectId), idea = vault.inbox.find((i) => i.id === c.source.id);
+    if (!p || !idea || idea.filed) { render(); return; }
+    vault.inbox = vault.inbox.map((i) => (i.id === idea.id ? { ...i, filed: p.id } : i));
+    Object.assign(p, addSource(p, { id: uid("src"), kind: "note", title: "💡 Idea", text: idea.text }));
+    persist(); render(); toast(`Añadida a «${p.name}». La idea sigue en tus ideas, ahora enlazada`); return;
   }
   if (c.kind === "proyecto") {
     try {
@@ -3890,6 +4031,9 @@ function hzAct(a) {
     case "hz-skin":
       if (!SKINS[d.v]) return;
       vault.settings.skin = d.v; persist(); render(); toast(`Tema ${SKINS[d.v]} activado. Tus datos no cambian.`); return;
+    case "hz-look":
+      if (!MP_LOOKS[d.v]) return;
+      vault.settings.mpLook = d.v; persist(); render(); toast(`mp. ${MP_LOOKS[d.v].toLowerCase()}. Tus datos no cambian.`); return;
     case "hz-mp-no": vault.settings.mpOffer = "no"; persist(); render(); toast("Vale. Lo tienes en Tú → Apariencia."); return;
     case "hz-dial-ahora": hzUi.minutos = null; render(); return;
     case "hz-manu": hzUi.manu = d.v === "cielo" ? "cielo" : "hablar"; memUi.open = null; memUi.correcting = null; render(); return;
@@ -4155,6 +4299,11 @@ document.addEventListener("click", async (e) => {
   if (a.dataset.act.startsWith("wk-")) { weekAct(a); return; }
   if (a.dataset.act.startsWith("dj-")) { dj.act(a).then(() => render()); return; }
   if (a.dataset.act === "panel") { panelAct(a); return; }
+  if (a.dataset.act === "side-go") { const from = tab; tab = "tu"; sub = a.dataset.to; subFrom = from === "hoy" ? "hoy" : null; if (sub === "limpieza") { cleanUi = { report: null, undo: null, loading: false }; } render({ focus: true, enter: "page" }); scrollTo(0, 0); return; }
+  if (a.dataset.act === "side-proj") { tab = "proyectos"; sub = null; openProject = a.dataset.id; render({ focus: true, enter: "page" }); scrollTo(0, 0); return; }
+  if (a.dataset.act === "side-collapse") { shellUi.collapsed = !shellUi.collapsed; saveShell(); applyShell(); return; }
+  if (a.dataset.act === "ctx-toggle") { toggleCtx(); return; }
+  if (a.dataset.act === "ctx-close") { toggleCtx(false); return; }
   if (a.dataset.act.startsWith("cl-")) { cleanAct(a); return; }
   if (a.dataset.act === "cer-export") { const file = new File([JSON.stringify({ exportado: new Date().toISOString(), origen: "MANU OS · copia local del cerebro", entradas: cerEntries() }, null, 2)], `cerebro-${localDay()}.json`, { type: "application/json" }); const l = document.createElement("a"); l.href = URL.createObjectURL(file); l.download = file.name; document.body.appendChild(l); l.click(); setTimeout(() => { URL.revokeObjectURL(l.href); l.remove(); }, 1000); toast("Copia descargada"); return; }
   if (a.dataset.act === "copy-link") { navigator.clipboard?.writeText(a.dataset.v).then(() => toast("Copiada")).catch(() => toast(a.dataset.v)); return; }
@@ -4566,6 +4715,7 @@ document.addEventListener("submit", async (e) => {
   if (f === "projStepForm") { const p = (vault.projects ?? []).find((x) => x.id === e.target.dataset.id); const text = $("pStep").value.trim().slice(0, 140); if (p && text) { vault.inbox.push({ ...capture({ id: uid("c"), text: `${p.emoji ?? "📁"} ${text}`, at: new Date().toISOString() }), status: "TASK", project: p.id }); p.updatedAt = new Date().toISOString(); persist(); render(); toast("Apuntado: te lo propondré cuando toque"); } return; }
   if (f === "momentForm") { await momentSave(); return; }
   if (f === "reserveForm") { reserveSubmit(); return; }
+  if (f === "ctxAsk") { const q = $("ctxQ").value.trim().slice(0, 500); if (!q) return; const before = vault.chat.length; say(q); if (refuge) { tab = "manu"; sub = null; shellUi.ctx = false; saveShell(); render({ focus: true }); return; } const last = vault.chat.slice(before).reverse().find((m) => m.from === "manu"); shellUi.reply = last ? String(last.text ?? "").slice(0, 600) : "Te contesto en el chat de MANU."; applyShell(); $("ctxQ")?.focus(); return; }
   if (f === "npForm") { const t = $("npText").value.replace(/\s+/g, " ").trim().slice(0, 60); if (!t) return; vault.settings.nightPrep = [...(vault.settings.nightPrep ?? []), { id: uid("np"), text: t }].slice(0, 12); persist(); render(); return; }
   if (f === "intForm") { try { vault.interests = [...(vault.interests ?? []), newInterest({ id: uid("in"), name: $("intName").value, kind: $("intKind").value, project: $("intProject").value || null })]; persist(); render(); toast("Añadido"); } catch (err) { toast(err.message); } return; }
   if (f === "momentFind") { momentUi = { ...momentUi, q: $("momentQ").value.trim().slice(0, 80) }; render(); return; }
@@ -5682,8 +5832,13 @@ function openCmdk(prefill = "") {
 function closeCmdk() { if (cmdk.el) cmdk.el.hidden = true; }
 function drawCmdk(rebuild = true) {
   const input = cmdk.el.querySelector("#cmdkInput");
-  if (rebuild) cmdk.items = suggest(input.value, { clock: shiftNow().state });
-  cmdk.el.querySelector("#cmdkList").innerHTML = cmdk.items.map((x, i) => `<li role="option" id="cmdk-${i}" data-i="${i}" class="cmdk-item${i === cmdk.sel ? " on" : ""}" aria-selected="${i === cmdk.sel}">${esc(x.label)}</li>`).join("");
+  if (rebuild) {
+    const q = input.value.trim();
+    // Sin IA: órdenes y pantallas (core/commands.js) + lo que ya tienes guardado, cada cosa con su procedencia.
+    const found = q.length >= 2 ? findEverywhere(q, 8).map((x) => ({ label: `${x.icon} ${x.title}`, detail: x.detail || x.kind, go: x.go })) : [];
+    cmdk.items = [...suggest(input.value, { clock: shiftNow().state }), ...found].slice(0, 14);
+  }
+  cmdk.el.querySelector("#cmdkList").innerHTML = cmdk.items.map((x, i) => `<li role="option" id="cmdk-${i}" data-i="${i}" class="cmdk-item${i === cmdk.sel ? " on" : ""}" aria-selected="${i === cmdk.sel}">${esc(x.label)}${x.detail ? `<span class="cmdk-src">${esc(x.detail)}</span>` : ""}</li>`).join("");
   input.setAttribute("aria-activedescendant", `cmdk-${cmdk.sel}`);
 }
 function pickCmdk(i) {
@@ -5692,6 +5847,11 @@ function pickCmdk(i) {
   const input = cmdk.el.querySelector("#cmdkInput");
   if (it.fill) { input.value = it.fill; cmdk.sel = 0; drawCmdk(); input.focus(); return; }
   closeCmdk();
+  if (it.go) {
+    const g = it.go;
+    if (g.project) { tab = "proyectos"; sub = null; openProject = g.project; } else if (g.sub) { tab = "tu"; sub = subpages[g.sub] ? g.sub : null; } else if (TABS.some(([id]) => id === g.tab)) { tab = g.tab; sub = null; }
+    subFrom = null; render({ focus: true, enter: "page" }); scrollTo(0, 0); return;
+  }
   runCommand(it.run);
 }
 function runCommand(text) {
@@ -5724,6 +5884,8 @@ document.addEventListener("keydown", (e) => {
   const typing = e.target.matches?.("input, textarea, select, [contenteditable]");
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); if (cmdk.el && !cmdk.el.hidden) closeCmdk(); else openCmdk(); }
   else if (e.key === "/" && !typing && !sheet && !(cmdk.el && !cmdk.el.hidden)) { e.preventDefault(); openCmdk(); }
+  else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "j") { e.preventDefault(); toggleCtx(); }
+  else if (e.key === "Escape" && shellUi.ctx && e.target.closest?.("#ctxPanel")) { e.preventDefault(); toggleCtx(false); }
 });
 
 // From a Shortcut: «#di=…» (or the old «?di=…»), «#eventos=…», «#manana=1».

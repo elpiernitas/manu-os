@@ -1,0 +1,114 @@
+/* Centro de operaciones (WEB-124): la misma app, otra experiencia en el ordenador.
+   - < 1024 px: lo de siempre (barra inferior). La barra lateral se «disuelve» (display: contents)
+     y su navegación sigue siendo la barra inferior; el resto de piezas del escritorio no se ven.
+   - ≥ 1024 px: barra lateral fija (contraíble), zona central ancha y panel de MANU a la derecha
+     (encima del contenido hasta 1279 px; acoplado desde 1280 px).
+   Aplica a los temas mp. y Claude Design; Clásico y Horizonte conservan su diseño. */
+
+.sidebar { display: contents; }
+.side-head, .side-sub, .side-foot { display: none; }
+.ctx-panel[hidden] { display: none !important; }
+.ctx-panel { position: fixed; z-index: 30; top: 0; right: 0; bottom: 0; width: min(380px, 100vw); overflow-y: auto; background: var(--bg); color: var(--text); border-left: 1px solid var(--line); box-shadow: -12px 0 40px rgba(0,0,0,.16); padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0px)); display: grid; align-content: start; gap: 14px; }
+.ctx-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.ctx-close { min-width: 44px; min-height: 44px; border: 0; border-radius: 12px; background: var(--surface); color: var(--text); font-size: 16px; cursor: pointer; }
+.ctx-body { display: grid; gap: 12px; }
+.ctx-box { display: grid; gap: 6px; padding: 12px; border-radius: 14px; background: var(--surface); }
+.ctx-box h3 { margin: 0; font-size: 12px; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+.ctx-box p { margin: 0; font-size: 14px; line-height: 1.45; }
+.ctx-src, .ctx-why { display: inline-block; font-size: 12px; color: var(--muted); }
+.ctx-src::before { content: "· "; }
+.ctx-why::before { content: "· porque "; }
+.ctx-infer { border-left: 3px dashed var(--muted); }
+.ctx-prop { display: grid; gap: 6px; }
+.ctx-prop + .ctx-prop { border-top: 1px solid var(--line); padding-top: 8px; }
+.ctx-ask { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+.ctx-reply { padding: 12px; border-radius: 14px; background: var(--surface); }
+.ctx-toggle-mobile { display: none; }
+
+@media (min-width: 1024px) {
+  html:is([data-skin="mp"], [data-skin="design"]) { --side-w: 232px; --ctx-w: 360px; }
+  html:is([data-skin="mp"], [data-skin="design"])[data-side="collapsed"] { --side-w: 76px; }
+  html:is([data-skin="mp"], [data-skin="design"]) .sidebar {
+    display: flex; flex-direction: column; gap: 6px; position: fixed; z-index: 12; inset: 0 auto 0 0; width: var(--side-w);
+    padding: 14px 10px; background: var(--bg); border-right: 1px solid var(--line); overflow-y: auto; overflow-x: hidden; transition: width 180ms var(--ease-out, ease);
+  }
+  html:is([data-skin="mp"], [data-skin="design"]) .side-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 48px; padding: 0 4px 8px; }
+  html:is([data-skin="mp"], [data-skin="design"]) .side-head .mp-logo { width: 40px; }
+  html:is([data-skin="mp"], [data-skin="design"]) .side-brand { display: flex; align-items: center; gap: 8px; font-weight: 800; white-space: nowrap; overflow: hidden; }
+  html:is([data-skin="mp"], [data-skin="design"]) .side-btn { min-width: 40px; min-height: 40px; border: 0; border-radius: 10px; background: var(--surface); color: var(--text); cursor: pointer; font: inherit; }
+  html:is([data-skin="mp"], [data-skin="design"]) .sidebar .tabbar {
+    position: static; transform: none; width: auto; height: auto; display: flex; flex-direction: column; gap: 2px; padding: 0;
+    border: 0; border-radius: 0; background: none; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none;
+  }
+  html:is([data-skin="mp"], [data-skin="design"]) .sidebar .tab { min-height: 44px; width: 100%; display: flex; flex-direction: row; justify-content: flex-start; align-items: center; gap: 12px; padding: 8px 12px; text-align: left; font-size: 15px; border-radius: 12px; }
+  html:is([data-skin="mp"], [data-skin="design"]) .sidebar .tab .dot { width: 26px; height: 26px; margin: 0; }
+  html:is([data-skin="mp"], [data-skin="design"]) .sidebar .tab-pill { display: none; }
+  html:is([data-skin="mp"], [data-skin="design"]) .side-sub { display: grid; gap: 2px; padding: 8px 0; border-top: 1px solid var(--line); }
+  html:is([data-skin="mp"], [data-skin="design"]) .side-label { margin: 2px 12px 4px; font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+  html:is([data-skin="mp"], [data-skin="design"]) .side-link { min-height: 36px; padding: 6px 12px; border: 0; border-radius: 10px; background: none; color: var(--text); text-align: left; font: inherit; font-size: 14px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  html:is([data-skin="mp"], [data-skin="design"]) .side-link:hover, html:is([data-skin="mp"], [data-skin="design"]) .sidebar .tab:hover { background: var(--surface); }
+  html:is([data-skin="mp"], [data-skin="design"]) .side-link[aria-current="page"] { background: var(--surface); font-weight: 700; color: var(--accent); }
+  html:is([data-skin="mp"], [data-skin="design"]) .side-foot { display: grid; gap: 6px; margin-top: auto; padding-top: 8px; border-top: 1px solid var(--line); }
+  html:is([data-skin="mp"], [data-skin="design"]) .side-foot button { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; padding: 8px 12px; border: 0; border-radius: 12px; background: var(--surface); color: var(--text); font: inherit; font-size: 14px; cursor: pointer; white-space: nowrap; overflow: hidden; }
+  html:is([data-skin="mp"], [data-skin="design"]) kbd { font: 600 11px/1 var(--font); padding: 4px 6px; border-radius: 6px; border: 1px solid var(--line); color: var(--muted); }
+  /* Contraída: solo iconos. Los nombres siguen ahí para el lector de pantalla. */
+  html:is([data-skin="mp"], [data-skin="design"])[data-side="collapsed"] .sidebar .tab > span:not(.dot),
+  html:is([data-skin="mp"], [data-skin="design"])[data-side="collapsed"] .side-sub,
+  html:is([data-skin="mp"], [data-skin="design"])[data-side="collapsed"] .side-brand-name,
+  html:is([data-skin="mp"], [data-skin="design"])[data-side="collapsed"] .side-foot .lbl,
+  html:is([data-skin="mp"], [data-skin="design"])[data-side="collapsed"] .side-foot kbd { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  html:is([data-skin="mp"], [data-skin="design"])[data-side="collapsed"] .side-head { flex-direction: column; }
+  html:is([data-skin="mp"], [data-skin="design"])[data-side="collapsed"] .sidebar .tab, html:is([data-skin="mp"], [data-skin="design"])[data-side="collapsed"] .side-foot button { justify-content: center; padding: 8px; }
+
+  /* Zona central: ancha de verdad, sin estirar tarjetas de móvil. */
+  html:is([data-skin="mp"], [data-skin="design"]) .app { max-width: none; margin: 0 var(--ctx-dock, 0px) 0 var(--side-w); padding: 28px clamp(24px, 3vw, 48px) 64px; transition: margin 180ms var(--ease-out, ease); }
+  html:is([data-skin="mp"], [data-skin="design"]) #screen { max-width: 1180px; margin: 0 auto; }
+  html:is([data-skin="mp"], [data-skin="design"]) .topbar { left: var(--side-w); right: var(--ctx-dock, 0px); }
+  html:is([data-skin="mp"], [data-skin="design"]) .chat-down { left: calc(var(--side-w) + (100vw - var(--side-w) - var(--ctx-dock, 0px)) / 2); }
+  html:is([data-skin="mp"], [data-skin="design"]) .composer { bottom: 20px; }
+  html:is([data-skin="mp"], [data-skin="design"]) .ctx-panel { width: var(--ctx-w); }
+  html:is([data-skin="mp"], [data-skin="design"]) .ctx-toggle-mobile { display: none; }
+
+  /* Vistas de escritorio (clases que ponen las pantallas). */
+  html:is([data-skin="mp"], [data-skin="design"]) .desk-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+  html:is([data-skin="mp"], [data-skin="design"]) .desk-cols > * { min-width: 0; }
+  html:is([data-skin="mp"], [data-skin="design"]) .desk-only { display: block; }
+  html:is([data-skin="mp"], [data-skin="design"]) .action-panel { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  html:is([data-skin="mp"], [data-skin="design"]) .ft-work { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 16px; align-items: start; }
+  html:is([data-skin="mp"], [data-skin="design"]) .ft-work > .ft-section-label { grid-column: 1 / -1; }
+  /* Agenda: la semana en 7 columnas. */
+  html:is([data-skin="mp"], [data-skin="design"]) .wk-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; }
+  html:is([data-skin="mp"], [data-skin="design"]) .wk-days .wk-day { border-top: 0; padding: 10px; border-radius: 12px; background: var(--bg); min-height: 160px; align-content: start; }
+  html:is([data-skin="mp"], [data-skin="design"]) .wk-days .wk-day.today { box-shadow: inset 0 0 0 2px var(--fill); }
+  html:is([data-skin="mp"], [data-skin="design"]) .wk-days .wk-item { flex-direction: column; gap: 2px; font-size: 13px; }
+  html:is([data-skin="mp"], [data-skin="design"]) .wk-days .wk-item { align-items: flex-start; }
+  html:is([data-skin="mp"], [data-skin="design"]) .wk-days .wk-tag { font-size: 10px; white-space: nowrap; }
+  html:is([data-skin="mp"], [data-skin="design"]) .wk-days .wk-item .link { font-size: 12px; min-height: 24px; text-align: left; }
+  html:is([data-skin="mp"], [data-skin="design"]) .wk-days .wk-day.wk-more { display: grid; }
+  html:is([data-skin="mp"], [data-skin="design"]) .wk-toggle { display: none; }
+  /* Dinero: movimientos como tabla. */
+  /* Dinero en dos columnas de tarjetas (el orden de lectura sigue el de móvil, columna a columna). */
+  html:is([data-skin="mp"], [data-skin="design"]) .money-desk { display: block; columns: 2 380px; column-gap: 20px; }
+  html:is([data-skin="mp"], [data-skin="design"]) .money-desk > * { break-inside: avoid; margin: 0 0 16px; min-width: 0; }
+  /* Tú: grupos en columnas. */
+  html:is([data-skin="mp"], [data-skin="design"]) .tu-groups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 20px; align-items: start; }
+  html:is([data-skin="mp"], [data-skin="design"]) .tu-group { min-width: 0; }
+}
+@media (min-width: 1280px) {
+  html:is([data-skin="mp"], [data-skin="design"])[data-ctx="open"] { --ctx-dock: var(--ctx-w); }
+  html:is([data-skin="mp"], [data-skin="design"])[data-ctx="open"] .ctx-panel { box-shadow: none; }
+}
+@media (min-width: 1680px) {
+  html:is([data-skin="mp"], [data-skin="design"]) #screen { max-width: 1320px; }
+}
+/* Móvil y tableta: la semana enseña 3 días hasta que pides los 7; las piezas de escritorio no se ven. */
+.wk-days .wk-day.wk-more { display: none; }
+.wk-days.open .wk-day.wk-more { display: grid; }
+@media (max-width: 1023px) {
+  .desk-only { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sidebar, .app { transition: none !important; }
+}
+/* ⌘K: cada resultado dice de dónde viene. */
+.cmdk-item .cmdk-src { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; }

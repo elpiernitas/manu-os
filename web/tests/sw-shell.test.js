@@ -34,3 +34,14 @@ test("service worker: no URL with a query is cached, only MANU caches are delete
   assert.match(sw, /Response\.error\(\)/);
   assert.doesNotMatch(sw, /hit \?\? caches\.match\("index\.html"\)/);
 });
+
+// WEB-124: la app no abría sin conexión porque shell/ no estaba en la caché. Todo lo que index.html
+// enlaza (CSS y JS locales) y todo shell/ y dj/ tiene que estar en SHELL.
+test("service worker caches every local file index.html links and every shell/ and dj/ module", () => {
+  const sw = readFileSync(new URL("../sw.js", import.meta.url), "utf8");
+  const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+  const linked = [...html.matchAll(/(?:href|src)="([^"#:?]+\.(?:css|js))"/g)].map((m) => m[1].replace(/^\.\//, ""));
+  const walk = (dir) => readdirSync(new URL(`../${dir}/`, import.meta.url), { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(`${dir}/${e.name}`) : e.name.endsWith(".js") || e.name.endsWith(".css") ? [`${dir}/${e.name}`] : []));
+  const missing = [...linked, ...walk("shell"), ...walk("dj")].filter((f) => !sw.includes(`"${f}"`));
+  assert.deepEqual(missing, []);
+});
