@@ -1,5 +1,40 @@
 # HANDOFF
 
+## WEB-123 · DJ funcionando con Spotify + panel de acciones en Hoy (Claude, 2026-11-24)
+
+Detalle en `docs/dj/DJ.md`.
+
+**Hecho:**
+- Hoy empieza con un **panel de acciones** de botones grandes, como Atajos: DJ, Mi mañana, Mi semana, Trabajo, Idea, Gasto, Momento y MANU.
+- El **DJ**:
+  - DJ-BRAIN (`web/dj/brain`, traído de la Fase 0) decide y Spotify reproduce;
+  - catálogo sin endpoints retirados;
+  - bucle de reproducción, cola corta y aprendizaje de saltos;
+  - estados SEARCHING y LOCKED_IN;
+  - descubrimiento y profundización en artistas;
+  - modos oficina y triste, y papeles de las playlists;
+  - idioma con etiquetas manuales;
+  - historial importable;
+  - retomar sin cortar.
+- Permisos de Spotify ampliados: hay que **volver a conectar una vez**.
+- Las portadas se cargan desde la CDN de Spotify (CSP `img-src`). La base `manuos-dj` entra en la copia completa.
+- Versión 123.
+
+**Pruebas:**
+- `npm test`: 532 de 532.
+- `dj.e2e`: 28 de 28, contra un Spotify falso.
+- Las 18 suites e2e en verde.
+
+**NO_VERIFICADO:**
+- La cuenta real de Spotify de Manu (permisos, Premium, dispositivos, géneros).
+- Safari real.
+- El comportamiento en segundo plano en iOS.
+
+**Pendiente:**
+- Bucle en el servidor para que funcione con MANU cerrada.
+- Una fuente real de idioma.
+- Last.fm.
+
 ## WEB-122b · Publicación en dos pasos (Claude, 2026-11-23)
 
 **Problema:**

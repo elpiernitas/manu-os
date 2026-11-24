@@ -28,7 +28,7 @@ export const VERSION = 1;
 const LS_PREFIX = "manuos.";
 const IDB_PREFIX = "manuos-";
 // Bases conocidas: se usan si el navegador no tiene indexedDB.databases().
-export const KNOWN_DATABASES = ["manuos-images", "manuos-archive"];
+export const KNOWN_DATABASES = ["manuos-images", "manuos-archive", "manuos-dj"];
 // Nunca salen del dispositivo ni se restauran desde un archivo.
 const SECRET_KEYS = new Set(["manuos.gemini", "manuos.spotify.tokens", "manuos.spotify.pkce"]);
 const SECRET_PATTERN = /(token|secret|password|passphrase|pkce|apikey|api-key|credential)/i;

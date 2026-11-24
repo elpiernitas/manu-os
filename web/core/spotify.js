@@ -7,7 +7,9 @@ import { normalise } from "./text.js";
 const AUTH = "https://accounts.spotify.com/authorize";
 const TOKEN = "https://accounts.spotify.com/api/token";
 const API = "https://api.spotify.com/v1/me/player";
-export const SPOTIFY_SCOPES = "user-read-playback-state user-modify-playback-state";
+// WEB-123: los permisos del DJ (leer lo que suena, tops, guardadas y playlists; poner la cola) se
+// piden de una vez con los del altavoz, para no tener que conectar dos veces.
+export const SPOTIFY_SCOPES = "user-read-playback-state user-modify-playback-state user-read-currently-playing user-read-recently-played user-top-read user-library-read playlist-read-private playlist-read-collaborative user-read-private";
 export const DEFAULT_SPEAKER = "baño";
 
 // PKCE login state is valid only for its own state value and at most 15
@@ -43,14 +45,16 @@ async function tokenRequest(body, fetchImpl) {
   const res = await fetchImpl(TOKEN, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams(body).toString() });
   if (!res.ok) throw Object.assign(new Error("Spotify no ha dado permiso"), { code: "auth" });
   const j = await res.json();
-  return { access: j.access_token, refresh: j.refresh_token ?? body.refresh_token ?? null, expires: Date.now() + (Number(j.expires_in) || 3600) * 1000 };
+  return { access: j.access_token, refresh: j.refresh_token ?? body.refresh_token ?? null, expires: Date.now() + (Number(j.expires_in) || 3600) * 1000, scope: j.scope ?? body.scope ?? null };
 }
 
 export const exchangeCode = ({ clientId, code, redirectUri, verifier }, fetchImpl = fetch) =>
   tokenRequest({ grant_type: "authorization_code", code, redirect_uri: redirectUri, client_id: clientId, code_verifier: verifier }, fetchImpl);
 
-export const refreshTokens = ({ clientId, refresh }, fetchImpl = fetch) =>
-  tokenRequest({ grant_type: "refresh_token", refresh_token: refresh, client_id: clientId }, fetchImpl);
+export const refreshTokens = async ({ clientId, refresh, scope = null }, fetchImpl = fetch) => {
+  const t = await tokenRequest({ grant_type: "refresh_token", refresh_token: refresh, client_id: clientId }, fetchImpl);
+  return { ...t, scope: t.scope ?? scope }; // si Spotify no repite los permisos al renovar, se conservan
+};
 
 // "Baño", "Altavoz baño", "BAÑO (Chromecast)" all match "baño".
 export function findSpeaker(devices, wanted = DEFAULT_SPEAKER) {
