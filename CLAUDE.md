@@ -15,3 +15,8 @@ Claude Code debe leer y cumplir `AGENTS.md` antes de actuar. Si existe conflicto
 ## Límites
 
 Fusiona solo según la regla de fusión de `AGENTS.md` (decisión de Manu del 2026-09-29). No conectes servicios, publiques, despliegues, uses datos personales reales, añadas secretos, generes costes ni amplíes permisos. Detente ante una decisión material de producto o un gate bloqueado.
+
+
+## Entrada compartida
+
+Consultar `README.md`, `docs/README.md` y `docs/COORDINACION.md`. Usar los mismos documentos que ChatGPT; no crear otra fuente paralela de estado o marca. Mantener `ai/PROJECT_STATE.md`, `ai/CURRENT_TASK.md` y `ai/HANDOFF.md` como fuentes técnicas.
